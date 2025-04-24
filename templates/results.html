@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>조 편성 결과</title>
+  <style>
+    :root {
+      --primary: #4a90e2;
+      --card: #fff;
+      --bg: #f7f9fc;
+      --text: #333;
+      --border: #ddd;
+    }
+    * { box-sizing: border-box; margin:0; padding:0; }
+    body {
+      font-family: sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+    }
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 1rem;
+      text-align: center;
+      font-size: 1.2rem;
+    }
+    .container {
+      flex: 1;
+      padding: 1rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      display: flex; flex-direction: column;
+    }
+    .card h2 {
+      margin-bottom: 0.5rem;
+      font-size: 1.1rem;
+      color: var(--primary);
+    }
+    .card ul {
+      list-style: none;
+      margin-bottom: 1rem;
+      flex: 1;
+    }
+    .card li {
+      padding: 0.3rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.95rem;
+    }
+    .card button {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 0.6rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+
+    /* 스크린샷 뷰 */
+    .screenshot-view {
+      display: none;
+      position: fixed; top:0; left:0;
+      width:100%; height:100%;
+      background:#fff; overflow:auto;
+      padding:2rem; box-sizing:border-box;
+      z-index:100;
+    }
+    .screenshot-view.active { display:block; }
+    .screenshot-view .group-block {
+      background: var(--card);
+      border:1px solid var(--border);
+      border-radius:6px;
+      padding:1rem;
+      margin-bottom:1rem;
+      font-size:1.3rem;
+      text-align:center;
+    }
+    .actions {
+      position: fixed; bottom:1rem; left:50%;
+      transform:translateX(-50%);
+      display:flex; gap:1rem;
+    }
+    .actions button {
+      padding:0.6rem 1.2rem;
+      border:none; border-radius:4px;
+      cursor:pointer; font-size:1rem;
+    }
+    .actions .confirm { background: #28a745; color:#fff; }
+    .actions .cancel  { background: #6c757d; color:#fff; }
+
+    .screen-mode .container { display: none; }
+  </style>
+</head>
+<body>
+
+  <header>🧠 조 편성 추천안</header>
+
+  <!-- 추천안 카드 그리드 -->
+  <div class="container">
+    {% for suggestion in suggestions %}
+      <div class="card">
+        <h2>추천안 {{ loop.index }}</h2>
+        <ul>
+          {% for group in suggestion %}
+            <li>
+              {% if group_names and group_names[loop.index0] %}
+                {{ group_names[loop.index0] }}
+              {% else %}
+                그룹 {{ loop.index }}
+              {% endif %}:
+              {{ group|join(', ') }}
+            </li>
+          {% endfor %}
+        </ul>
+        <button onclick='previewSuggestion({{ suggestion|tojson }})'>
+          스크린샷용 미리보기
+        </button>
+      </div>
+    {% endfor %}
+  </div>
+
+  <!-- 스크린샷 전체 화면 뷰 -->
+  <div id="screenshot" class="screenshot-view">
+    <div id="screenshot-groups"></div>
+    <div class="actions">
+      <button class="confirm" onclick="saveAndExit()">저장 후 종료</button>
+      <button class="cancel"  onclick="cancelPreview()">다시 선택</button>
+    </div>
+  </div>
+
+  <script>
+    const present      = {{ present|tojson }};
+    const facilitators = {{ facilitators|tojson }};
+    const groupNames   = {{ group_names|tojson }};
+
+    function previewSuggestion(groups) {
+      document.body.classList.add('screen-mode');
+      const cont = document.getElementById('screenshot-groups');
+      cont.innerHTML = '';
+      groups.forEach((grp, i) => {
+        const d = document.createElement('div');
+        d.className = 'group-block';
+        d.textContent = (groupNames[i]||`그룹 ${i+1}`) + ': ' + grp.join(', ');
+        cont.appendChild(d);
+      });
+      document.getElementById('screenshot').classList.add('active');
+    }
+    function saveAndExit() {
+      const blocks = document.querySelectorAll('.group-block');
+      const groups = Array.from(blocks).map(b=>b.textContent.split(': ')[1].split(', '));
+      fetch('/save',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          date:new Date().toISOString().split('T')[0],
+          groups, present, facilitators
+        })
+      }).then(r=>{
+        if(r.ok) window.location='/'
+        else alert('저장 실패')
+      });
+    }
+    function cancelPreview() {
+      document.body.classList.remove('screen-mode');
+      document.getElementById('screenshot').classList.remove('active');
+    }
+  </script>
+
+</body>
+</html>
+
+
+
