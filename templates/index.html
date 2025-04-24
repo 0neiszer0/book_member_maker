@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>독서모임 조 편성</title>
+</head>
+<body>
+  <h1>📚 독서모임 조 편성</h1>
+
+  <form method="POST">
+    <h3>오늘 오는 사람</h3>
+    {% for m in members %}
+      <label>
+        <input type="checkbox" name="present" value="{{ m.name }}">
+        {{ m.name }}
+      </label><br>
+    {% endfor %}
+
+    <h3>발제자 선택</h3>
+    {% for m in members %}
+      <label>
+        <input type="checkbox" name="facilitators" value="{{ m.name }}">
+        {{ m.name }}
+      </label><br>
+    {% endfor %}
+
+    <br>
+    <button type="submit">조 편성하기</button>
+    <br><br>
+
+    <!-- [더보기] 버튼 -->
+    <details>
+      <summary>⚙️ 더보기: 선호/비선호 설정</summary>
+      <p>추후 구현 예정 (우선 UI만 표시)</p>
+    </details>
+
+  </form>
+</body>
+</html>
