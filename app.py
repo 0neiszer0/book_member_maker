@@ -3,6 +3,18 @@ import itertools
 import random
 import math
 from flask import Flask, render_template, request, jsonify
+from supabase import create_client, Client
+
+# Supabase 연결 설정
+SUPABASE_URL = "https://lzvfkbekhbcqfbknldmo.supabase.co"
+SUPABASE_KEY = ("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+                "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6d"
+                "mZrYmVraGJjcWZia25sZG1vIiwicm9sZSI6Im"
+                "Fub24iLCJpYXQiOjE3NDU3MzQ5MTAsImV4cCI"
+                "6MjA2MTMxMDkxMH0.DT5ldnEqu5krGD1UBsJC"
+                "l7RiEaDrAiUWSW-uZpPHRQQ")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 
 app = Flask(__name__)
 
@@ -124,36 +136,48 @@ def index():
 
 @app.route('/save', methods=['POST'])
 def save():
-    data      = request.json
-    history   = load_json(HISTORY_FILE)
+    data = request.json
+    # 2) Supabase에 기록 추가
+    record = {
+        "date": data["date"],
+        "present": data["present"],
+        "facilitators": data["facilitators"],
+        "groups": data["groups"]
+    }
+    supabase.postgrest.from_("history").insert(record).execute()
+
+    # 3) co_meeting_matrix.json 업데이트 (기존 로직 그대로)
     co_matrix = load_json(CO_MATRIX_FILE)
-    history.append(data)
-    save_json(HISTORY_FILE, history)
     for g in data['groups']:
-        for a, b in itertools.combinations(g,2):
-            key = '-'.join(sorted([a,b]))
+        for a, b in itertools.combinations(g, 2):
+            key   = '-'.join(sorted([a, b]))
             entry = co_matrix.get(key, {'count':0,'last_met':None})
             entry['count']   += 1
             entry['last_met'] = data['date']
             co_matrix[key]   = entry
     save_json(CO_MATRIX_FILE, co_matrix)
+
     return jsonify({'status':'ok'})
 
 @app.route('/api/history', methods=['GET'])
 def api_get_history():
-    history = load_json(HISTORY_FILE)
-    return jsonify(history)
+    # Supabase history 테이블에서 전체 조회
+    # 필요한 대로 order() 를 추가할 수 있습니다 (예: 최신순)
+    response = supabase.postgrest.from_("history").select("*").order("date", desc=True).execute()
+    return jsonify(response.data)
 
 @app.route('/api/history/delete', methods=['POST'])
 def api_delete_history():
-    data    = request.json
-    idx     = data.get('index')
-    history = load_json(HISTORY_FILE)
-    if isinstance(idx,int) and 0<=idx<len(history):
-        history.pop(idx)
-        save_json(HISTORY_FILE, history)
-        return jsonify({'status':'ok'})
-    return jsonify({'status':'error','message':'Invalid index'}),400
+    idx = request.json.get("index")
+    # 1) 삭제 대상 레코드의 id(문자열 uuid) 목록 조회
+    response = supabase.postgrest.from_("history").select("id").order("date", desc=True).execute()
+    records = response.data
+    # 2) index 유효성 검사 후 실제 삭제
+    if isinstance(idx, int) and 0 <= idx < len(records):
+        record_id = records[idx]["id"]
+        supabase.postgrest.from_("history").delete().eq("id", record_id).execute()
+        return jsonify({"status":"ok"})
+    return jsonify({"status":"error","message":"Invalid index"}), 400
 
 if __name__=='__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
