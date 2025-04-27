@@ -62,10 +62,12 @@ def generate_groups(participants, facilitators, members, co_matrix,
     min_groups = math.ceil(total/max_size)
     max_groups = total//min_size
     app.logger.info(f"[GENERATE] computed min_groups={min_groups}, max_groups={max_groups}")
-    if group_count_override and min_groups<=group_count_override<=max_groups:
+    if group_count_override is not None:
         group_count = group_count_override
         app.logger.info(f"override 적용 완료 그룹 수: {group_count}")
     else:
+        min_groups = math.ceil(total / max_size)
+        max_groups = total // min_size
         group_count = min(max(min_groups, len(facilitators)), max_groups)
     if group_count<=0: group_count = min_groups
 
