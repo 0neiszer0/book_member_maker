@@ -116,7 +116,11 @@ def index():
         present      = request.form.getlist('present')
         facilitators = request.form.getlist('facilitators')
         raw = (request.form.get('group_count') or '').strip()
-        group_count_override = int(raw) if raw.isdigit() and int(raw)>0 else None
+        try:
+            gc = int(raw)
+            group_count_override = gc if gc > 0 else None
+        except ValueError:
+            group_count_override = None
         raw_names   = request.form.get('group_names') or ''
         group_names = [n.strip() for n in raw_names.split(',') if n.strip()]
         members_dict= {m['name']:m for m in members_list}
