@@ -50,9 +50,7 @@
       display: flex; align-items: center;
       background: var(--bg); padding: 0.5rem; border-radius:4px;
     }
-    .form-check input {
-      margin-right: 0.5rem;
-    }
+    .form-check input { margin-right: 0.5rem; }
     .controls {
       margin-bottom: 0.5rem;
       text-align: right;
@@ -67,9 +65,7 @@
       margin-left: 0.5rem;
       cursor: pointer;
     }
-    .controls button.secondary {
-      background: #999;
-    }
+    .controls button.secondary { background: #999; }
     .settings {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -154,18 +150,105 @@
     <button type="submit" class="btn-submit">조 편성하기</button>
   </form>
 
+  <!-- 이전 기록 삭제 전용 -->
+  <div style="margin-top:1rem; text-align:right;">
+    <button type="button" id="manage-history-btn">🗂️ 이전 기록 관리</button>
+  </div>
+
+  <dialog id="history-dialog"
+          style="width:90%;max-width:600px;padding:1rem;
+                 border:none;border-radius:8px;">
+    <h3>📜 이전 모임 기록 조회/삭제</h3>
+    <div id="history-list"
+         style="min-height:100px;max-height:300px;overflow:auto;
+                border:1px solid #ccc;border-radius:4px;padding:8px;">
+      로딩 중…
+    </div>
+    <div style="text-align:right;margin-top:1rem;">
+      <button type="button" id="history-close">닫기</button>
+    </div>
+  </dialog>
+
   <script>
-    document.getElementById('select-all-present').onclick = () =>
-      document.querySelectorAll('input[name="present"]').forEach(cb=>cb.checked=true);
-    document.getElementById('deselect-all-present').onclick = () =>
-      document.querySelectorAll('input[name="present"]').forEach(cb=>cb.checked=false);
-    document.getElementById('select-all-facilitators').onclick = () =>
-      document.querySelectorAll('input[name="facilitators"]').forEach(cb=>cb.checked=true);
-    document.getElementById('deselect-all-facilitators').onclick = () =>
-      document.querySelectorAll('input[name="facilitators"]').forEach(cb=>cb.checked=false);
+    // 전체 선택/해제
+    document.getElementById('select-all-present').onclick =
+      () => document.querySelectorAll('input[name="present"]')
+               .forEach(cb=>cb.checked=true);
+    document.getElementById('deselect-all-present').onclick =
+      () => document.querySelectorAll('input[name="present"]')
+               .forEach(cb=>cb.checked=false);
+    document.getElementById('select-all-facilitators').onclick =
+      () => document.querySelectorAll('input[name="facilitators"]')
+               .forEach(cb=>cb.checked=true);
+    document.getElementById('deselect-all-facilitators').onclick =
+      () => document.querySelectorAll('input[name="facilitators"]')
+               .forEach(cb=>cb.checked=false);
+  </script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const btnOpen  = document.getElementById('manage-history-btn');
+      const dialog   = document.getElementById('history-dialog');
+      const btnClose = document.getElementById('history-close');
+      const listDiv  = document.getElementById('history-list');
+
+      // 모달 열기 & 기록 로드
+      btnOpen.addEventListener('click', () => {
+        listDiv.textContent = '로딩 중…';
+        dialog.showModal();
+        fetch('/api/history')
+          .then(res => res.ok ? res.json() : Promise.reject(res.statusText))
+          .then(data => {
+            listDiv.innerHTML = '';
+            if (!data.length) {
+              listDiv.textContent = '저장된 기록이 없습니다.';
+              return;
+            }
+            data.forEach((rec, idx) => {
+              const row = document.createElement('div');
+              row.style.cssText = 'display:flex;justify-content:space-between;padding:4px 0;';
+              row.innerHTML = `
+                <span><strong>${rec.date}</strong> —
+                  ${rec.groups.map(g=>g.join(', ')).join(' | ')}
+                </span>
+                <button data-idx="${idx}"
+                        style="background:#e74c3c;color:#fff;border:none;
+                               padding:4px 8px;border-radius:4px;cursor:pointer;">
+                  삭제
+                </button>`;
+              listDiv.appendChild(row);
+            });
+            // 삭제 버튼 바인딩
+            listDiv.querySelectorAll('button').forEach(b => {
+              b.onclick = () => {
+                const i = +b.dataset.idx;
+                fetch('/api/history/delete', {
+                  method:'POST',
+                  headers:{'Content-Type':'application/json'},
+                  body: JSON.stringify({index: i})
+                })
+                .then(r => r.json())
+                .then(j => {
+                  if (j.status==='ok') btnOpen.click();
+                  else alert('삭제 실패');
+                })
+                .catch(e => alert('삭제 오류: '+e));
+              };
+            });
+          })
+          .catch(e => {
+            listDiv.textContent = '불러오기 실패';
+            console.error(e);
+          });
+      });
+
+      // 모달 닫기
+      btnClose.addEventListener('click', () => dialog.close());
+    });
   </script>
 
 </body>
 </html>
+
 
 
