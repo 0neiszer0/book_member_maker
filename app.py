@@ -3,16 +3,12 @@ import itertools
 import random
 import math
 from flask import Flask, render_template, request, jsonify
+import os
 from supabase import create_client, Client
 
 # Supabase 연결 설정
-SUPABASE_URL = "https://lzvfkbekhbcqfbknldmo.supabase.co"
-SUPABASE_KEY = ("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-                "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6d"
-                "mZrYmVraGJjcWZia25sZG1vIiwicm9sZSI6Im"
-                "Fub24iLCJpYXQiOjE3NDU3MzQ5MTAsImV4cCI"
-                "6MjA2MTMxMDkxMH0.DT5ldnEqu5krGD1UBsJC"
-                "l7RiEaDrAiUWSW-uZpPHRQQ")
+SUPABASE_URL = os.environ.get('SUPABASE_URL')
+SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
