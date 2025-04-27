@@ -54,13 +54,17 @@ def generate_groups(participants, facilitators, members, co_matrix,
                     group_count_override=None,
                     group_size_range=(3,5),
                     top_n=5):
+    app.logger.info(f"[GENERATE] called with override={group_count_override}, "
+                    f"participants={len(participants)}, facilitators={len(facilitators)}")
     total = len(participants:=participants.copy())
     min_size, max_size = group_size_range
 
     min_groups = math.ceil(total/max_size)
     max_groups = total//min_size
+    app.logger.info(f"[GENERATE] computed min_groups={min_groups}, max_groups={max_groups}")
     if group_count_override and min_groups<=group_count_override<=max_groups:
         group_count = group_count_override
+        app.logger.info(f"override 적용 완료 그룹 수: {group_count}")
     else:
         group_count = min(max(min_groups, len(facilitators)), max_groups)
     if group_count<=0: group_count = min_groups
@@ -121,6 +125,7 @@ def index():
             group_count_override = gc if gc > 0 else None
         except ValueError:
             group_count_override = None
+        app.logger.info(f"[INDEX] raw group_count='{raw}', parsed override={group_count_override}")
         raw_names   = request.form.get('group_names') or ''
         group_names = [n.strip() for n in raw_names.split(',') if n.strip()]
         members_dict= {m['name']:m for m in members_list}
