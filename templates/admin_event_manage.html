@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>슬롯 생성 관리</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-4 md:p-8 max-w-4xl">
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800">{{ event.event_name }}</h1>
+                <p class="text-gray-500">이벤트 기간: {{ event.start_date }} ~ {{ event.end_date }}</p>
+            </div>
+            <a href="{{ url_for('admin_dashboard') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">대시보드로 돌아가기</a>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}
+                <div class="p-4 mb-4 text-sm rounded-lg {{ 'bg-green-100 text-green-700' if category == 'success' else 'bg-red-100 text-red-700' if category == 'danger' else 'bg-yellow-100 text-yellow-700' }}" role="alert">{{ message }}</div>
+            {% endfor %}{% endif %}
+        {% endwith %}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-xl font-bold mb-1">시간 슬롯 일괄 생성</h2>
+                <p class="text-sm text-gray-500 mb-4">선택한 기간과 시간에 15분 단위로 면접 시간을 자동으로 생성합니다.</p>
+
+                <form action="{{ url_for('generate_slots', event_id=event.id) }}" method="post" class="space-y-4">
+                    <div>
+                        <label for="start_date" class="block text-sm font-medium text-gray-700">날짜 범위 선택 (주말 제외)</label>
+                        <div class="flex items-center space-x-2 mt-1">
+                            <input type="date" name="start_date" id="start_date" value="{{ event.start_date }}" min="{{ event.start_date }}" max="{{ event.end_date }}" required class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                            <span>~</span>
+                            <input type="date" name="end_date" id="end_date" value="{{ event.end_date }}" min="{{ event.start_date }}" max="{{ event.end_date }}" required class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">시간 범위 선택</label>
+                        <div class="flex items-center space-x-2 mt-1">
+                            <!-- [수정] JavaScript로 동적 옵션을 채울 빈 드롭다운 메뉴 -->
+                            <select name="start_time" id="start_time" required class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"></select>
+                            <span>~</span>
+                            <select name="end_time" id="end_time" required class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"></select>
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-lg transition-colors duration-200">
+                        슬롯 생성하기
+                    </button>
+                </form>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-xl font-bold mb-4">생성된 슬롯 현황</h2>
+                <div class="max-h-80 overflow-y-auto space-y-2 pr-2">
+                    {% if slots_summary %}
+                        {% for date, count in slots_summary.items()|sort %}
+                        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-md">
+                            <span class="font-medium text-gray-700">{{ date }}</span>
+                            <span class="text-sm font-semibold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">{{ count }}개 슬롯</span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-center text-gray-500 py-10">아직 생성된 슬롯이 없습니다.</p>
+                    {% endif %}
+                </div>
+                 <div class="mt-4 text-center">
+                    <a href="{{ url_for('admin_event_timetable', event_id=event.id) }}" class="text-indigo-600 hover:text-indigo-800 font-semibold">전체 타임테이블 보기 &rarr;</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+// [신규] 페이지 로드 시, 시간 드롭다운을 동적으로 생성하는 JavaScript
+document.addEventListener('DOMContentLoaded', () => {
+    const startTimeSelect = document.getElementById('start_time');
+    const endTimeSelect = document.getElementById('end_time');
+
+    // 00:00 부터 23:45 까지 15분 간격으로 시간 옵션을 생성하는 함수
+    function populateTimeOptions(selectElement) {
+        for (let hour = 0; hour < 24; hour++) {
+            for (let minute = 0; minute < 60; minute += 15) {
+                const hourStr = String(hour).padStart(2, '0');
+                const minuteStr = String(minute).padStart(2, '0');
+                const timeValue = `${hourStr}:${minuteStr}`;
+
+                let ampm = hour < 12 ? '오전' : '오후';
+                let displayHour = hour % 12;
+                if (displayHour === 0) { displayHour = 12; } // 0시는 12시로 표시
+
+                const displayTime = `${ampm} ${String(displayHour).padStart(2, '0')}:${minuteStr}`;
+
+                const option = document.createElement('option');
+                option.value = timeValue;
+                option.textContent = displayTime;
+                selectElement.appendChild(option);
+            }
+        }
+    }
+
+    // 시작 시간과 종료 시간 드롭다운에 옵션 채우기
+    populateTimeOptions(startTimeSelect);
+    populateTimeOptions(endTimeSelect);
+
+    // 기본값 설정 (예: 오전 10시 ~ 오후 5시)
+    startTimeSelect.value = '10:00';
+    endTimeSelect.value = '17:00';
+});
+</script>
+</body>
+</html>

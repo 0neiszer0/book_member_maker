@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ event.event_name }} - 타임테이블</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        tr.slot.closed { background-color: #fecaca; }
+        tr.slot.closed td { text-decoration: line-through; color: #9ca3af; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-4 md:p-8">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-gray-800">{{ event.event_name }} 타임테이블</h1>
+            <a href="{{ url_for('admin_dashboard' if user_role == 'admin' else 'interviewer_events_list') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">목록으로</a>
+        </div>
+        <div id="timetable-container" class="space-y-8"><div class="loader"></div></div>
+    </div>
+
+    <!-- 면접관 배정 모달을 위한 컨테이너 -->
+    <div id="modal-container" class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full hidden z-50"></div>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    const eventId = '{{ event_id }}';
+    const userRole = '{{ user_role }}';
+    const currentUserName = '{{ session.user_name }}';
+    const allInterviewers = {{ all_interviewers|tojson|safe if user_role == 'admin' and all_interviewers else '[]' }};
+    const container = document.getElementById('timetable-container');
+    const modalContainer = document.getElementById('modal-container');
+
+    async function fetchData(showLoader = true) {
+        try {
+            if (showLoader) { container.innerHTML = '<div class="loader"></div>'; }
+            const response = await fetch(`/api/events/${eventId}/timetable_data`);
+            if (!response.ok) {
+                const errorResult = await response.json();
+                throw new Error(errorResult.error || '데이터를 불러오는데 실패했습니다.');
+            }
+            return await response.json();
+        } catch (error) {
+            container.innerHTML = `<p class="text-red-500 text-center">${error.message}</p>`;
+            return null;
+        }
+    }
+
+    function renderTimetable(slots) {
+        container.innerHTML = '';
+        if (!slots || slots.length === 0) {
+            container.innerHTML = '<div class="bg-white p-6 rounded-lg shadow-md text-center"><p class="text-gray-500">생성된 슬롯이 없습니다.</p></div>'; return;
+        }
+        const slotsByDate = slots.reduce((acc, slot) => {
+            const date = new Date(slot.slot_datetime).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+            if (!acc[date]) acc[date] = []; acc[date].push(slot); return acc;
+        }, {});
+
+        Object.keys(slotsByDate).sort().forEach(date => {
+            const dateBlock = document.createElement('div');
+            dateBlock.className = 'bg-white p-6 rounded-lg shadow-md';
+            let tableHTML = `<h2 class="text-xl font-bold mb-4 text-indigo-600">${date}</h2><div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">시간</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">예약자 정보</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">배정된 면접관</th><th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">관리</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
+
+            slotsByDate[date].forEach(slot => {
+                const time = slot.time_display || '시간오류';
+                const applicantInfo = slot.applicant ? `${slot.applicant.name}(${slot.applicant.phone_number})` : '<span class="text-gray-400">예약 없음</span>';
+                const interviewerInfo = slot.interviewer_names ? `<span class="font-semibold">${slot.interviewer_names}</span>` : '<span class="text-gray-400">미배정</span>';
+                let actionControls = '-';
+
+                if (userRole === 'admin') {
+                    const assignBtn = `<button data-slot-id="${slot.id}" data-assigned-ids='${JSON.stringify(slot.interviewer_ids || [])}' class="admin-assign-btn text-white text-xs font-bold py-1 px-2 rounded bg-purple-500 hover:bg-purple-600">배정</button>`;
+                    const cancelBtn = slot.is_booked ? `<button data-slot-id="${slot.id}" class="cancel-reservation-btn text-white text-xs font-bold py-1 px-2 rounded bg-yellow-500 hover:bg-yellow-600 ml-2">예약취소</button>` : '';
+                    const toggleBtnText = slot.is_active ? '닫기' : '열기';
+                    const toggleBtnClass = slot.is_active ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600';
+                    const toggleBtn = `<button data-slot-id="${slot.id}" data-active="${slot.is_active}" class="toggle-slot-btn text-white text-xs font-bold py-1 px-2 rounded ${toggleBtnClass} ml-2">${toggleBtnText}</button>`;
+                    actionControls = `<div class="flex items-center justify-center">${assignBtn}${cancelBtn}${toggleBtn}</div>`;
+                } else if (userRole === 'interviewer' && slot.is_active) {
+                    const isAlreadyAssigned = (slot.interviewer_names || '').includes(currentUserName);
+                    if (!isAlreadyAssigned) {
+                        actionControls = `<button data-slot-id="${slot.id}" class="assign-me-btn text-white text-xs font-bold py-1 px-2 rounded bg-blue-500 hover:bg-blue-600">참여하기</button>`;
+                    } else {
+                        actionControls = `<span class="text-green-600 font-bold text-xs">참여중</span>`;
+                    }
+                }
+
+                tableHTML += `<tr class="slot ${!slot.is_active ? 'closed' : ''}"><td class="px-4 py-2 whitespace-nowrap text-sm font-medium">${time}</td><td class="px-4 py-2 whitespace-nowrap text-sm">${applicantInfo}</td><td class="px-4 py-2 whitespace-nowrap text-sm">${interviewerInfo}</td><td class="px-4 py-2 whitespace-nowrap text-sm text-center">${actionControls}</td></tr>`;
+            });
+            tableHTML += `</tbody></table></div>`;
+            dateBlock.innerHTML = tableHTML;
+            container.appendChild(dateBlock);
+        });
+    }
+
+    function showInterviewerModal(slotId, assignedIds) {
+        let checkboxesHTML = '';
+        allInterviewers.forEach(interviewer => {
+            const isChecked = assignedIds.includes(interviewer.id) ? 'checked' : '';
+            checkboxesHTML += `<label class="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-100"><input type="checkbox" value="${interviewer.id}" class="interviewer-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded" ${isChecked}><span>${interviewer.name}</span></label>`;
+        });
+        const modalContent = `<div class="p-4"><h3 class="text-lg font-bold">면접관 배정</h3><div class="mt-4 space-y-2 max-h-60 overflow-y-auto">${checkboxesHTML}</div><div class="mt-6 flex justify-end space-x-3"><button id="cancel-modal-btn" class="px-4 py-2 bg-gray-200 rounded-md text-sm font-medium hover:bg-gray-300">취소</button><button id="save-interviewers-btn" data-slot-id="${slotId}" class="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700">저장</button></div></div>`;
+        modalContainer.innerHTML = `<div class="relative top-20 mx-auto w-full max-w-md bg-white rounded-lg shadow-xl">${modalContent}</div>`;
+        modalContainer.classList.remove('hidden');
+        document.getElementById('cancel-modal-btn').onclick = () => modalContainer.classList.add('hidden');
+        document.getElementById('save-interviewers-btn').onclick = handleSaveInterviewers;
+    }
+
+    async function handleSaveInterviewers(e) {
+        const slotId = e.target.dataset.slotId;
+        const selectedIds = Array.from(document.querySelectorAll('.interviewer-checkbox:checked')).map(cb => cb.value);
+        await performAction(`/api/admin/slots/${slotId}/update_interviewers`, { interviewer_ids: selectedIds });
+        modalContainer.classList.add('hidden');
+    }
+
+    async function performAction(url, body, confirmMessage) {
+        if (confirmMessage && !confirm(confirmMessage)) return;
+        try {
+            const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message || '작업 실패');
+            const updatedData = await fetchData(false);
+            if(updatedData) renderTimetable(updatedData);
+        } catch (error) {
+            alert(`오류: ${error.message}`);
+            const updatedData = await fetchData(false);
+            if(updatedData) renderTimetable(updatedData);
+        }
+    }
+
+    function handleEvents(e) {
+        const target = e.target;
+        let url, body, confirmMessage;
+
+        if (target.matches('.admin-assign-btn')) {
+            showInterviewerModal(target.dataset.slotId, JSON.parse(target.dataset.assignedIds)); return;
+        } else if (target.matches('.toggle-slot-btn')) {
+            confirmMessage = '정말로 이 시간의 예약 가능 상태를 변경하시겠습니까?';
+            url = `/api/admin/slots/${target.dataset.slotId}/toggle_active`;
+            body = { is_active: !(target.dataset.active === 'true') };
+        } else if (target.matches('.assign-me-btn')) {
+            confirmMessage = '이 시간에 면접관으로 참여하시겠습니까?';
+            url = `/api/interviewer/slots/${target.dataset.slotId}/assign`;
+            body = {};
+        } else if (target.matches('.cancel-reservation-btn')) {
+            confirmMessage = '정말로 이 예약을 취소하시겠습니까?';
+            url = `/api/admin/reservations/${target.dataset.slotId}/cancel`;
+            body = {};
+        } else { return; }
+
+        target.disabled = true;
+        performAction(url, body, confirmMessage);
+    }
+
+    const initialData = await fetchData(true);
+    if(initialData) {
+        renderTimetable(initialData);
+        container.addEventListener('click', handleEvents);
+    }
+});
+</script>
+</body>
+</html>
