@@ -6,21 +6,22 @@
     <title>관리자 대시보드</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* 면접관 지정 토글을 위한 CSS */
-        input.interviewer-toggle:checked ~ .dot { transform: translateX(1.25rem); background-color: #ffffff; }
-        input.interviewer-toggle:checked ~ .block { background-color: #34d399; /* green-400 */ }
-        /* 이벤트 활성화 토글을 위한 CSS */
+        /* 토글 스위치를 위한 CSS */
+        input:checked ~ .dot { transform: translateX(1.25rem); }
+        input:checked ~ .block { background-color: #34d399; }
         input.event-toggle:checked + div { background-color: #34d399; }
         input.event-toggle:checked + div:after { transform: translateX(100%); }
     </style>
 </head>
-<body class="bg-gray-100">
-    <div class="container mx-auto p-4 md:p-8">
-        <div class="flex justify-between items-center mb-8">
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <!-- [수정] 모바일 화면에서 제목과 버튼이 세로로 정렬되도록 flex-col, sm:flex-row 추가 -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
             <h1 class="text-3xl font-bold text-gray-800">관리자 대시보드</h1>
-            <div>
-                <a href="/making_team" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg mr-2">독서 모임 조 편성</a>
-                <a href="/logout" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">로그아웃</a>
+            <!-- [수정] 모바일에서 버튼들이 꽉 차도록 w-full, sm:w-auto 추가 -->
+            <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <a href="/making_team" class="w-full sm:w-auto text-center bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">독서 모임 조 편성</a>
+                <a href="/logout" class="w-full sm:w-auto text-center bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">로그아웃</a>
             </div>
         </div>
 
@@ -31,36 +32,32 @@
         {% endwith %}
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
             <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-xl font-bold mb-4">이벤트 목록</h2>
                 <div class="overflow-x-auto">
-                    <!-- [수정] 이벤트 테이블에 ID를 부여하고, 컬럼을 추가합니다. -->
                     <table class="min-w-full divide-y divide-gray-200" id="events-table">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">이벤트 이름</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">기간</th>
-                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">활성화</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">관리</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">이벤트</th>
+                                <th class="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">기간</th>
+                                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">활성화</th>
+                                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">관리</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
                             {% for event in events %}
                             <tr data-event-id="{{ event.id }}">
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ event.event_name }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ event.start_date }} ~ {{ event.end_date }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-center">
-                                    <!-- [추가] 이벤트 활성화/비활성화 토글 스위치 -->
+                                <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ event.event_name }}</td>
+                                <td class="hidden md:table-cell px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{ event.start_date }} ~ {{ event.end_date }}</td>
+                                <td class="px-4 py-4 whitespace-nowrap text-center">
                                     <label class="relative inline-flex items-center cursor-pointer">
                                         <input type="checkbox" class="sr-only peer event-toggle" data-event-id="{{ event.id }}" {% if event.is_active %}checked{% endif %}>
-                                        <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                                        <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
                                     </label>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <a href="{{ url_for('admin_event_timetable', event_id=event.id) }}" class="text-indigo-600 hover:text-indigo-900 mr-4">타임테이블</a>
-                                    <a href="{{ url_for('manage_event', event_id=event.id) }}" class="text-gray-600 hover:text-gray-900 mr-4">슬롯생성</a>
-                                    <!-- [추가] 이벤트 삭제 버튼 -->
+                                <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <a href="{{ url_for('admin_event_timetable', event_id=event.id) }}" class="text-indigo-600 hover:text-indigo-900 mr-2">타임테이블</a>
+                                    <a href="{{ url_for('manage_event', event_id=event.id) }}" class="text-gray-600 hover:text-gray-900 mr-2">슬롯생성</a>
                                     <button class="delete-event-btn text-red-600 hover:text-red-800" data-event-id="{{ event.id }}" data-event-name="{{ event.event_name }}">삭제</button>
                                 </td>
                             </tr>
@@ -102,7 +99,7 @@
                             <span class="font-semibold text-gray-800">{{ member.name }}</span>
                             <div class="relative">
                                 <input type="checkbox" class="sr-only interviewer-toggle" data-name="{{ member.name }}" {% if member.name in interviewer_names %}checked{% endif %}>
-                                <div class="block bg-gray-300 w-12 h-6 rounded-full"></div>
+                                <div class="block bg-gray-200 w-12 h-6 rounded-full"></div>
                                 <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition"></div>
                             </div>
                         </label>
@@ -114,10 +111,8 @@
             </div>
         </div>
     </div>
-
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // 면접관 지정 토글을 위한 스크립트
     const toggleList = document.getElementById('interviewer-toggle-list');
     if(toggleList) {
         toggleList.addEventListener('change', (e) => {
@@ -125,22 +120,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const checkbox = e.target;
                 const memberName = checkbox.dataset.name;
                 const originalState = checkbox.checked;
-                fetch('/api/admin/toggle_interviewer', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: memberName })
-                })
-                .then(response => {
-                    if (!response.ok) { checkbox.checked = !originalState; alert('오류가 발생했습니다.'); }
-                    return response.json();
-                })
+                fetch('/api/admin/toggle_interviewer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: memberName }) })
+                .then(response => { if (!response.ok) { checkbox.checked = !originalState; alert('오류가 발생했습니다.'); } return response.json(); })
                 .then(data => { if (data.status === 'error') { checkbox.checked = !originalState; alert('오류: ' + data.message); }})
                 .catch(error => { checkbox.checked = !originalState; console.error('Error:', error); });
             }
         });
     }
 
-    // [추가] 이벤트 관리(활성화/삭제)를 위한 스크립트
     const eventsTable = document.getElementById('events-table');
     if(eventsTable) {
         eventsTable.addEventListener('change', (e) => {
@@ -148,15 +135,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const checkbox = e.target;
                 const eventId = checkbox.dataset.eventId;
                 const newActiveState = checkbox.checked;
-                fetch(`/api/admin/events/${eventId}/toggle_active`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ is_active: newActiveState })
-                })
-                .then(response => {
-                    if (!response.ok) { checkbox.checked = !newActiveState; alert('상태 변경에 실패했습니다.'); }
-                    // 성공 시 새로고침 없이 UI 유지
-                });
+                fetch(`/api/admin/events/${eventId}/toggle_active`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: newActiveState })})
+                .then(response => { if (!response.ok) { checkbox.checked = !newActiveState; alert('상태 변경에 실패했습니다.'); } });
             }
         });
 
@@ -166,17 +146,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const eventId = button.dataset.eventId;
                 const eventName = button.dataset.eventName;
                 if (confirm(`정말로 '${eventName}' 이벤트를 삭제하시겠습니까?\n이벤트에 속한 모든 시간 슬롯과 예약 정보가 함께 삭제되며, 이 작업은 되돌릴 수 없습니다.`)) {
-                    fetch(`/api/admin/events/${eventId}/delete`, {
-                        method: 'POST'
-                    })
+                    fetch(`/api/admin/events/${eventId}/delete`, { method: 'POST' })
                     .then(response => response.json())
                     .then(data => {
-                        if (data.status === 'success') {
-                            button.closest('tr').remove();
-                            alert('이벤트가 삭제되었습니다.');
-                        } else {
-                            alert('삭제 실패: ' + data.message);
-                        }
+                        if (data.status === 'success') { button.closest('tr').remove(); alert('이벤트가 삭제되었습니다.'); }
+                        else { alert('삭제 실패: ' + data.message); }
                     })
                     .catch(error => console.error('Error:', error));
                 }
