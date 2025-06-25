@@ -9,9 +9,10 @@ import math
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
 from supabase import create_client, Client
-from datetime import datetime, timedelta, time, timezone
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 import requests
+import re
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
@@ -122,6 +123,7 @@ def login():
         INTERVIEWER_PASS = os.environ.get("INTERVIEWER_PASSWORD")
         APPLICANT_PASS = os.environ.get("APPLICANT_PASSWORD")
 
+        # 역할 1: 관리자 로그인 (기존과 동일)
         if role == 'admin' and password == ADMIN_PASS:
             session.clear()
             session['user_role'] = 'admin'
@@ -129,28 +131,57 @@ def login():
             flash('관리자님, 환영합니다!', 'success')
             return redirect(url_for('admin_dashboard'))
 
+        # 역할 2: 면접관 로그인
         elif role == 'interviewer' and password == INTERVIEWER_PASS:
             interviewer_name = request.form.get('name')
             if not interviewer_name:
                 flash('면접관 이름을 입력해주세요.', 'danger')
                 return redirect(url_for('login'))
+
+            # [추가] 입력한 이름이 'members' 테이블에 존재하는지 확인합니다.
+            try:
+                member_res = supabase.table('members').select('name').eq('name', interviewer_name).execute()
+                if not member_res.data:
+                    flash('등록된 모임원이 아닙니다. 관리자에게 문의하세요.', 'danger')
+                    return redirect(url_for('login'))
+            except Exception as e:
+                flash('사용자 확인 중 오류가 발생했습니다.', 'danger')
+                app.logger.error(f"Error checking member: {e}")
+                return redirect(url_for('login'))
+
             session.clear()
             session['user_role'] = 'interviewer'
             session['user_name'] = interviewer_name
             flash(f"{session['user_name']} 면접관님, 환영합니다!", 'success')
             return redirect(url_for('interviewer_events_list'))
 
+        # 역할 3: 면접자 로그인
         elif role == 'applicant' and password == APPLICANT_PASS:
+            name = request.form.get('name')
+            phone = request.form.get('phone_number')
+
+            # [추가] 이름과 전화번호 형식 유효성 검사
+            if not (name and phone):
+                flash('이름과 연락처를 모두 입력해주세요.', 'danger')
+                return redirect(url_for('login'))
+
+            if not re.match(r'^[가-힣]{2,4}$', name):
+                flash('이름은 2~4자의 한글로 입력해주세요.', 'danger')
+                return redirect(url_for('login'))
+
+            if not re.match(r'^\d{11}$', phone):
+                flash('연락처는 11자리 숫자로 입력해주세요. (예: 01012345678)', 'danger')
+                return redirect(url_for('login'))
+
             session.clear()
             session['user_role'] = 'applicant'
-            session['user_name'] = request.form.get('name')
-            session['user_phone'] = request.form.get('phone_number')
+            session['user_name'] = name
+            session['user_phone'] = phone
             flash(f"{session['user_name']}님, 환영합니다!", 'success')
             return redirect(url_for('interview_index'))
 
         else:
             flash('입력 정보가 올바르지 않습니다.', 'danger')
-            return redirect(url_for('login'))
 
     return render_template('login.html')
 

@@ -60,23 +60,36 @@
             const roleSelect = document.getElementById('role');
             const additionalFields = document.getElementById('additional-fields');
 
-            const fields = {
-                admin: '',
-                interviewer: `
-                    <div class="mb-4">
-                        <label for="name" class="block text-gray-700 text-sm font-bold mb-2">이름</label>
-                        <input type="text" id="name" name="name" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    </div>`,
-                applicant: `
-                    <div class="mb-4">
-                        <label for="name" class="block text-gray-700 text-sm font-bold mb-2">이름</label>
-                        <input type="text" id="name" name="name" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    </div>
-                    <div class="mb-4">
-                        <label for="phone_number" class="block text-gray-700 text-sm font-bold mb-2">연락처</label>
-                        <input type="tel" id="phone_number" name="phone_number" required placeholder="01012345678" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    </div>`
-            };
+const fields = {
+    admin: '',
+    interviewer: `
+        <div class="mb-4">
+            <label for="name" class="block text-gray-700 text-sm font-bold mb-2">이름</label>
+            <!-- [수정] 한글 이름 2~4자 패턴과 title 속성을 추가합니다. -->
+            <input type="text" id="name" name="name" required
+                   pattern="^[가-힣]{2,4}$"
+                   title="이름은 2~4자의 한글로 입력해주세요."
+                   class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>`,
+    applicant: `
+        <div class="mb-4">
+            <label for="name" class="block text-gray-700 text-sm font-bold mb-2">이름</label>
+            <!-- [수정] 한글 이름 2~4자 패턴과 title 속성을 추가합니다. -->
+            <input type="text" id="name" name="name" required
+                   pattern="^[가-힣]{2,4}$"
+                   title="이름은 2~4자의 한글로 입력해주세요."
+                   class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
+        <div class="mb-4">
+            <label for="phone_number" class="block text-gray-700 text-sm font-bold mb-2">연락처</label>
+            <!-- [수정] 11자리 숫자 패턴과 title 속성을 추가합니다. -->
+            <input type="tel" id="phone_number" name="phone_number" required
+                   placeholder="01012345678"
+                   pattern="^\\d{11}$"
+                   title="연락처는 11자리 숫자로 입력해주세요. (예: 01012345678)"
+                   class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>`
+};
 
             function updateFields() {
                 const selectedRole = roleSelect.value;
