@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>독서모임 조 편성 결과 (GA)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-gray-800">조 편성 결과</h1>
+            <a href="/making_team" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">다시 편성하기</a>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- 성비 우선 결과 -->
+            <section>
+                <h2 class="text-2xl font-semibold mb-4 text-center text-blue-600">성비 우선 조합</h2>
+                {% if gender_solutions %}
+                    {% for result in gender_solutions %}
+                        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                            <div class="flex justify-between items-center mb-3">
+                                <h3 class="text-lg font-bold">추천안 {{ loop.index }}</h3>
+                                <span class="text-sm font-semibold bg-blue-100 text-blue-800 px-3 py-1 rounded-full">총점: {{ result.score }}</span>
+                            </div>
+                            <p class="text-xs text-gray-500 mb-3">세부 점수 (성비, 새만남, 발제자, 선호도): {{ result.details|join(', ') }}</p>
+                            <div class="space-y-2">
+                                {% for group in result.groups %}
+                                    <div class="p-2 bg-gray-50 rounded">
+                                        <strong class="text-gray-700">그룹 {{ loop.index }}:</strong> {{ group|join(', ') }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            <button onclick="saveGroups({{ result.groups|tojson }})" class="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded-lg">이 조합으로 저장</button>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-center text-gray-500">결과를 생성하지 못했습니다.</p>
+                {% endif %}
+            </section>
+
+            <!-- 새로운 만남 우선 결과 -->
+            <section>
+                <h2 class="text-2xl font-semibold mb-4 text-center text-green-600">새로운 만남 우선 조합</h2>
+                {% if new_face_solutions %}
+                    {% for result in new_face_solutions %}
+                        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                            <div class="flex justify-between items-center mb-3">
+                                <h3 class="text-lg font-bold">추천안 {{ loop.index }}</h3>
+                                <span class="text-sm font-semibold bg-green-100 text-green-800 px-3 py-1 rounded-full">총점: {{ result.score }}</span>
+                            </div>
+                            <p class="text-xs text-gray-500 mb-3">세부 점수 (성비, 새만남, 발제자, 선호도): {{ result.details|join(', ') }}</p>
+                            <div class="space-y-2">
+                                {% for group in result.groups %}
+                                    <div class="p-2 bg-gray-50 rounded">
+                                        <strong class="text-gray-700">그룹 {{ loop.index }}:</strong> {{ group|join(', ') }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            <button onclick="saveGroups({{ result.groups|tojson }})" class="mt-4 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 rounded-lg">이 조합으로 저장</button>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                     <p class="text-center text-gray-500">결과를 생성하지 못했습니다.</p>
+                {% endif %}
+            </section>
+        </div>
+    </div>
+
+<script>
+    const present = {{ present|tojson }};
+    const facilitators = {{ facilitators|tojson }};
+
+    async function saveGroups(groups) {
+        if (!confirm("이 조 편성 결과를 저장하시겠습니까?")) return;
+
+        const dataToSave = {
+            date: new Date().toISOString().slice(0, 10),
+            present: present,
+            facilitators: facilitators,
+            groups: groups
+        };
+
+        try {
+            const response = await fetch('/api/bookclub/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dataToSave)
+            });
+            const result = await response.json();
+            if (result.status === 'ok') {
+                alert('성공적으로 저장되었습니다!');
+                window.location.href = "/making_team";
+            } else {
+                throw new Error(result.message || '저장에 실패했습니다.');
+            }
+        } catch (error) {
+            alert('오류: ' + error.message);
+        }
+    }
+</script>
+</body>
+</html>
