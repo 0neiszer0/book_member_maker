@@ -3,3 +3,6 @@ supabase
 gunicorn
 python-dotenv
 requests
+pandas
+numpy
+deap

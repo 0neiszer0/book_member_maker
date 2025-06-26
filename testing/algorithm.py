@@ -175,9 +175,11 @@ def run_ga_for_philosophy(weights, philosophy_name, num_results=3):
     toolbox.register("mutate", combined_mutation)
     toolbox.register("select", tools.selTournament, tournsize=3)
 
-    pop_size, num_generation, mut_prob = 800, 200, 0.4
+    # ★★★★★ [수정됨] 알고리즘 탐색 능력 강화 ★★★★★
+    pop_size, num_generation, mut_prob = 1200, 200, 0.6  # 개체 수와 돌연변이 확률 증가
+
     pop = toolbox.population(n=pop_size)
-    hall_of_fame = tools.HallOfFame(20)  # 명예의 전당 크기를 늘려 더 많은 후보 확보
+    hall_of_fame = tools.HallOfFame(20)
     algorithms.eaSimple(pop, toolbox, cxpb=0.7, mutpb=mut_prob, ngen=num_generation,
                         stats=None, halloffame=hall_of_fame, verbose=False)
 
@@ -186,7 +188,6 @@ def run_ga_for_philosophy(weights, philosophy_name, num_results=3):
 
     def calculate_total_score(ind): return sum(v * w for v, w in zip(ind.fitness.values, weights))
 
-    # 점수 순으로 먼저 정렬
     sorted_solutions = sorted(valid_solutions, key=calculate_total_score, reverse=True)
 
     return sorted_solutions, weights
@@ -235,9 +236,9 @@ def main():
     gender_solutions_pool, used_weights_gender = run_ga_for_philosophy(weights_gender_first, "성비 우선", 15)
     new_face_solutions_pool, used_weights_new_face = run_ga_for_philosophy(weights_new_face_first, "새로운 만남 우선", 15)
 
-    # ★★★ 다양성 필터링 적용 ★★★
-    # 최소 거리: 전체 멤버의 약 20% (튜닝 가능)
-    min_dist_threshold = int(len(today_final_attendees_ids) * 0.2)
+    # ★★★★★ [수정됨] 다양성 필터 기준값 조정 ★★★★★
+    # 최소 거리: 전체 멤버의 약 15%로 기준을 약간 완화 (튜닝 가능)
+    min_dist_threshold = int(len(today_final_attendees_ids) * 0.15)
 
     final_gender_solutions = select_diverse_solutions(gender_solutions_pool, 3, min_dist_threshold)
     final_new_face_solutions = select_diverse_solutions(new_face_solutions_pool, 3, min_dist_threshold)

@@ -13,6 +13,9 @@ from datetime import datetime, timedelta, timezone
 from functools import wraps
 import requests
 import re
+import pandas as pd
+import numpy as np
+from deap import base, creator, tools, algorithms
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
@@ -199,9 +202,7 @@ def main_index():
 
 
 # ==============================================================================
-# --- 4. 관리자 (Admin) 전용 기능 ---
-# ==============================================================================
-
+# <editor-fold desc="4. 관리자 (Admin) 전용 기능">
 # --- 4.1. 관리자 대시보드 및 이벤트 관리 ---
 @app.route('/admin/dashboard')
 @login_required(role="admin")
@@ -555,34 +556,248 @@ def generate_groups(participants, facilitators, members, co_matrix, group_count_
 @login_required(role="admin")
 def bookclub_index():
     try:
-        members_response = supabase.table("members").select("*").order("name").execute()
-        members_list = members_response.data
+        members_res = supabase.table("members").select("*").order("name").execute().data
     except Exception as e:
-        app.logger.error(f"Error fetching members: {e}")
         return "<h3>회원 정보를 불러오는 중 오류가 발생했습니다.</h3>", 500
+
     if request.method == 'POST':
-        present = request.form.getlist('present')
-        facilitators = request.form.getlist('facilitators')
-        raw = (request.form.get('group_count') or '').strip()
+        present_names = request.form.getlist('present')
+        facilitator_names = request.form.getlist('facilitators')
+
         try:
-            gc = int(raw)
-            group_count_override = gc if gc > 0 else None
-        except ValueError:
-            group_count_override = None
-        raw_names = request.form.get('group_names') or ''
-        group_names = [n.strip() for n in raw_names.split(',') if n.strip()]
-        members_dict = {m['name']: m for m in members_list}
-        try:
-            co_matrix_response = supabase.table("bookclub_co_matrix").select("*").execute()
-            co_matrix = {item['pair_key']: item for item in co_matrix_response.data}
+            members_df = pd.DataFrame(members_res)
+            history_res = supabase.table("history").select("groups").execute().data
+            history_df = pd.DataFrame(history_res)
+
+            # 두 가지 철학(성비, 새만남)으로 각각 실행
+            gender_solutions = run_genetic_algorithm(
+                members_df=members_df, history_df=history_df,
+                attendee_names=present_names, presenter_names=facilitator_names,
+                weights=(10.0, 6.0, 3.0, 2.0, -1000.0)  # 성비 우선 가중치
+            )
+            new_face_solutions = run_genetic_algorithm(
+                members_df=members_df, history_df=history_df,
+                attendee_names=present_names, presenter_names=facilitator_names,
+                weights=(6.0, 10.0, 3.0, 2.0, -1000.0)  # 새로운 만남 우선 가중치
+            )
+
+            return render_template(
+                'bookclub_ga_results.html',
+                gender_solutions=gender_solutions,
+                new_face_solutions=new_face_solutions,
+                present=present_names,
+                facilitators=facilitator_names
+            )
         except Exception as e:
-            app.logger.error(f"Error fetching co_matrix: {e}")
-            co_matrix = {}
-        suggestions = generate_groups(present, facilitators, members_dict, co_matrix,
-                                      group_count_override=group_count_override)
-        return render_template('bookclub_results.html', suggestions=suggestions, present=present,
-                               facilitators=facilitators, group_names=group_names)
-    return render_template('bookclub_index.html', members=members_list)
+            flash(f"알고리즘 실행 중 오류가 발생했습니다: {e}", "danger")
+            return redirect(url_for('bookclub_index'))
+
+    return render_template('bookclub_index.html', members=members_res)
+
+
+def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_names, weights, num_results=3):
+    # --- 1. 데이터 전처리 ---
+    members_info = members_df.set_index('id').to_dict('index')
+    name_to_id_map = pd.Series(members_df.id.values, index=members_df.name).to_dict()
+    meeting_history = {}
+    if not history_df.empty and 'groups' in history_df.columns:
+        for index, row in history_df.iterrows():
+            try:
+                groups_list = row['groups']
+                if not isinstance(groups_list, list): continue
+                for group in groups_list:
+                    member_ids_in_group = [name_to_id_map.get(name) for name in group if name in name_to_id_map]
+                    for i in range(len(member_ids_in_group)):
+                        for j in range(i + 1, len(member_ids_in_group)):
+                            if member_ids_in_group[i] is None or member_ids_in_group[j] is None: continue
+                            pair = tuple(sorted((member_ids_in_group[i], member_ids_in_group[j])))
+                            meeting_history[pair] = meeting_history.get(pair, 0) + 1
+            except Exception:
+                continue
+
+    # --- 2. 시나리오 설정 ---
+    TODAY_ATTENDEE_IDS = [name_to_id_map[name] for name in attendee_names if name in name_to_id_map]
+    TODAY_PRESENTER_IDS = [name_to_id_map[name] for name in presenter_names if name in name_to_id_map]
+    num_attendees = len(TODAY_ATTENDEE_IDS)
+    if num_attendees < 3: return []
+
+    if num_attendees <= 5:
+        num_groups = 1
+    elif num_attendees <= 10:
+        num_groups = 2
+    else:
+        num_groups = round(num_attendees / 4.5)
+    if num_groups == 0: num_groups = 1
+
+    attendee_id_map = {idx: member_id for idx, member_id in enumerate(TODAY_ATTENDEE_IDS)}
+
+    # --- 3. 적합도 평가 함수 (evaluate) ---
+    MIN_GROUP_SIZE = 3
+    MAX_GROUP_SIZE = 5
+    RECENT_MEETING_THRESHOLD = 2
+
+    def evaluate(individual):
+        groups = {i: [] for i in range(num_groups)}
+        for i, g in enumerate(individual):
+            groups[g].append(attendee_id_map[i])
+
+        size_penalty = sum(1 for g in groups.values() if 0 < len(g) < MIN_GROUP_SIZE or len(g) > MAX_GROUP_SIZE)
+        if size_penalty > 0:
+            return 0, 0, 0, 0, -size_penalty * 1000
+
+        gender_score, new_face_score, preference_score, total_pairs = 0, 0, 0, 0
+
+        group_gender_scores = []
+        for group_members_for_gender in groups.values():
+            if not group_members_for_gender: continue
+            males = sum(1 for mid in group_members_for_gender if members_info.get(mid, {}).get('gender') == 'M')
+            females = len(group_members_for_gender) - males
+            if males > 0 and females > 0:
+                group_gender_scores.append(min(males, females) / max(males, females))
+            else:
+                group_gender_scores.append(0)
+
+        gender_score = np.mean(group_gender_scores) if group_gender_scores else 0
+
+        for group_members in groups.values():
+            if not group_members: continue
+            for i, member_id in enumerate(group_members):
+                member_prefs = members_info.get(member_id)
+                if member_prefs:
+                    preferred_id = member_prefs.get('preferred_member_id')
+                    avoided_id = member_prefs.get('avoided_member_id')
+                    for j in range(i + 1, len(group_members)):
+                        other_member_id = group_members[j]
+                        total_pairs += 1
+                        pair = tuple(sorted((member_id, other_member_id)))
+                        meet_count = meeting_history.get(pair, 0)
+                        new_face_score += 1 / (meet_count + 1)
+                        if other_member_id == preferred_id and meet_count < RECENT_MEETING_THRESHOLD: preference_score += 1
+                        other_prefs = members_info.get(other_member_id)
+                        if other_prefs and other_prefs.get(
+                            'preferred_member_id') == member_id and meet_count < RECENT_MEETING_THRESHOLD: preference_score += 1
+                        if other_member_id == avoided_id: preference_score -= 1.5
+                        if other_prefs and other_prefs.get('avoided_member_id') == member_id: preference_score -= 1.5
+
+        norm_new_face = new_face_score / total_pairs if total_pairs > 0 else 0
+        max_pref_score = len(TODAY_ATTENDEE_IDS) * 2
+        norm_pref = (preference_score + max_pref_score) / (max_pref_score * 2) if max_pref_score > 0 else 0
+        presenters_per_group = [sum(1 for mid in g if mid in TODAY_PRESENTER_IDS) for g in groups.values()]
+        presenter_score = 1 / (np.var(presenters_per_group) + 0.1) if len(presenters_per_group) > 1 else 10.0
+
+        return gender_score, norm_new_face, presenter_score, norm_pref, 0
+
+    # --- 4. 유전 알고리즘 실행 ---
+    fitness_name = f"FitnessGA_{abs(hash(weights))}"
+    individual_name = f"IndividualGA_{abs(hash(weights))}"
+    if hasattr(creator, fitness_name): delattr(creator, fitness_name)
+    if hasattr(creator, individual_name): delattr(creator, individual_name)
+
+    creator.create(fitness_name, base.Fitness, weights=weights)
+    creator.create(individual_name, list, fitness=getattr(creator, fitness_name))
+    toolbox = base.Toolbox()
+    toolbox.register("individual", tools.initRepeat, getattr(creator, individual_name),
+                     lambda: random.randint(0, num_groups - 1), n=num_attendees)
+    toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+    toolbox.register("evaluate", evaluate)
+    toolbox.register("mate", tools.cxTwoPoint)
+    toolbox.register("mutate", tools.mutUniformInt, low=0, up=num_groups - 1, indpb=0.05)
+    toolbox.register("select", tools.selTournament, tournsize=3)
+
+    pop_size, ngen, cxpb, mutpb = 1200, 200, 0.7, 0.6
+    population = toolbox.population(n=pop_size)
+    hall_of_fame = tools.HallOfFame(20)
+
+    # [수정] eaSimple을 직접 구현한 루프로 변경하여 진행률 로깅 추가
+    app.logger.info(f"유전 알고리즘 시작: 총 {ngen} 세대 진행")
+
+    # 초기 집단 평가
+    invalid_ind = [ind for ind in population if not ind.fitness.valid]
+    fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+    for ind, fit in zip(invalid_ind, fitnesses):
+        ind.fitness.values = fit
+    hall_of_fame.update(population)
+
+    # 세대 진화 시작
+    for gen in range(1, ngen + 1):
+        offspring = toolbox.select(population, len(population))
+        offspring = algorithms.varAnd(offspring, toolbox, cxpb, mutpb)
+        invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
+        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+        for ind, fit in zip(invalid_ind, fitnesses):
+            ind.fitness.values = fit
+        hall_of_fame.update(offspring)
+        population[:] = offspring
+
+        # 20세대마다 서버 로그에 진행률 출력
+        if gen % 20 == 0:
+            app.logger.info(f"알고리즘 진행 중... {gen}/{ngen} 세대 완료")
+
+    app.logger.info("유전 알고리즘 완료. 최적해 필터링 시작.")
+
+    valid_solutions = [ind for ind in hall_of_fame if ind.fitness.values[4] == 0]
+    if not valid_solutions: return []
+
+    # --- 5. 중복 제거 및 결과 포맷팅 ---
+    def normalized_hamming_distance(ind1, ind2):
+        labels1 = sorted(list(set(ind1)));
+        labels2 = sorted(list(set(ind2)))
+        if len(labels1) != len(labels2): return len(ind1)
+        min_dist = len(ind1)
+        for p_labels in itertools.permutations(labels2):
+            label_map = {original: permuted for original, permuted in zip(labels2, p_labels)}
+            permuted_ind2 = [label_map[label] for label in ind2]
+            dist = sum(c1 != c2 for c1, c2 in zip(ind1, permuted_ind2))
+            if dist < min_dist: min_dist = dist
+        return min_dist
+
+    def get_groups_from_individual(individual, attendee_id_map):
+        groups_dict = {}
+        for i, group_num in enumerate(individual):
+            if group_num not in groups_dict: groups_dict[group_num] = []
+            groups_dict[group_num].append(attendee_id_map[i])
+        return {frozenset(v) for v in groups_dict.values() if v}
+
+    def select_diverse_solutions(sorted_solutions, num_to_select, min_distance, attendee_id_map):
+        if not sorted_solutions: return []
+        diverse_selection, used_groups = [], set()
+        for sol in sorted_solutions:
+            if len(diverse_selection) >= num_to_select: break
+            candidate_groups = get_groups_from_individual(sol, attendee_id_map)
+            if not candidate_groups.isdisjoint(used_groups): continue
+            if diverse_selection:
+                min_dist_to_selection = min(
+                    normalized_hamming_distance(sol, selected_sol) for selected_sol in diverse_selection)
+                if min_dist_to_selection < min_distance: continue
+            diverse_selection.append(sol)
+            used_groups.update(candidate_groups)
+        return diverse_selection
+
+    def calculate_total_score(ind):
+        return sum(v * w for v, w in zip(ind.fitness.values, weights))
+
+    sorted_solutions = sorted(valid_solutions, key=calculate_total_score, reverse=True)
+
+    min_dist_threshold = int(len(TODAY_ATTENDEE_IDS) * 0.15)
+    final_solutions_indices = select_diverse_solutions(sorted_solutions, num_results, min_dist_threshold,
+                                                       attendee_id_map)
+
+    output_results = []
+    id_to_name_map = {v: k for k, v in name_to_id_map.items()}
+    for sol in final_solutions_indices:
+        groups = {i: [] for i in range(num_groups)}
+        [groups[g].append(attendee_id_map[i]) for i, g in enumerate(sol)]
+        formatted_groups = []
+        for group_id in sorted(groups.keys()):
+            if not groups[group_id]: continue
+            member_names = [id_to_name_map.get(mid, "Unknown") for mid in groups[group_id]]
+            formatted_groups.append(member_names)
+        output_results.append({
+            "score": f"{calculate_total_score(sol):.2f}",
+            "details": [f"{v:.2f}" for v in sol.fitness.values[:4]],
+            "groups": formatted_groups
+        })
+    return output_results
 
 
 @app.route('/api/bookclub/save', methods=['POST'])
@@ -633,6 +848,8 @@ def bookclub_api_delete_history():
         supabase.table("history").delete().eq("id", record_id).execute()
         return jsonify({"status": "ok"})
     return jsonify({"status": "error", "message": "Invalid index"}), 400
+# </editor-fold>
+# ==============================================================================
 
 
 # ==============================================================================
