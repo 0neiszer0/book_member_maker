@@ -4,186 +4,239 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ event.event_name }} - Timetable</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A;
-            --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444;
-        }
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
-        h1, h2 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; }
-        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
-        .eva-table-header { background-color: #333333; }
-        /* 테이블 행 스타일을 명확하게 정의 */
-        .eva-table-row { background-color: #252525; }
-        .eva-table-row:nth-child(even) { background-color: #2A2A2A; }
-        .loader { border: 4px solid #444; border-top: 4px solid var(--eva-green); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+        body { font-family: 'Noto Sans KR', sans-serif; }
+        h1, h2, h3, h4, h5, h6 { font-family: 'Orbitron', sans-serif; letter-spacing: 0.05em; }
+        .loader { border: 4px solid #dee2e6; border-top: 4px solid #0d6efd; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        /* '닫힘' 상태 스타일은 우선순위를 높여 확실히 적용 */
-        tr.slot.closed { background-color: #4b5563 !important; }
-        tr.slot.closed td { text-decoration: line-through; color: #9ca3af; }
+        .slot-closed { background-color: #f8f9fa; }
+        .slot-closed td { text-decoration: line-through; color: #6c757d; }
+        .applicant-cell { cursor: pointer; }
+        .applicant-cell:hover .text-muted { text-decoration: underline; color: #0d6efd !important; }
+        .applicant-cell:hover .fw-bold { text-decoration: underline; }
     </style>
 </head>
-<body class="min-h-screen">
-    <div class="container mx-auto p-4 md:p-8">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            <h1 class="text-2xl sm:text-3xl font-bold text-eva-green">{{ event.event_name }} Timetable</h1>
-            <a href="{{ url_for('admin_dashboard' if user_role == 'admin' else 'interviewer_events_list') }}" class="w-full sm:w-auto text-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md">목록으로</a>
+<body>
+    <div class="container my-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h2">{{ event.event_name }} Timetable</h1>
+            <a href="{{ url_for('admin_dashboard' if user_role == 'admin' else 'interviewer_events_list') }}" class="btn btn-secondary">목록으로</a>
         </div>
-        <div id="timetable-container" class="space-y-8"><div class="loader"></div></div>
+        <div id="timetable-container" class="space-y-4"><div class="loader"></div></div>
     </div>
 
-    <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-80 overflow-y-auto h-full w-full hidden z-50"></div>
+    {% if user_role == 'admin' %}
+    <div class="modal fade" id="interviewerModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title">면접관 배정</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body"><div id="interviewer-checkbox-list" class="list-group"></div></div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button><button type="button" class="btn btn-primary" id="save-interviewers-btn">저장</button></div>
+            </div>
+        </div>
+    </div>
 
+    <div class="modal fade" id="applicantModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title" id="applicantModalLabel">면접자 관리</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <input type="hidden" id="applicantModalSlotId">
+                    <input type="hidden" id="applicantModalApplicantId">
+                    <input type="hidden" id="applicantModalMode">
+                    <div class="mb-3"><label for="applicantName" class="form-label">이름</label><input type="text" class="form-control" id="applicantName" required></div>
+                    <div class="mb-3"><label for="applicantPhone" class="form-label">연락처</label><input type="text" class="form-control" id="applicantPhone" placeholder="01012345678" required></div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button><button type="button" class="btn btn-primary" onclick="handleSaveApplicant()">저장</button></div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', async () => {
+    // --- 전역 변수 및 초기화 ---
     const eventId = '{{ event_id }}';
     const userRole = '{{ user_role }}';
     const currentUserName = '{{ session.user_name }}';
     const allInterviewers = {{ all_interviewers|tojson|safe if user_role == 'admin' and all_interviewers else '[]' }};
     const container = document.getElementById('timetable-container');
-    const modalContainer = document.getElementById('modal-container');
 
-    async function fetchData(showLoader = true) {
-        try {
-            if (showLoader) { container.innerHTML = '<div class="loader"></div>'; }
-            const response = await fetch(`/api/events/${eventId}/timetable_data`);
-            if (!response.ok) {
-                const errorResult = await response.json();
-                throw new Error(errorResult.error || '데이터를 불러오는데 실패했습니다.');
-            }
-            return await response.json();
-        } catch (error) {
-            container.innerHTML = `<div class="eva-card p-6 rounded-lg text-center"><p class="text-red-400">${error.message}</p></div>`;
-            return null;
+    let interviewerModal, applicantModal, saveInterviewersBtn;
+    if (userRole === 'admin') {
+        if (document.getElementById('interviewerModal')) {
+            interviewerModal = new bootstrap.Modal(document.getElementById('interviewerModal'));
+            saveInterviewersBtn = document.getElementById('save-interviewers-btn');
+        }
+        if (document.getElementById('applicantModal')) {
+            applicantModal = new bootstrap.Modal(document.getElementById('applicantModal'));
         }
     }
 
-    function renderTimetable(slots) {
+    // --- 데이터 렌더링 함수 ---
+   function renderTimetable(slots) {
         container.innerHTML = '';
-        if (!slots || slots.length === 0) {
-            container.innerHTML = '<div class="eva-card p-6 rounded-lg text-center"><p class="text-gray-500">생성된 슬롯이 없습니다.</p></div>'; return;
-        }
+        if (!slots || slots.length === 0) { container.innerHTML = '<div class="alert alert-warning text-center">생성된 슬롯이 없습니다.</div>'; return; }
         const slotsByDate = slots.reduce((acc, slot) => {
             const date = new Date(slot.slot_datetime).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
             if (!acc[date]) acc[date] = []; acc[date].push(slot); return acc;
         }, {});
-
         Object.keys(slotsByDate).sort().forEach(date => {
-            const dateBlock = document.createElement('div');
-            // [수정] eva-card 스타일 적용
-            dateBlock.className = 'eva-card p-6 rounded-lg';
-            // [수정] 테이블 클래스를 다크 테마에 맞게 변경
-            let tableHTML = `<h2 class="text-xl font-bold mb-4 text-eva-purple">${date}</h2><div class="overflow-x-auto"><table class="min-w-full divide-y divide-border-dark"><thead class="eva-table-header"><tr><th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">시간</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">예약자 정보</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">배정된 면접관</th><th class="px-4 py-3 text-center text-xs font-medium text-gray-300 uppercase">관리</th></tr></thead><tbody class="divide-y divide-border-dark">`;
-
+            const card = document.createElement('div'); card.className = 'card';
+            let tableHTML = `<div class="card-header"><h3 class="mb-0">${date}</h3></div><div class="table-responsive"><table class="table table-hover table-striped mb-0">
+                             <thead class="table-dark"><tr><th>시간</th><th>예약자 정보</th><th>배정된 면접관</th><th class="text-center">관리</th></tr></thead><tbody>`;
             slotsByDate[date].forEach(slot => {
                 const time = slot.time_display || '시간오류';
-                // [수정] 텍스트 색상을 명시적으로 지정하여 가독성 확보
-                const applicantInfo = slot.applicant ? `<span class="text-gray-200">${slot.applicant.name}(${slot.applicant.phone_number})</span>` : '<span class="text-gray-500">예약 없음</span>';
-                const interviewerInfo = slot.interviewer_names ? `<span class="font-semibold text-eva-green">${slot.interviewer_names}</span>` : '<span class="text-gray-500">미배정</span>';
-                let actionControls = '-';
-
-                if (userRole === 'admin') {
-                    const assignBtn = `<button data-slot-id="${slot.id}" data-assigned-ids='${JSON.stringify(slot.interviewer_ids || [])}' class="admin-assign-btn text-white text-xs font-bold py-1 px-2 rounded bg-purple-600 hover:bg-purple-700">배정</button>`;
-                    const cancelBtn = slot.is_booked ? `<button data-slot-id="${slot.id}" class="cancel-reservation-btn text-black text-xs font-bold py-1 px-2 rounded bg-yellow-400 hover:bg-yellow-500 ml-2">예약취소</button>` : '';
-                    const toggleBtnText = slot.is_active ? '닫기' : '열기';
-                    const toggleBtnClass = slot.is_active ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700';
-                    const toggleBtn = `<button data-slot-id="${slot.id}" data-active="${slot.is_active}" class="toggle-slot-btn text-white text-xs font-bold py-1 px-2 rounded ${toggleBtnClass} ml-2">${toggleBtnText}</button>`;
-                    actionControls = `<div class="flex items-center justify-center">${assignBtn}${cancelBtn}${toggleBtn}</div>`;
-                } else if (userRole === 'interviewer' && slot.is_active) {
-                    const isAlreadyAssigned = (slot.interviewer_names || '').includes(currentUserName);
-                    if (!isAlreadyAssigned) {
-                        actionControls = `<button data-slot-id="${slot.id}" class="assign-me-btn text-white text-xs font-bold py-1 px-2 rounded bg-blue-600 hover:bg-blue-700">참여하기</button>`;
-                    } else {
-                        actionControls = `<span class="text-green-400 font-bold text-xs">참여중</span>`;
-                    }
+                let applicantInfo;
+                if (slot.applicant) {
+                    applicantInfo = `<span class="fw-bold applicant-info-cell">${slot.applicant.name}(${slot.applicant.phone_number})</span>`;
+                } else {
+                    applicantInfo = `<div class="d-flex justify-content-start align-items-center">
+                                       <span class="text-muted">예약 없음</span>
+                                       ${userRole === 'admin' ? '<button class="btn btn-sm btn-outline-primary ms-2 manual-register-btn">+ 등록</button>' : ''}
+                                     </div>`;
                 }
-
-                // [수정] 행에 eva-table-row 클래스 적용 및 텍스트 색상 수정
-                tableHTML += `<tr class="slot eva-table-row ${!slot.is_active ? 'closed' : ''}">
-                                <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-300">${time}</td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm">${applicantInfo}</td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm">${interviewerInfo}</td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm text-center">${actionControls}</td>
-                              </tr>`;
+                const interviewerInfo = slot.interviewer_names ? `<span class="fw-bold text-success">${slot.interviewer_names}</span>` : '<span class="text-muted">미배정</span>';
+                const actionControls = generateActionControls(slot);
+                tableHTML += `<tr class="${!slot.is_active ? 'slot-closed' : ''}" data-slot-id="${slot.id}" data-slot-info='${JSON.stringify(slot)}'>
+                                <td>${time}</td><td>${applicantInfo}</td><td>${interviewerInfo}</td><td class="text-center">${actionControls}</td></tr>`;
             });
-            tableHTML += `</tbody></table></div>`;
-            dateBlock.innerHTML = tableHTML;
-            container.appendChild(dateBlock);
+            card.innerHTML = tableHTML + '</tbody></table></div>';
+            container.appendChild(card);
         });
     }
 
+    function generateActionControls(slot) {
+        if (userRole === 'admin') {
+            const assignBtn = `<button class="btn btn-sm btn-primary admin-assign-btn">배정</button>`;
+            const cancelBtn = slot.is_booked ? `<button class="btn btn-sm btn-warning ms-1 cancel-reservation-btn">예약취소</button>` : '';
+            const toggleBtnText = slot.is_active ? '닫기' : '열기';
+            const toggleBtnClass = slot.is_active ? 'btn-danger' : 'btn-success';
+            const toggleBtn = `<button class="btn btn-sm ${toggleBtnClass} ms-1 toggle-slot-btn">${toggleBtnText}</button>`;
+            return `<div>${assignBtn}${cancelBtn}${toggleBtn}</div>`;
+        }
+        if (userRole === 'interviewer' && slot.is_active) {
+            return (slot.interviewer_names || '').includes(currentUserName) ? `<span class="badge bg-success">참여중</span>` : `<button class="btn btn-sm btn-info assign-me-btn">참여하기</button>`;
+        }
+        return '-';
+    }
+
+    // --- 이벤트 핸들링 ---
+    container.addEventListener('click', (e) => {
+        const target = e.target;
+        const slotRow = target.closest('tr');
+        if (!slotRow) return;
+        const slotData = JSON.parse(slotRow.dataset.slotInfo);
+
+        if (target.matches('.admin-assign-btn')) showInterviewerModal(slotData.id, slotData.interviewer_ids || []);
+        else if (target.matches('.cancel-reservation-btn')) handleCancelReservation(slotData.id);
+        else if (target.matches('.toggle-slot-btn')) handleToggleSlot(slotData.id, slotData.is_active);
+        else if (target.matches('.assign-me-btn')) handleAssignMe(slotData.id);
+        else if (target.closest('.applicant-cell') && userRole === 'admin') openApplicantModal(slotData);
+    });
+
+    function handleCancelReservation(slotId) { if (confirm('정말로 이 예약을 취소하시겠습니까?')) performAction(`/api/admin/reservations/${slotId}/cancel`, {}); }
+    function handleToggleSlot(slotId, isActive) { if (confirm('정말로 이 시간의 예약 가능 상태를 변경하시겠습니까?')) performAction(`/api/admin/slots/${slotId}/toggle_active`, { is_active: !isActive }); }
+    function handleAssignMe(slotId) { if (confirm('이 시간에 면접관으로 참여하시겠습니까?')) performAction(`/api/interviewer/slots/${slotId}/assign`, {}); }
+
+    // --- 모달 관련 함수 ---
     function showInterviewerModal(slotId, assignedIds) {
-        // 모달은 기존 스타일을 유지합니다.
-        let checkboxesHTML = '';
-        allInterviewers.forEach(interviewer => {
-            const isChecked = assignedIds.includes(interviewer.id) ? 'checked' : '';
-            // 모달 내부 텍스트 색상을 어둡게 조정
-            checkboxesHTML += `<label class="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-100"><input type="checkbox" value="${interviewer.id}" class="interviewer-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded" ${isChecked}><span class="text-gray-800">${interviewer.name}</span></label>`;
-        });
-        const modalContent = `<div class="p-4"><h3 class="text-lg font-bold text-gray-900">면접관 배정</h3><div class="mt-4 space-y-2 max-h-60 overflow-y-auto">${checkboxesHTML}</div><div class="mt-6 flex justify-end space-x-3"><button id="cancel-modal-btn" class="px-4 py-2 bg-gray-200 rounded-md text-sm font-medium text-gray-800 hover:bg-gray-300">취소</button><button id="save-interviewers-btn" data-slot-id="${slotId}" class="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700">저장</button></div></div>`;
-        modalContainer.innerHTML = `<div class="relative top-20 mx-auto w-full max-w-md bg-white rounded-lg shadow-xl">${modalContent}</div>`;
-        modalContainer.classList.remove('hidden');
-        document.getElementById('cancel-modal-btn').onclick = () => modalContainer.classList.add('hidden');
-        document.getElementById('save-interviewers-btn').onclick = handleSaveInterviewers;
+        const list = document.getElementById('interviewer-checkbox-list');
+        list.innerHTML = allInterviewers.map(i => `<label class="list-group-item"><input class="form-check-input me-1" type="checkbox" value="${i.id}" ${assignedIds.includes(i.id) ? 'checked' : ''}>${i.name}</label>`).join('');
+        saveInterviewersBtn.dataset.slotId = slotId;
+        interviewerModal.show();
     }
 
-    async function handleSaveInterviewers(e) {
-        const slotId = e.target.dataset.slotId;
-        const selectedIds = Array.from(document.querySelectorAll('.interviewer-checkbox:checked')).map(cb => cb.value);
-        await performAction(`/api/admin/slots/${slotId}/update_interviewers`, { interviewer_ids: selectedIds });
-        modalContainer.classList.add('hidden');
+    container.addEventListener('click', (e) => {
+        const target = e.target;
+        const slotRow = target.closest('tr');
+        if (!slotRow) return;
+        const slotData = JSON.parse(slotRow.dataset.slotInfo);
+
+        if (target.matches('.admin-assign-btn')) showInterviewerModal(slotData.id, slotData.interviewer_ids || []);
+        else if (target.matches('.cancel-reservation-btn')) handleCancelReservation(slotData.id);
+        else if (target.matches('.toggle-slot-btn')) handleToggleSlot(slotData.id, slotData.is_active);
+        else if (target.matches('.assign-me-btn')) handleAssignMe(slotData.id);
+        else if (target.matches('.applicant-info-cell') || target.matches('.manual-register-btn')) {
+            if (userRole === 'admin') openApplicantModal(slotData);
+        }
+    });
+
+    if (saveInterviewersBtn) {
+        saveInterviewersBtn.onclick = () => {
+            const slotId = saveInterviewersBtn.dataset.slotId;
+            // [오류 수정] parseInt 제거: ID를 문자열로 처리
+            const selectedIds = Array.from(document.querySelectorAll('#interviewer-checkbox-list input:checked')).map(cb => cb.value);
+            performAction(`/api/admin/slots/${slotId}/update_interviewers`, { interviewer_ids: selectedIds }).then(() => interviewerModal.hide());
+        };
     }
 
-    async function performAction(url, body, confirmMessage) {
-        if (confirmMessage && !confirm(confirmMessage)) return;
+    function openApplicantModal(slot) {
+        document.getElementById('applicantModalSlotId').value = slot.id;
+        const nameInput = document.getElementById('applicantName');
+        const phoneInput = document.getElementById('applicantPhone');
+        const modeInput = document.getElementById('applicantModalMode');
+        const applicantIdInput = document.getElementById('applicantModalApplicantId');
+
+        if (slot.is_booked && slot.applicant) { // 수정 모드
+            document.getElementById('applicantModalLabel').textContent = '예약자 정보 수정';
+            modeInput.value = 'edit';
+            applicantIdInput.value = slot.applicant.id;
+            nameInput.value = slot.applicant.name;
+            phoneInput.value = slot.applicant.phone_number;
+        } else { // 신규 등록 모드
+            document.getElementById('applicantModalLabel').textContent = '신규 예약 등록';
+            modeInput.value = 'create';
+            applicantIdInput.value = '';
+            nameInput.value = '';
+            phoneInput.value = '';
+        }
+        applicantModal.show();
+    }
+
+    window.handleSaveApplicant = () => {
+        const mode = document.getElementById('applicantModalMode').value;
+        const name = document.getElementById('applicantName').value;
+        const phone = document.getElementById('applicantPhone').value;
+
+        if (!name || !phone) { alert('이름과 연락처를 모두 입력해주세요.'); return; }
+
+        let url, body;
+        if (mode === 'edit') {
+            const applicantId = document.getElementById('applicantModalApplicantId').value;
+            url = `/api/admin/applicants/${applicantId}/update`;
+            body = { name: name, phone_number: phone };
+        } else { // create
+            const slotId = document.getElementById('applicantModalSlotId').value;
+            url = '/api/admin/reservations/create';
+            body = { slot_id: slotId, name: name, phone_number: phone };
+        }
+        performAction(url, body).then(() => applicantModal.hide());
+    }
+
+    // --- API 통신 및 화면 업데이트 ---
+    async function performAction(url, body) {
         try {
             const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
             const result = await response.json();
-            if (!response.ok) throw new Error(result.message || '작업 실패');
-            const updatedData = await fetchData(false);
-            if(updatedData) renderTimetable(updatedData);
-        } catch (error) {
-            alert(`오류: ${error.message}`);
-            // 액션 실패 시에도 데이터는 다시 불러와서 화면을 동기화합니다.
-            const updatedData = await fetchData(false);
-            if(updatedData) renderTimetable(updatedData);
-        }
+            if (!response.ok) throw new Error(result.error || '작업 실패');
+            await fetchAndRender(false);
+        } catch (error) { alert(`오류: ${error.message}`); }
     }
 
-    function handleEvents(e) {
-        const target = e.target;
-        let url, body, confirmMessage;
-
-        if (target.matches('.admin-assign-btn')) {
-            showInterviewerModal(target.dataset.slotId, JSON.parse(target.dataset.assignedIds)); return;
-        } else if (target.matches('.toggle-slot-btn')) {
-            confirmMessage = '정말로 이 시간의 예약 가능 상태를 변경하시겠습니까?';
-            url = `/api/admin/slots/${target.dataset.slotId}/toggle_active`;
-            body = { is_active: !(target.dataset.active === 'true') };
-        } else if (target.matches('.assign-me-btn')) {
-            confirmMessage = '이 시간에 면접관으로 참여하시겠습니까?';
-            url = `/api/interviewer/slots/${target.dataset.slotId}/assign`;
-            body = {};
-        } else if (target.matches('.cancel-reservation-btn')) {
-            confirmMessage = '정말로 이 예약을 취소하시겠습니까?';
-            url = `/api/admin/reservations/${target.dataset.slotId}/cancel`;
-            body = {};
-        } else { return; }
-
-        target.disabled = true;
-        performAction(url, body, confirmMessage);
+    async function fetchAndRender(showLoader = true) {
+        if(showLoader) container.innerHTML = '<div class="loader"></div>';
+        const response = await fetch(`/api/events/${eventId}/timetable_data`);
+        if (response.ok) renderTimetable(await response.json());
+        else container.innerHTML = `<div class="alert alert-danger">데이터 로딩 실패</div>`;
     }
 
-    // 초기 데이터 로드
-    const initialData = await fetchData(true);
-    if(initialData) {
-        renderTimetable(initialData);
-        container.addEventListener('click', handleEvents);
-    }
+    fetchAndRender(true);
 });
 </script>
 </body>

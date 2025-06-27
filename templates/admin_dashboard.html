@@ -5,29 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>관리자 대시보드</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --eva-purple: #6A0DAD; /* 에바 보라색 */
-            --eva-green: #00FF7F;  /* 에바 형광 녹색 */
-            --eva-orange: #FF8C00; /* 에바 주황색 */
-            --bg-dark: #1A1A1A;    /* NERV 배경색 */
-            --card-dark: #2D2D2D;  /* 카드 배경색 */
-            --text-light: #E5E5E5; /* 기본 텍스트 색상 */
-            --border-dark: #444444;/* 테두리 색상 */
+            --eva-purple: #6A0DAD; --eva-green: #00FF7F; --eva-orange: #FF8C00;
+            --bg-dark: #1A1A1A; --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444;
         }
-        body {
-            font-family: 'Noto Sans KR', sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-light);
-        }
-        h1, h2, h3, h4, h5, h6 {
-            font-family: 'Orbitron', sans-serif;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
+        h1, h2, h3, h4, h5, h6 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; }
         .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
         .eva-button-primary { background-color: var(--eva-purple); color: white; }
         .eva-button-primary:hover { background-color: #8A2BE2; }
@@ -39,11 +27,13 @@
         .eva-link:hover { color: #ADFF2F; }
         .eva-table-header { background-color: #333333; }
         .eva-table-row:nth-child(even) { background-color: #383838; }
-        .eva-input { background-color: #1A1A1A; border-color: var(--border-dark); color: var(--text-light); }
-        .eva-input:focus { border-color: var(--eva-green); ring: 1; ring-color: var(--eva-green); }
+        .eva-input { background-color: #1A1A1A; border-color: var(--border-dark); color: var(--text-light); cursor: pointer; }
+        .eva-input:focus { border-color: var(--eva-green); outline: none; box-shadow: 0 0 0 2px var(--eva-green); }
         .eva-toggle-bg { background-color: #4A4A4A; }
         input.event-toggle:checked + .eva-toggle-bg { background-color: var(--eva-green); }
-        input.interviewer-toggle:checked ~ .block { background-color: var(--eva-green); }
+        .interviewer-toggle ~ .dot { transition: transform .2s ease-in-out; }
+        .interviewer-toggle:checked ~ .dot { transform: translateX(1.5rem); }
+        .interviewer-toggle:checked ~ .block { background-color: var(--eva-purple); }
     </style>
 </head>
 <body class="min-h-screen">
@@ -88,8 +78,8 @@
                                 </td>
                                 <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <a href="{{ url_for('admin_event_timetable', event_id=event.id) }}" class="eva-link mr-2">타임테이블</a>
-                                    <a href="{{ url_for('manage_event', event_id=event.id) }}" class="text-gray-400 hover:text-gray-200 mr-2">슬롯생성</a>
-                                    <button class="eva-button-delete text-xs font-bold py-1 px-2 rounded-md" data-event-id="{{ event.id }}" data-event-name="{{ event.event_name }}">삭제</button>
+                                    <a href="{{ url_for('manage_event', event_id=event.id) }}" class="text-gray-400 hover:text-gray-200 mr-2">슬롯관리</a>
+                                    <button class="eva-button-delete delete-event-btn text-xs font-bold py-1 px-2 rounded-md" data-event-id="{{ event.id }}" data-event-name="{{ event.event_name }}">삭제</button>
                                 </td>
                             </tr>
                             {% else %}
@@ -105,9 +95,9 @@
                     <h2 class="text-xl font-bold mb-4 text-eva-green">New Event</h2>
                     <form action="/admin/events/create" method="post" class="space-y-4">
                         <div><label for="event_name" class="block text-sm font-medium">이벤트 이름</label><input type="text" name="event_name" id="event_name" required class="eva-input mt-1 block w-full px-3 py-2 rounded-md shadow-sm"></div>
-                        <div><label for="start_date" class="block text-sm font-medium">시작일</label><input type="date" name="start_date" id="start_date" required class="eva-input mt-1 block w-full px-3 py-2 rounded-md shadow-sm"></div>
-                        <div><label for="end_date" class="block text-sm font-medium">종료일</label><input type="date" name="end_date" id="end_date" required class="mt-1 block w-full px-3 py-2 rounded-md shadow-sm"></div>
-                        <div class="flex items-center"><input type="checkbox" name="is_active" id="is_active" checked class="h-4 w-4 eva-link border-gray-300 rounded focus:ring-eva-green"><label for="is_active" class="ml-2 block text-sm">즉시 활성화</label></div>
+                        <div><label for="start_date" class="block text-sm font-medium">시작일</label><input type="text" name="start_date" id="start_date" required class="eva-input mt-1 block w-full px-3 py-2 rounded-md shadow-sm datepicker" placeholder="날짜를 선택하세요"></div>
+                        <div><label for="end_date" class="block text-sm font-medium">종료일</label><input type="text" name="end_date" id="end_date" required class="eva-input mt-1 block w-full px-3 py-2 rounded-md shadow-sm datepicker" placeholder="날짜를 선택하세요"></div>
+                        <div class="flex items-center"><input type="checkbox" name="is_active" id="is_active" checked class="h-4 w-4 text-eva-purple bg-gray-700 border-gray-600 rounded focus:ring-eva-purple"><label for="is_active" class="ml-2 block text-sm">즉시 활성화</label></div>
                         <button type="submit" class="w-full eva-button-primary font-bold py-2 px-4 rounded-lg">생성하기</button>
                     </form>
                 </div>
@@ -117,9 +107,13 @@
                     <p class="text-sm text-gray-400 mb-4">독서 모임 회원 목록에서 면접관을 지정합니다.</p>
                     <div id="interviewer-toggle-list" class="space-y-2 max-h-96 overflow-y-auto pr-2">
                         {% for member in all_members %}
-                        <label class="flex justify-between items-center p-3 bg-bg-dark rounded-lg cursor-pointer hover:bg-border-dark">
+                        <label class="interviewer-label flex justify-between items-center p-3 bg-gray-700 rounded-lg cursor-pointer transition-colors duration-200">
                             <span class="font-semibold">{{ member.name }}</span>
-                            <div class="relative"><input type="checkbox" class="sr-only interviewer-toggle" data-name="{{ member.name }}" {% if member.name in interviewer_names %}checked{% endif %}><div class="block bg-gray-600 w-12 h-6 rounded-full"></div><div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition"></div></div>
+                            <div class="relative">
+                                <input type="checkbox" class="sr-only interviewer-toggle" data-name="{{ member.name }}" {% if member.name in interviewer_names %}checked{% endif %}>
+                                <div class="block bg-gray-600 w-12 h-6 rounded-full"></div>
+                                <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full"></div>
+                            </div>
                         </label>
                         {% else %}
                         <p class="text-center text-sm text-gray-500">등록된 독서 모임 회원이 없습니다.</p>
@@ -129,19 +123,27 @@
             </div>
         </div>
     </div>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/ko.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    // 달력 초기화
+    flatpickr(".datepicker", {
+        "locale": "ko",
+        dateFormat: "Y-m-d",
+    });
+
+    // --- 기존 스크립트 ---
     const toggleList = document.getElementById('interviewer-toggle-list');
     if(toggleList) {
         toggleList.addEventListener('change', (e) => {
             if (e.target.matches('.interviewer-toggle')) {
                 const checkbox = e.target;
                 const memberName = checkbox.dataset.name;
-                const originalState = checkbox.checked;
                 fetch('/api/admin/toggle_interviewer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: memberName }) })
-                .then(response => { if (!response.ok) { checkbox.checked = !originalState; alert('오류가 발생했습니다.'); } return response.json(); })
-                .then(data => { if (data.status === 'error') { checkbox.checked = !originalState; alert('오류: ' + data.message); }})
-                .catch(error => { checkbox.checked = !originalState; console.error('Error:', error); });
+                .then(response => { if (!response.ok) { checkbox.checked = !checkbox.checked; alert('오류가 발생했습니다.'); } return response.json(); })
+                .then(data => { if (data.status === 'error') { checkbox.checked = !checkbox.checked; alert('오류: ' + data.message); }})
+                .catch(error => { checkbox.checked = !checkbox.checked; console.error('Error:', error); });
             }
         });
     }
