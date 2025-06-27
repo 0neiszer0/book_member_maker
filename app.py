@@ -117,6 +117,11 @@ def send_telegram_notification(message):
 # --- 3. 로그인, 로그아웃, 메인 페이지 라우트 ---
 # ==============================================================================
 
+# [신규] 가장 기본이 되는 메인 페이지 라우트를 추가합니다.
+@app.route('/')
+def main_index():
+    return render_template('main_index.html')
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -194,12 +199,6 @@ def logout():
     session.clear()
     flash('성공적으로 로그아웃되었습니다.', 'info')
     return redirect(url_for('main_index'))
-
-
-@app.route('/')
-def main_index():
-    return render_template('main_index.html')
-
 
 # ==============================================================================
 # <editor-fold desc="4. 관리자 (Admin) 전용 기능">

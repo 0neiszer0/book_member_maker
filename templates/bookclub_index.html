@@ -4,40 +4,46 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>독서모임 조 편성</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    :root { --primary: #4a90e2; --bg: #f7f9fc; --card: #ffffff; --text: #333; --border: #ddd; }
-    * { box-sizing: border-box; margin:0; padding:0; }
-    body { font-family: sans-serif; background: var(--bg); color: var(--text); padding: 1rem; display: flex; flex-direction: column; align-items: center; }
-    h1 { margin-bottom: 1rem; }
+    :root {
+        --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A;
+        --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444;
+    }
+    body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); padding: 1rem; display: flex; flex-direction: column; align-items: center; }
+    h1, h2, h3, summary { font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; }
     form { width: 100%; max-width: 600px; }
-    .section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 1rem; overflow: hidden; }
-    .section summary { list-style: none; background: var(--primary); color: #fff; padding: 0.75rem 1rem; cursor: pointer; font-weight: bold; }
-    .section[open] summary { border-bottom: 1px solid var(--border); }
+    .section { background-color: var(--card-dark); border: 1px solid var(--border-dark); border-radius: 8px; margin-bottom: 1rem; overflow: hidden; }
+    .section summary { list-style: none; background-color: var(--eva-purple); color: #fff; padding: 0.75rem 1rem; cursor: pointer; font-weight: bold; }
+    .section[open] summary { border-bottom: 1px solid var(--border-dark); }
     .section div.content { padding: 1rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap: 0.5rem; }
-    .form-check { display: flex; align-items: center; background: var(--bg); padding: 0.5rem; border-radius:4px; }
-    .form-check input { margin-right: 0.5rem; }
+    .form-check { display: flex; align-items: center; background-color: var(--bg-dark); padding: 0.5rem; border-radius:4px; }
+    .form-check input { margin-right: 0.5rem; accent-color: var(--eva-green); }
     .controls { text-align: right; grid-column: 1 / -1; margin-bottom: 0.5rem; }
-    .controls button { background: var(--primary); color: #fff; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.85rem; margin-left: 0.5rem; cursor: pointer; }
-    .controls button.secondary { background: #999; }
+    .controls button { background-color: var(--eva-green); color: black; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.85rem; margin-left: 0.5rem; cursor: pointer; font-weight: bold; }
+    .controls button.secondary { background-color: #4A4A4A; color: var(--text-light); }
     .settings { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding: 1rem; }
     .settings label { display: flex; flex-direction: column; font-size: 0.9rem; margin-bottom: 0.5rem; }
-    .settings input { margin-top: 0.3rem; padding: 0.4rem; border: 1px solid var(--border); border-radius: 4px; }
-    .btn-submit { width: 100%; padding: 0.8rem; background: var(--primary); color: #fff; border: none; font-size: 1.1rem; border-radius: 6px; cursor: pointer; }
+    .settings input { margin-top: 0.3rem; padding: 0.4rem; background-color: var(--bg-dark); border: 1px solid var(--border-dark); border-radius: 4px; color: var(--text-light); }
+    .btn-submit { width: 100%; padding: 0.8rem; background-color: var(--eva-green); color: black; border: none; font-size: 1.1rem; font-weight: bold; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+    .btn-submit:hover { box-shadow: 0 0 15px var(--eva-green); }
     .footer-nav { margin-top: 1.5rem; display: flex; justify-content: space-between; width: 100%; max-width: 600px; }
-
-    /* 로딩 오버레이 스타일 */
-    #loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); z-index: 1000; flex-direction: column; justify-content: center; align-items: center; }
-    #loading-overlay .loader { border: 8px solid #f3f3f3; border-top: 8px solid #4a90e2; border-radius: 50%; width: 60px; height: 60px; animation: spin 1.5s linear infinite; }
+    dialog { background-color: var(--card-dark); color: var(--text-light); border: 1px solid var(--border-dark); border-radius: 8px; }
+    #loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); z-index: 1000; flex-direction: column; justify-content: center; align-items: center; }
+    #loading-overlay .loader { border: 8px solid #444; border-top: 8px solid var(--eva-green); border-radius: 50%; width: 60px; height: 60px; animation: spin 1.5s linear infinite; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
 
-  <h1>📚 독서모임 조 편성</h1>
+  <h1 class="text-3xl text-eva-green mb-4">Bookclub Grouping</h1>
 
   <form method="POST" action="/making_team">
     <details class="section" open>
-      <summary>오늘 오는 사람</summary>
+      <summary>ATTENDEE SELECT</summary>
       <div class="content">
         <div class="controls">
           <button type="button" id="select-all-present">전체</button>
@@ -53,7 +59,7 @@
     </details>
 
     <details class="section" open>
-      <summary>발제자 선택</summary>
+      <summary>FACILITATOR SELECT</summary>
       <div class="content">
         <div class="controls">
           <button type="button" id="select-all-facilitators">전체</button>
@@ -69,7 +75,7 @@
     </details>
 
     <details class="section">
-      <summary>⚙️ 추가 설정</summary>
+      <summary>⚙️ ADVANCED SETTINGS</summary>
       <div class="settings">
         <label>그룹 수 (선택)
           <input type="number" name="group_count" min="1" max="30" placeholder="자동">
@@ -80,25 +86,24 @@
       </div>
     </details>
 
-    <button type="submit" class="btn-submit">조 편성하기</button>
+    <button type="submit" class="btn-submit">GENERATE GROUPS</button>
   </form>
 
   <div class="footer-nav">
-      <a href="/" style="padding: 0.5rem 1rem; background: #6c757d; color: white; border-radius: 4px; text-decoration: none;">🏠 메인으로</a>
-      <button type="button" id="manage-history-btn" style="background: #17a2b8; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">🗂️ 이전 기록 관리</button>
+      <a href="/" style="padding: 0.5rem 1rem; background: #4A4A4A; color: white; border-radius: 4px; text-decoration: none;">🏠 MAIN</a>
+      <button type="button" id="manage-history-btn" style="background: #6A0DAD; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">🗂️ HISTORY</button>
   </div>
 
-  <dialog id="history-dialog" style="width:90%;max-width:600px;padding:1rem; border:none;border-radius:8px;">
+  <dialog id="history-dialog">
     <h3>📜 이전 모임 기록 조회/삭제</h3>
-    <div id="history-list" style="min-height:100px;max-height:300px;overflow:auto; border:1px solid #ccc;border-radius:4px;padding:8px;">
+    <div id="history-list" style="min-height:100px;max-height:300px;overflow:auto; border:1px solid var(--border-dark);border-radius:4px;padding:8px; margin-top: 1rem;">
       로딩 중…
     </div>
     <div style="text-align:right;margin-top:1rem;">
-      <button type="button" id="history-close">닫기</button>
+      <button type="button" id="history-close" style="background: #4A4A4A; color: white; padding: 0.5rem 1rem; border-radius: 4px;">닫기</button>
     </div>
   </dialog>
 
-  <!-- 로딩 오버레이 HTML -->
   <div id="loading-overlay">
     <div class="loader"></div>
     <p style="color: white; margin-top: 20px; font-size: 1.2rem; font-weight: bold;">최적의 조합을 찾고 있습니다...</p>
