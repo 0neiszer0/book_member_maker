@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SYSTEM MAIN</title>
+    <title>책 먹는 호반우</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,7 +22,7 @@
             background-color: var(--bg-dark);
             color: var(--text-light);
         }
-        h1, h2 {
+        h1, h2, h3 {
             font-family: 'Orbitron', sans-serif;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -30,59 +30,170 @@
         .eva-card {
             background-color: var(--card-dark);
             border: 1px solid var(--border-dark);
-            box-shadow: 0 0 25px rgba(0, 255, 127, 0.15);
         }
         .eva-button {
             background-color: var(--eva-green);
             color: black;
             font-weight: bold;
             transition: all 0.2s ease-in-out;
+            text-align: center;
         }
         .eva-button:hover {
             box-shadow: 0 0 15px var(--eva-green);
             transform: translateY(-2px);
         }
+        .eva-button-secondary {
+            background-color: var(--eva-purple);
+            color: white;
+            font-weight: bold;
+            transition: all 0.2s ease-in-out;
+            text-align: center;
+        }
+        .eva-button-secondary:hover {
+            box-shadow: 0 0 15px var(--eva-purple);
+            transform: translateY(-2px);
+        }
+
+        /* FAQ 아코디언 스타일 */
+        details > summary {
+            cursor: pointer;
+            padding: 1rem;
+            background-color: #374151;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s;
+        }
+        details > summary:hover {
+            background-color: #4b5563;
+        }
+        details[open] > summary {
+            background-color: var(--eva-purple);
+        }
+        details > div {
+            padding: 1rem;
+            border: 1px solid var(--border-dark);
+            border-top: none;
+            border-radius: 0 0 0.5rem 0.5rem;
+        }
     </style>
 </head>
-<body class="flex items-center justify-center min-h-screen">
-    <div class="text-center eva-card p-10 md:p-16 rounded-xl shadow-2xl max-w-2xl w-full">
+<body class="w-full">
+    <header class="bg-card-dark shadow-md sticky top-0 z-50 border-b border-border-dark">
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center py-4">
+            <a href="/" class="text-xl font-bold text-eva-green">책 먹는 호반우</a>
 
-        <!-- 로그인 상태에 따라 다른 화면 표시 -->
-        {% if session.user_role %}
-            <h1 class="text-3xl font-bold text-eva-green mb-4">
-                Welcome, {{ session.user_name or '사용자' }}
-            </h1>
-            <p class="text-gray-400 mb-8">
-                ROLE: <span class="font-bold text-eva-purple">{{ session.user_role | capitalize }}</span>
-            </p>
-            <div class="space-y-4">
-                {% if session.user_role == 'admin' %}
-                    <a href="{{ url_for('admin_dashboard') }}" class="block w-full bg-red-500 hover:bg-red-600 eva-button py-3 px-6 rounded-lg text-lg">Admin Dashboard</a>
-                    <a href="{{ url_for('bookclub_index') }}" class="block w-full bg-blue-500 hover:bg-blue-600 eva-button py-3 px-6 rounded-lg text-lg">독서 모임 조 편성</a>
-                {% endif %}
-                {% if session.user_role == 'interviewer' %}
-                     <a href="{{ url_for('interviewer_events_list') }}" class="block w-full bg-purple-600 hover:bg-purple-700 eva-button py-3 px-6 rounded-lg text-lg">내 면접 스케줄 보기</a>
-                {% endif %}
-                {% if session.user_role == 'applicant' %}
-                    <a href="{{ url_for('interview_index') }}" class="block w-full bg-green-500 hover:bg-green-600 eva-button py-3 px-6 rounded-lg text-lg">면접 시간 예약하기</a>
-                {% endif %}
+            <div class="flex items-center space-x-4">
+            {% if session.user_role %}
+                <a href="{{ url_for('logout') }}" class="text-sm text-gray-400 hover:text-eva-green">로그아웃</a>
+
+                {#--- 사용자 역할에 따라 '마이페이지' 버튼의 링크를 다르게 설정 ---#}
+                <a href="
+                    {% if session.user_role == 'admin' %}{{ url_for('admin_dashboard') }}
+                    {% elif session.user_role == 'interviewer' %}{{ url_for('interviewer_events_list') }}
+                    {% elif session.user_role == 'applicant' %}{{ url_for('interview_index') }}
+                    {% else %}{{ url_for('main_index') }}
+                    {% endif %}
+                " class="eva-button-secondary text-sm font-bold py-2 px-4 rounded-md">
+                    마이페이지
+                </a>
+            {% else %}
+                <a href="{{ url_for('login') }}" class="eva-button text-sm font-bold py-2 px-4 rounded-md">
+                    로그인
+                </a>
+            {% endif %}
             </div>
-            <div class="mt-8">
-                <a href="/logout" class="text-sm text-gray-500 hover:text-eva-green">Logout</a>
-            </div>
 
-        <!-- 로그인 안 된 상태일 때 -->
-        {% else %}
-            <h1 class="text-4xl font-bold text-eva-green mb-8">책 먹는 호반우</h1>
-            <p class="text-gray-400 mb-10">
-                서비스를 이용하려면 로그인이 필요합니다.
-            </p>
-            <a href="/login" class="block w-full bg-eva-green hover:shadow-lg hover:shadow-eva-green/50 eva-button py-4 px-6 rounded-lg text-xl">
-                LOGIN
-            </a>
-        {% endif %}
-
+        </div>
     </div>
+</header>
+
+    <main class="container mx-auto p-4 sm:p-6 lg:p-8">
+
+        <section class="text-center my-12 md:my-20">
+            <h1 class="text-3xl md:text-5xl font-bold text-eva-green mb-4">D-7, 여름방학 독서캠프 모집</h1>
+            <p class="text-lg text-gray-300 max-w-3xl mx-auto mb-8">
+                2022년부터 운영된 KNU 독서모임 '책 먹는 호반우'에서 25년 여름방학을 함께 할 열정적인 캠프 인원을 모집합니다. 독서를 통해 함께 성장하고 즐거운 추억을 만들어봐요!
+            </p>
+            <a href="https://naver.me/xQiVCYuJ" target="_blank" class="eva-button py-3 px-8 rounded-lg text-xl inline-block">
+                지금 바로 지원하기
+            </a>
+        </section>
+
+        <section class="my-16">
+            <h2 class="text-2xl text-center font-bold text-eva-purple mb-8">이런 분들을 기다립니다</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+                <div class="eva-card p-6 rounded-lg">✔️ 평소 독서에 관심이 많으신 분</div>
+                <div class="eva-card p-6 rounded-lg">✔️ 책을 읽고 싶은데 동기부여가 필요하신 분</div>
+                <div class="eva-card p-6 rounded-lg">✔️ 책 감상을 타인과 공유하고 싶은 분</div>
+                <div class="eva-card p-6 rounded-lg">✔️ 교양적인 활동으로 방학을 채우고 싶은 분</div>
+                <div class="eva-card p-6 rounded-lg">✔️ 심심해서 같이 놀 사람이 필요하신 분</div>
+                <div class="eva-card p-6 rounded-lg bg-green-900/50 border-eva-green">🔥 어떤 동기든, 열정이 있다면 대환영!</div>
+            </div>
+        </section>
+
+        <section class="my-16">
+             <h2 class="text-2xl text-center font-bold text-eva-purple mb-8">모집 요강</h2>
+             <div class="eva-card max-w-3xl mx-auto p-8 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                <div><strong class="text-eva-green mr-2">모집 기간:</strong> 25.05.20 ~ 25.07.04</div>
+                <div><strong class="text-eva-green mr-2">활동 기간:</strong> 25.07.07 ~ 2학기 개강 전</div>
+                <div><strong class="text-eva-green mr-2">모집 대상:</strong> 경북대학교 재학생 누구나</div>
+                <div><strong class="text-eva-green mr-2">모집 인원:</strong> 0명 (유동적으로 선발)</div>
+                <div><strong class="text-eva-green mr-2">면접 진행:</strong> 지원자 대상 오프라인 면접</div>
+                <div><strong class="text-eva-green mr-2">회비:</strong> 30,000원 (행사, 자료 제공비 등)</div>
+                <div class="md:col-span-2"><strong class="text-eva-green mr-2">정기 모임:</strong> 매주 월요일 19시 ~ 21시</div>
+                <div class="md:col-span-2"><strong class="text-eva-green mr-2">모임 장소:</strong> 경북대학교 북문 인근 카페 대관</div>
+             </div>
+        </section>
+
+        <section class="my-16">
+            <h2 class="text-2xl text-center font-bold text-eva-purple mb-8">주요 활동</h2>
+            <div class="eva-card max-w-3xl mx-auto p-8 rounded-xl">
+                <ul class="space-y-4 list-disc list-inside text-gray-300">
+                    <li>여름방학 지정 커리큘럼에 따른 도서 세미나 진행</li>
+                    <li>세미나 전, 발제문을 바탕으로 한 개인간 논의 및 전체 토론</li>
+                    <li>세미나 이후 자율적인 뒷풀이로 즐거운 친목 도모</li>
+                    <li>새로운 회원들과 함께하는 OT & MT 진행</li>
+                    <li>모임 활동 기록은 인스타그램 <a href="https://www.instagram.com/knu_read/" target="_blank" class="font-bold text-eva-green hover:underline">@knu_read</a> 참고!</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="my-16">
+            <h2 class="text-2xl text-center font-bold text-eva-purple mb-8">자주 묻는 질문 (FAQ)</h2>
+            <div class="max-w-3xl mx-auto space-y-4">
+                <details>
+                    <summary class="font-bold">Q. 평소에 책을 안 읽었는데 괜찮을까요?</summary>
+                    <div><p class="text-gray-300">A. 물론입니다! 중요한 것은 책을 읽으려는 마음입니다. 세미나 참석은 자율이므로 부담 없이 지원해주세요.</p></div>
+                </details>
+                <details>
+                    <summary class="font-bold">Q. 말을 잘 못하는데 괜찮을까요?</summary>
+                    <div><p class="text-gray-300">A. 발표 형식이 아닌 편안한 대화 분위기입니다. 모임장이 듣는 것도, 말하는 것도 좋아해서 걱정하실 필요 없습니다!</p></div>
+                </details>
+                 <details>
+                    <summary class="font-bold">Q. 세미나 논의는 어느정도 수준인가요?</summary>
+                    <div><p class="text-gray-300">A. 책을 분석하는 문학회보다는 가볍고, 독서를 가장한 친목모임보다는 깊이 있습니다. 즐거운 세미나를 지향하니 부담 갖지 마세요.</p></div>
+                </details>
+            </div>
+        </section>
+
+        <section class="text-center my-16">
+            <h2 class="text-3xl font-bold text-eva-green mb-6">지금, 우리와 함께 하세요</h2>
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                 <a href="https://naver.me/xQiVCYuJ" target="_blank" class="eva-button py-3 px-8 rounded-lg text-lg w-full sm:w-auto">
+                    지원서 작성하기
+                </a>
+                 <a href="https://open.kakao.com/o/sj85uChg" target="_blank" class="eva-button-secondary py-3 px-8 rounded-lg text-lg w-full sm:w-auto">
+                    1:1 문의하기
+                </a>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="text-center p-8 border-t border-border-dark mt-16">
+        <p class="text-sm text-gray-500">&copy; 2025 책 먹는 호반우. All rights reserved.</p>
+    </footer>
+
 </body>
 </html>
 
