@@ -110,13 +110,29 @@
     <main class="container mx-auto p-4 sm:p-6 lg:p-8">
 
         <section class="text-center my-12 md:my-20">
-            <h1 class="text-3xl md:text-5xl font-bold text-eva-green mb-4">D-7, 여름방학 독서캠프 모집</h1>
-            <p class="text-lg text-gray-300 max-w-3xl mx-auto mb-8">
-                2022년부터 운영된 KNU 독서모임 '책 먹는 호반우'에서 25년 여름방학을 함께 할 열정적인 캠프 인원을 모집합니다. 독서를 통해 함께 성장하고 즐거운 추억을 만들어봐요!
-            </p>
-            <a href="https://naver.me/xQiVCYuJ" target="_blank" class="eva-button py-3 px-8 rounded-lg text-xl inline-block">
-                지금 바로 지원하기
-            </a>
+            {# d_day가 0 이상이면(모집 기간이거나 당일이면) D-데이 표시 #}
+            {% if d_day >= 0 %}
+                <h1 class="text-3xl md:text-5xl font-bold text-eva-green mb-4">
+                    {% if d_day > 0 %}
+                        D-{{ d_day }}
+                    {% else %}
+                        D-DAY
+                    {% endif %}
+                    , 여름방학 독서캠프 모집
+                </h1>
+                <p class="text-lg text-gray-300 max-w-3xl mx-auto mb-8">
+                    2022년부터 운영된 KNU 독서모임 '책 먹는 호반우'에서 25년 여름방학을 함께 할 열정적인 캠프 인원을 모집합니다. 독서를 통해 함께 성장하고 즐거운 추억을 만들어봐요!
+                </p>
+                <a href="https://naver.me/xQiVCYuJ" target="_blank" class="eva-button py-3 px-8 rounded-lg text-xl inline-block">
+                    지금 바로 지원하기
+                </a>
+            {# d_day가 0보다 작으면(모집 기간이 지났으면) 다른 내용 표시 #}
+            {% else %}
+                <h1 class="text-3xl md:text-5xl font-bold text-eva-green mb-4">책 먹는 호반우</h1>
+                <p class="text-lg text-gray-300 max-w-3xl mx-auto mb-8">
+                    책 먹는 호반우 페이지입니다.
+                </p>
+            {% endif %}
         </section>
 
         <section class="my-16">

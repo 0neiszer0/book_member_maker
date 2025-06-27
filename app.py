@@ -120,7 +120,26 @@ def send_telegram_notification(message):
 # [신규] 가장 기본이 되는 메인 페이지 라우트를 추가합니다.
 @app.route('/')
 def main_index():
-    return render_template('main_index.html')
+    # --- [수정] D-데이 계산 로직 추가 ---
+    try:
+        # 모집 마감일을 설정합니다. (년, 월, 일)
+        end_date_str = "2025-07-04"
+        # templates/main_index.html 파일의 모집 기간 마지막 날짜와 일치시킵니다.
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
+
+        # 오늘 날짜를 가져옵니다.
+        today = datetime.now()
+
+        # 남은 날짜(D-데이)를 계산합니다.
+        # 날짜만 비교하기 위해 .date()를 사용합니다.
+        delta = end_date.date() - today.date()
+        d_day = delta.days
+    except Exception as e:
+        app.logger.error(f"D-day calculation error: {e}")
+        d_day = -1  # 오류 발생 시 기간이 지난 것으로 처리
+
+    # 계산된 d_day 값을 템플릿으로 전달합니다.
+    return render_template('main_index.html', d_day=d_day)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -276,28 +295,55 @@ def create_event():
 @login_required(role="admin")
 def manage_event(event_id):
     """
-    [수정] 이벤트 정보와 함께, 이미 생성된 슬롯들의 요약 정보도 함께 불러옵니다.
+    [수정] 이벤트 정보와 함께, 생성된 모든 슬롯의 상세 목록도 함께 불러옵니다.
     """
     try:
         event_res = supabase.table('events').select('*').eq('id', event_id).single().execute()
+        event_data = event_res.data
 
-        # 해당 이벤트에 이미 생성된 슬롯들을 날짜별로 카운트합니다.
-        # Supabase에서는 직접적인 GROUP BY와 COUNT를 RPC(DB 함수)로 구현하는 것이 가장 효율적입니다.
-        # 여기서는 Python에서 처리하는 간단한 방식을 사용합니다.
-        slots_res = supabase.table('time_slots').select('slot_datetime').eq('event_id', event_id).execute()
+        # 해당 이벤트의 모든 슬롯을 시간순으로 정렬하여 가져옵니다.
+        # 예약자 정보를 함께 표시하기 위해 관련 데이터도 조회합니다.
+        slots_res = supabase.table('time_slots').select('*, reservations(applicants(*))').eq('event_id', event_id).order('slot_datetime').execute()
+        slots_data = slots_res.data
 
+        # 날짜별 슬롯 요약 (기존 기능 유지)
         slots_summary = {}
-        if slots_res.data:
-            for slot in slots_res.data:
-                # KST 기준으로 날짜 키 생성
-                kst_dt = datetime.fromisoformat(slot['slot_datetime'].replace('Z', '+00:00')) + timedelta(hours=9)
-                date_key = kst_dt.strftime('%Y-%m-%d')
-                slots_summary[date_key] = slots_summary.get(date_key, 0) + 1
+        KST = timezone(timedelta(hours=9))
+        for slot in slots_data:
+            utc_dt = datetime.fromisoformat(slot['slot_datetime'].replace('Z', '+00:00'))
+            kst_dt = utc_dt.astimezone(KST)
+            date_key = kst_dt.strftime('%Y-%m-%d')
+            slots_summary[date_key] = slots_summary.get(date_key, 0) + 1
 
-        return render_template('admin_event_manage.html', event=event_res.data, slots_summary=slots_summary)
+        return render_template(
+            'admin_event_manage.html',
+            event=event_data,
+            slots_summary=slots_summary,
+            all_slots=slots_data  # 상세 슬롯 목록을 템플릿으로 전달
+        )
     except Exception as e:
         flash(f"이벤트 정보를 불러오는 중 오류 발생: {e}", "danger")
         return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/api/admin/slots/<slot_id>/delete', methods=['POST'])
+@login_required(role="admin")
+def delete_single_slot(slot_id):
+    """관리자가 특정 시간 슬롯 하나를 삭제합니다."""
+    try:
+        # 슬롯이 예약되어 있는지 확인하고, 예약되어 있다면 예약을 먼저 삭제합니다.
+        supabase.table('reservations').delete().eq('slot_id', slot_id).execute()
+
+        # 이제 시간 슬롯을 삭제합니다.
+        result = supabase.table('time_slots').delete().eq('id', slot_id).execute()
+
+        if not result.data:
+            return jsonify({'status': 'error', 'message': '삭제할 슬롯을 찾을 수 없습니다.'}), 404
+
+        return jsonify({'status': 'success', 'message': '슬롯이 성공적으로 삭제되었습니다.'})
+    except Exception as e:
+        app.logger.error(f"Error deleting slot {slot_id}: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @app.route('/admin/events/<event_id>/timetable')
@@ -325,7 +371,7 @@ def admin_event_timetable(event_id):
 @login_required(role="admin")
 def generate_slots(event_id):
     """
-    [수정] 주말에도 면접 날짜를 생성할 수 있도록 요일 확인 로직을 제거합니다.
+    [수정] 선택된 요일에만 면접 슬롯이 생성되도록 로직을 변경합니다.
     """
     try:
         form = request.form
@@ -333,23 +379,30 @@ def generate_slots(event_id):
         end_date = datetime.strptime(form.get('end_date'), '%Y-%m-%d').date()
         start_time = datetime.strptime(form.get('start_time'), '%H:%M').time()
         end_time = datetime.strptime(form.get('end_time'), '%H:%M').time()
+        # 요일 정보를 리스트로 받습니다. (월요일=0, 화요일=1, ..., 일요일=6)
+        selected_days = request.form.getlist('days')
+        if not selected_days:
+            flash("슬롯을 생성할 요일을 하나 이상 선택해주세요.", "warning")
+            return redirect(url_for('manage_event', event_id=event_id))
 
         KST = timezone(timedelta(hours=9))
         slots_to_insert = []
         current_date = start_date
 
         while current_date <= end_date:
-            # [수정] 주말을 확인하는 if 문을 제거하여 모든 요일에 슬롯이 생성되도록 합니다.
-            current_dt_naive = datetime.combine(current_date, start_time)
-            end_dt_naive = datetime.combine(current_date, end_time)
+            # 현재 날짜의 요일이 선택된 요일 리스트에 있는지 확인
+            # str()로 감싸는 이유는 form에서 온 값들이 문자열이기 때문입니다.
+            if str(current_date.weekday()) in selected_days:
+                current_dt_naive = datetime.combine(current_date, start_time)
+                end_dt_naive = datetime.combine(current_date, end_time)
 
-            while current_dt_naive < end_dt_naive:
-                aware_dt_kst = current_dt_naive.replace(tzinfo=KST)
-                slots_to_insert.append({
-                    'event_id': event_id,
-                    'slot_datetime': aware_dt_kst.isoformat()
-                })
-                current_dt_naive += timedelta(minutes=15)
+                while current_dt_naive < end_dt_naive:
+                    aware_dt_kst = current_dt_naive.replace(tzinfo=KST)
+                    slots_to_insert.append({
+                        'event_id': event_id,
+                        'slot_datetime': aware_dt_kst.isoformat()
+                    })
+                    current_dt_naive += timedelta(minutes=15)
 
             current_date += timedelta(days=1)
 
@@ -357,8 +410,7 @@ def generate_slots(event_id):
             supabase.table('time_slots').insert(slots_to_insert).execute()
             flash(f"{len(slots_to_insert)}개의 시간 슬롯이 성공적으로 생성되었습니다.", 'success')
         else:
-            # [수정] 안내 메시지를 변경했습니다.
-            flash("생성된 시간 슬롯이 없습니다. 날짜나 시간을 다시 확인해주세요.", 'warning')
+            flash("선택하신 기간과 요일에 생성할 슬롯이 없습니다. 날짜나 시간을 다시 확인해주세요.", 'warning')
 
     except Exception as e:
         flash(f"슬롯 생성 중 오류 발생: {e}", "danger")
@@ -444,6 +496,49 @@ def admin_update_interviewers(slot_id):
         app.logger.error(f"Error updating interviewers by admin: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+@app.route('/api/admin/reservations/create', methods=['POST'])
+@login_required(role="admin")
+def admin_create_reservation():
+    """관리자가 타임테이블에서 직접 면접자를 등록하고 예약합니다."""
+    data = request.get_json()
+    slot_id = data.get('slot_id')
+    name = data.get('name')
+    phone = data.get('phone_number')
+
+    if not all([slot_id, name, phone]):
+        return jsonify({"error": "슬롯 ID, 이름, 연락처는 필수입니다."}), 400
+
+    try:
+        # 1. 슬롯 상태 확인
+        slot_info = supabase.table('time_slots').select('is_booked').eq('id', slot_id).single().execute().data
+        if not slot_info:
+            return jsonify({"error": "존재하지 않는 슬롯입니다."}), 404
+        if slot_info.get('is_booked'):
+            return jsonify({"error": "이미 예약된 슬롯입니다."}), 409
+
+        # 2. 면접자(applicant) 정보 확인 또는 생성
+        applicant_res = supabase.table('applicants').select('id').eq('phone_number', phone).execute().data
+        if applicant_res:
+            applicant_id = applicant_res[0]['id']
+            # 이미 있는 지원자 정보 업데이트 (이름이 다를 경우 대비)
+            supabase.table('applicants').update({'name': name}).eq('id', applicant_id).execute()
+        else:
+            # 새로운 지원자 생성
+            new_applicant = supabase.table('applicants').insert({'name': name, 'phone_number': phone}).execute().data[0]
+            applicant_id = new_applicant['id']
+
+        # 3. 예약(reservation) 생성
+        supabase.table('reservations').insert({'slot_id': slot_id, 'applicant_id': applicant_id}).execute()
+
+        # 4. 슬롯 상태를 '예약 완료'로 변경
+        supabase.table('time_slots').update({'is_booked': True}).eq('id', slot_id).execute()
+
+        return jsonify({"message": "예약이 성공적으로 등록되었습니다."}), 201
+
+    except Exception as e:
+        app.logger.error(f"Error creating reservation by admin: {e}")
+        return jsonify({"error": "예약 처리 중 서버 오류가 발생했습니다."}), 500
+
 
 @app.route('/api/admin/events/<event_id>/toggle_active', methods=['POST'])
 @login_required(role="admin")
@@ -466,17 +561,86 @@ def delete_event(event_id):
         # 이벤트에 속한 슬롯들을 먼저 조회합니다.
         slots_to_delete_res = supabase.table('time_slots').select('id').eq('event_id', event_id).execute()
 
-        # 슬롯이 존재하면, 해당 슬롯들과 연결된 예약들을 먼저 삭제합니다.
+        # 슬롯이 존재하면, 관련된 예약과 슬롯을 명시적으로 삭제합니다.
         if slots_to_delete_res.data:
             slot_ids = [slot['id'] for slot in slots_to_delete_res.data]
+            # 1. 예약(reservations)을 먼저 삭제합니다.
             supabase.table('reservations').delete().in_('slot_id', slot_ids).execute()
+            # 2. 시간 슬롯(time_slots)을 그 다음 삭제합니다.
+            supabase.table('time_slots').delete().eq('event_id', event_id).execute()
 
-        # 이제 이벤트를 삭제합니다. DB 설정(ON DELETE CASCADE)에 따라 관련 슬롯들도 함께 삭제됩니다.
+        # 3. 이제 관련 데이터가 모두 사라졌으므로 이벤트를 안전하게 삭제합니다.
         supabase.table('events').delete().eq('id', event_id).execute()
 
         return jsonify({'status': 'success', 'message': '이벤트가 성공적으로 삭제되었습니다.'})
     except Exception as e:
         app.logger.error(f"Error deleting event: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/admin/events/<event_id>/delete_all_slots', methods=['POST'])
+@login_required(role="admin")
+def delete_all_slots(event_id):
+    """특정 이벤트에 속한 모든 시간 슬롯과 예약을 삭제합니다."""
+    try:
+        # 1. 삭제할 슬롯들의 ID를 먼저 조회합니다.
+        slots_to_delete_res = supabase.table('time_slots').select('id').eq('event_id', event_id).execute()
+        if not slots_to_delete_res.data:
+            return jsonify({'status': 'info', 'message': '삭제할 슬롯이 없습니다.'})
+
+        slot_ids = [slot['id'] for slot in slots_to_delete_res.data]
+
+        # 2. 해당 슬롯들과 연결된 '예약(reservations)'을 먼저 삭제합니다.
+        supabase.table('reservations').delete().in_('slot_id', slot_ids).execute()
+
+        # 3. '시간 슬롯(time_slots)'을 삭제합니다.
+        supabase.table('time_slots').delete().eq('event_id', event_id).execute()
+
+        return jsonify({'status': 'success', 'message': f'{len(slot_ids)}개의 슬롯과 관련 예약이 모두 삭제되었습니다.'})
+
+    except Exception as e:
+        app.logger.error(f"Error deleting all slots for event {event_id}: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/admin/events/<event_id>/update', methods=['POST'])
+@login_required(role="admin")
+def update_event(event_id):
+    """이벤트 정보를 수정합니다."""
+    try:
+        form_data = request.form
+        update_data = {
+            'event_name': form_data.get('event_name'),
+            'start_date': form_data.get('start_date'),
+            'end_date': form_data.get('end_date'),
+        }
+        supabase.table('events').update(update_data).eq('id', event_id).execute()
+        flash('이벤트 정보가 성공적으로 수정되었습니다.', 'success')
+    except Exception as e:
+        app.logger.error(f"Error updating event {event_id}: {e}")
+        flash(f'이벤트 수정 중 오류 발생: {e}', 'danger')
+
+    return redirect(url_for('manage_event', event_id=event_id))
+
+@app.route('/api/admin/applicants/<applicant_id>/update', methods=['POST'])
+@login_required(role="admin")
+def update_applicant_info(applicant_id):
+    """관리자가 예약자의 정보를 수정합니다."""
+    try:
+        data = request.json
+        name = data.get('name')
+        phone_number = data.get('phone_number')
+
+        if not name or not phone_number:
+            return jsonify({'status': 'error', 'message': '이름과 연락처는 필수입니다.'}), 400
+
+        supabase.table('applicants').update({
+            'name': name,
+            'phone_number': phone_number
+        }).eq('id', applicant_id).execute()
+
+        return jsonify({'status': 'success', 'message': '예약자 정보가 수정되었습니다.'})
+
+    except Exception as e:
+        app.logger.error(f"Error updating applicant info for {applicant_id}: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
@@ -563,21 +727,35 @@ def bookclub_index():
         present_names = request.form.getlist('present')
         facilitator_names = request.form.getlist('facilitators')
 
+        # [추가] 고급 설정 값 가져오기
+        group_count_str = request.form.get('group_count')
+        group_names_str = request.form.get('group_names', '')
+
+        try:
+            # [추가] 그룹 수를 정수로 변환 (입력이 없으면 None)
+            group_count_override = int(group_count_str) if group_count_str else None
+        except ValueError:
+            group_count_override = None  # 숫자가 아닌 값이 입력된 경우 무시
+
+        # [추가] 그룹 이름을 리스트로 변환
+        group_names = [name.strip() for name in group_names_str.split(',') if name.strip()]
+
         try:
             members_df = pd.DataFrame(members_res)
             history_res = supabase.table("history").select("groups").execute().data
             history_df = pd.DataFrame(history_res)
 
-            # 두 가지 철학(성비, 새만남)으로 각각 실행
             gender_solutions = run_genetic_algorithm(
                 members_df=members_df, history_df=history_df,
                 attendee_names=present_names, presenter_names=facilitator_names,
-                weights=(10.0, 6.0, 3.0, 2.0, -1000.0)  # 성비 우선 가중치
+                weights=(10.0, 6.0, 3.0, 2.0, -1000.0),
+                group_count_override=group_count_override  # [수정] 인자 전달
             )
             new_face_solutions = run_genetic_algorithm(
                 members_df=members_df, history_df=history_df,
                 attendee_names=present_names, presenter_names=facilitator_names,
-                weights=(6.0, 10.0, 3.0, 2.0, -1000.0)  # 새로운 만남 우선 가중치
+                weights=(6.0, 10.0, 3.0, 2.0, -1000.0),
+                group_count_override=group_count_override  # [수정] 인자 전달
             )
 
             return render_template(
@@ -585,7 +763,8 @@ def bookclub_index():
                 gender_solutions=gender_solutions,
                 new_face_solutions=new_face_solutions,
                 present=present_names,
-                facilitators=facilitator_names
+                facilitators=facilitator_names,
+                group_names=group_names  # [추가] 그룹 이름을 템플릿에 전달
             )
         except Exception as e:
             flash(f"알고리즘 실행 중 오류가 발생했습니다: {e}", "danger")
@@ -594,7 +773,7 @@ def bookclub_index():
     return render_template('bookclub_index.html', members=members_res)
 
 
-def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_names, weights, num_results=3):
+def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_names, weights, num_results=3, group_count_override=None):
     # --- 1. 데이터 전처리 ---
     members_info = members_df.set_index('id').to_dict('index')
     name_to_id_map = pd.Series(members_df.id.values, index=members_df.name).to_dict()
@@ -620,13 +799,17 @@ def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_name
     num_attendees = len(TODAY_ATTENDEE_IDS)
     if num_attendees < 3: return []
 
-    if num_attendees <= 5:
-        num_groups = 1
-    elif num_attendees <= 10:
-        num_groups = 2
+    # [수정] 사용자 지정 그룹 수를 우선 적용
+    if group_count_override and group_count_override > 0:
+        num_groups = group_count_override
     else:
-        num_groups = round(num_attendees / 4.5)
-    if num_groups == 0: num_groups = 1
+        # 기존의 자동 계산 로직을 fallback으로 사용
+        if num_attendees <= 5:
+            num_groups = 1
+        elif num_attendees <= 10:
+            num_groups = 2
+        else:
+            num_groups = round(num_attendees / 4.5)
 
     attendee_id_map = {idx: member_id for idx, member_id in enumerate(TODAY_ATTENDEE_IDS)}
 
