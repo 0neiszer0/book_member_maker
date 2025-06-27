@@ -40,8 +40,15 @@
                             <p class="text-xs text-gray-400 mb-3">세부 점수 (성비, 새만남, 발제자, 선호도): {{ result.details|join(', ') }}</p>
                             <div class="space-y-2">
                                 {% for group in result.groups %}
-                                    <div class="p-2 bg-bg-dark rounded"><strong class="text-gray-300">그룹 {{ loop.index }}:</strong> {{ group|join(', ') }}</div>
-                                {% endfor %}
+                                <div class="p-2 bg-bg-dark rounded">
+                                    <strong class="text-gray-300">
+                                        {% if group_names and group_names[loop.index0] %}
+                                            {{ group_names[loop.index0] }}
+                                        {% else %}
+                                            그룹 {{ loop.index }}
+                                        {% endif %}:
+                                    </strong> {{ group|join(', ') }}
+                                </div>                                {% endfor %}
                             </div>
                             <button onclick="saveGroups({{ result.groups|tojson }})" class="mt-4 w-full eva-button bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg">이 조합으로 저장</button>
                         </div>

@@ -3,38 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>슬롯 생성 관리</title>
+    <title>{{ event.event_name }} - 이벤트 관리</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A;
-            --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444;
+            --eva-purple: #6A0DAD; --eva-green: #00FF7F; --eva-orange: #FF8C00;
+            --bg-dark: #1A1A1A; --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444;
         }
         body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
-        h1, h2 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; }
+        h1, h2, h3, h4, h5, h6 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; }
         .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
-        .eva-button-primary { background-color: var(--eva-purple); color: white; }
+        .eva-button-primary { background-color: var(--eva-purple); color: white; transition: background-color 0.2s; }
         .eva-button-primary:hover { background-color: #8A2BE2; }
-        .eva-button-secondary { background-color: #4A4A4A; color: var(--text-light); }
+        .eva-button-secondary { background-color: #4A4A4A; color: var(--text-light); transition: background-color 0.2s; }
         .eva-button-secondary:hover { background-color: #666666; }
+        .eva-button-delete { background-color: var(--eva-orange); color: black; transition: background-color 0.2s; }
+        .eva-button-delete:hover { background-color: #FFA500; }
         .eva-link { color: var(--eva-green); }
         .eva-link:hover { color: #ADFF2F; }
         .eva-input { background-color: #1A1A1A; border-color: var(--border-dark); color: var(--text-light); }
         .eva-input:focus { border-color: var(--eva-green); outline: none; box-shadow: 0 0 0 2px var(--eva-green); }
-        .weekday-label { border: 1px solid var(--border-dark); }
+        .weekday-label { border: 1px solid var(--border-dark); transition: background-color 0.2s, color 0.2s; }
         .weekday-label:has(:checked) { background-color: var(--eva-green); color: black; border-color: var(--eva-green); }
+        .eva-table-header { background-color: #333333; }
+        .eva-table-row:nth-child(even) { background-color: #383838; }
     </style>
 </head>
 <body class="min-h-screen">
-    <div class="container mx-auto p-4 md:p-8 max-w-4xl">
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            <div>
-                <h1 class="text-2xl sm:text-3xl font-bold text-eva-green">{{ event.event_name }}</h1>
-                <p class="text-gray-400 mt-1">이벤트 기간: {{ event.start_date }} ~ {{ event.end_date }}</p>
-            </div>
+            <h1 class="text-2xl sm:text-3xl font-bold text-eva-green">Event Management</h1>
             <a href="{{ url_for('admin_dashboard') }}" class="w-full sm:w-auto text-center eva-button-secondary font-bold py-2 px-4 rounded-md">Dashboard</a>
         </div>
 
@@ -44,91 +46,157 @@
             {% endfor %}{% endif %}
         {% endwith %}
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div class="eva-card p-6 rounded-lg">
-                <h2 class="text-xl font-bold mb-1">시간 슬롯 일괄 생성</h2>
-                <p class="text-sm text-gray-400 mb-4">선택한 기간과 시간에 15분 단위로 면접 시간을 자동으로 생성합니다.</p>
-
-                <form action="{{ url_for('generate_slots', event_id=event.id) }}" method="post" class="space-y-4">
-                    <div>
-                        <label for="start_date" class="block text-sm font-medium">날짜 범위 선택</label>
-                        <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2 mt-1">
-                            <input type="date" name="start_date" id="start_date" value="{{ event.start_date }}" min="{{ event.start_date }}" max="{{ event.end_date }}" required class="eva-input block w-full px-3 py-2 rounded-md">
-                            <span class="hidden sm:inline">~</span>
-                            <input type="date" name="end_date" id="end_date" value="{{ event.end_date }}" min="{{ event.start_date }}" max="{{ event.end_date }}" required class="eva-input block w-full px-3 py-2 rounded-md">
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+            <div class="lg:col-span-2 space-y-8">
+                <div class="eva-card p-6 rounded-lg">
+                    <h2 class="text-xl font-bold mb-4 text-eva-purple">이벤트 정보 수정</h2>
+                    <form action="{{ url_for('update_event', event_id=event.id) }}" method="POST" class="space-y-4">
+                        <div>
+                            <label for="eventName" class="block text-sm font-medium">이벤트 이름</label>
+                            <input type="text" class="eva-input mt-1 block w-full px-3 py-2 rounded-md" id="eventName" name="event_name" value="{{ event.event_name }}" required>
                         </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium">면접 진행 요일 선택</label>
-                        <div class="mt-2 grid grid-cols-4 sm:grid-cols-7 gap-2">
-                            {% set weekdays = [('0', '월'), ('1', '화'), ('2', '수'), ('3', '목'), ('4', '금'), ('5', '토'), ('6', '일')] %}
-                            {% for value, name in weekdays %}
-                            <label class="weekday-label flex items-center justify-center p-2 rounded-md cursor-pointer">
-                                <input type="checkbox" name="weekdays" value="{{ value }}" class="sr-only">
-                                <span>{{ name }}</span>
-                            </label>
-                            {% endfor %}
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="startDate" class="block text-sm font-medium">시작일</label>
+                                <input type="text" class="eva-input datepicker mt-1 block w-full px-3 py-2 rounded-md" id="startDate" name="start_date" value="{{ event.start_date }}" placeholder="날짜 선택" required>
+                            </div>
+                            <div>
+                                <label for="endDate" class="block text-sm font-medium">종료일</label>
+                                <input type="text" class="eva-input datepicker mt-1 block w-full px-3 py-2 rounded-md" id="endDate" name="end_date" value="{{ event.end_date }}" placeholder="날짜 선택" required>
+                            </div>
                         </div>
-                    </div>
+                        <button type="submit" class="eva-button-primary font-bold py-2.5 px-4 rounded-lg">정보 저장</button>
+                    </form>
+                </div>
 
-                    <div>
-                        <label class="block text-sm font-medium">시간 범위 선택</label>
-                        <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2 mt-1">
-                            <select name="start_time" id="start_time" required class="eva-input block w-full px-3 py-2 rounded-md"></select>
-                            <span class="hidden sm:inline">~</span>
-                            <select name="end_time" id="end_time" required class="eva-input block w-full px-3 py-2 rounded-md"></select>
+                <div class="eva-card p-6 rounded-lg">
+                    <h2 class="text-xl font-bold mb-1 text-eva-purple">시간 슬롯 일괄 생성</h2>
+                    <form action="{{ url_for('generate_slots', event_id=event.id) }}" method="post" class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">날짜 범위 선택</label>
+                            <div class="flex flex-col sm:flex-row items-center gap-2">
+                                <input type="text" name="start_date" value="{{ event.start_date }}" required class="eva-input datepicker block w-full px-3 py-2 rounded-md" placeholder="시작 날짜">
+                                <span class="hidden sm:inline text-gray-400">-</span>
+                                <input type="text" name="end_date" value="{{ event.end_date }}" required class="eva-input datepicker block w-full px-3 py-2 rounded-md" placeholder="종료 날짜">
+                            </div>
                         </div>
-                    </div>
-                    <button type="submit" class="w-full eva-button-primary font-bold py-2.5 px-4 rounded-lg">슬롯 생성하기</button>
-                </form>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">면접 진행 요일 선택</label>
+                            <div class="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                                {% set weekdays = [('0', '월'), ('1', '화'), ('2', '수'), ('3', '목'), ('4', '금'), ('5', '토'), ('6', '일')] %}
+                                {% for value, name in weekdays %}<label class="weekday-label flex items-center justify-center p-2 rounded-md cursor-pointer text-center"><input type="checkbox" name="days" value="{{ value }}" class="sr-only"><span>{{ name }}</span></label>{% endfor %}
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">시간 범위 선택</label>
+                            <div class="flex flex-col sm:flex-row items-center gap-2">
+                                <input type="text" name="start_time" required class="eva-input timepicker block w-full px-3 py-2 rounded-md" placeholder="시작 시간">
+                                <span class="hidden sm:inline text-gray-400">-</span>
+                                <input type="text" name="end_time" required class="eva-input timepicker block w-full px-3 py-2 rounded-md" placeholder="종료 시간">
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full eva-button-primary font-bold py-2.5 px-4 rounded-lg">슬롯 생성하기</button>
+                    </form>
+                </div>
+                <div class="eva-card p-6 rounded-lg border-eva-orange/50">
+                    <h2 class="text-xl font-bold mb-2 text-eva-orange">위험 구역</h2>
+                    <p class="text-sm text-gray-400 mb-4">주의: 이 이벤트의 모든 슬롯과 예약이 영구적으로 삭제됩니다.</p>
+                    <button class="w-full eva-button-delete font-bold py-2.5 px-4 rounded-lg" onclick="deleteAllSlots('{{ event.id }}')">모든 슬롯 일괄 삭제</button>
+                </div>
             </div>
 
-            <div class="eva-card p-6 rounded-lg">
-                <h2 class="text-xl font-bold mb-4">생성된 슬롯 현황</h2>
-                <div class="max-h-80 overflow-y-auto space-y-2 pr-2">
-                    {% if slots_summary %}
-                        {% for date, count in slots_summary.items()|sort %}
-                        <div class="flex justify-between items-center p-3 bg-bg-dark rounded-md">
-                            <span class="font-medium">{{ date }}</span>
-                            <span class="text-sm font-semibold text-eva-green bg-purple-900 px-2 py-0.5 rounded-full">{{ count }}개 슬롯</span>
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                        <p class="text-center text-gray-500 py-10">아직 생성된 슬롯이 없습니다.</p>
-                    {% endif %}
-                </div>
-                 <div class="mt-4 text-center">
-                    <a href="{{ url_for('admin_event_timetable', event_id=event.id) }}" class="eva-link font-semibold">전체 타임테이블 보기 &rarr;</a>
+            <div class="lg:col-span-3">
+                <div class="eva-card p-6 rounded-lg">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold text-eva-green">개별 슬롯 관리</h2>
+                        <a href="{{ url_for('admin_event_timetable', event_id=event.id) }}" class="eva-link font-semibold text-sm">전체 타임테이블 &rarr;</a>
+                    </div>
+                    <div class="max-h-[80vh] overflow-y-auto">
+                        <table class="min-w-full divide-y divide-border-dark" id="slots-table">
+                            <thead class="eva-table-header sticky top-0">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">시간</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">상태</th>
+                                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-300 uppercase">관리</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-border-dark">
+                                {% for slot in all_slots %}
+                                <tr id="slot-row-{{ slot.id }}" class="eva-table-row">
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium">{{ slot.slot_datetime | datetime }}</td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm">
+                                        {# --- [오류 해결] slot.reservations[0].applicants 까지 모두 존재하는지 확인 --- #}
+                                        {% if slot.is_booked and slot.reservations and slot.reservations[0] and slot.reservations[0].applicants %}
+                                            <span class="font-bold text-eva-orange">예약 완료</span>
+                                            <span class="text-gray-400 text-xs ml-2">({{ slot.reservations[0].applicants.name }})</span>
+                                        {% elif not slot.is_active %}
+                                            <span class="text-gray-500">닫힘</span>
+                                        {% else %}
+                                            <span class="text-eva-green">예약 가능</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-center">
+                                        <button class="eva-button-delete text-xs font-bold py-1 px-2 rounded-md delete-slot-btn" data-slot-id="{{ slot.id }}" data-is-booked="{{ 'true' if slot.is_booked else 'false' }}">삭제</button>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="3" class="px-6 py-10 text-center text-sm text-gray-500">생성된 슬롯이 없습니다.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/ko.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    const startTimeSelect = document.getElementById('start_time');
-    const endTimeSelect = document.getElementById('end_time');
-    function populateTimeOptions(selectElement) {
-        for (let hour = 0; hour < 24; hour++) {
-            for (let minute = 0; minute < 60; minute += 15) {
-                const hourStr = String(hour).padStart(2, '0');
-                const minuteStr = String(minute).padStart(2, '0');
-                const timeValue = `${hourStr}:${minuteStr}`;
-                let ampm = hour < 12 ? '오전' : '오후';
-                let displayHour = hour % 12;
-                if (displayHour === 0) { displayHour = 12; }
-                const displayTime = `${ampm} ${String(displayHour).padStart(2, '0')}:${minuteStr}`;
-                const option = document.createElement('option');
-                option.value = timeValue;
-                option.textContent = displayTime;
-                selectElement.appendChild(option);
+    // 날짜 선택기
+    flatpickr(".datepicker", { "locale": "ko", dateFormat: "Y-m-d" });
+    // 시간 선택기
+    flatpickr(".timepicker", { enableTime: true, noCalendar: true, dateFormat: "H:i", time_24hr: true });
+
+    // 전체 슬롯 일괄 삭제 함수
+    window.deleteAllSlots = (eventId) => {
+        if (!confirm('정말로 이 이벤트의 모든 슬롯과 예약 정보를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
+        fetch(`/api/admin/events/${eventId}/delete_all_slots`, { method: 'POST', headers: {'Content-Type': 'application/json'} })
+        .then(response => response.json()).then(data => {
+            alert(data.message);
+            if (data.status === 'success') window.location.reload();
+        }).catch(error => alert('슬롯 삭제 중 오류가 발생했습니다.'));
+    };
+
+    // 개별 슬롯 삭제 이벤트 리스너
+    const slotsTable = document.getElementById('slots-table');
+    if (slotsTable) {
+        slotsTable.addEventListener('click', (e) => {
+            if (e.target.matches('.delete-slot-btn')) {
+                const button = e.target;
+                const slotId = button.dataset.slotId;
+                const isBooked = button.dataset.isBooked === 'true';
+                let confirmMessage = '정말로 이 슬롯을 삭제하시겠습니까?';
+                if (isBooked) { confirmMessage += '\n\n경고: 이 슬롯은 이미 예약되었습니다. 삭제 시 예약 정보도 함께 사라집니다.'; }
+                if (confirm(confirmMessage)) {
+                    fetch(`/api/admin/slots/${slotId}/delete`, { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            document.getElementById(`slot-row-${slotId}`).remove();
+                        } else {
+                            alert('삭제 실패: ' + data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('삭제 처리 중 오류가 발생했습니다.');
+                    });
+                }
             }
-        }
+        });
     }
-    populateTimeOptions(startTimeSelect);
-    populateTimeOptions(endTimeSelect);
-    startTimeSelect.value = '10:00';
-    endTimeSelect.value = '17:00';
 });
 </script>
 </body>
