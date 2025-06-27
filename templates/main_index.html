@@ -3,51 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>프로젝트 선택</title>
+    <title>SYSTEM MAIN</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --eva-purple: #6A0DAD;
+            --eva-green: #00FF7F;
+            --bg-dark: #1A1A1A;
+            --card-dark: #2D2D2D;
+            --text-light: #E5E5E5;
+            --border-dark: #444444;
+        }
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+        }
+        h1, h2 {
+            font-family: 'Orbitron', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .eva-card {
+            background-color: var(--card-dark);
+            border: 1px solid var(--border-dark);
+            box-shadow: 0 0 25px rgba(0, 255, 127, 0.15);
+        }
+        .eva-button {
+            background-color: var(--eva-green);
+            color: black;
+            font-weight: bold;
+            transition: all 0.2s ease-in-out;
+        }
+        .eva-button:hover {
+            box-shadow: 0 0 15px var(--eva-green);
+            transform: translateY(-2px);
+        }
+    </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center h-screen">
-    <div class="text-center bg-white p-10 md:p-16 rounded-xl shadow-2xl max-w-2xl w-full">
+<body class="flex items-center justify-center min-h-screen">
+    <div class="text-center eva-card p-10 md:p-16 rounded-xl shadow-2xl max-w-2xl w-full">
 
-        <!-- 로그인 상태일 때 -->
+        <!-- 로그인 상태에 따라 다른 화면 표시 -->
         {% if session.user_role %}
-            <h1 class="text-3xl font-bold text-gray-800 mb-4">
-                환영합니다, {{ session.user_name or '사용자' }}님!
+            <h1 class="text-3xl font-bold text-eva-green mb-4">
+                Welcome, {{ session.user_name or '사용자' }}
             </h1>
-            <p class="text-gray-600 mb-8">
-                현재 '<span class="font-bold text-blue-600">{{ session.user_role | capitalize }}</span>' 역할로 로그인되어 있습니다.
+            <p class="text-gray-400 mb-8">
+                ROLE: <span class="font-bold text-eva-purple">{{ session.user_role | capitalize }}</span>
             </p>
             <div class="space-y-4">
-
-                <!-- 관리자 전용 메뉴 -->
                 {% if session.user_role == 'admin' %}
-                    <a href="{{ url_for('admin_dashboard') }}" class="block w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg text-lg transition duration-300">면접 관리 대시보드</a>
-                    <a href="{{ url_for('bookclub_index') }}" class="block w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg text-lg transition duration-300">독서 모임 조 편성</a>
+                    <a href="{{ url_for('admin_dashboard') }}" class="block w-full bg-red-500 hover:bg-red-600 eva-button py-3 px-6 rounded-lg text-lg">Admin Dashboard</a>
+                    <a href="{{ url_for('bookclub_index') }}" class="block w-full bg-blue-500 hover:bg-blue-600 eva-button py-3 px-6 rounded-lg text-lg">독서 모임 조 편성</a>
                 {% endif %}
-
-                <!-- 면접관 전용 메뉴 -->
                 {% if session.user_role == 'interviewer' %}
-                     <a href="{{ url_for('interviewer_events_list') }}" class="block w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-lg text-lg transition duration-300">내 면접 스케줄 보기</a>
+                     <a href="{{ url_for('interviewer_events_list') }}" class="block w-full bg-purple-600 hover:bg-purple-700 eva-button py-3 px-6 rounded-lg text-lg">내 면접 스케줄 보기</a>
                 {% endif %}
-
-                <!-- 면접자 전용 메뉴 -->
                 {% if session.user_role == 'applicant' %}
-                    <a href="{{ url_for('interview_index') }}" class="block w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg text-lg transition duration-300">면접 시간 예약하기</a>
+                    <a href="{{ url_for('interview_index') }}" class="block w-full bg-green-500 hover:bg-green-600 eva-button py-3 px-6 rounded-lg text-lg">면접 시간 예약하기</a>
                 {% endif %}
-
             </div>
             <div class="mt-8">
-                <a href="{{ url_for('logout') }}" class="text-sm text-gray-500 hover:text-gray-700">로그아웃</a>
+                <a href="/logout" class="text-sm text-gray-500 hover:text-eva-green">Logout</a>
             </div>
 
         <!-- 로그인 안 된 상태일 때 -->
         {% else %}
-            <h1 class="text-4xl font-bold text-gray-800 mb-8">환영합니다!</h1>
-            <p class="text-gray-600 mb-10">
+            <h1 class="text-4xl font-bold text-eva-green mb-8">책 먹는 호반우</h1>
+            <p class="text-gray-400 mb-10">
                 서비스를 이용하려면 로그인이 필요합니다.
             </p>
-            <a href="{{ url_for('login') }}" class="block w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-6 rounded-lg text-xl transition duration-300 ease-in-out transform hover:-translate-y-1">
-                로그인 페이지로 이동
+            <a href="/login" class="block w-full bg-eva-green hover:shadow-lg hover:shadow-eva-green/50 eva-button py-4 px-6 rounded-lg text-xl">
+                LOGIN
             </a>
         {% endif %}
 

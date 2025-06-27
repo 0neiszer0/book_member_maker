@@ -5,34 +5,45 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>독서모임 조 편성 결과 (GA)</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A;
+            --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444;
+        }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
+        h1, h2, h3 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; }
+        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
+        .eva-button { font-weight: bold; transition: all 0.2s; }
+        .eva-button:hover { transform: translateY(-1px); }
+    </style>
 </head>
-<body class="bg-gray-100">
+<body class="min-h-screen">
     <div class="container mx-auto p-4 sm:p-6 lg:p-8">
         <div class="flex justify-between items-center mb-6">
-            <h1 class="text-3xl font-bold text-gray-800">조 편성 결과</h1>
-            <a href="/making_team" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">다시 편성하기</a>
+            <h1 class="text-3xl font-bold text-eva-green">Grouping Result</h1>
+            <a href="/making_team" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md">다시 편성하기</a>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <!-- 성비 우선 결과 -->
             <section>
-                <h2 class="text-2xl font-semibold mb-4 text-center text-blue-600">성비 우선 조합</h2>
+                <h2 class="text-2xl font-semibold mb-4 text-center text-blue-400">성비 우선 조합</h2>
                 {% if gender_solutions %}
                     {% for result in gender_solutions %}
-                        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                        <div class="eva-card p-6 mb-6 rounded-lg">
                             <div class="flex justify-between items-center mb-3">
                                 <h3 class="text-lg font-bold">추천안 {{ loop.index }}</h3>
-                                <span class="text-sm font-semibold bg-blue-100 text-blue-800 px-3 py-1 rounded-full">총점: {{ result.score }}</span>
+                                <span class="text-sm font-semibold bg-blue-900 text-blue-200 px-3 py-1 rounded-full">총점: {{ result.score }}</span>
                             </div>
-                            <p class="text-xs text-gray-500 mb-3">세부 점수 (성비, 새만남, 발제자, 선호도): {{ result.details|join(', ') }}</p>
+                            <p class="text-xs text-gray-400 mb-3">세부 점수 (성비, 새만남, 발제자, 선호도): {{ result.details|join(', ') }}</p>
                             <div class="space-y-2">
                                 {% for group in result.groups %}
-                                    <div class="p-2 bg-gray-50 rounded">
-                                        <strong class="text-gray-700">그룹 {{ loop.index }}:</strong> {{ group|join(', ') }}
-                                    </div>
+                                    <div class="p-2 bg-bg-dark rounded"><strong class="text-gray-300">그룹 {{ loop.index }}:</strong> {{ group|join(', ') }}</div>
                                 {% endfor %}
                             </div>
-                            <button onclick="saveGroups({{ result.groups|tojson }})" class="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded-lg">이 조합으로 저장</button>
+                            <button onclick="saveGroups({{ result.groups|tojson }})" class="mt-4 w-full eva-button bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg">이 조합으로 저장</button>
                         </div>
                     {% endfor %}
                 {% else %}
@@ -40,25 +51,22 @@
                 {% endif %}
             </section>
 
-            <!-- 새로운 만남 우선 결과 -->
             <section>
-                <h2 class="text-2xl font-semibold mb-4 text-center text-green-600">새로운 만남 우선 조합</h2>
+                <h2 class="text-2xl font-semibold mb-4 text-center text-eva-green">새로운 만남 우선 조합</h2>
                 {% if new_face_solutions %}
                     {% for result in new_face_solutions %}
-                        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                        <div class="eva-card p-6 mb-6 rounded-lg">
                             <div class="flex justify-between items-center mb-3">
                                 <h3 class="text-lg font-bold">추천안 {{ loop.index }}</h3>
-                                <span class="text-sm font-semibold bg-green-100 text-green-800 px-3 py-1 rounded-full">총점: {{ result.score }}</span>
+                                <span class="text-sm font-semibold bg-green-900 text-green-200 px-3 py-1 rounded-full">총점: {{ result.score }}</span>
                             </div>
-                            <p class="text-xs text-gray-500 mb-3">세부 점수 (성비, 새만남, 발제자, 선호도): {{ result.details|join(', ') }}</p>
+                            <p class="text-xs text-gray-400 mb-3">세부 점수 (성비, 새만남, 발제자, 선호도): {{ result.details|join(', ') }}</p>
                             <div class="space-y-2">
                                 {% for group in result.groups %}
-                                    <div class="p-2 bg-gray-50 rounded">
-                                        <strong class="text-gray-700">그룹 {{ loop.index }}:</strong> {{ group|join(', ') }}
-                                    </div>
+                                    <div class="p-2 bg-bg-dark rounded"><strong class="text-gray-300">그룹 {{ loop.index }}:</strong> {{ group|join(', ') }}</div>
                                 {% endfor %}
                             </div>
-                            <button onclick="saveGroups({{ result.groups|tojson }})" class="mt-4 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 rounded-lg">이 조합으로 저장</button>
+                            <button onclick="saveGroups({{ result.groups|tojson }})" class="mt-4 w-full eva-button bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">이 조합으로 저장</button>
                         </div>
                     {% endfor %}
                 {% else %}
@@ -74,14 +82,12 @@
 
     async function saveGroups(groups) {
         if (!confirm("이 조 편성 결과를 저장하시겠습니까?")) return;
-
         const dataToSave = {
             date: new Date().toISOString().slice(0, 10),
             present: present,
             facilitators: facilitators,
             groups: groups
         };
-
         try {
             const response = await fetch('/api/bookclub/save', {
                 method: 'POST',
