@@ -5,23 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>면접 시간 예약</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        .slot-btn { transition: all 0.2s ease-in-out; }
-        .slot-btn:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        .slot-btn:disabled { cursor: not-allowed; background-color: #e5e7eb; color: #9ca3af; }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 40px auto; }
+        :root {
+            --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A;
+            --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444;
+        }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
+        h1, h2, h3 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; }
+        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
+        .slot-btn { background-color: #312e81; color: #c7d2fe; transition: all 0.2s ease-in-out; }
+        .slot-btn:not(:disabled):hover { background-color: #4338ca; color: white; transform: translateY(-2px); box-shadow: 0 0 10px var(--eva-green); }
+        .slot-btn:disabled { cursor: not-allowed; background-color: #374151; color: #6b7280; }
+        .loader { border: 4px solid #444; border-top: 4px solid var(--eva-green); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 40px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .eva-input { background-color: #1A1A1A; border-color: var(--border-dark); color: var(--text-light); }
     </style>
 </head>
-<body class="bg-gray-50 font-sans">
+<body class="font-sans">
 
-    <header class="bg-white shadow-sm sticky top-0 z-40">
+    <header class="bg-card-dark shadow-md sticky top-0 z-40 border-b border-border-dark">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center py-4">
-                <h1 class="text-xl font-bold text-gray-800">면접 예약 시스템</h1>
+                <h1 class="text-xl font-bold text-eva-green">Interview Reservation</h1>
                 <div>
-                    <span class="text-sm text-gray-600 mr-4">환영합니다, <strong>{{ user_name or '지원자' }}</strong>님!</span>
-                    <a href="/logout" class="text-sm font-medium text-indigo-600 hover:text-indigo-500">로그아웃</a>
+                    <span class="text-sm text-gray-400 mr-4">Welcome, <strong>{{ user_name or '지원자' }}</strong></span>
+                    <a href="/logout" class="text-sm font-medium text-purple-400 hover:text-eva-green">Logout</a>
                 </div>
             </div>
         </div>
@@ -30,31 +41,29 @@
     <main class="container mx-auto p-4 sm:p-6 lg:p-8">
         {% if event %}
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg">
-                <h2 class="text-2xl font-bold text-gray-900">{{ event.event_name }}</h2>
-                <p id="info-text" class="mt-1 text-gray-500">아래에서 원하시는 면접 날짜와 시간을 선택해주세요.</p>
-                <div id="slots-container" class="mt-6 space-y-6"><div id="loader" class="loader"></div></div>
+            <div class="lg:col-span-2 eva-card p-6 rounded-xl shadow-lg">
+                <h2 class="text-2xl font-bold text-eva-green">{{ event.event_name }}</h2>
+                <p id="info-text" class="mt-1 text-gray-400">아래에서 원하시는 면접 날짜와 시간을 선택해주세요.</p>
+                <div id="slots-container" class="mt-6 space-y-6"><div class="loader"></div></div>
             </div>
             <div class="lg:col-span-1">
-                <div class="bg-white p-6 rounded-xl shadow-lg sticky top-24">
-                    <h3 class="text-lg font-bold text-gray-900">나의 예약 정보</h3>
-                    <div id="my-reservation-info" class="mt-4">
-                        <p class="text-gray-500">예약 정보를 불러오는 중...</p>
-                    </div>
+                <div class="eva-card p-6 rounded-xl shadow-lg sticky top-24">
+                    <h3 class="text-lg font-bold text-eva-green">My Reservation</h3>
+                    <div id="my-reservation-info" class="mt-4"><p class="text-gray-500">예약 정보를 불러오는 중...</p></div>
                 </div>
             </div>
         </div>
         {% else %}
-        <div class="text-center bg-white p-12 rounded-xl shadow-lg max-w-2xl mx-auto">
-            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-            <h2 class="mt-4 text-2xl font-bold text-gray-800">예약 가능한 면접이 없습니다</h2>
-            <p class="mt-2 text-gray-600">현재 관리자가 오픈한 면접이 없습니다. 나중에 다시 확인해주세요.</p>
-            <div class="mt-6"><a href="/" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">메인으로 돌아가기</a></div>
+        <div class="text-center eva-card p-12 rounded-xl shadow-lg max-w-2xl mx-auto">
+            <svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            <h2 class="mt-4 text-2xl font-bold text-orange-400">No Event Available</h2>
+            <p class="mt-2 text-gray-400">현재 예약 가능한 면접이 없습니다.</p>
+            <div class="mt-6"><a href="/" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-black bg-eva-green hover:shadow-lg hover:shadow-eva-green/50">메인으로 돌아가기</a></div>
         </div>
         {% endif %}
     </main>
 
-    <div id="modal-container" class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full hidden z-50"></div>
+    <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-80 overflow-y-auto h-full w-full hidden z-50"></div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -71,33 +80,39 @@ document.addEventListener('DOMContentLoaded', function() {
     let hasReservation = false;
 
     function showModal(content) {
-        modalContainer.innerHTML = `<div class="relative top-20 mx-auto p-5 border w-full max-w-sm shadow-lg rounded-md bg-white">${content}</div>`;
+        const modalContainer = document.getElementById('modal-container');
+        modalContainer.innerHTML = `<div class="relative top-20 mx-auto p-5 border border-border-dark w-full max-w-sm shadow-lg rounded-md eva-card">${content}</div>`;
         modalContainer.classList.remove('hidden');
     }
-    function hideModal() { modalContainer.classList.add('hidden'); }
+    function hideModal() { document.getElementById('modal-container').classList.add('hidden'); }
 
     function showAlert(title, message, isSuccess = true) {
         const icon = isSuccess ?
-            `<svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>` :
-            `<svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>`;
-        const iconBg = isSuccess ? 'bg-green-100' : 'bg-red-100';
+            `<svg class="h-6 w-6 text-eva-green" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>` :
+            `<svg class="h-6 w-6 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>`;
+        const iconBg = isSuccess ? 'bg-green-900/50' : 'bg-orange-900/50';
+
         const alertContent = `
             <div class="mt-3 text-center">
                 <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full ${iconBg}">${icon}</div>
-                <h3 class="text-lg leading-6 font-medium text-gray-900 mt-4">${title}</h3>
-                <div class="mt-2 px-7 py-3"><p class="text-sm text-gray-500">${message}</p></div>
-                <div class="items-center px-4 py-3"><button id="alert-close-btn" class="px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-600">닫기</button></div>
+                <h3 class="text-lg leading-6 font-medium text-eva-green mt-4">${title}</h3>
+                <div class="mt-2 px-7 py-3"><p class="text-sm text-gray-400">${message}</p></div>
+                <div class="items-center px-4 py-3"><button id="alert-close-btn" class="px-4 py-2 bg-eva-purple text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-purple-700">닫기</button></div>
             </div>`;
         showModal(alertContent);
         document.getElementById('alert-close-btn').onclick = hideModal;
     }
 
     function showConfirmModal(slotId, slotTime) {
+        // [수정] 주 버튼의 텍스트를 '예약하기'로 변경하고, 배경과 명확히 대비되는 색상으로 수정
         const modalContent = `
             <div class="mt-3 text-center">
-                <h3 class="text-lg leading-6 font-medium text-gray-900">예약 확인</h3>
-                <div class="mt-2 px-7 py-3"><p class="text-sm text-gray-500"><strong>${slotTime}</strong><br>이 시간으로 면접을 예약하시겠습니까?</p><input type="text" class="mt-4 w-full px-3 py-2 border rounded-md bg-gray-100" value="${userName}" readonly><input type="tel" class="mt-2 w-full px-3 py-2 border rounded-md bg-gray-100" value="${userPhone}" readonly></div>
-                <div class="items-center px-4 py-3 space-y-2"><button id="confirm-reservation-btn" data-slot-id="${slotId}" class="px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-600">예, 예약합니다</button><button id="cancel-modal-btn" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300">취소</button></div>
+                <h3 class="text-lg leading-6 font-medium text-eva-green">예약 확인</h3>
+                <div class="mt-2 px-7 py-3"><p class="text-sm text-gray-400"><strong>${slotTime}</strong><br>이 시간으로 면접을 예약하시겠습니까?</p><input type="text" class="eva-input mt-4 w-full px-3 py-2 border rounded-md" value="${userName}" readonly><input type="tel" class="eva-input mt-2 w-full px-3 py-2 border rounded-md" value="${userPhone}" readonly></div>
+                <div class="items-center px-4 py-3 space-y-2">
+                    <button id="confirm-reservation-btn" data-slot-id="${slotId}" class="px-4 py-2 bg-gray-200 text-black font-bold text-base rounded-md w-full shadow-sm hover:bg-white transition-colors">예약하기</button>
+                    <button id="cancel-modal-btn" class="px-4 py-2 bg-transparent border border-gray-500 text-gray-300 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-700 hover:text-white transition-colors">취소</button>
+                </div>
             </div>`;
         showModal(modalContent);
         document.getElementById('confirm-reservation-btn').onclick = handleReservation;
@@ -131,19 +146,22 @@ document.addEventListener('DOMContentLoaded', function() {
             slotsContainer.innerHTML = '';
             const sortedDates = Object.keys(slotsByDate).sort();
             if (sortedDates.length === 0) {
-                 slotsContainer.innerHTML = '<div class="text-center p-6 bg-gray-50 rounded-lg"><p class="text-gray-500">예약 가능한 시간이 없습니다.</p></div>';
+                 // [수정] 밝은 배경 대신 테마에 맞는 eva-card 스타일 적용
+                 slotsContainer.innerHTML = '<div class="text-center p-6 eva-card rounded-lg"><p class="text-gray-500">예약 가능한 시간이 없습니다.</p></div>';
                  return;
             }
             sortedDates.forEach(date => {
                 const dateContainer = document.createElement('div');
                 const dateObj = new Date(date);
                 const dateString = dateObj.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
-                dateContainer.innerHTML = `<h3 class="text-lg font-bold text-gray-800 mb-3 sticky top-0 bg-white py-2">${dateString}</h3>`;
+                // [수정] 흰색 배경, 어두운 텍스트를 제거하고 테마에 맞게 수정
+                dateContainer.innerHTML = `<h3 class="text-lg font-bold text-eva-purple mb-3 sticky top-[6.5rem] py-2" style="background-color: var(--card-dark);">${dateString}</h3>`;
                 const grid = document.createElement('div');
                 grid.className = 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2';
                 slotsByDate[date].forEach(slot => {
                     const button = document.createElement('button');
-                    button.className = 'slot-btn bg-indigo-50 text-indigo-700 font-medium py-2 px-2 rounded-lg text-sm';
+                    // [수정] 불필요한 Tailwind 클래스를 제거하여 style 태그의 .slot-btn이 적용되도록 함
+                    button.className = 'slot-btn font-medium py-2 px-2 rounded-lg text-sm';
                     button.textContent = slot.time_display;
                     button.dataset.slotId = slot.id;
                     button.dataset.slotTime = `${dateString} ${slot.time_display}`;
@@ -153,7 +171,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 dateContainer.appendChild(grid);
                 slotsContainer.appendChild(dateContainer);
             });
-        } catch (error) { slotsContainer.innerHTML = `<div class="text-center p-6 bg-red-50 rounded-lg"><p class="text-red-600">오류: ${error.message}</p></div>`; }
+        } catch (error) { slotsContainer.innerHTML = `<div class="text-center p-6 eva-card rounded-lg"><p class="text-red-400">오류: ${error.message}</p></div>`; }
     }
 
     async function fetchMyReservation() {
@@ -170,17 +188,16 @@ document.addEventListener('DOMContentLoaded', function() {
             infoText.textContent = "예약이 완료되었습니다. 예약을 변경하거나 취소하려면 관리자에게 문의해주세요.";
             const result = await response.json();
 
-            // [핵심 수정] new Date()를 사용하여 UTC 시간을 사용자의 local 시간으로 올바르게 변환합니다.
-            // +9시간을 하는 잘못된 로직을 완전히 제거합니다.
             const localTime = new Date(result.slot_datetime);
 
             const dateString = localTime.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'});
             const timeString = localTime.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: true });
 
+            // [수정] 밝은 파란색 박스를 제거하고, 테마에 맞는 강조 스타일로 변경
             myReservationInfo.innerHTML = `
-                <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <p class="text-sm text-gray-600">이벤트: <strong class="text-gray-900">${result.event_name}</strong></p>
-                    <p class="text-sm text-gray-600 mt-1">예약 시간: <strong class="text-gray-900">${dateString} ${timeString}</strong></p>
+                <div class="p-4 rounded-lg border border-eva-green bg-bg-dark">
+                    <p class="text-sm text-gray-400">이벤트: <strong class="text-text-light">${result.event_name}</strong></p>
+                    <p class="text-sm text-gray-400 mt-1">예약 시간: <strong class="text-text-light">${dateString} ${timeString}</strong></p>
                 </div>`;
         } catch(error) {
             hasReservation = false;
@@ -189,6 +206,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function initializePage() {
+        // 로더를 표시하고 시작
+        slotsContainer.innerHTML = '<div class="loader"></div>';
+        myReservationInfo.innerHTML = '<p class="text-gray-500">예약 정보를 불러오는 중...</p>';
+
         await fetchMyReservation();
         await fetchAndRenderSlots();
     }

@@ -3,26 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ event.event_name }} - 타임테이블</title>
+    <title>{{ event.event_name }} - Timetable</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+        :root {
+            --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A;
+            --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444;
+        }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
+        h1, h2 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; }
+        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
+        .eva-table-header { background-color: #333333; }
+        /* 테이블 행 스타일을 명확하게 정의 */
+        .eva-table-row { background-color: #252525; }
+        .eva-table-row:nth-child(even) { background-color: #2A2A2A; }
+        .loader { border: 4px solid #444; border-top: 4px solid var(--eva-green); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        tr.slot.closed { background-color: #fecaca; }
+        /* '닫힘' 상태 스타일은 우선순위를 높여 확실히 적용 */
+        tr.slot.closed { background-color: #4b5563 !important; }
         tr.slot.closed td { text-decoration: line-through; color: #9ca3af; }
     </style>
 </head>
-<body class="bg-gray-100">
+<body class="min-h-screen">
     <div class="container mx-auto p-4 md:p-8">
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-3xl font-bold text-gray-800">{{ event.event_name }} 타임테이블</h1>
-            <a href="{{ url_for('admin_dashboard' if user_role == 'admin' else 'interviewer_events_list') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">목록으로</a>
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+            <h1 class="text-2xl sm:text-3xl font-bold text-eva-green">{{ event.event_name }} Timetable</h1>
+            <a href="{{ url_for('admin_dashboard' if user_role == 'admin' else 'interviewer_events_list') }}" class="w-full sm:w-auto text-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md">목록으로</a>
         </div>
         <div id="timetable-container" class="space-y-8"><div class="loader"></div></div>
     </div>
 
-    <!-- 면접관 배정 모달을 위한 컨테이너 -->
-    <div id="modal-container" class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full hidden z-50"></div>
+    <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-80 overflow-y-auto h-full w-full hidden z-50"></div>
 
 <script>
 document.addEventListener('DOMContentLoaded', async () => {
@@ -43,7 +57,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             return await response.json();
         } catch (error) {
-            container.innerHTML = `<p class="text-red-500 text-center">${error.message}</p>`;
+            container.innerHTML = `<div class="eva-card p-6 rounded-lg text-center"><p class="text-red-400">${error.message}</p></div>`;
             return null;
         }
     }
@@ -51,7 +65,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function renderTimetable(slots) {
         container.innerHTML = '';
         if (!slots || slots.length === 0) {
-            container.innerHTML = '<div class="bg-white p-6 rounded-lg shadow-md text-center"><p class="text-gray-500">생성된 슬롯이 없습니다.</p></div>'; return;
+            container.innerHTML = '<div class="eva-card p-6 rounded-lg text-center"><p class="text-gray-500">생성된 슬롯이 없습니다.</p></div>'; return;
         }
         const slotsByDate = slots.reduce((acc, slot) => {
             const date = new Date(slot.slot_datetime).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
@@ -60,32 +74,41 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         Object.keys(slotsByDate).sort().forEach(date => {
             const dateBlock = document.createElement('div');
-            dateBlock.className = 'bg-white p-6 rounded-lg shadow-md';
-            let tableHTML = `<h2 class="text-xl font-bold mb-4 text-indigo-600">${date}</h2><div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">시간</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">예약자 정보</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">배정된 면접관</th><th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">관리</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
+            // [수정] eva-card 스타일 적용
+            dateBlock.className = 'eva-card p-6 rounded-lg';
+            // [수정] 테이블 클래스를 다크 테마에 맞게 변경
+            let tableHTML = `<h2 class="text-xl font-bold mb-4 text-eva-purple">${date}</h2><div class="overflow-x-auto"><table class="min-w-full divide-y divide-border-dark"><thead class="eva-table-header"><tr><th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">시간</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">예약자 정보</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">배정된 면접관</th><th class="px-4 py-3 text-center text-xs font-medium text-gray-300 uppercase">관리</th></tr></thead><tbody class="divide-y divide-border-dark">`;
 
             slotsByDate[date].forEach(slot => {
                 const time = slot.time_display || '시간오류';
-                const applicantInfo = slot.applicant ? `${slot.applicant.name}(${slot.applicant.phone_number})` : '<span class="text-gray-400">예약 없음</span>';
-                const interviewerInfo = slot.interviewer_names ? `<span class="font-semibold">${slot.interviewer_names}</span>` : '<span class="text-gray-400">미배정</span>';
+                // [수정] 텍스트 색상을 명시적으로 지정하여 가독성 확보
+                const applicantInfo = slot.applicant ? `<span class="text-gray-200">${slot.applicant.name}(${slot.applicant.phone_number})</span>` : '<span class="text-gray-500">예약 없음</span>';
+                const interviewerInfo = slot.interviewer_names ? `<span class="font-semibold text-eva-green">${slot.interviewer_names}</span>` : '<span class="text-gray-500">미배정</span>';
                 let actionControls = '-';
 
                 if (userRole === 'admin') {
-                    const assignBtn = `<button data-slot-id="${slot.id}" data-assigned-ids='${JSON.stringify(slot.interviewer_ids || [])}' class="admin-assign-btn text-white text-xs font-bold py-1 px-2 rounded bg-purple-500 hover:bg-purple-600">배정</button>`;
-                    const cancelBtn = slot.is_booked ? `<button data-slot-id="${slot.id}" class="cancel-reservation-btn text-white text-xs font-bold py-1 px-2 rounded bg-yellow-500 hover:bg-yellow-600 ml-2">예약취소</button>` : '';
+                    const assignBtn = `<button data-slot-id="${slot.id}" data-assigned-ids='${JSON.stringify(slot.interviewer_ids || [])}' class="admin-assign-btn text-white text-xs font-bold py-1 px-2 rounded bg-purple-600 hover:bg-purple-700">배정</button>`;
+                    const cancelBtn = slot.is_booked ? `<button data-slot-id="${slot.id}" class="cancel-reservation-btn text-black text-xs font-bold py-1 px-2 rounded bg-yellow-400 hover:bg-yellow-500 ml-2">예약취소</button>` : '';
                     const toggleBtnText = slot.is_active ? '닫기' : '열기';
-                    const toggleBtnClass = slot.is_active ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600';
+                    const toggleBtnClass = slot.is_active ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700';
                     const toggleBtn = `<button data-slot-id="${slot.id}" data-active="${slot.is_active}" class="toggle-slot-btn text-white text-xs font-bold py-1 px-2 rounded ${toggleBtnClass} ml-2">${toggleBtnText}</button>`;
                     actionControls = `<div class="flex items-center justify-center">${assignBtn}${cancelBtn}${toggleBtn}</div>`;
                 } else if (userRole === 'interviewer' && slot.is_active) {
                     const isAlreadyAssigned = (slot.interviewer_names || '').includes(currentUserName);
                     if (!isAlreadyAssigned) {
-                        actionControls = `<button data-slot-id="${slot.id}" class="assign-me-btn text-white text-xs font-bold py-1 px-2 rounded bg-blue-500 hover:bg-blue-600">참여하기</button>`;
+                        actionControls = `<button data-slot-id="${slot.id}" class="assign-me-btn text-white text-xs font-bold py-1 px-2 rounded bg-blue-600 hover:bg-blue-700">참여하기</button>`;
                     } else {
-                        actionControls = `<span class="text-green-600 font-bold text-xs">참여중</span>`;
+                        actionControls = `<span class="text-green-400 font-bold text-xs">참여중</span>`;
                     }
                 }
 
-                tableHTML += `<tr class="slot ${!slot.is_active ? 'closed' : ''}"><td class="px-4 py-2 whitespace-nowrap text-sm font-medium">${time}</td><td class="px-4 py-2 whitespace-nowrap text-sm">${applicantInfo}</td><td class="px-4 py-2 whitespace-nowrap text-sm">${interviewerInfo}</td><td class="px-4 py-2 whitespace-nowrap text-sm text-center">${actionControls}</td></tr>`;
+                // [수정] 행에 eva-table-row 클래스 적용 및 텍스트 색상 수정
+                tableHTML += `<tr class="slot eva-table-row ${!slot.is_active ? 'closed' : ''}">
+                                <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-300">${time}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm">${applicantInfo}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm">${interviewerInfo}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-center">${actionControls}</td>
+                              </tr>`;
             });
             tableHTML += `</tbody></table></div>`;
             dateBlock.innerHTML = tableHTML;
@@ -94,12 +117,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function showInterviewerModal(slotId, assignedIds) {
+        // 모달은 기존 스타일을 유지합니다.
         let checkboxesHTML = '';
         allInterviewers.forEach(interviewer => {
             const isChecked = assignedIds.includes(interviewer.id) ? 'checked' : '';
-            checkboxesHTML += `<label class="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-100"><input type="checkbox" value="${interviewer.id}" class="interviewer-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded" ${isChecked}><span>${interviewer.name}</span></label>`;
+            // 모달 내부 텍스트 색상을 어둡게 조정
+            checkboxesHTML += `<label class="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-100"><input type="checkbox" value="${interviewer.id}" class="interviewer-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded" ${isChecked}><span class="text-gray-800">${interviewer.name}</span></label>`;
         });
-        const modalContent = `<div class="p-4"><h3 class="text-lg font-bold">면접관 배정</h3><div class="mt-4 space-y-2 max-h-60 overflow-y-auto">${checkboxesHTML}</div><div class="mt-6 flex justify-end space-x-3"><button id="cancel-modal-btn" class="px-4 py-2 bg-gray-200 rounded-md text-sm font-medium hover:bg-gray-300">취소</button><button id="save-interviewers-btn" data-slot-id="${slotId}" class="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700">저장</button></div></div>`;
+        const modalContent = `<div class="p-4"><h3 class="text-lg font-bold text-gray-900">면접관 배정</h3><div class="mt-4 space-y-2 max-h-60 overflow-y-auto">${checkboxesHTML}</div><div class="mt-6 flex justify-end space-x-3"><button id="cancel-modal-btn" class="px-4 py-2 bg-gray-200 rounded-md text-sm font-medium text-gray-800 hover:bg-gray-300">취소</button><button id="save-interviewers-btn" data-slot-id="${slotId}" class="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700">저장</button></div></div>`;
         modalContainer.innerHTML = `<div class="relative top-20 mx-auto w-full max-w-md bg-white rounded-lg shadow-xl">${modalContent}</div>`;
         modalContainer.classList.remove('hidden');
         document.getElementById('cancel-modal-btn').onclick = () => modalContainer.classList.add('hidden');
@@ -123,6 +148,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if(updatedData) renderTimetable(updatedData);
         } catch (error) {
             alert(`오류: ${error.message}`);
+            // 액션 실패 시에도 데이터는 다시 불러와서 화면을 동기화합니다.
             const updatedData = await fetchData(false);
             if(updatedData) renderTimetable(updatedData);
         }
@@ -152,6 +178,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         performAction(url, body, confirmMessage);
     }
 
+    // 초기 데이터 로드
     const initialData = await fetchData(true);
     if(initialData) {
         renderTimetable(initialData);
