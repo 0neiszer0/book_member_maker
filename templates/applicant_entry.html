@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>면접 예약</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A; --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444; }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
+        h1, label { font-family: 'Orbitron', sans-serif; text-transform: uppercase; }
+        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
+        .eva-button { background-color: var(--eva-green); color: black; font-weight: bold; }
+        .eva-input { background-color: #1A1A1A; border-color: var(--border-dark); color: var(--text-light); }
+        .eva-input:focus { border-color: var(--eva-green); outline: none; box-shadow: 0 0 0 2px var(--eva-green); }
+    </style>
+</head>
+<body class="flex items-center justify-center h-screen p-4">
+    <div class="w-full max-w-md">
+        <form action="/process_entry" method="post" class="eva-card shadow-lg rounded-xl px-8 pt-6 pb-8 mb-4">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-eva-green">INTERVIEW ENTRY</h1>
+                <p class="mt-2 text-gray-300">면접 시간 예약을 위해 본인 정보를 입력해 주세요.</p>
+            </div>
+
+            <div class="mb-4">
+                <label for="name" class="block text-sm font-bold mb-2">NAME</label>
+                <input type="text" id="name" name="name" required pattern="^[가-힣]{2,4}$" title="이름은 2~4자의 한글로 입력해주세요." class="eva-input shadow rounded w-full py-2 px-3" placeholder="실명을 입력하세요 (예: 홍길동)">
+            </div>
+
+            <div class="mb-2">
+                <label for="phone_number" class="block text-sm font-bold mb-2">PHONE</label>
+                <input type="tel" id="phone_number" name="phone_number" required placeholder="'-' 없이 11자리 숫자" pattern="^\d{11}$" title="연락처는 11자리 숫자로 입력해주세요." class="eva-input shadow rounded w-full py-2 px-3">
+            </div>
+
+            <p class="text-xs text-gray-500 mb-6 text-right">예) 01012345678</p>
+
+            <button type="submit" class="eva-button w-full font-bold py-3 px-4 rounded text-base">
+                정보 확인 및 예약 계속하기
+            </button>
+        </form>
+    </div>
+</body>
+</html>
