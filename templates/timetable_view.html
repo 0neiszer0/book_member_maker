@@ -152,21 +152,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         interviewerModal.show();
     }
 
-    container.addEventListener('click', (e) => {
-        const target = e.target;
-        const slotRow = target.closest('tr');
-        if (!slotRow) return;
-        const slotData = JSON.parse(slotRow.dataset.slotInfo);
-
-        if (target.matches('.admin-assign-btn')) showInterviewerModal(slotData.id, slotData.interviewer_ids || []);
-        else if (target.matches('.cancel-reservation-btn')) handleCancelReservation(slotData.id);
-        else if (target.matches('.toggle-slot-btn')) handleToggleSlot(slotData.id, slotData.is_active);
-        else if (target.matches('.assign-me-btn')) handleAssignMe(slotData.id);
-        else if (target.matches('.applicant-info-cell') || target.matches('.manual-register-btn')) {
-            if (userRole === 'admin') openApplicantModal(slotData);
-        }
-    });
-
     if (saveInterviewersBtn) {
         saveInterviewersBtn.onclick = () => {
             const slotId = saveInterviewersBtn.dataset.slotId;
