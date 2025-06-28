@@ -223,6 +223,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     fetchAndRender(true);
 });
+
+    function generateActionControls(slot) {
+    // [수정] is_shared_view가 True이면 아무 버튼도 보여주지 않음
+    const isShared = {{ is_shared_view|tojson|default(false) }};
+    if (isShared) {
+        return '<span>-</span>'; // 혹은 그냥 빈 문자열 ''
+    }
+
+    // 기존의 역할별 버튼 생성 로직은 그대로 둠
+    if (userRole === 'admin') {
+        const assignBtn = `<button class="btn btn-sm btn-primary admin-assign-btn">배정</button>`;
+        const cancelBtn = slot.is_booked ? `<button class="btn btn-sm btn-warning ms-1 cancel-reservation-btn">예약취소</button>` : '';
+        const toggleBtnText = slot.is_active ? '닫기' : '열기';
+        const toggleBtnClass = slot.is_active ? 'btn-danger' : 'btn-success';
+        const toggleBtn = `<button class="btn btn-sm ${toggleBtnClass} ms-1 toggle-slot-btn">${toggleBtnText}</button>`;
+        return `<div>${assignBtn}${cancelBtn}${toggleBtn}</div>`;
+    }
+    if (userRole === 'interviewer' && slot.is_active) {
+        return (slot.interviewer_names || '').includes(currentUserName) ? `<span class="badge bg-success">참여중</span>` : `<button class="btn btn-sm btn-info assign-me-btn">참여하기</button>`;
+    }
+    return '-';
+}
 </script>
 </body>
 </html>

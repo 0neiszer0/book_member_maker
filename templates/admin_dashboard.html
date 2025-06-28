@@ -79,6 +79,9 @@
                                 <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <a href="{{ url_for('admin_event_timetable', event_id=event.id) }}" class="eva-link mr-2">타임테이블</a>
                                     <a href="{{ url_for('manage_event', event_id=event.id) }}" class="text-gray-400 hover:text-gray-200 mr-2">슬롯관리</a>
+
+                                    <button class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-2 rounded-md mr-2 share-link-btn" data-event-id="{{ event.id }}">공유</button>
+
                                     <button class="eva-button-delete delete-event-btn text-xs font-bold py-1 px-2 rounded-md" data-event-id="{{ event.id }}" data-event-name="{{ event.event_name }}">삭제</button>
                                 </td>
                             </tr>
@@ -149,7 +152,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const eventsTable = document.getElementById('events-table');
-    if(eventsTable) {
+    if (eventsTable) {
+        // '활성화' 토글을 위한 'change' 이벤트 리스너
         eventsTable.addEventListener('change', (e) => {
             if (e.target.matches('.event-toggle')) {
                 const checkbox = e.target;
@@ -160,7 +164,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        // [수정] '삭제'와 '공유' 버튼을 한번에 처리하는 'click' 이벤트 리스너
         eventsTable.addEventListener('click', (e) => {
+            // 삭제 버튼을 눌렀을 경우
             if (e.target.matches('.delete-event-btn')) {
                 const button = e.target;
                 const eventId = button.dataset.eventId;
@@ -175,9 +181,28 @@ document.addEventListener('DOMContentLoaded', () => {
                     .catch(error => console.error('Error:', error));
                 }
             }
+            // 공유 버튼을 눌렀을 경우
+            else if (e.target.matches('.share-link-btn')) {
+                const button = e.target;
+                const eventId = button.dataset.eventId;
+
+                fetch(`/api/admin/events/${eventId}/generate_share_link`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        navigator.clipboard.writeText(data.link).then(() => {
+                            alert('공유 링크가 클립보드에 복사되었습니다.\n' + data.link);
+                        });
+                    } else {
+                        alert('링크 생성 실패: ' + data.message);
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            }
         });
     }
 });
+
 </script>
 </body>
 </html>

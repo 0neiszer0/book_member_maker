@@ -16,6 +16,7 @@ import re
 import pandas as pd
 import numpy as np
 from deap import base, creator, tools, algorithms
+import uuid
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
@@ -213,6 +214,92 @@ def login():
     return render_template('login.html')
 
 
+# --- [신규] 접근 키가 포함된 링크를 처리하는 라우트 ---
+@app.route('/entry')
+def quick_entry():
+    # URL에서 key 파라미터 값을 가져옴 (예: /entry?key=hobanu-interview-2025-summer)
+    access_key = request.args.get('key')
+
+    # .env 파일에 저장된 키와 비교
+    expected_key = os.environ.get('APPLICANT_ACCESS_KEY')
+
+    if access_key == expected_key:
+        # 키가 일치하면, 이름과 연락처만 입력하는 전용 페이지를 보여줌
+        return render_template('applicant_entry.html')
+    else:
+        # 키가 없거나 일치하지 않으면, 일반 로그인 페이지로 리다이렉트
+        flash('유효하지 않은 접근 링크입니다.', 'danger')
+        return redirect(url_for('login'))
+
+
+# --- [신규] 전용 입장 페이지에서 이름/연락처를 받아 처리하는 라우트 ---
+@app.route('/process_entry', methods=['POST'])
+def process_quick_entry():
+    name = request.form.get('name')
+    phone = request.form.get('phone_number')
+
+    # 유효성 검사 (기존 로그인 로직과 동일)
+    if not (name and phone):
+        flash('이름과 연락처를 모두 입력해주세요.', 'danger')
+        return redirect(url_for('quick_entry'))  # 오류 시 다시 입력 페이지로
+
+    if not re.match(r'^[가-힣]{2,4}$', name) or not re.match(r'^\d{11}$', phone):
+        flash('이름 또는 연락처 형식이 올바르지 않습니다.', 'danger')
+        return redirect(url_for('quick_entry'))
+
+    # 비밀번호 확인 없이 바로 세션에 정보 저장 (로그인 처리)
+    session.clear()
+    session['user_role'] = 'applicant'
+    session['user_name'] = name
+    session['user_phone'] = phone
+
+    flash(f"{session['user_name']}님, 환영합니다!", 'success')
+    return redirect(url_for('interview_index'))
+
+
+# --- [신규] 관리자가 이벤트 공유 링크를 생성하는 API ---
+@app.route('/api/admin/events/<event_id>/generate_share_link', methods=['POST'])
+@login_required(role="admin")
+def generate_share_link(event_id):
+    try:
+        # 1. 추측 불가능한 고유 토큰 생성
+        token = str(uuid.uuid4())
+
+        # 2. DB의 해당 이벤트에 토큰 저장
+        supabase.table('events').update({'share_token': token}).eq('id', event_id).execute()
+
+        # 3. 완성된 공유 링크를 반환
+        link = f"{request.host_url}shared_timetable?token={token}"
+        return jsonify({'status': 'success', 'link': link})
+    except Exception as e:
+        app.logger.error(f"Error generating share link for event {event_id}: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# --- [신규] 로그인 없이 공유 링크로 타임테이블을 보는 라우트 ---
+@app.route('/shared_timetable')
+def view_shared_timetable():
+    token = request.args.get('token')
+    if not token:
+        return "잘못된 접근입니다.", 400
+
+    try:
+        # 1. 토큰으로 이벤트를 검색
+        res = supabase.table('events').select('id, event_name').eq('share_token', token).single().execute()
+        event_data = res.data
+
+        # 2. '읽기 전용' 모드임을 템플릿에 전달
+        return render_template(
+            'timetable_view.html',
+            event=event_data,
+            event_id=event_data['id'],
+            user_role='guest',  # 사용자가 게스트임을 명시
+            is_shared_view=True  # 읽기 전용 뷰임을 나타내는 플래그
+        )
+    except Exception as e:
+        app.logger.error(f"Failed to load shared timetable with token {token}: {e}")
+        return "유효하지 않은 링크이거나 만료되었습니다.", 404
+
 @app.route('/logout')
 def logout():
     session.clear()
@@ -346,24 +433,52 @@ def delete_single_slot(slot_id):
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+# app.py
+
 @app.route('/admin/events/<event_id>/timetable')
 @login_required(role="admin")
 def admin_event_timetable(event_id):
+    app.logger.info("--- admin_event_timetable 함수 실행 시작 ---")
     try:
-        event_res = supabase.table('events').select('event_name').eq('id', event_id).single().execute()
-        # [추가] 모든 면접관의 목록을 불러옵니다.
+        # 1. 이벤트 정보 조회
+        app.logger.info(f"이벤트 조회 시도: ID = {event_id}")
+        event_res = supabase.table('events').select('id, event_name').eq('id', event_id).execute()
+
+        # 데이터가 있는지 확인
+        if not hasattr(event_res, 'data') or not event_res.data:
+            flash('해당 이벤트를 찾을 수 없습니다.', 'danger')
+            app.logger.warning(f"이벤트를 찾지 못함: ID = {event_id}")
+            return redirect(url_for('admin_dashboard'))
+
+        event_data = event_res.data[0]
+        app.logger.info(f"이벤트 조회 성공: {event_data}")
+
+        # 2. 면접관 목록 조회
+        app.logger.info("면접관 목록 조회 시도...")
         interviewers_res = supabase.table('interviewers').select('id, name').order('name').execute()
+
+        # 데이터가 있는지 확인 (가장 확실한 방법)
+        interviewers_data = interviewers_res.data if hasattr(interviewers_res, 'data') else []
+        app.logger.info(f"면접관 목록 조회 성공: {len(interviewers_data)}명")
+
+        # 3. 템플릿 렌더링 시도
+        app.logger.info("render_template 호출 직전...")
+        app.logger.info(
+            f"전달할 데이터: event={event_data}, event_id={event_data['id']}, all_interviewers={interviewers_data}")
 
         return render_template(
             'timetable_view.html',
-            event=event_res.data,
-            event_id=event_id,
+            event=event_data,
+            event_id=event_data['id'],
             user_role=session['user_role'],
-            # [추가] 템플릿으로 면접관 목록 전달
-            all_interviewers=interviewers_res.data
+            all_interviewers=interviewers_data,
+            is_shared_view=False  # [수정] 이 값을 명시적으로 전달
         )
+
     except Exception as e:
-        flash(f"타임테이블 로딩 오류: {e}", "danger")
+        # [중요] 오류 발생 시, 상세한 전체 오류 내용을 로그에 기록
+        app.logger.error("!!! admin_event_timetable 함수에서 예외 발생 !!!", exc_info=True)
+        flash(f"타임테이블 로딩 중 예측하지 못한 오류 발생: {e}", "danger")
         return redirect(url_for('admin_dashboard'))
 
 
@@ -419,25 +534,57 @@ def generate_slots(event_id):
 
 
 @app.route('/api/events/<event_id>/timetable_data')
-@login_required()
 def get_timetable_data(event_id):
-    """[수정] 여러 명의 면접관 이름을 모두 가져와서 조합합니다."""
+    """[수정] 로깅을 추가하여 데이터 흐름을 추적합니다."""
+    app.logger.info(f"--- 타임테이블 데이터 요청 시작 (Event ID: {event_id}) ---")
     try:
-        slots_res = supabase.table('time_slots').select('*').eq('event_id', event_id).order(
-            'slot_datetime').execute().data
-        all_interviewer_ids = set()
+        # --- 1. 슬롯 정보 조회 ---
+        response_slots = supabase.table('time_slots').select('*').eq('event_id', event_id).order(
+            'slot_datetime').execute()
+        slots_res = response_slots.data if hasattr(response_slots, 'data') and response_slots.data else []
+        app.logger.info(f"1. 슬롯 조회 완료: {len(slots_res)}개 슬롯 발견")
+
+        # --- 중간 데이터 확인 (로깅) ---
+        # 로깅을 위해 필요한 데이터만 간추려서 확인합니다.
+        interviewer_ids_to_fetch = set()
         for s in slots_res:
             if s.get('interviewer_ids'):
-                all_interviewer_ids.update(s['interviewer_ids'])
+                interviewer_ids_to_fetch.update(s['interviewer_ids'])
 
         booked_slot_ids = [s['id'] for s in slots_res if s['is_booked']]
-        reservations_data = supabase.table('reservations').select('slot_id, applicant_id').in_('slot_id',
-                                                                                               booked_slot_ids).execute().data if booked_slot_ids else []
-        applicant_ids = {r['applicant_id'] for r in reservations_data}
-        applicants_data = supabase.table('applicants').select('*').in_('id', list(
-            applicant_ids)).execute().data if applicant_ids else []
-        interviewers_data = supabase.table('interviewers').select('id, name').in_('id', list(
-            all_interviewer_ids)).execute().data if all_interviewer_ids else []
+        app.logger.info(f"2. 예약된 슬롯 ID: {booked_slot_ids}")
+        app.logger.info(f"3. 필요한 면접관 ID: {interviewer_ids_to_fetch}")
+
+        # --- 2. 관련 정보 조회 ---
+        reservations_data = []
+        if booked_slot_ids:
+            response_reservations = supabase.table('reservations').select('slot_id, applicant_id').in_('slot_id',
+                                                                                                       booked_slot_ids).execute()
+            reservations_data = response_reservations.data if hasattr(response_reservations,
+                                                                      'data') and response_reservations.data else []
+        app.logger.info(f"4. 예약 정보 조회 완료: {len(reservations_data)}개 예약 발견")
+
+        applicant_ids_to_fetch = {r['applicant_id'] for r in reservations_data}
+        app.logger.info(f"5. 필요한 지원자 ID: {applicant_ids_to_fetch}")
+
+        applicants_data = []
+        if applicant_ids_to_fetch:
+            response_applicants = supabase.table('applicants').select('*').in_('id',
+                                                                               list(applicant_ids_to_fetch)).execute()
+            applicants_data = response_applicants.data if hasattr(response_applicants,
+                                                                  'data') and response_applicants.data else []
+        app.logger.info(f"6. 지원자 정보 조회 완료: {len(applicants_data)}명 정보 발견")
+
+        interviewers_data = []
+        if interviewer_ids_to_fetch:
+            response_interviewers = supabase.table('interviewers').select('id, name').in_('id', list(
+                interviewer_ids_to_fetch)).execute()
+            interviewers_data = response_interviewers.data if hasattr(response_interviewers,
+                                                                      'data') and response_interviewers.data else []
+        app.logger.info(f"7. 면접관 정보 조회 완료: {len(interviewers_data)}명 정보 발견")
+
+        # --- 3. 데이터 가공 ---
+        app.logger.info("8. 데이터 가공 시작...")
         applicants_map = {a['id']: a for a in applicants_data}
         interviewers_map = {i['id']: i['name'] for i in interviewers_data}
         reservation_map = {r['slot_id']: r['applicant_id'] for r in reservations_data}
@@ -449,10 +596,16 @@ def get_timetable_data(event_id):
                 slot['interviewer_names'] = ', '.join(
                     [interviewers_map.get(i_id, "알 수 없음") for i_id in slot['interviewer_ids']])
             if slot['id'] in reservation_map:
-                slot['applicant'] = applicants_map.get(reservation_map[slot['id']])
+                applicant_id = reservation_map[slot['id']]
+                slot['applicant'] = applicants_map.get(applicant_id)  # .get()은 키가 없으면 None을 반환하여 안전
+
+        app.logger.info("9. 데이터 가공 완료. JSON 변환 시도...")
+        app.logger.info(f"최종 데이터: {slots_res}")  # 최종 데이터를 로그로 출력
+
         return jsonify(slots_res)
+
     except Exception as e:
-        app.logger.error(f"Error getting timetable data: {e}")
+        app.logger.error(f"!!! get_timetable_data 함수에서 오류 발생: {e}", exc_info=True)  # exc_info=True로 상세한 오류 위치 추적
         return jsonify({'error': str(e)}), 500
 
 
@@ -472,10 +625,15 @@ def toggle_slot_active(slot_id):
 def cancel_reservation(slot_id):
     """관리자가 예약을 취소하는 API"""
     try:
+        # --- [신규] 취소할 슬롯의 event_id를 먼저 가져옴 ---
+        slot_res = supabase.table('time_slots').select('event_id').eq('id', slot_id).single().execute()
+        event_id = slot_res.data['event_id']
         # 예약 테이블에서 해당 슬롯 ID의 예약을 삭제합니다.
         supabase.table('reservations').delete().eq('slot_id', slot_id).execute()
         # 시간 슬롯 테이블에서 is_booked 상태를 false로 되돌립니다.
         supabase.table('time_slots').update({'is_booked': False}).eq('id', slot_id).execute()
+        # --- [신규] 예약 취소 후 슬롯 클러스터링 함수 호출 ---
+        update_active_slots_for_clustering(event_id)
 
         return jsonify({'status': 'success', 'message': '예약이 성공적으로 취소되었습니다.'})
     except Exception as e:
@@ -643,6 +801,67 @@ def update_applicant_info(applicant_id):
         app.logger.error(f"Error updating applicant info for {applicant_id}: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+
+def update_active_slots_for_clustering(event_id):
+    """
+    특정 이벤트의 예약 현황을 기반으로 슬롯을 클러스터링(군집화)하도록
+    is_active 상태를 동적으로 업데이트하는 함수.
+    """
+    try:
+        # 1. 해당 이벤트의 모든 슬롯 정보를 가져옵니다.
+        all_slots_res = supabase.table('time_slots').select('id, slot_datetime, is_booked').eq('event_id',
+                                                                                               event_id).order(
+            'slot_datetime').execute()
+        all_slots = all_slots_res.data
+        if not all_slots:
+            return  # 슬롯이 없으면 아무것도 하지 않음
+
+        # 2. 예약된 슬롯들의 시간만 추출합니다.
+        booked_times = [datetime.fromisoformat(slot['slot_datetime'].replace('Z', '+00:00')) for slot in all_slots if
+                        slot['is_booked']]
+
+        # 3. 예약이 하나도 없으면, 모든 슬롯을 활성화 상태로 두고 종료 (관리자가 설정한 초기 상태 유지)
+        if not booked_times:
+            supabase.table('time_slots').update({'is_active': True}).eq('event_id', event_id).execute()
+            app.logger.info(f"Event {event_id}: No bookings found. All slots activated.")
+            return
+
+        # 4. 예약된 시간 앞뒤로 활성화할 버퍼(시간 간격)를 설정합니다. (예: 30분)
+        buffer = timedelta(minutes=15)
+
+        slots_to_activate = set()
+        slots_to_deactivate = set()
+
+        # 5. 모든 슬롯을 순회하며 활성화/비활성화 여부 결정
+        for slot in all_slots:
+            # 이미 예약된 슬롯은 항상 활성 상태로 둡니다.
+            if slot['is_booked']:
+                slots_to_activate.add(slot['id'])
+                continue
+
+            slot_time = datetime.fromisoformat(slot['slot_datetime'].replace('Z', '+00:00'))
+            is_near_booking = False
+            # 현재 슬롯이 예약된 시간들의 버퍼 안에 있는지 확인
+            for booked_time in booked_times:
+                if (booked_time - buffer) <= slot_time <= (booked_time + buffer):
+                    is_near_booking = True
+                    break
+
+            if is_near_booking:
+                slots_to_activate.add(slot['id'])
+            else:
+                slots_to_deactivate.add(slot['id'])
+
+        # 6. 데이터베이스 업데이트 실행
+        if slots_to_activate:
+            supabase.table('time_slots').update({'is_active': True}).in_('id', list(slots_to_activate)).execute()
+        if slots_to_deactivate:
+            supabase.table('time_slots').update({'is_active': False}).in_('id', list(slots_to_deactivate)).execute()
+
+        app.logger.info(f"Event {event_id}: Clustered slots around bookings.")
+
+    except Exception as e:
+        app.logger.error(f"Error updating slots for clustering (Event ID: {event_id}): {e}")
 
 # --- 4.2. 독서 모임 조 편성 (관리자 전용) ---
 def gender_balance_score(group, members):
@@ -1191,7 +1410,19 @@ def interview_create_reservation():
             event_res = supabase.table('events').select('event_name').eq('id', slot_response[
                 'event_id']).single().execute().data
             event_name = event_res['event_name']
-            reserved_time_str = format_datetime_filter(slot_response['slot_datetime'])
+
+            # --- [수정] 요일을 포함한 시간 문자열 생성 로직 ---
+            KST = timezone(timedelta(hours=9))
+            utc_dt = datetime.fromisoformat(slot_response['slot_datetime'].replace('Z', '+00:00'))
+            kst_dt = utc_dt.astimezone(KST)
+
+            weekdays_kr = ["월", "화", "수", "목", "금", "토", "일"]
+            day_of_week = weekdays_kr[kst_dt.weekday()]  # 요일을 숫자로 받아(월=0) 한국어 요일로 변환
+
+            # 최종 시간 문자열 포맷팅
+            reserved_time_str = kst_dt.strftime(f"%Y년 %m월 %d일 ({day_of_week}) %p %I:%M").replace("AM", "오전").replace(
+                "PM", "오후")
+            # --- 수정 끝 ---
 
             # 텔레그램 메시지 내용 구성
             message = (
@@ -1207,6 +1438,10 @@ def interview_create_reservation():
 
         except Exception as e:
             app.logger.error(f"예약 후 텔레그램 알림 발송 중 오류 발생: {e}")
+
+        # --- [신규] 예약 완료 후 슬롯 클러스터링 함수 호출 ---
+        event_id = slot_response['event_id']
+        update_active_slots_for_clustering(event_id)
 
         return jsonify({"message": "예약이 성공적으로 완료되었습니다."}), 201
 
@@ -1253,8 +1488,17 @@ def interview_check_reservation():
         app.logger.debug(f"Reservation check for {phone} found no data: {e}")
         return jsonify({"error": "예약 정보를 찾을 수 없습니다."}), 404
 
+
 # ==============================================================================
 # --- 7. 서버 실행 ---
 # ==============================================================================
 if __name__ == '__main__':
+    # --- [신규] 서버 시작 시 지원자용 빠른 접속 링크 출력 ---
+    access_key = os.environ.get('APPLICANT_ACCESS_KEY')
+    if access_key:
+        print("\n" + "=" * 60)
+        print("✅ 지원자용 빠른 접속 링크 (Applicant Quick Entry Link):")
+        print(f"   http://127.0.0.1:5000/entry?key={access_key}")
+        print("=" * 60 + "\n")
+
     app.run(host='0.0.0.0', port=5000, debug=True)
