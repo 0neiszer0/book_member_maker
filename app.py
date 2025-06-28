@@ -1271,9 +1271,21 @@ def interviewer_events_list():
 @login_required(role="interviewer")
 def interviewer_event_timetable(event_id):
     try:
-        event_res = supabase.table('events').select('event_name').eq('id', event_id).single().execute()
-        return render_template('timetable_view.html', event=event_res.data, event_id=event_id,
-                               user_role=session['user_role'])
+        # [수정] 안정적인 데이터 조회 방식으로 변경
+        event_res = supabase.table('events').select('id, event_name').eq('id', event_id).execute()
+        if not event_res.data:
+            flash('해당 이벤트를 찾을 수 없습니다.', 'danger')
+            return redirect(url_for('interviewer_events_list'))
+
+        event_data = event_res.data[0]
+
+        return render_template(
+            'timetable_view.html',
+            event=event_data,
+            event_id=event_data['id'],
+            user_role=session['user_role'],
+            is_shared_view=False  # [수정] is_shared_view=False 명시적 전달
+        )
     except Exception as e:
         flash(f"타임테이블 로딩 오류: {e}", "danger")
         return redirect(url_for('interviewer_events_list'))
@@ -1304,6 +1316,44 @@ def assign_interviewer_to_slot(slot_id):
         app.logger.error(f"Error assigning interviewer: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+
+@app.route('/api/interviewer/slots/<slot_id>/unassign', methods=['POST'])
+@login_required(role="interviewer")
+def unassign_interviewer_from_slot(slot_id):
+    """면접관이 특정 슬롯에서 자신의 참여를 취소합니다."""
+    try:
+        # 1. 현재 로그인한 면접관의 ID를 안정적으로 가져옵니다.
+        interviewer_name = session.get('user_name')
+        interviewer_res = supabase.table('interviewers').select('id').eq('name', interviewer_name).execute()
+
+        if not hasattr(interviewer_res, 'data') or not interviewer_res.data:
+            return jsonify({'status': 'error', 'message': '등록된 면접관 정보가 없습니다.'}), 404
+
+        interviewer_id = interviewer_res.data[0]['id']
+
+        # 2. 현재 슬롯의 면접관 ID 목록을 안정적으로 가져옵니다.
+        slot_res = supabase.table('time_slots').select('interviewer_ids').eq('id', slot_id).execute()
+
+        if not hasattr(slot_res, 'data') or not slot_res.data:
+            return jsonify({'status': 'error', 'message': '존재하지 않는 슬롯입니다.'}), 404
+
+        current_ids = slot_res.data[0].get('interviewer_ids') or []
+
+        # 3. 목록에 해당 면접관 ID가 없으면, 취소할 수 없음을 알립니다.
+        if interviewer_id not in current_ids:
+            return jsonify({'status': 'error', 'message': '이 시간에 배정되어 있지 않습니다.'}), 409
+
+        # 4. 목록에서 해당 면접관의 ID를 제거합니다.
+        current_ids.remove(interviewer_id)
+
+        # 5. 변경된 ID 목록으로 데이터베이스를 업데이트합니다.
+        supabase.table('time_slots').update({'interviewer_ids': current_ids if current_ids else None}).eq('id',
+                                                                                                          slot_id).execute()
+
+        return jsonify({'status': 'success', 'message': '참여가 성공적으로 취소되었습니다.'})
+    except Exception as e:
+        app.logger.error(f"Error unassigning interviewer: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 # ==============================================================================
 # --- 6. 면접자 (Applicant) 전용 기능 ---
