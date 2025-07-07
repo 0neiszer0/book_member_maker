@@ -958,7 +958,9 @@ def start_group_generation():
             members_df = pd.DataFrame(members_res)
             history_res = supabase.table("history").select("groups").execute().data
             history_df = pd.DataFrame(history_res)
-            group_count_override = int(group_count_str) if group_count_str else None
+            group_count_override = None
+            if group_count_str and group_count_str.isdigit():
+                group_count_override = int(group_count_str)
 
             # --- 이 아래 로직이 중요하게 변경됩니다 ---
 
@@ -972,8 +974,9 @@ def start_group_generation():
                         progress_data = json.dumps({'progress': int(progress_offset + (progress * progress_scale))})
                         yield f"event: progress\ndata: {progress_data}\n\n"
                     except StopIteration as e:
-                        # 제너레이터가 끝나면 return 값을 최종 결과로 저장
+                        # [수정] 이제 하나의 값만 반환되므로, 그대로 변수에 할당합니다.
                         final_result = e.value
+                        logbook_result = None  # logbook은 없으므로 None으로 설정
                         break
                 return final_result
 
@@ -1013,7 +1016,12 @@ def start_group_generation():
     return Response(generate_events(), mimetype='text/event-stream')
 
 
-def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_names, weights, num_results=3, group_count_override=None):
+# app.py 파일에서 이 함수 전체를 아래 코드로 교체해주세요.
+
+def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_names, weights, num_results=3,
+                          group_count_override=None, test_mode=False):
+    # --- 1, 2, 3 단계는 기존과 동일하게 유지 ---
+    # ... (데이터 전처리, 시나리오 설정, evaluate 함수 등은 생략) ...
     # --- 1. 데이터 전처리 ---
     members_info = members_df.set_index('id').to_dict('index')
     name_to_id_map = pd.Series(members_df.id.values, index=members_df.name).to_dict()
@@ -1037,13 +1045,12 @@ def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_name
     TODAY_ATTENDEE_IDS = [name_to_id_map[name] for name in attendee_names if name in name_to_id_map]
     TODAY_PRESENTER_IDS = [name_to_id_map[name] for name in presenter_names if name in name_to_id_map]
     num_attendees = len(TODAY_ATTENDEE_IDS)
-    if num_attendees < 3: return []
+    if num_attendees < 3:
+        return [], None
 
-    # [수정] 사용자 지정 그룹 수를 우선 적용
     if group_count_override and group_count_override > 0:
         num_groups = group_count_override
     else:
-        # 기존의 자동 계산 로직을 fallback으로 사용
         if num_attendees <= 5:
             num_groups = 1
         elif num_attendees <= 10:
@@ -1058,31 +1065,45 @@ def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_name
     MAX_GROUP_SIZE = 5
     RECENT_MEETING_THRESHOLD = 2
 
+    def calculate_total_score(ind_fitness_values, W):
+        total = sum(v * w for v, w in zip(ind_fitness_values, W))
+
+        # [디버깅] 비정상적으로 큰 점수가 계산될 때만 내부 계산 과정을 출력합니다.
+        if total > 1000:
+            raw_scores_str = ", ".join([f"{v:.2f}" for v in ind_fitness_values])
+            print(f"[SCORE_DEBUG] Raw Scores: [{raw_scores_str}] -> Total: {total:.2f}")
+
+        return total
+
     def evaluate(individual):
         groups = {i: [] for i in range(num_groups)}
         for i, g in enumerate(individual):
             groups[g].append(attendee_id_map[i])
 
+        # [수정] size_penalty를 계산만 하고, 조기 return하지 않습니다.
         size_penalty = sum(1 for g in groups.values() if 0 < len(g) < MIN_GROUP_SIZE or len(g) > MAX_GROUP_SIZE)
+
+        # 만약 유효하지 않은 그룹 크기라면, 다른 점수 계산 없이 바로 페널티만 적용된 값을 반환합니다.
+        # 이렇게 하면 계산 시간을 절약하고 로직이 명확해집니다.
         if size_penalty > 0:
-            return 0, 0, 0, 0, -size_penalty * 1000
+            return 0, 0, 0, 0, size_penalty  # 페널티는 양수로 반환
 
-        gender_score, new_face_score, preference_score, total_pairs = 0, 0, 0, 0
-
+        # --- 유효한 그룹일 경우에만 아래 점수들을 계산 ---
+        new_face_score, preference_score, total_pairs = 0, 0, 0
         group_gender_scores = []
-        for group_members_for_gender in groups.values():
-            if not group_members_for_gender: continue
-            males = sum(1 for mid in group_members_for_gender if members_info.get(mid, {}).get('gender') == 'M')
-            females = len(group_members_for_gender) - males
+
+        for group_members in groups.values():
+            if not group_members: continue
+
+            # 성비 점수 계산
+            males = sum(1 for mid in group_members if members_info.get(mid, {}).get('gender') == 'M')
+            females = len(group_members) - males
             if males > 0 and females > 0:
                 group_gender_scores.append(min(males, females) / max(males, females))
             else:
                 group_gender_scores.append(0)
 
-        gender_score = np.mean(group_gender_scores) if group_gender_scores else 0
-
-        for group_members in groups.values():
-            if not group_members: continue
+            # 새얼굴, 선호도 점수 계산
             for i, member_id in enumerate(group_members):
                 member_prefs = members_info.get(member_id)
                 if member_prefs:
@@ -1101,13 +1122,16 @@ def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_name
                         if other_member_id == avoided_id: preference_score -= 1.5
                         if other_prefs and other_prefs.get('avoided_member_id') == member_id: preference_score -= 1.5
 
+        # 최종 정규화된 점수 계산
+        gender_score = np.mean(group_gender_scores) if group_gender_scores else 0
         norm_new_face = new_face_score / total_pairs if total_pairs > 0 else 0
         max_pref_score = len(TODAY_ATTENDEE_IDS) * 2
         norm_pref = (preference_score + max_pref_score) / (max_pref_score * 2) if max_pref_score > 0 else 0
         presenters_per_group = [sum(1 for mid in g if mid in TODAY_PRESENTER_IDS) for g in groups.values()]
         presenter_score = 1 / (np.var(presenters_per_group) + 0.1) if len(presenters_per_group) > 1 else 10.0
 
-        return gender_score, norm_new_face, presenter_score, norm_pref, 0
+        # [수정] 마지막에 모든 점수를 함께 반환합니다. 페널티는 양수(0, 1, 2...) 입니다.
+        return gender_score, norm_new_face, presenter_score, norm_pref, size_penalty
 
     # --- 4. 유전 알고리즘 실행 ---
     fitness_name = f"FitnessGA_{abs(hash(weights))}"
@@ -1126,12 +1150,12 @@ def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_name
     toolbox.register("mutate", tools.mutUniformInt, low=0, up=num_groups - 1, indpb=0.05)
     toolbox.register("select", tools.selTournament, tournsize=3)
 
-    pop_size, ngen, cxpb, mutpb = 1200, 200, 0.7, 0.6
+    pop_size, ngen, cxpb, mutpb = 1200, 100, 0.7, 0.6
     population = toolbox.population(n=pop_size)
     hall_of_fame = tools.HallOfFame(20)
 
-    # [수정] eaSimple을 직접 구현한 루프로 변경하여 진행률 로깅 추가
-    app.logger.info(f"유전 알고리즘 시작: 총 {ngen} 세대 진행")
+    # [수정] Logbook 객체 대신 단순 파이썬 리스트 사용
+    manual_log = []
 
     # 초기 집단 평가
     invalid_ind = [ind for ind in population if not ind.fitness.valid]
@@ -1142,9 +1166,10 @@ def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_name
 
     # 세대 진화 시작
     for gen in range(1, ngen + 1):
-        # 10세대마다 진행률을 전송하여 너무 많은 이벤트를 방지합니다.
-        if gen % 10 == 0 or gen == ngen:
-             yield int((gen / ngen) * 100) # 현재 진행률(%)을 반환
+        if not test_mode:
+            if gen % 10 == 0 or gen == ngen:
+                yield int((gen / ngen) * 100)
+
         offspring = toolbox.select(population, len(population))
         offspring = algorithms.varAnd(offspring, toolbox, cxpb, mutpb)
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
@@ -1154,14 +1179,10 @@ def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_name
         hall_of_fame.update(offspring)
         population[:] = offspring
 
-        # 20세대마다 서버 로그에 진행률 출력
-        if gen % 20 == 0:
-            app.logger.info(f"알고리즘 진행 중... {gen}/{ngen} 세대 완료")
-
-    app.logger.info("유전 알고리즘 완료. 최적해 필터링 시작.")
-
-    valid_solutions = [ind for ind in hall_of_fame if ind.fitness.values[4] == 0]
-    if not valid_solutions: return []
+        # [수정] Statistics 객체 대신 직접 최고 점수를 계산하고 리스트에 추가
+        current_scores = [calculate_total_score(ind.fitness.values, weights) for ind in population]
+        max_score = np.max(current_scores)
+        manual_log.append({'gen': gen, 'max_score': max_score})
 
     # --- 5. 중복 제거 및 결과 포맷팅 ---
     def normalized_hamming_distance(ind1, ind2):
@@ -1198,13 +1219,13 @@ def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_name
             used_groups.update(candidate_groups)
         return diverse_selection
 
-    def calculate_total_score(ind):
-        return sum(v * w for v, w in zip(ind.fitness.values, weights))
+    valid_solutions = [ind for ind in hall_of_fame if ind.fitness.values[4] == 0]
+    if not valid_solutions:
+        return [], manual_log
 
-    sorted_solutions = sorted(valid_solutions, key=calculate_total_score, reverse=True)
-
-    min_dist_threshold = int(len(TODAY_ATTENDEE_IDS) * 0.15)
-    final_solutions_indices = select_diverse_solutions(sorted_solutions, num_results, min_dist_threshold,
+    sorted_solutions = sorted(valid_solutions, key=lambda ind: calculate_total_score(ind.fitness.values, weights),
+                              reverse=True)
+    final_solutions_indices = select_diverse_solutions(sorted_solutions, num_results, int(num_attendees * 0.15),
                                                        attendee_id_map)
 
     output_results = []
@@ -1218,11 +1239,17 @@ def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_name
             member_names = [id_to_name_map.get(mid, "Unknown") for mid in groups[group_id]]
             formatted_groups.append(member_names)
         output_results.append({
-            "score": f"{calculate_total_score(sol):.2f}",
+            "score": f"{calculate_total_score(sol.fitness.values, weights):.2f}",
             "details": [f"{v:.2f}" for v in sol.fitness.values[:4]],
             "groups": formatted_groups
         })
-    return output_results
+
+    if test_mode:
+        # 테스트 스크립트에서는 결과와 로그를 모두 반환
+        return output_results, manual_log
+    else:
+        # 웹사이트에서는 최종 결과만 반환
+        return output_results
 
 
 @app.route('/api/bookclub/save', methods=['POST'])
