@@ -934,67 +934,83 @@ def generate_groups(participants, facilitators, members, co_matrix, group_count_
     suggestions.sort(key=lambda x: x[0], reverse=True)
     return [g for _, g in suggestions[:top_n]]
 
-
-@app.route('/making_team', methods=['GET', 'POST'])
+@app.route('/making_team', methods=['GET']) # POST를 제거
 @login_required(role="admin")
 def bookclub_index():
     try:
         members_res = supabase.table("members").select("*").order("name").execute().data
     except Exception as e:
         return "<h3>회원 정보를 불러오는 중 오류가 발생했습니다.</h3>", 500
+    # POST 로직을 모두 제거하고 템플릿만 렌더링
+    return render_template('bookclub_index.html', members=members_res)
 
-    if request.method == 'POST':
-        present_names = request.form.getlist('present')
-        facilitator_names = request.form.getlist('facilitators')
+@app.route('/start_group_generation')
+@login_required(role="admin")
+def start_group_generation():
+    present_names = request.args.getlist('present')
+    facilitator_names = request.args.getlist('facilitators')
+    group_count_str = request.args.get('group_count')
+    group_names_str = request.args.get('group_names', '')
 
-        if not present_names:
-            flash("조 편성을 위해서는 최소 1명 이상의 참석자를 선택해야 합니다.", "warning")
-            return redirect(url_for('bookclub_index'))
-
-        # [추가] 고급 설정 값 가져오기
-        group_count_str = request.form.get('group_count')
-        group_names_str = request.form.get('group_names', '')
-
+    def generate_events():
         try:
-            # [추가] 그룹 수를 정수로 변환 (입력이 없으면 None)
-            group_count_override = int(group_count_str) if group_count_str else None
-        except ValueError:
-            group_count_override = None  # 숫자가 아닌 값이 입력된 경우 무시
-
-        # [추가] 그룹 이름을 리스트로 변환
-        group_names = [name.strip() for name in group_names_str.split(',') if name.strip()]
-
-        try:
+            members_res = supabase.table("members").select("*").order("name").execute().data
             members_df = pd.DataFrame(members_res)
             history_res = supabase.table("history").select("groups").execute().data
             history_df = pd.DataFrame(history_res)
+            group_count_override = int(group_count_str) if group_count_str else None
 
-            gender_solutions = run_genetic_algorithm(
-                members_df=members_df, history_df=history_df,
-                attendee_names=present_names, presenter_names=facilitator_names,
-                weights=(10.0, 6.0, 3.0, 2.0, -1000.0),
-                group_count_override=group_count_override  # [수정] 인자 전달
-            )
-            new_face_solutions = run_genetic_algorithm(
-                members_df=members_df, history_df=history_df,
-                attendee_names=present_names, presenter_names=facilitator_names,
-                weights=(6.0, 10.0, 3.0, 2.0, -1000.0),
-                group_count_override=group_count_override  # [수정] 인자 전달
-            )
+            # --- 이 아래 로직이 중요하게 변경됩니다 ---
 
-            return render_template(
-                'bookclub_ga_results.html',
-                gender_solutions=gender_solutions,
-                new_face_solutions=new_face_solutions,
-                present=present_names,
-                facilitators=facilitator_names,
-                group_names=group_names  # [추가] 그룹 이름을 템플릿에 전달
+            # 제너레이터를 실행하고 진행률과 최종 결과를 분리해서 받는 함수
+            def get_final_result_from_generator(generator, progress_offset=0, progress_scale=0.5):
+                final_result = []
+                while True:
+                    try:
+                        progress = next(generator)
+                        # 진행률 데이터를 클라이언트로 스트리밍
+                        progress_data = json.dumps({'progress': int(progress_offset + (progress * progress_scale))})
+                        yield f"event: progress\ndata: {progress_data}\n\n"
+                    except StopIteration as e:
+                        # 제너레이터가 끝나면 return 값을 최종 결과로 저장
+                        final_result = e.value
+                        break
+                return final_result
+
+            # '성비 우선' 알고리즘 실행
+            gender_generator = run_genetic_algorithm(
+                members_df, history_df, present_names, facilitator_names,
+                (10.0, 6.0, 3.0, 2.0, -1000.0), 3, group_count_override
             )
+            gender_solutions = yield from get_final_result_from_generator(gender_generator, 0, 0.5)
+
+            # '새로운 만남 우선' 알고리즘 실행
+            new_face_generator = run_genetic_algorithm(
+                members_df, history_df, present_names, facilitator_names,
+                (6.0, 10.0, 3.0, 2.0, -1000.0), 3, group_count_override
+            )
+            new_face_solutions = yield from get_final_result_from_generator(new_face_generator, 50, 0.5)
+
+            # 최종 결과 페이지 렌더링
+            with app.app_context():  # Flask 어플리케이션 컨텍스트를 명시적으로 생성
+                group_names = [name.strip() for name in group_names_str.split(',') if name.strip()]
+                final_html = render_template(
+                    'bookclub_ga_results.html',
+                    gender_solutions=gender_solutions,
+                    new_face_solutions=new_face_solutions,
+                    present=present_names,
+                    facilitators=facilitator_names,
+                    group_names=group_names
+                )
+                complete_data = json.dumps({'html': final_html})
+                yield f"event: complete\ndata: {complete_data}\n\n"
+
         except Exception as e:
-            flash(f"알고리즘 실행 중 오류가 발생했습니다: {e}", "danger")
-            return redirect(url_for('bookclub_index'))
+            app.logger.error(f"조 편성 중 오류 발생: {e}", exc_info=True)
+            error_data = json.dumps({'error': str(e)})
+            yield f"event: error\ndata: {error_data}\n\n"
 
-    return render_template('bookclub_index.html', members=members_res)
+    return Response(generate_events(), mimetype='text/event-stream')
 
 
 def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_names, weights, num_results=3, group_count_override=None):
@@ -1126,6 +1142,9 @@ def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_name
 
     # 세대 진화 시작
     for gen in range(1, ngen + 1):
+        # 10세대마다 진행률을 전송하여 너무 많은 이벤트를 방지합니다.
+        if gen % 10 == 0 or gen == ngen:
+             yield int((gen / ngen) * 100) # 현재 진행률(%)을 반환
         offspring = toolbox.select(population, len(population))
         offspring = algorithms.varAnd(offspring, toolbox, cxpb, mutpb)
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
