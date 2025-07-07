@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>독서모임 조 편성 결과 (GA)</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
@@ -42,15 +45,19 @@
                                 {% for group in result.groups %}
                                 <div class="p-2 bg-bg-dark rounded">
                                     <strong class="text-gray-300">
-                                        {% if group_names and group_names[loop.index0] %}
-                                            {{ group_names[loop.index0] }}
-                                        {% else %}
-                                            그룹 {{ loop.index }}
-                                        {% endif %}:
-                                    </strong> {{ group|join(', ') }}
-                                </div>                                {% endfor %}
+                                        {% if group_names and group_names[loop.index0] %}{{ group_names[loop.index0] }}{% else %}그룹 {{ loop.index }}{% endif %}:
+                                    </strong>
+                                    {% set facilitators_in_group = [] %}{% for name in group %}{% if name in facilitators %}{% set _ = facilitators_in_group.append(name) %}{% endif %}{% endfor %}
+                                    {% set members_in_group = [] %}{% for name in group %}{% if name not in facilitators %}{% set _ = members_in_group.append(name) %}{% endif %}{% endfor %}
+                                    {% for name in facilitators_in_group %}<strong>{{ name }}</strong>{% if not loop.last or members_in_group %}, {% endif %}{% endfor %}
+                                    {% for name in members_in_group %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %}
+                                </div>
+                                {% endfor %}
                             </div>
-                            <button onclick="saveGroups({{ result.groups|tojson }})" class="mt-4 w-full eva-button bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg">이 조합으로 저장</button>
+                            <div class="grid grid-cols-2 gap-2 mt-4">
+                                <button class="w-full eva-button bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg save-groups-btn" data-groups='{{ result.groups|tojson|safe }}'>이 조합으로 저장</button>
+                                <button class="w-full eva-button bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg capture-groups-btn" data-groups='{{ result.groups|tojson|safe }}'>결과 캡쳐</button>
+                            </div>
                         </div>
                     {% endfor %}
                 {% else %}
@@ -70,10 +77,21 @@
                             <p class="text-xs text-gray-400 mb-3">세부 점수 (성비, 새만남, 발제자, 선호도): {{ result.details|join(', ') }}</p>
                             <div class="space-y-2">
                                 {% for group in result.groups %}
-                                    <div class="p-2 bg-bg-dark rounded"><strong class="text-gray-300">그룹 {{ loop.index }}:</strong> {{ group|join(', ') }}</div>
+                                <div class="p-2 bg-bg-dark rounded">
+                                    <strong class="text-gray-300">
+                                        {% if group_names and group_names[loop.index0] %}{{ group_names[loop.index0] }}{% else %}그룹 {{ loop.index }}{% endif %}:
+                                    </strong>
+                                    {% set facilitators_in_group = [] %}{% for name in group %}{% if name in facilitators %}{% set _ = facilitators_in_group.append(name) %}{% endif %}{% endfor %}
+                                    {% set members_in_group = [] %}{% for name in group %}{% if name not in facilitators %}{% set _ = members_in_group.append(name) %}{% endif %}{% endfor %}
+                                    {% for name in facilitators_in_group %}<strong>{{ name }}</strong>{% if not loop.last or members_in_group %}, {% endif %}{% endfor %}
+                                    {% for name in members_in_group %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %}
+                                </div>
                                 {% endfor %}
                             </div>
-                            <button onclick="saveGroups({{ result.groups|tojson }})" class="mt-4 w-full eva-button bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">이 조합으로 저장</button>
+                            <div class="grid grid-cols-2 gap-2 mt-4">
+                                <button class="w-full eva-button bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg save-groups-btn" data-groups='{{ result.groups|tojson|safe }}'>이 조합으로 저장</button>
+                                <button class="w-full eva-button bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg capture-groups-btn" data-groups='{{ result.groups|tojson|safe }}'>결과 캡쳐</button>
+                            </div>
                         </div>
                     {% endfor %}
                 {% else %}
@@ -84,8 +102,9 @@
     </div>
 
 <script>
-    const present = {{ present|tojson }};
-    const facilitators = {{ facilitators|tojson }};
+    const present = {{ present|tojson|safe }};
+    const facilitators = {{ facilitators|tojson|safe }};
+    const group_names = {{ group_names|tojson|safe }};
 
     async function saveGroups(groups) {
         if (!confirm("이 조 편성 결과를 저장하시겠습니까?")) return;
@@ -112,6 +131,86 @@
             alert('오류: ' + error.message);
         }
     }
+
+    async function captureCleanGroups(groups) {
+        if (typeof html2canvas === 'undefined') {
+            alert('오류: 캡쳐 라이브러리(html2canvas)를 로드하지 못했습니다.\n인터넷 연결을 확인하거나 잠시 후 다시 시도해주세요.');
+            return;
+        }
+        if (!navigator.clipboard || !navigator.clipboard.write) {
+            alert('오류: 클립보드 복사 기능이 지원되지 않는 환경입니다.\nHTTPS 또는 localhost 환경에서 접속했는지 확인해주세요.');
+            return;
+        }
+
+        const captureContainer = document.createElement('div');
+        try {
+            Object.assign(captureContainer.style, {
+                position: 'absolute',
+                top: '-9999px',
+                left: '0px',
+                width: '550px',
+                padding: '24px',
+                backgroundColor: '#2D2D2D',
+                color: '#E5E5E5',
+                fontFamily: "'Noto Sans KR', sans-serif",
+                border: '1px solid #444444',
+                borderRadius: '12px'
+            });
+
+            let innerHTML = '<h3 style="font-family: \'Orbitron\', sans-serif; font-size: 20px; font-weight: bold; color: #00FF7F; margin-bottom: 16px; text-transform: uppercase;">Grouping Result</h3>';
+            groups.forEach((group, index) => {
+                const groupName = (group_names && group_names[index]) ? group_names[index] : `그룹 ${index + 1}`;
+                const memberNames = [...group].sort().map(name =>
+                    facilitators.includes(name) ? `<strong>${name}</strong>` : name
+                ).join(', ');
+                innerHTML += `<div style="background-color: #1A1A1A; padding: 12px; border-radius: 8px; margin-bottom: 10px;"><strong style="color: #E5E5E5;">${groupName}:</strong> ${memberNames}</div>`;
+            });
+            captureContainer.innerHTML = innerHTML;
+
+            document.body.appendChild(captureContainer);
+
+            const canvas = await html2canvas(captureContainer, { scale: 2 });
+
+            canvas.toBlob(async (blob) => {
+                if (!blob) throw new Error('이미지 변환 실패');
+                try {
+                    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                    alert('정리된 조 편성 결과 이미지가 클립보드에 복사되었습니다!');
+                } catch (clipboardError) {
+                    console.error('클립보드 쓰기 실패:', clipboardError);
+                    alert('클립보드에 복사하는데 실패했습니다. 브라우저가 페이지의 클립보드 접근을 허용했는지 확인해주세요.');
+                }
+            }, 'image/png');
+
+        } catch (err) {
+            console.error('캡쳐 준비 중 오류 발생:', err);
+            alert('캡쳐 이미지를 준비하는 중 오류가 발생했습니다: ' + err.message);
+        } finally {
+            if (document.body.contains(captureContainer)) {
+                document.body.removeChild(captureContainer);
+            }
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const saveButtons = document.querySelectorAll('.save-groups-btn');
+        saveButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const groupsDataString = button.dataset.groups;
+                const groupsObject = JSON.parse(groupsDataString);
+                saveGroups(groupsObject);
+            });
+        });
+
+        const captureButtons = document.querySelectorAll('.capture-groups-btn');
+        captureButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const groupsDataString = button.dataset.groups;
+                const groupsObject = JSON.parse(groupsDataString);
+                captureCleanGroups(groupsObject);
+            });
+        });
+    });
 </script>
 </body>
 </html>
