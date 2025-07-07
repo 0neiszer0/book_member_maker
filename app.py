@@ -7,7 +7,8 @@ import itertools
 import random
 import math
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash, Response
+import json
 from supabase import create_client, Client
 from datetime import datetime, timedelta, timezone
 from functools import wraps
@@ -945,6 +946,10 @@ def bookclub_index():
     if request.method == 'POST':
         present_names = request.form.getlist('present')
         facilitator_names = request.form.getlist('facilitators')
+
+        if not present_names:
+            flash("조 편성을 위해서는 최소 1명 이상의 참석자를 선택해야 합니다.", "warning")
+            return redirect(url_for('bookclub_index'))
 
         # [추가] 고급 설정 값 가져오기
         group_count_str = request.form.get('group_count')
