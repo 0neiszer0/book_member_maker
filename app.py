@@ -1256,30 +1256,107 @@ def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_name
 @login_required(role="admin")
 def bookclub_save():
     data = request.json
+    # 헬퍼 함수를 호출하여 저장 로직 실행
+    result = save_group_record_to_db(data["date"], data["present"], data["facilitators"], data["groups"])
+
+    if result["status"] == "ok":
+        return jsonify(result)
+    else:
+        return jsonify(result), 500
+
+
+# [신규] 조 편성 기록을 DB에 저장하는 헬퍼 함수
+def save_group_record_to_db(date, present, facilitators, groups):
+    """주어진 데이터로 조 편성 기록과 만남 횟수 매트릭스를 DB에 저장/업데이트합니다."""
     try:
-        record = {"date": data["date"], "present": data["present"], "facilitators": data["facilitators"],
-                  "groups": data["groups"]}
+        # 1. history 테이블에 기록 저장
+        record = {"date": date, "present": present, "facilitators": facilitators, "groups": groups}
         supabase.table("history").insert(record).execute()
-        today = data['date']
+
+        # 2. bookclub_co_matrix 업데이트
         keys_to_update = {}
-        for g in data['groups']:
+        for g in groups:
             for a, b in itertools.combinations(g, 2):
                 key = '-'.join(sorted([a, b]))
                 keys_to_update[key] = keys_to_update.get(key, 0) + 1
+
         if keys_to_update:
             keys_to_fetch = list(keys_to_update.keys())
             matrix_res = supabase.table('bookclub_co_matrix').select('pair_key, count').in_('pair_key',
                                                                                             keys_to_fetch).execute()
             current_counts = {item['pair_key']: item['count'] for item in matrix_res.data}
+
             final_upsert_data = []
             for key, increment in keys_to_update.items():
-                current_count = current_counts.get(key, 0)
-                final_upsert_data.append({"pair_key": key, "count": current_count + increment, "last_met": today})
+                new_count = current_counts.get(key, 0) + increment
+                final_upsert_data.append({"pair_key": key, "count": new_count, "last_met": date})
+
             supabase.table("bookclub_co_matrix").upsert(final_upsert_data).execute()
-        return jsonify({'status': 'ok'})
+
+        return {"status": "ok"}
     except Exception as e:
-        app.logger.error(f"Error saving bookclub data: {e}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        app.logger.error(f"Error saving group record: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.route('/manual_entry')
+@login_required(role="admin")
+def manual_entry():
+    """수동으로 조 편성을 입력하는 페이지를 렌더링합니다."""
+    try:
+        members_res = supabase.table("members").select("name").order("name").execute().data
+        all_members = [m['name'] for m in members_res]
+    except Exception as e:
+        flash(f"회원 정보를 불러오는 중 오류 발생: {e}", "danger")
+        all_members = []
+    return render_template('manual_entry.html', all_members=all_members)
+
+
+# app.py에 아래 라우트 추가
+
+@app.route('/save_manual_groups', methods=['POST'])
+@login_required(role="admin")
+def save_manual_groups():
+    """수동으로 입력된 조 편성 데이터를 저장합니다."""
+    try:
+        form_data = request.form
+
+        # 1. 폼 데이터 추출
+        meeting_date = form_data.get('meeting_date')
+        present_members = form_data.getlist('present')
+
+        # 2. 그룹 데이터 파싱 및 정리
+        # "그룹 1" 텍스트 영역의 텍스트를 가져와서 쉼표로 분리하고, 각 이름의 공백을 제거
+        groups = []
+        for i in range(1, 6):  # 최대 5개 그룹까지 처리
+            group_text = form_data.get(f'group_{i}')
+            if group_text:
+                # 쉼표, 줄바꿈, 공백 등 다양한 구분자로 분리 가능하도록 처리
+                member_names = re.split(r'[,;\s\n]+', group_text)
+                # 비어있지 않은 이름만 필터링하여 리스트 생성
+                cleaned_group = [name.strip() for name in member_names if name.strip()]
+                if cleaned_group:
+                    groups.append(cleaned_group)
+
+        # 3. 간단한 유효성 검사
+        if not all([meeting_date, present_members, groups]):
+            flash("날짜, 참석자, 최소 1개 이상의 그룹을 모두 입력해야 합니다.", "danger")
+            return redirect(url_for('manual_entry'))
+
+
+        # 4. 헬퍼 함수를 사용해 DB에 저장
+        # (발제자(facilitators)는 별도로 입력받지 않았으므로 빈 리스트로 전달)
+        result = save_group_record_to_db(meeting_date, present_members, [], groups)
+
+        if result["status"] == "ok":
+            flash("수동 조 편성 기록이 성공적으로 저장되었습니다.", "success")
+            return redirect(url_for('admin_dashboard'))
+        else:
+            flash(f"저장 중 오류 발생: {result['message']}", "danger")
+            return redirect(url_for('manual_entry'))
+
+    except Exception as e:
+        flash(f"처리 중 예외 발생: {e}", "danger")
+        return redirect(url_for('manual_entry'))
 
 
 @app.route('/api/bookclub/history', methods=['GET'])

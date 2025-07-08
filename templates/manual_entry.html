@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>수동 조 편성 기록</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A; --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444; }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
+        h1, h2 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; }
+        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
+        .eva-input { background-color: var(--bg-dark); border-color: var(--border-dark); color: var(--text-light); }
+        .eva-button { background-color: var(--eva-green); color: black; font-weight: bold; }
+        .form-check { display: flex; align-items: center; background-color: var(--bg-dark); padding: 0.5rem; border-radius:4px; }
+        .form-check input { margin-right: 0.5rem; accent-color: var(--eva-green); }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="container mx-auto max-w-4xl">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl md:text-3xl font-bold text-eva-green">Manual Group Entry</h1>
+            <a href="{{ url_for('admin_dashboard') }}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md">대시보드로</a>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="p-4 mb-4 text-sm rounded-lg border {{ 'bg-red-900/50 text-red-300 border-red-500/50' if category == 'danger' else 'bg-green-900/50 text-green-300 border-green-500/50' }}" role="alert">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('save_manual_groups') }}" method="POST" class="eva-card p-6 rounded-lg space-y-6">
+            <div>
+                <label for="meeting_date" class="block text-lg font-bold text-eva-purple mb-2">모임 날짜</label>
+                <input type="date" id="meeting_date" name="meeting_date" required class="eva-input w-full md:w-1/2 p-2 rounded-md">
+            </div>
+
+            <div>
+                <h2 class="text-lg font-bold text-eva-purple mb-2">참석자 선택</h2>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                    {% for member in all_members %}
+                    <label class="form-check">
+                        <input type="checkbox" name="present" value="{{ member }}">
+                        {{ member }}
+                    </label>
+                    {% else %}
+                    <p>등록된 회원이 없습니다.</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-lg font-bold text-eva-purple mb-2">그룹 입력</h2>
+                <p class="text-sm text-gray-400 mb-4">각 그룹의 멤버 이름을 쉼표(,)나 공백, 줄바꿈으로 구분하여 입력하세요.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <textarea name="group_1" placeholder="그룹 1 멤버..." rows="5" class="eva-input w-full p-2 rounded-md"></textarea>
+                    <textarea name="group_2" placeholder="그룹 2 멤버..." rows="5" class="eva-input w-full p-2 rounded-md"></textarea>
+                    <textarea name="group_3" placeholder="그룹 3 멤버..." rows="5" class="eva-input w-full p-2 rounded-md"></textarea>
+                    <textarea name="group_4" placeholder="그룹 4 멤버..." rows="5" class="eva-input w-full p-2 rounded-md"></textarea>
+                    <textarea name="group_5" placeholder="그룹 5 멤버..." rows="5" class="eva-input w-full p-2 rounded-md"></textarea>
+                </div>
+            </div>
+
+            <div class="pt-4">
+                <button type="submit" class="eva-button w-full text-lg py-3 rounded-md">기록 저장하기</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>
