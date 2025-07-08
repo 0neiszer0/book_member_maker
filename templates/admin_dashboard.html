@@ -42,9 +42,10 @@
             <h1 class="text-3xl font-bold text-eva-green">Admin Dashboard</h1>
             <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <a href="/making_team" class="w-full sm:w-auto text-center eva-button-primary font-bold py-2 px-4 rounded-md">독서 모임 조 편성</a>
+                <a href="{{ url_for('manual_entry') }}" class="w-full sm:w-auto text-center eva-button-secondary font-bold py-2 px-4 rounded-md">수동 기록 추가</a>
                 <a href="/logout" class="w-full sm:w-auto text-center eva-button-secondary font-bold py-2 px-4 rounded-md">Logout</a>
             </div>
-        </div>
+            </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}{% for category, message in messages %}
@@ -136,7 +137,6 @@ document.addEventListener('DOMContentLoaded', () => {
         dateFormat: "Y-m-d",
     });
 
-    // --- 기존 스크립트 ---
     const toggleList = document.getElementById('interviewer-toggle-list');
     if(toggleList) {
         toggleList.addEventListener('change', (e) => {
@@ -153,7 +153,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const eventsTable = document.getElementById('events-table');
     if (eventsTable) {
-        // '활성화' 토글을 위한 'change' 이벤트 리스너
         eventsTable.addEventListener('change', (e) => {
             if (e.target.matches('.event-toggle')) {
                 const checkbox = e.target;
@@ -164,9 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // [수정] '삭제'와 '공유' 버튼을 한번에 처리하는 'click' 이벤트 리스너
         eventsTable.addEventListener('click', (e) => {
-            // 삭제 버튼을 눌렀을 경우
             if (e.target.matches('.delete-event-btn')) {
                 const button = e.target;
                 const eventId = button.dataset.eventId;
@@ -181,7 +178,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     .catch(error => console.error('Error:', error));
                 }
             }
-            // 공유 버튼을 눌렀을 경우
             else if (e.target.matches('.share-link-btn')) {
                 const button = e.target;
                 const eventId = button.dataset.eventId;
