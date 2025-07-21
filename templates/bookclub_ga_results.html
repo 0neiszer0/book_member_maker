@@ -5,9 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>독서모임 조 편성 결과 (GA)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
@@ -21,6 +19,11 @@
         .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
         .eva-button { font-weight: bold; transition: all 0.2s; }
         .eva-button:hover { transform: translateY(-1px); }
+        #image-modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.9); justify-content: center; align-items: center; }
+        #image-modal-content { max-width: 90%; max-height: 80%; border-radius: 8px; }
+        #modal-caption { text-align: center; color: #ccc; padding: 10px 0; font-size: 1rem;}
+        #modal-close { position: absolute; top: 15px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; transition: 0.3s; cursor: pointer; }
+        #modal-close:hover { color: #bbb; }
     </style>
 </head>
 <body class="min-h-screen">
@@ -107,7 +110,7 @@
                             <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mt-4">
                                 <button class="w-full eva-button bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg save-groups-btn" data-groups='{{ result.groups|tojson|safe }}'>이 조합으로 저장</button>
                                 <button class="w-full eva-button bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg capture-groups-btn" data-groups='{{ result.groups|tojson|safe }}'>결과 캡쳐</button>
-                                <button onclick="editGroups({{ result.groups|tojson|safe }})" class="w-full md:col-span-1 eva-button bg-yellow-600 hover:bg-yellow-700 text-white py-2 rounded-lg">편집</button>
+                                <button class="w-full md:col-span-1 eva-button bg-yellow-600 hover:bg-yellow-700 text-white py-2 rounded-lg edit-groups-btn" data-groups='{{ result.groups|tojson|safe }}'>편집</button>
                             </div>
                         </div>
                     {% endfor %}
@@ -121,17 +124,19 @@
         </div>
     </div>
 
+    <div id="image-modal">
+        <span id="modal-close">&times;</span>
+        <img id="image-modal-content">
+        <div id="modal-caption">이미지를 길게 누르거나 우클릭하여 저장/공유하세요.</div>
+    </div>
+
 <script>
-    // --- 서버로부터 전달받는 전역 데이터 ---
     const present = {{ present|tojson|safe }};
     const facilitators = {{ facilitators|tojson|safe }};
     const group_names = {{ group_names|tojson|safe }};
     const meetingHistory = {{ meeting_history|tojson|safe }};
+    const manual_entry_url = "{{ manual_entry_url|safe }}";
 
-    /**
-     * 선택된 조 편성 결과를 서버에 저장하는 함수
-     * @param {Array<Array<string>>} groups - 저장할 그룹 배열
-     */
     async function saveGroups(groups) {
         if (!confirm("이 조 편성 결과를 저장하시겠습니까?")) return;
         const dataToSave = {
@@ -150,27 +155,15 @@
             if (result.status === 'ok') {
                 alert('성공적으로 저장되었습니다!');
                 window.location.href = "/making_team";
-            } else {
-                throw new Error(result.message || '저장에 실패했습니다.');
-            }
-        } catch (error) {
-            alert('오류: ' + error.message);
-        }
+            } else { throw new Error(result.message || '저장에 실패했습니다.'); }
+        } catch (error) { alert('오류: ' + error.message); }
     }
 
-    /**
-     * 조 편성 결과를 서식이 적용된 이미지로 캡쳐하여 클립보드에 복사하는 함수
-     * @param {Array<Array<string>>} groups - 캡쳐할 그룹 배열
-     */
     async function captureCleanGroups(groups) {
         if (typeof html2canvas === 'undefined') {
-            alert('오류: 캡쳐 라이브러리(html2canvas)를 로드하지 못했습니다.\n인터넷 연결을 확인하거나 잠시 후 다시 시도해주세요.');
-            return;
+            alert('오류: 캡쳐 라이브러리(html2canvas)를 로드하지 못했습니다.'); return;
         }
-        if (!navigator.clipboard || !navigator.clipboard.write) {
-            alert('오류: 클립보드 복사 기능이 지원되지 않는 환경입니다.\nHTTPS 또는 localhost 환경에서 접속했는지 확인해주세요.');
-            return;
-        }
+
         const captureContainer = document.createElement('div');
         try {
             Object.assign(captureContainer.style, {
@@ -179,7 +172,7 @@
                 color: '#E5E5E5', fontFamily: "'Noto Sans KR', sans-serif",
                 border: '1px solid #444444', borderRadius: '12px'
             });
-            let innerHTML = '<h3 style="font-family: \'Orbitron\', sans-serif; font-size: 20px; font-weight: bold; color: #00FF7F; margin-bottom: 16px; text-transform: uppercase;">Grouping Result</h3>';
+            let innerHTML = `<h3 style="font-family: 'Orbitron', sans-serif; font-size: 20px; font-weight: bold; color: #00FF7F; margin-bottom: 16px; text-transform: uppercase;">Grouping Result</h3>`;
             groups.forEach((group, index) => {
                 const groupName = (group_names && group_names[index]) ? group_names[index] : `그룹 ${index + 1}`;
                 const memberNames = [...group].sort().map(name =>
@@ -189,12 +182,14 @@
             });
             captureContainer.innerHTML = innerHTML;
             document.body.appendChild(captureContainer);
+
             const canvas = await html2canvas(captureContainer, { scale: 2 });
-            canvas.toBlob(async (blob) => {
-                if (!blob) throw new Error('이미지 변환 실패');
-                await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-                alert('정리된 조 편성 결과 이미지가 클립보드에 복사되었습니다!');
-            }, 'image/png');
+
+            const modal = document.getElementById('image-modal');
+            const modalImg = document.getElementById('image-modal-content');
+            modalImg.src = canvas.toDataURL("image/png");
+            modal.style.display = 'flex';
+
         } catch (err) {
             console.error('캡쳐 실패:', err);
             alert('캡쳐 이미지를 준비하는 중 오류가 발생했습니다: ' + err.message);
@@ -205,28 +200,16 @@
         }
     }
 
-    /**
-     * 조 편성 결과를 수동 편집 페이지로 넘기는 함수
-     * @param {Array<Array<string>>} groups - 편집할 그룹 배열
-     */
     function editGroups(groups) {
         const dataToEdit = {
             present: present, facilitators: facilitators, groups: groups,
             group_names: group_names, date: new Date().toISOString().slice(0, 10)
         };
         sessionStorage.setItem('manualEntryData', JSON.stringify(dataToEdit));
-
-        // [수정] Jinja2의 url_for 대신, 서버에서 전달받은 변수를 사용합니다.
-        window.location.href = "{{ manual_entry_url }}";
+        window.location.href = manual_entry_url;
     }
 
-    // --- 페이지 로드 시 실행되는 이벤트 리스너 ---
     document.addEventListener('DOMContentLoaded', () => {
-        /**
-         * '더 보기' 버튼을 설정하는 함수
-         * @param {string} buttonId - 버튼의 ID
-         * @param {string} cardClass - 숨겨진 카드의 클래스
-         */
         function setupLoadMore(buttonId, cardClass) {
             const loadMoreBtn = document.getElementById(buttonId);
             if (!loadMoreBtn) return;
@@ -244,7 +227,6 @@
             });
         }
 
-        // '저장'과 '캡쳐' 버튼에 이벤트 리스너를 동적으로 할당
         document.querySelectorAll('.save-groups-btn').forEach(button => {
             button.addEventListener('click', () => {
                 const groupsObject = JSON.parse(button.dataset.groups);
@@ -260,15 +242,13 @@
         document.querySelectorAll('.edit-groups-btn').forEach(button => {
             button.addEventListener('click', () => {
                 const groupsObject = JSON.parse(button.dataset.groups);
-                editGroups(groupsObject); // 기존 editGroups 함수 호출
+                editGroups(groupsObject);
             });
         });
 
-        // 각 섹션에 '더 보기' 기능 활성화
         setupLoadMore('load-more-gender', 'result-card-gender');
         setupLoadMore('load-more-newface', 'result-card-newface');
 
-        // '기록 보기' 버튼에 대한 이벤트 리스너 (이벤트 위임)
         document.querySelector('.container').addEventListener('click', (e) => {
             if (e.target.matches('.show-history-btn')) {
                 const button = e.target;
@@ -283,11 +263,7 @@
                 }
 
                 const pairs = [];
-                for (let i = 0; i < group.length; i++) {
-                    for (let j = i + 1; j < group.length; j++) {
-                        pairs.push([group[i], group[j]]);
-                    }
-                }
+                for (let i = 0; i < group.length; i++) { for (let j = i + 1; j < group.length; j++) { pairs.push([group[i], group[j]]); } }
 
                 if (pairs.length < 1) {
                     detailsDiv.innerHTML = '<span>비교할 기록이 없습니다.</span>';
@@ -306,6 +282,13 @@
                 button.textContent = '기록 닫기';
             }
         });
+
+        const modal = document.getElementById('image-modal');
+        const modalClose = document.getElementById('modal-close');
+        if(modal && modalClose) {
+            modalClose.onclick = () => { modal.style.display = "none"; }
+            modal.onclick = (e) => { if(e.target === modal) { modal.style.display = "none"; } }
+        }
     });
 </script>
 </body>
