@@ -35,7 +35,7 @@
                 <h2 class="text-2xl font-semibold mb-4 text-center text-blue-400">성비 우선 조합</h2>
                 {% if gender_solutions %}
                     {% for result in gender_solutions %}
-                        <div class="eva-card p-6 mb-6 rounded-lg">
+                        <div class="eva-card p-6 mb-6 rounded-lg result-card-gender" {% if loop.index > 6 %}style="display: none;"{% endif %}>
                             <div class="flex justify-between items-center mb-3">
                                 <h3 class="text-lg font-bold">추천안 {{ loop.index }}</h3>
                                 <span class="text-sm font-semibold bg-blue-900 text-blue-200 px-3 py-1 rounded-full">총점: {{ result.score }}</span>
@@ -44,22 +44,32 @@
                             <div class="space-y-2">
                                 {% for group in result.groups %}
                                 <div class="p-2 bg-bg-dark rounded">
-                                    <strong class="text-gray-300">
-                                        {% if group_names and group_names[loop.index0] %}{{ group_names[loop.index0] }}{% else %}그룹 {{ loop.index }}{% endif %}:
-                                    </strong>
-                                    {% set facilitators_in_group = [] %}{% for name in group %}{% if name in facilitators %}{% set _ = facilitators_in_group.append(name) %}{% endif %}{% endfor %}
-                                    {% set members_in_group = [] %}{% for name in group %}{% if name not in facilitators %}{% set _ = members_in_group.append(name) %}{% endif %}{% endfor %}
-                                    {% for name in facilitators_in_group %}<strong>{{ name }}</strong>{% if not loop.last or members_in_group %}, {% endif %}{% endfor %}
-                                    {% for name in members_in_group %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %}
+                                    <div class="flex justify-between items-center">
+                                        <span class="pr-2">
+                                            <strong class="text-gray-300">
+                                                {% if group_names and group_names[loop.index0] %}{{ group_names[loop.index0] }}{% else %}그룹 {{ loop.index }}{% endif %}:
+                                            </strong>
+                                            {% set facilitators_in_group = [] %}{% for name in group %}{% if name in facilitators %}{% set _ = facilitators_in_group.append(name) %}{% endif %}{% endfor %}
+                                            {% set members_in_group = [] %}{% for name in group %}{% if name not in facilitators %}{% set _ = members_in_group.append(name) %}{% endif %}{% endfor %}
+                                            {% for name in facilitators_in_group %}<strong>{{ name }}</strong>{% if not loop.last or members_in_group %}, {% endif %}{% endfor %}
+                                            {% for name in members_in_group %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %}
+                                        </span>
+                                        <button class="show-history-btn text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded-md ml-2 flex-shrink-0" data-group='{{ group|tojson|safe }}'>기록 보기</button>
+                                    </div>
+                                    <div class="history-details mt-2 text-xs text-gray-400 border-t border-gray-700 pt-2" style="display: none;"></div>
                                 </div>
                                 {% endfor %}
                             </div>
-                            <div class="grid grid-cols-2 gap-2 mt-4">
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mt-4">
                                 <button class="w-full eva-button bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg save-groups-btn" data-groups='{{ result.groups|tojson|safe }}'>이 조합으로 저장</button>
                                 <button class="w-full eva-button bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg capture-groups-btn" data-groups='{{ result.groups|tojson|safe }}'>결과 캡쳐</button>
+                                <button class="w-full md:col-span-1 eva-button bg-yellow-600 hover:bg-yellow-700 text-white py-2 rounded-lg edit-groups-btn" data-groups='{{ result.groups|tojson|safe }}'>편집</button>
                             </div>
                         </div>
                     {% endfor %}
+                    {% if gender_solutions|length > 6 %}
+                    <button id="load-more-gender" class="w-full eva-button bg-gray-800 hover:bg-black text-white py-2 rounded-lg">더 보기</button>
+                    {% endif %}
                 {% else %}
                     <p class="text-center text-gray-500">결과를 생성하지 못했습니다.</p>
                 {% endif %}
@@ -69,7 +79,7 @@
                 <h2 class="text-2xl font-semibold mb-4 text-center text-eva-green">새로운 만남 우선 조합</h2>
                 {% if new_face_solutions %}
                     {% for result in new_face_solutions %}
-                        <div class="eva-card p-6 mb-6 rounded-lg">
+                        <div class="eva-card p-6 mb-6 rounded-lg result-card-newface" {% if loop.index > 6 %}style="display: none;"{% endif %}>
                             <div class="flex justify-between items-center mb-3">
                                 <h3 class="text-lg font-bold">추천안 {{ loop.index }}</h3>
                                 <span class="text-sm font-semibold bg-green-900 text-green-200 px-3 py-1 rounded-full">총점: {{ result.score }}</span>
@@ -78,22 +88,32 @@
                             <div class="space-y-2">
                                 {% for group in result.groups %}
                                 <div class="p-2 bg-bg-dark rounded">
-                                    <strong class="text-gray-300">
-                                        {% if group_names and group_names[loop.index0] %}{{ group_names[loop.index0] }}{% else %}그룹 {{ loop.index }}{% endif %}:
-                                    </strong>
-                                    {% set facilitators_in_group = [] %}{% for name in group %}{% if name in facilitators %}{% set _ = facilitators_in_group.append(name) %}{% endif %}{% endfor %}
-                                    {% set members_in_group = [] %}{% for name in group %}{% if name not in facilitators %}{% set _ = members_in_group.append(name) %}{% endif %}{% endfor %}
-                                    {% for name in facilitators_in_group %}<strong>{{ name }}</strong>{% if not loop.last or members_in_group %}, {% endif %}{% endfor %}
-                                    {% for name in members_in_group %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %}
+                                    <div class="flex justify-between items-center">
+                                        <span class="pr-2">
+                                            <strong class="text-gray-300">
+                                                {% if group_names and group_names[loop.index0] %}{{ group_names[loop.index0] }}{% else %}그룹 {{ loop.index }}{% endif %}:
+                                            </strong>
+                                            {% set facilitators_in_group = [] %}{% for name in group %}{% if name in facilitators %}{% set _ = facilitators_in_group.append(name) %}{% endif %}{% endfor %}
+                                            {% set members_in_group = [] %}{% for name in group %}{% if name not in facilitators %}{% set _ = members_in_group.append(name) %}{% endif %}{% endfor %}
+                                            {% for name in facilitators_in_group %}<strong>{{ name }}</strong>{% if not loop.last or members_in_group %}, {% endif %}{% endfor %}
+                                            {% for name in members_in_group %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %}
+                                        </span>
+                                        <button class="show-history-btn text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded-md ml-2 flex-shrink-0" data-group='{{ group|tojson|safe }}'>기록 보기</button>
+                                    </div>
+                                    <div class="history-details mt-2 text-xs text-gray-400 border-t border-gray-700 pt-2" style="display: none;"></div>
                                 </div>
                                 {% endfor %}
                             </div>
-                            <div class="grid grid-cols-2 gap-2 mt-4">
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mt-4">
                                 <button class="w-full eva-button bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg save-groups-btn" data-groups='{{ result.groups|tojson|safe }}'>이 조합으로 저장</button>
                                 <button class="w-full eva-button bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg capture-groups-btn" data-groups='{{ result.groups|tojson|safe }}'>결과 캡쳐</button>
+                                <button onclick="editGroups({{ result.groups|tojson|safe }})" class="w-full md:col-span-1 eva-button bg-yellow-600 hover:bg-yellow-700 text-white py-2 rounded-lg">편집</button>
                             </div>
                         </div>
                     {% endfor %}
+                    {% if new_face_solutions|length > 6 %}
+                    <button id="load-more-newface" class="w-full eva-button bg-gray-800 hover:bg-black text-white py-2 rounded-lg">더 보기</button>
+                    {% endif %}
                 {% else %}
                      <p class="text-center text-gray-500">결과를 생성하지 못했습니다.</p>
                 {% endif %}
@@ -102,10 +122,16 @@
     </div>
 
 <script>
+    // --- 서버로부터 전달받는 전역 데이터 ---
     const present = {{ present|tojson|safe }};
     const facilitators = {{ facilitators|tojson|safe }};
     const group_names = {{ group_names|tojson|safe }};
+    const meetingHistory = {{ meeting_history|tojson|safe }};
 
+    /**
+     * 선택된 조 편성 결과를 서버에 저장하는 함수
+     * @param {Array<Array<string>>} groups - 저장할 그룹 배열
+     */
     async function saveGroups(groups) {
         if (!confirm("이 조 편성 결과를 저장하시겠습니까?")) return;
         const dataToSave = {
@@ -132,6 +158,10 @@
         }
     }
 
+    /**
+     * 조 편성 결과를 서식이 적용된 이미지로 캡쳐하여 클립보드에 복사하는 함수
+     * @param {Array<Array<string>>} groups - 캡쳐할 그룹 배열
+     */
     async function captureCleanGroups(groups) {
         if (typeof html2canvas === 'undefined') {
             alert('오류: 캡쳐 라이브러리(html2canvas)를 로드하지 못했습니다.\n인터넷 연결을 확인하거나 잠시 후 다시 시도해주세요.');
@@ -141,49 +171,32 @@
             alert('오류: 클립보드 복사 기능이 지원되지 않는 환경입니다.\nHTTPS 또는 localhost 환경에서 접속했는지 확인해주세요.');
             return;
         }
-
         const captureContainer = document.createElement('div');
         try {
             Object.assign(captureContainer.style, {
-                position: 'absolute',
-                top: '-9999px',
-                left: '0px',
-                width: '550px',
-                padding: '24px',
-                backgroundColor: '#2D2D2D',
-                color: '#E5E5E5',
-                fontFamily: "'Noto Sans KR', sans-serif",
-                border: '1px solid #444444',
-                borderRadius: '12px'
+                position: 'absolute', top: '-9999px', left: '0px',
+                width: '550px', padding: '24px', backgroundColor: '#2D2D2D',
+                color: '#E5E5E5', fontFamily: "'Noto Sans KR', sans-serif",
+                border: '1px solid #444444', borderRadius: '12px'
             });
-
             let innerHTML = '<h3 style="font-family: \'Orbitron\', sans-serif; font-size: 20px; font-weight: bold; color: #00FF7F; margin-bottom: 16px; text-transform: uppercase;">Grouping Result</h3>';
             groups.forEach((group, index) => {
                 const groupName = (group_names && group_names[index]) ? group_names[index] : `그룹 ${index + 1}`;
                 const memberNames = [...group].sort().map(name =>
-                    facilitators.includes(name) ? `<strong>${name}</strong>` : name
+                    facilitators.includes(name) ? `<strong style="font-weight: bold; color: #ADFF2F;">[발제자] ${name}</strong>` : name
                 ).join(', ');
                 innerHTML += `<div style="background-color: #1A1A1A; padding: 12px; border-radius: 8px; margin-bottom: 10px;"><strong style="color: #E5E5E5;">${groupName}:</strong> ${memberNames}</div>`;
             });
             captureContainer.innerHTML = innerHTML;
-
             document.body.appendChild(captureContainer);
-
             const canvas = await html2canvas(captureContainer, { scale: 2 });
-
             canvas.toBlob(async (blob) => {
                 if (!blob) throw new Error('이미지 변환 실패');
-                try {
-                    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-                    alert('정리된 조 편성 결과 이미지가 클립보드에 복사되었습니다!');
-                } catch (clipboardError) {
-                    console.error('클립보드 쓰기 실패:', clipboardError);
-                    alert('클립보드에 복사하는데 실패했습니다. 브라우저가 페이지의 클립보드 접근을 허용했는지 확인해주세요.');
-                }
+                await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                alert('정리된 조 편성 결과 이미지가 클립보드에 복사되었습니다!');
             }, 'image/png');
-
         } catch (err) {
-            console.error('캡쳐 준비 중 오류 발생:', err);
+            console.error('캡쳐 실패:', err);
             alert('캡쳐 이미지를 준비하는 중 오류가 발생했습니다: ' + err.message);
         } finally {
             if (document.body.contains(captureContainer)) {
@@ -192,23 +205,106 @@
         }
     }
 
+    /**
+     * 조 편성 결과를 수동 편집 페이지로 넘기는 함수
+     * @param {Array<Array<string>>} groups - 편집할 그룹 배열
+     */
+    function editGroups(groups) {
+        const dataToEdit = {
+            present: present, facilitators: facilitators, groups: groups,
+            group_names: group_names, date: new Date().toISOString().slice(0, 10)
+        };
+        sessionStorage.setItem('manualEntryData', JSON.stringify(dataToEdit));
+
+        // [수정] Jinja2의 url_for 대신, 서버에서 전달받은 변수를 사용합니다.
+        window.location.href = "{{ manual_entry_url }}";
+    }
+
+    // --- 페이지 로드 시 실행되는 이벤트 리스너 ---
     document.addEventListener('DOMContentLoaded', () => {
-        const saveButtons = document.querySelectorAll('.save-groups-btn');
-        saveButtons.forEach(button => {
+        /**
+         * '더 보기' 버튼을 설정하는 함수
+         * @param {string} buttonId - 버튼의 ID
+         * @param {string} cardClass - 숨겨진 카드의 클래스
+         */
+        function setupLoadMore(buttonId, cardClass) {
+            const loadMoreBtn = document.getElementById(buttonId);
+            if (!loadMoreBtn) return;
+            const cards = document.querySelectorAll('.' + cardClass);
+            let visibleCount = 6;
+            loadMoreBtn.addEventListener('click', () => {
+                const nextVisibleCount = visibleCount + 6;
+                for (let i = visibleCount; i < nextVisibleCount && i < cards.length; i++) {
+                    cards[i].style.display = 'block';
+                }
+                visibleCount = nextVisibleCount;
+                if (visibleCount >= cards.length) {
+                    loadMoreBtn.style.display = 'none';
+                }
+            });
+        }
+
+        // '저장'과 '캡쳐' 버튼에 이벤트 리스너를 동적으로 할당
+        document.querySelectorAll('.save-groups-btn').forEach(button => {
             button.addEventListener('click', () => {
-                const groupsDataString = button.dataset.groups;
-                const groupsObject = JSON.parse(groupsDataString);
+                const groupsObject = JSON.parse(button.dataset.groups);
                 saveGroups(groupsObject);
             });
         });
-
-        const captureButtons = document.querySelectorAll('.capture-groups-btn');
-        captureButtons.forEach(button => {
+        document.querySelectorAll('.capture-groups-btn').forEach(button => {
             button.addEventListener('click', () => {
-                const groupsDataString = button.dataset.groups;
-                const groupsObject = JSON.parse(groupsDataString);
+                const groupsObject = JSON.parse(button.dataset.groups);
                 captureCleanGroups(groupsObject);
             });
+        });
+        document.querySelectorAll('.edit-groups-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                const groupsObject = JSON.parse(button.dataset.groups);
+                editGroups(groupsObject); // 기존 editGroups 함수 호출
+            });
+        });
+
+        // 각 섹션에 '더 보기' 기능 활성화
+        setupLoadMore('load-more-gender', 'result-card-gender');
+        setupLoadMore('load-more-newface', 'result-card-newface');
+
+        // '기록 보기' 버튼에 대한 이벤트 리스너 (이벤트 위임)
+        document.querySelector('.container').addEventListener('click', (e) => {
+            if (e.target.matches('.show-history-btn')) {
+                const button = e.target;
+                const group = JSON.parse(button.dataset.group);
+                const detailsDiv = button.closest('.p-2.bg-bg-dark').querySelector('.history-details');
+
+                if (detailsDiv.style.display === 'block') {
+                    detailsDiv.style.display = 'none';
+                    detailsDiv.innerHTML = '';
+                    button.textContent = '기록 보기';
+                    return;
+                }
+
+                const pairs = [];
+                for (let i = 0; i < group.length; i++) {
+                    for (let j = i + 1; j < group.length; j++) {
+                        pairs.push([group[i], group[j]]);
+                    }
+                }
+
+                if (pairs.length < 1) {
+                    detailsDiv.innerHTML = '<span>비교할 기록이 없습니다.</span>';
+                } else {
+                    let html = '<ul class="list-disc list-inside space-y-1">';
+                    pairs.forEach(pair => {
+                        const key = pair.sort().join('-');
+                        const count = meetingHistory[key] || 0;
+                        html += `<li>${pair[0]} & ${pair[1]}: <span class="font-bold text-eva-green">${count}회</span> 만남</li>`;
+                    });
+                    html += '</ul>';
+                    detailsDiv.innerHTML = html;
+                }
+
+                detailsDiv.style.display = 'block';
+                button.textContent = '기록 닫기';
+            }
         });
     });
 </script>
