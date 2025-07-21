@@ -944,6 +944,7 @@ def bookclub_index():
     # POST 로직을 모두 제거하고 템플릿만 렌더링
     return render_template('bookclub_index.html', members=members_res)
 
+
 @app.route('/start_group_generation')
 @login_required(role="admin")
 def start_group_generation():
@@ -952,50 +953,63 @@ def start_group_generation():
     group_count_str = request.args.get('group_count')
     group_names_str = request.args.get('group_names', '')
 
-    def generate_events():
+    # 요청 컨텍스트가 활성 상태일 때 '편집' 페이지 URL을 미리 생성합니다.
+    manual_entry_url = url_for('manual_entry')
+
+    def generate_events(manual_url):
         try:
+            # DB에서 데이터 로드
             members_res = supabase.table("members").select("*").order("name").execute().data
             members_df = pd.DataFrame(members_res)
             history_res = supabase.table("history").select("groups").execute().data
-            history_df = pd.DataFrame(history_res)
+            history_df = pd.DataFrame(history_res if history_res else [])
+
             group_count_override = None
             if group_count_str and group_count_str.isdigit():
                 group_count_override = int(group_count_str)
 
-            # --- 이 아래 로직이 중요하게 변경됩니다 ---
-
-            # 제너레이터를 실행하고 진행률과 최종 결과를 분리해서 받는 함수
+            # 제너레이터의 최종 반환 값(return)을 처리하는 헬퍼 함수
             def get_final_result_from_generator(generator, progress_offset=0, progress_scale=0.5):
                 final_result = []
                 while True:
                     try:
                         progress = next(generator)
-                        # 진행률 데이터를 클라이언트로 스트리밍
                         progress_data = json.dumps({'progress': int(progress_offset + (progress * progress_scale))})
                         yield f"event: progress\ndata: {progress_data}\n\n"
                     except StopIteration as e:
-                        # [수정] 이제 하나의 값만 반환되므로, 그대로 변수에 할당합니다.
+                        # 웹사이트에서는 결과 1개만 반환되므로, 그대로 할당합니다.
                         final_result = e.value
-                        logbook_result = None  # logbook은 없으므로 None으로 설정
                         break
                 return final_result
 
             # '성비 우선' 알고리즘 실행
             gender_generator = run_genetic_algorithm(
                 members_df, history_df, present_names, facilitator_names,
-                (10.0, 6.0, 3.0, 2.0, -1000.0), 3, group_count_override
+                (10.0, 6.0, 3.0, 2.0, -1000.0), 20, group_count_override, test_mode=False
             )
             gender_solutions = yield from get_final_result_from_generator(gender_generator, 0, 0.5)
 
             # '새로운 만남 우선' 알고리즘 실행
             new_face_generator = run_genetic_algorithm(
                 members_df, history_df, present_names, facilitator_names,
-                (6.0, 10.0, 3.0, 2.0, -1000.0), 3, group_count_override
+                (6.0, 10.0, 3.0, 2.0, -1000.0), 20, group_count_override, test_mode=False
             )
             new_face_solutions = yield from get_final_result_from_generator(new_face_generator, 50, 0.5)
 
+            # 프론트엔드에 전달할 '만남 횟수 기록' 데이터 생성
+            meeting_history = {}
+            if not history_df.empty and 'groups' in history_df.columns:
+                for _, row in history_df.iterrows():
+                    groups_list = row['groups']
+                    if not isinstance(groups_list, list): continue
+                    for group in groups_list:
+                        for i in range(len(group)):
+                            for j in range(i + 1, len(group)):
+                                pair_key = '-'.join(sorted([group[i], group[j]]))
+                                meeting_history[pair_key] = meeting_history.get(pair_key, 0) + 1
+
             # 최종 결과 페이지 렌더링
-            with app.app_context():  # Flask 어플리케이션 컨텍스트를 명시적으로 생성
+            with app.app_context():
                 group_names = [name.strip() for name in group_names_str.split(',') if name.strip()]
                 final_html = render_template(
                     'bookclub_ga_results.html',
@@ -1003,7 +1017,9 @@ def start_group_generation():
                     new_face_solutions=new_face_solutions,
                     present=present_names,
                     facilitators=facilitator_names,
-                    group_names=group_names
+                    group_names=group_names,
+                    meeting_history=meeting_history,
+                    manual_entry_url=manual_url
                 )
                 complete_data = json.dumps({'html': final_html})
                 yield f"event: complete\ndata: {complete_data}\n\n"
@@ -1013,7 +1029,7 @@ def start_group_generation():
             error_data = json.dumps({'error': str(e)})
             yield f"event: error\ndata: {error_data}\n\n"
 
-    return Response(generate_events(), mimetype='text/event-stream')
+    return Response(generate_events(manual_entry_url), mimetype='text/event-stream')
 
 
 # app.py 파일에서 이 함수 전체를 아래 코드로 교체해주세요.
@@ -1062,7 +1078,14 @@ def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_name
 
     # --- 3. 적합도 평가 함수 (evaluate) ---
     MIN_GROUP_SIZE = 3
-    MAX_GROUP_SIZE = 5
+
+    # [수정] 최대 그룹 인원 수를 동적으로 계산합니다.
+    DEFAULT_MAX_GROUP_SIZE = 5
+    # 수학적으로 필요한 최소한의 최대 인원 수를 계산합니다 (예: 17명/3그룹 -> 5.33 -> 6명)
+    required_max_size = math.ceil(num_attendees / num_groups) if num_groups > 0 else 0
+    # 기본값과 필요값 중 더 큰 값을 실제 최대 인원 수로 사용합니다.
+    MAX_GROUP_SIZE = max(DEFAULT_MAX_GROUP_SIZE, required_max_size)
+
     RECENT_MEETING_THRESHOLD = 2
 
     def calculate_total_score(ind_fitness_values, W):
@@ -1152,7 +1175,7 @@ def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_name
 
     pop_size, ngen, cxpb, mutpb = 1200, 100, 0.7, 0.6
     population = toolbox.population(n=pop_size)
-    hall_of_fame = tools.HallOfFame(20)
+    hall_of_fame = tools.HallOfFame(50)
 
     # [수정] Logbook 객체 대신 단순 파이썬 리스트 사용
     manual_log = []
@@ -1205,18 +1228,32 @@ def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_name
         return {frozenset(v) for v in groups_dict.values() if v}
 
     def select_diverse_solutions(sorted_solutions, num_to_select, min_distance, attendee_id_map):
-        if not sorted_solutions: return []
-        diverse_selection, used_groups = [], set()
-        for sol in sorted_solutions:
-            if len(diverse_selection) >= num_to_select: break
-            candidate_groups = get_groups_from_individual(sol, attendee_id_map)
-            if not candidate_groups.isdisjoint(used_groups): continue
-            if diverse_selection:
-                min_dist_to_selection = min(
-                    normalized_hamming_distance(sol, selected_sol) for selected_sol in diverse_selection)
-                if min_dist_to_selection < min_distance: continue
-            diverse_selection.append(sol)
-            used_groups.update(candidate_groups)
+        if not sorted_solutions:
+            return []
+
+        diverse_selection = []
+        # 가장 점수가 높은 첫 번째 추천안은 무조건 포함합니다.
+        diverse_selection.append(sorted_solutions[0])
+
+        # 나머지 추천안들을 순회하며 비교합니다.
+        for sol in sorted_solutions[1:]:
+            # 목표 개수에 도달하면 중단합니다.
+            if len(diverse_selection) >= num_to_select:
+                break
+
+            is_diverse_enough = True
+            # 이미 선택된 모든 추천안들과 하나씩 비교합니다.
+            for selected_sol in diverse_selection:
+                dist = normalized_hamming_distance(sol, selected_sol)
+                # 너무 유사한 추천안이 하나라도 발견되면 탈락시킵니다.
+                if dist < min_distance:
+                    is_diverse_enough = False
+                    break
+
+            # 모든 기존 추천안들과 충분히 다르다고 판단되면, 최종 목록에 추가합니다.
+            if is_diverse_enough:
+                diverse_selection.append(sol)
+
         return diverse_selection
 
     valid_solutions = [ind for ind in hall_of_fame if ind.fitness.values[4] == 0]
@@ -1311,41 +1348,32 @@ def manual_entry():
     return render_template('manual_entry.html', all_members=all_members)
 
 
-# app.py에 아래 라우트 추가
-
 @app.route('/save_manual_groups', methods=['POST'])
 @login_required(role="admin")
 def save_manual_groups():
-    """수동으로 입력된 조 편성 데이터를 저장합니다."""
     try:
         form_data = request.form
 
-        # 1. 폼 데이터 추출
         meeting_date = form_data.get('meeting_date')
         present_members = form_data.getlist('present')
+        # [수정] 발제자 정보도 폼에서 가져옵니다.
+        facilitator_members = form_data.getlist('facilitators')
 
-        # 2. 그룹 데이터 파싱 및 정리
-        # "그룹 1" 텍스트 영역의 텍스트를 가져와서 쉼표로 분리하고, 각 이름의 공백을 제거
         groups = []
-        for i in range(1, 6):  # 최대 5개 그룹까지 처리
+        for i in range(1, 6):
             group_text = form_data.get(f'group_{i}')
             if group_text:
-                # 쉼표, 줄바꿈, 공백 등 다양한 구분자로 분리 가능하도록 처리
                 member_names = re.split(r'[,;\s\n]+', group_text)
-                # 비어있지 않은 이름만 필터링하여 리스트 생성
                 cleaned_group = [name.strip() for name in member_names if name.strip()]
                 if cleaned_group:
                     groups.append(cleaned_group)
 
-        # 3. 간단한 유효성 검사
         if not all([meeting_date, present_members, groups]):
             flash("날짜, 참석자, 최소 1개 이상의 그룹을 모두 입력해야 합니다.", "danger")
             return redirect(url_for('manual_entry'))
 
-
-        # 4. 헬퍼 함수를 사용해 DB에 저장
-        # (발제자(facilitators)는 별도로 입력받지 않았으므로 빈 리스트로 전달)
-        result = save_group_record_to_db(meeting_date, present_members, [], groups)
+        # [수정] 헬퍼 함수에 발제자 정보를 전달합니다.
+        result = save_group_record_to_db(meeting_date, present_members, facilitator_members, groups)
 
         if result["status"] == "ok":
             flash("수동 조 편성 기록이 성공적으로 저장되었습니다.", "success")
