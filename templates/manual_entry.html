@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>수동 조 편성 기록</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root { --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A; --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444; }
@@ -12,7 +13,8 @@
         h1, h2 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; }
         .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
         .eva-input { background-color: var(--bg-dark); border-color: var(--border-dark); color: var(--text-light); }
-        .eva-button { background-color: var(--eva-green); color: black; font-weight: bold; }
+        .eva-button { background-color: var(--eva-green); color: black; font-weight: bold; transition: opacity 0.2s; }
+        .eva-button:hover { opacity: 0.85; }
         .form-check { display: flex; align-items: center; background-color: var(--bg-dark); padding: 0.5rem; border-radius:4px; }
         .form-check input { margin-right: 0.5rem; accent-color: var(--eva-green); }
     </style>
@@ -34,23 +36,34 @@
             {% endif %}
         {% endwith %}
 
-        <form action="{{ url_for('save_manual_groups') }}" method="POST" class="eva-card p-6 rounded-lg space-y-6">
+        <form id="manual-form" action="{{ url_for('save_manual_groups') }}" method="POST" class="eva-card p-6 rounded-lg space-y-6">
             <div>
                 <label for="meeting_date" class="block text-lg font-bold text-eva-purple mb-2">모임 날짜</label>
                 <input type="date" id="meeting_date" name="meeting_date" required class="eva-input w-full md:w-1/2 p-2 rounded-md">
             </div>
 
-            <div>
-                <h2 class="text-lg font-bold text-eva-purple mb-2">참석자 선택</h2>
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                    {% for member in all_members %}
-                    <label class="form-check">
-                        <input type="checkbox" name="present" value="{{ member }}">
-                        {{ member }}
-                    </label>
-                    {% else %}
-                    <p>등록된 회원이 없습니다.</p>
-                    {% endfor %}
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <div>
+                    <h2 class="text-lg font-bold text-eva-purple mb-2">참석자 선택</h2>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {% for member in all_members %}
+                        <label class="form-check">
+                            <input type="checkbox" name="present" value="{{ member }}">
+                            {{ member }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div>
+                    <h2 class="text-lg font-bold text-eva-purple mb-2">발제자 선택 (선택사항)</h2>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {% for member in all_members %}
+                        <label class="form-check">
+                            <input type="checkbox" name="facilitators" value="{{ member }}">
+                            {{ member }}
+                        </label>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
 
@@ -66,10 +79,94 @@
                 </div>
             </div>
 
-            <div class="pt-4">
+            <div class="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button type="button" id="capture-btn" class="eva-button w-full text-lg py-3 rounded-md" style="background-color: #4A4A4A; color: white;">화면 캡쳐</button>
                 <button type="submit" class="eva-button w-full text-lg py-3 rounded-md">기록 저장하기</button>
             </div>
         </form>
     </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const dataToEditJSON = sessionStorage.getItem('manualEntryData');
+        if (dataToEditJSON) {
+            const data = JSON.parse(dataToEditJSON);
+            document.getElementById('meeting_date').value = data.date;
+
+            // [수정] 불필요한 역슬래시를 제거하여 선택자가 올바르게 작동하도록 수정
+            document.querySelectorAll('input[name="present"]').forEach(cb => { if (data.present.includes(cb.value)) { cb.checked = true; } });
+            document.querySelectorAll('input[name="facilitators"]').forEach(cb => { if (data.facilitators.includes(cb.value)) { cb.checked = true; } });
+
+            data.groups.forEach((group, index) => {
+                const textarea = document.querySelector(`textarea[name="group_${index + 1}"]`);
+                if (textarea) { textarea.value = group.join(', '); }
+            });
+            sessionStorage.removeItem('manualEntryData');
+        } else {
+            document.getElementById('meeting_date').valueAsDate = new Date();
+        }
+
+        const captureBtn = document.getElementById('capture-btn');
+        captureBtn.addEventListener('click', async () => {
+            if (typeof html2canvas === 'undefined') {
+                alert('오류: 캡쳐 라이브러리를 로드하지 못했습니다.');
+                return;
+            }
+
+            const meetingDate = document.getElementById('meeting_date').value;
+            const presentMembers = Array.from(document.querySelectorAll('input[name="present"]:checked')).map(cb => cb.value);
+            const facilitatorMembers = Array.from(document.querySelectorAll('input[name="facilitators"]:checked')).map(cb => cb.value);
+            const groupTexts = Array.from(document.querySelectorAll('textarea[name^="group_"]')).map(textarea => textarea.value);
+            const groups = groupTexts.map(text => text.split(/[,;\s\n]+/g).map(name => name.trim()).filter(name => name !== ''));
+
+            const captureContainer = document.createElement('div');
+            try {
+                Object.assign(captureContainer.style, {
+                    position: 'absolute', top: '-9999px', left: '0px',
+                    width: '550px', padding: '24px', backgroundColor: '#2D2D2D',
+                    color: '#E5E5E5', fontFamily: "'Noto Sans KR', sans-serif",
+                    border: '1px solid #444444', borderRadius: '12px'
+                });
+
+                let innerHTML = '<h3 style="font-family: \'Orbitron\', sans-serif; font-size: 20px; font-weight: bold; color: #00FF7F; margin-bottom: 16px; text-transform: uppercase;">수동 기록</h3>';
+                if (meetingDate) {
+                    innerHTML += `<p style="font-size: 14px; margin-bottom: 8px;"><strong>날짜:</strong> ${meetingDate}</p>`;
+                }
+                if (presentMembers.length > 0) {
+                    innerHTML += `<p style="font-size: 14px; margin-bottom: 8px;"><strong>참석자:</strong> ${presentMembers.sort().join(', ')}</p>`;
+                }
+                if (facilitatorMembers.length > 0) {
+                    innerHTML += `<p style="font-size: 14px; margin-bottom: 8px;"><strong>발제자:</strong> <span style="color: #ADFF2F;">${facilitatorMembers.sort().join(', ')}</span></p>`;
+                }
+                innerHTML += '<div style="margin-top: 16px;"></div>';
+                groups.forEach((group, index) => {
+                    if (group.length > 0) {
+                        const memberNames = [...group].sort().map(name =>
+                            facilitatorMembers.includes(name) ? `<strong style="font-weight: bold; color: #ADFF2F;">${name}</strong>` : name
+                        ).join(', ');
+                        innerHTML += `<div style="background-color: #1A1A1A; padding: 12px; border-radius: 8px; margin-bottom: 10px;"><strong style="color: #E5E5E5;">그룹 ${index + 1}:</strong> ${memberNames}</div>`;
+                    }
+                });
+                captureContainer.innerHTML = innerHTML;
+                document.body.appendChild(captureContainer);
+
+                const canvas = await html2canvas(captureContainer, { scale: 2 });
+                canvas.toBlob(async (blob) => {
+                    if (!blob) throw new Error('이미지 변환 실패');
+                    await navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
+                    alert('입력 내용이 클립보드에 이미지로 복사되었습니다!');
+                });
+
+            } catch (err) {
+                alert('캡쳐 중 오류가 발생했습니다: ' + err.message);
+                console.error(err);
+            } finally {
+                if (document.body.contains(captureContainer)) {
+                    document.body.removeChild(captureContainer);
+                }
+            }
+        });
+    });
+    </script>
 </body>
 </html>
