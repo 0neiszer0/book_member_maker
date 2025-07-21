@@ -17,6 +17,11 @@
         .eva-button:hover { opacity: 0.85; }
         .form-check { display: flex; align-items: center; background-color: var(--bg-dark); padding: 0.5rem; border-radius:4px; }
         .form-check input { margin-right: 0.5rem; accent-color: var(--eva-green); }
+        #image-modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.9); justify-content: center; align-items: center; }
+        #image-modal-content { max-width: 90%; max-height: 80%; border-radius: 8px; }
+        #modal-caption { text-align: center; color: #ccc; padding: 10px 0; font-size: 1rem;}
+        #modal-close { position: absolute; top: 15px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; transition: 0.3s; cursor: pointer; }
+        #modal-close:hover { color: #bbb; }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -86,17 +91,20 @@
         </form>
     </div>
 
+    <div id="image-modal">
+        <span id="modal-close">&times;</span>
+        <img id="image-modal-content">
+        <div id="modal-caption">이미지를 길게 누르거나 우클릭하여 저장/공유하세요.</div>
+    </div>
+
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         const dataToEditJSON = sessionStorage.getItem('manualEntryData');
         if (dataToEditJSON) {
             const data = JSON.parse(dataToEditJSON);
             document.getElementById('meeting_date').value = data.date;
-
-            // [수정] 불필요한 역슬래시를 제거하여 선택자가 올바르게 작동하도록 수정
             document.querySelectorAll('input[name="present"]').forEach(cb => { if (data.present.includes(cb.value)) { cb.checked = true; } });
             document.querySelectorAll('input[name="facilitators"]').forEach(cb => { if (data.facilitators.includes(cb.value)) { cb.checked = true; } });
-
             data.groups.forEach((group, index) => {
                 const textarea = document.querySelector(`textarea[name="group_${index + 1}"]`);
                 if (textarea) { textarea.value = group.join(', '); }
@@ -109,18 +117,17 @@
         const captureBtn = document.getElementById('capture-btn');
         captureBtn.addEventListener('click', async () => {
             if (typeof html2canvas === 'undefined') {
-                alert('오류: 캡쳐 라이브러리를 로드하지 못했습니다.');
-                return;
+                alert('오류: 캡쳐 라이브러리를 로드하지 못했습니다.'); return;
             }
-
-            const meetingDate = document.getElementById('meeting_date').value;
-            const presentMembers = Array.from(document.querySelectorAll('input[name="present"]:checked')).map(cb => cb.value);
-            const facilitatorMembers = Array.from(document.querySelectorAll('input[name="facilitators"]:checked')).map(cb => cb.value);
-            const groupTexts = Array.from(document.querySelectorAll('textarea[name^="group_"]')).map(textarea => textarea.value);
-            const groups = groupTexts.map(text => text.split(/[,;\s\n]+/g).map(name => name.trim()).filter(name => name !== ''));
 
             const captureContainer = document.createElement('div');
             try {
+                const meetingDate = document.getElementById('meeting_date').value;
+                const presentMembers = Array.from(document.querySelectorAll('input[name="present"]:checked')).map(cb => cb.value);
+                const facilitatorMembers = Array.from(document.querySelectorAll('input[name="facilitators"]:checked')).map(cb => cb.value);
+                const groupTexts = Array.from(document.querySelectorAll('textarea[name^="group_"]')).map(textarea => textarea.value);
+                const groups = groupTexts.map(text => text.split(/[,;\s\n]+/g).map(name => name.trim()).filter(name => name !== ''));
+
                 Object.assign(captureContainer.style, {
                     position: 'absolute', top: '-9999px', left: '0px',
                     width: '550px', padding: '24px', backgroundColor: '#2D2D2D',
@@ -129,15 +136,9 @@
                 });
 
                 let innerHTML = '<h3 style="font-family: \'Orbitron\', sans-serif; font-size: 20px; font-weight: bold; color: #00FF7F; margin-bottom: 16px; text-transform: uppercase;">수동 기록</h3>';
-                if (meetingDate) {
-                    innerHTML += `<p style="font-size: 14px; margin-bottom: 8px;"><strong>날짜:</strong> ${meetingDate}</p>`;
-                }
-                if (presentMembers.length > 0) {
-                    innerHTML += `<p style="font-size: 14px; margin-bottom: 8px;"><strong>참석자:</strong> ${presentMembers.sort().join(', ')}</p>`;
-                }
-                if (facilitatorMembers.length > 0) {
-                    innerHTML += `<p style="font-size: 14px; margin-bottom: 8px;"><strong>발제자:</strong> <span style="color: #ADFF2F;">${facilitatorMembers.sort().join(', ')}</span></p>`;
-                }
+                if (meetingDate) { innerHTML += `<p style="font-size: 14px; margin-bottom: 8px;"><strong>날짜:</strong> ${meetingDate}</p>`; }
+                if (presentMembers.length > 0) { innerHTML += `<p style="font-size: 14px; margin-bottom: 8px;"><strong>참석자:</strong> ${presentMembers.sort().join(', ')}</p>`; }
+                if (facilitatorMembers.length > 0) { innerHTML += `<p style="font-size: 14px; margin-bottom: 8px;"><strong>발제자:</strong> <span style="color: #ADFF2F;">${facilitatorMembers.sort().join(', ')}</span></p>`; }
                 innerHTML += '<div style="margin-top: 16px;"></div>';
                 groups.forEach((group, index) => {
                     if (group.length > 0) {
@@ -151,11 +152,11 @@
                 document.body.appendChild(captureContainer);
 
                 const canvas = await html2canvas(captureContainer, { scale: 2 });
-                canvas.toBlob(async (blob) => {
-                    if (!blob) throw new Error('이미지 변환 실패');
-                    await navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
-                    alert('입력 내용이 클립보드에 이미지로 복사되었습니다!');
-                });
+
+                const modal = document.getElementById('image-modal');
+                const modalImg = document.getElementById('image-modal-content');
+                modalImg.src = canvas.toDataURL("image/png");
+                modal.style.display = 'flex';
 
             } catch (err) {
                 alert('캡쳐 중 오류가 발생했습니다: ' + err.message);
@@ -166,6 +167,13 @@
                 }
             }
         });
+
+        const modal = document.getElementById('image-modal');
+        const modalClose = document.getElementById('modal-close');
+        if(modal && modalClose) {
+            modalClose.onclick = () => { modal.style.display = "none"; }
+            modal.onclick = (e) => { if(e.target === modal) { modal.style.display = "none"; } }
+        }
     });
     </script>
 </body>
