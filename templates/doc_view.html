@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ doc.title }} - 책 먹는 호반우</title>
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Noto+Serif+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A;
+            --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444;
+            --wiki-link-blue: #60a5fa; --wiki-heading-white: #f1f5f9;
+        }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
+        h1 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; }
+        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
+        .eva-input { background-color: var(--bg-dark); border-color: var(--border-dark); color: var(--text-light); }
+        .wiki-content h2, .wiki-content h3, .wiki-content h4, .wiki-content h5, .wiki-content h6 {
+            font-family: 'Noto Serif KR', serif; text-transform: none;
+            color: var(--wiki-heading-white); border-bottom: 1px solid var(--border-dark);
+            padding-bottom: 0.5rem; margin-top: 2rem;
+        }
+        .wiki-content a { color: var(--wiki-link-blue); text-decoration: underline; }
+        .wiki-content ul { list-style-type: disc; margin-left: 1.5rem; }
+        .wiki-content ol { list-style-type: decimal; margin-left: 1.5rem; }
+        .wiki-content strong { font-weight: 700; color: white; }
+
+        /* templates/doc_view.html 의 <style> 태그 안에 추가 */
+
+        .wiki-content .wikitable {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1em;
+            margin-bottom: 1em;
+            border: 1px solid var(--border-dark);
+        }
+        .wiki-content .wikitable th,
+        .wiki-content .wikitable td {
+            border: 1px solid var(--border-dark);
+            padding: 0.5rem 0.75rem;
+        }
+        .wiki-content .wikitable th {
+            background-color: #374151; /* 어두운 회색 계열 */
+            font-weight: bold;
+            text-align: center;
+        }
+        .wiki-content .wikitable tr:nth-of-type(even) {
+            background-color: rgba(255, 255, 255, 0.05); /* 약간 밝은 배경 */
+        }
+                /* [추가] <code> 태그에 대한 스타일 */
+        .wiki-content code {
+            background-color: #374151; /* 어두운 회색 배경 */
+            color: #fca5a5; /* 밝은 빨간색 계열 텍스트 */
+            padding: 0.2em 0.4em;
+            margin: 0;
+            font-size: 85%;
+            border-radius: 6px;
+        }
+
+        /* [추가] <pre> 태그 안의 <code> 태그는 별도 스타일 제거 */
+        .wiki-content pre code {
+            background-color: transparent;
+            color: inherit;
+            padding: 0;
+            font-size: inherit;
+        }
+
+        /* [추가] {{틀}} 문법으로 생성된 div 박스에 대한 스타일 */
+        .wiki-content .template-box {
+            padding: 1rem;
+            border-left-width: 4px;
+            border-color: #f59e0b; /* 노란색 계열 */
+            background-color: rgba(245, 158, 11, 0.1); /* 반투명 노란색 배경 */
+            color: #fde68a; /* 밝은 노란색 텍스트 */
+            margin-top: 1em;
+            margin-bottom: 1em;
+            border-radius: 0 0.5rem 0.5rem 0;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="container mx-auto max-w-4xl">
+        <header class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-eva-green">{{ doc.title }}</h1>
+            <div class="flex items-center space-x-2">
+                {% if session.user_id %}
+                    <button id="edit-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">편집</button>
+                    <button id="save-btn" class="hidden bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">저장</button>
+                    <button id="cancel-btn" class="hidden bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">취소</button>
+
+                    <button id="history-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">로그</button>
+
+                    {% if doc.author_id == session.user_id or session.user_role == 'admin' %}
+                    <button id="delete-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">삭제</button>
+                    {% endif %}
+                {% endif %}
+                <a href="{{ url_for('view_all_documents') }}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">목록으로</a>
+            </div>
+        </header>
+
+        <div class="eva-card p-6 md:p-8 rounded-lg">
+            <article id="content-view" class="wiki-content prose prose-invert max-w-none">
+                {{ content | safe }}
+            </article>
+
+            <div id="content-edit" class="hidden">
+                <textarea id="content-editor" class="eva-input w-full h-[60vh] p-3 rounded-md">{{ doc.content or '' }}</textarea>
+                <div class="text-xs text-gray-500 mt-2">
+                    '''굵게''', ''기울임'', ==제목==, [[링크]], [[파일:URL]]
+                </div>
+            </div>
+        </div>
+
+        <footer class="text-center text-sm text-gray-500 mt-6">
+            <p>마지막 수정: <span id="last-updated">{{ doc.updated_at | datetime }}</span></p>
+        </footer>
+    </div>
+
+    <div id="history-modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+        <div class="eva-card rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <header class="p-4 border-b border-border-dark flex justify-between items-center">
+                <h2 class="text-xl font-bold text-eva-purple">수정 기록</h2>
+                <button id="close-modal-btn" class="text-2xl hover:text-red-500">&times;</button>
+            </header>
+            <div id="history-list" class="p-6 overflow-y-auto">
+                </div>
+        </div>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    {% if session.user_id %}
+    const docId = "{{ doc.id }}";
+
+    // 버튼 요소
+    const editBtn = document.getElementById('edit-btn');
+    const saveBtn = document.getElementById('save-btn');
+    const cancelBtn = document.getElementById('cancel-btn');
+    const historyBtn = document.getElementById('history-btn');
+    const deleteBtn = document.getElementById('delete-btn');
+
+    // 컨텐츠 요소
+    const contentView = document.getElementById('content-view');
+    const contentEdit = document.getElementById('content-edit');
+    const contentEditor = document.getElementById('content-editor');
+    const lastUpdatedSpan = document.getElementById('last-updated');
+
+    // 모달 요소
+    const historyModal = document.getElementById('history-modal');
+    const historyList = document.getElementById('history-list');
+    const closeModalBtn = document.getElementById('close-modal-btn');
+
+    // --- 모든 이벤트 리스너 ---
+
+    // 편집 모드 전환 함수
+    function toggleEditMode(isEditing) {
+        editBtn.classList.toggle('hidden', isEditing);
+        historyBtn.classList.toggle('hidden', isEditing);
+        if(deleteBtn) deleteBtn.classList.toggle('hidden', isEditing);
+        saveBtn.classList.toggle('hidden', !isEditing);
+        cancelBtn.classList.toggle('hidden', !isEditing);
+        contentView.classList.toggle('hidden', isEditing);
+        contentEdit.classList.toggle('hidden', !isEditing);
+    }
+
+    // '편집' 버튼 클릭
+    editBtn.addEventListener('click', () => toggleEditMode(true));
+
+    // '취소' 버튼 클릭
+    cancelBtn.addEventListener('click', () => {
+        // tojson 필터를 사용해 Javascript 문자열 오류 방지
+        contentEditor.value = {{ doc.content | tojson }};
+        toggleEditMode(false);
+    });
+
+    // '저장' 버튼 클릭
+    saveBtn.addEventListener('click', async () => {
+        const newContent = contentEditor.value;
+        saveBtn.disabled = true;
+        saveBtn.textContent = '저장 중...';
+        try {
+            const response = await fetch(`/api/docs/edit/${docId}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ content: newContent })
+            });
+            const result = await response.json();
+            if (result.status !== 'success') throw new Error(result.message);
+
+            contentView.innerHTML = result.rendered_html;
+            lastUpdatedSpan.textContent = new Date().toLocaleString('ko-KR');
+            toggleEditMode(false);
+
+        } catch (error) {
+            alert(`저장 실패: ${error.message}`);
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = '저장';
+        }
+    });
+
+    // '로그' 버튼 클릭
+    historyBtn.addEventListener('click', async () => {
+        historyList.innerHTML = '<p>로그를 불러오는 중...</p>';
+        historyModal.classList.remove('hidden');
+        try {
+            const response = await fetch(`/api/docs/${docId}/history`);
+            const logs = await response.json();
+            if (!response.ok) throw new Error(logs.error || 'Unknown error');
+
+            if (logs.length === 0) {
+                historyList.innerHTML = '<p class="text-gray-500">수정 기록이 없습니다.</p>';
+                return;
+            }
+
+            let logHtml = '<ul class="space-y-4">';
+            logs.forEach(log => {
+                const date = new Date(log.created_at).toLocaleString('ko-KR');
+                const editor = log.members ? log.members.name : '알 수 없음';
+                logHtml += `<li class="border-b border-border-dark pb-2">
+                                <p class="text-sm font-semibold">
+                                    <span class="text-eva-green">${date}</span>
+                                    by <span class="text-yellow-400">${editor}</span>
+                                </p>
+                            </li>`;
+            });
+            logHtml += '</ul>';
+            historyList.innerHTML = logHtml;
+
+        } catch (error) {
+            historyList.innerHTML = `<p class="text-red-500">오류: ${error.message}</p>`;
+        }
+    });
+
+    // 모달 닫기 버튼
+    closeModalBtn.addEventListener('click', () => historyModal.classList.add('hidden'));
+
+    // '삭제' 버튼 클릭 (버튼이 존재할 때만 리스너 추가)
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', async () => {
+            const docTitle = {{ doc.title | tojson }};
+            if (!confirm(`정말로 '${docTitle}' 문서를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/docs/delete/${docId}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                if (result.status !== 'success') throw new Error(result.message);
+
+                alert('문서가 삭제되었습니다.');
+                window.location.href = "{{ url_for('view_all_documents') }}";
+
+            } catch (error) {
+                alert(`삭제 실패: ${error.message}`);
+            }
+        });
+    }
+    {% endif %}
+});
+</script>
+</body>
+</html>

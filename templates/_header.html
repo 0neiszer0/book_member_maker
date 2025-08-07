@@ -1,0 +1,143 @@
+<header class="bg-card-dark shadow-md sticky top-0 z-50 border-b border-border-dark">
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center py-4">
+            <a href="/" class="text-xl font-bold text-eva-green">책 먹는 호반우</a>
+
+            <div class="flex items-center space-x-4">
+            {% if session.user_role %}
+                <a href="{{ url_for('member_board') }}" class="text-sm text-gray-300 hover:text-eva-green font-bold">멤버 보드</a>
+                <a href="{{ url_for('view_all_documents') }}" class="text-sm text-gray-300 hover:text-eva-green font-bold">위키</a>
+                <a href="{{ url_for('profiles_page') }}" class="text-sm text-gray-300 hover:text-eva-green font-bold">멤버 프로필</a>
+
+                {% if session.user_role == 'admin' %}
+                    <div id="notification-dropdown" class="dropdown">
+                        <button id="notification-btn" type="button" class="relative text-yellow-400 hover:text-yellow-300">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                            </svg>
+                            <span id="notification-dot" class="notification-dot hidden"></span>
+                        </button>
+                        <div id="notification-list" class="dropdown-content">
+                            </div>
+                    </div>
+
+                    <a href="{{ url_for('admin_dashboard') }}" class="text-sm text-yellow-400 hover:text-yellow-300 font-bold">관리자</a>
+                    <a href="{{ url_for('bookclub_index') }}" class="text-sm text-yellow-400 hover:text-yellow-300 font-bold">조 편성</a>
+                {% endif %}
+
+                <a href="{{ url_for('logout') }}" class="text-sm text-gray-400 hover:text-eva-green">로그아웃</a>
+                <a href="{{ url_for('my_page') }}" class="eva-button-secondary text-sm font-bold py-2 px-4 rounded-md">
+                    마이페이지
+                </a>
+            {% else %}
+                <a href="{{ url_for('login') }}" class="eva-button text-sm font-bold py-2 px-4 rounded-md">
+                    로그인
+                </a>
+            {% endif %}
+            </div>
+        </div>
+    </div>
+</header>
+
+<style>
+    .notification-dot { position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; background-color: #ef4444; border-radius: 50%; }
+    .dropdown { position: relative; display: inline-block; }
+    .dropdown-content { display: none; position: absolute; right: 0; background-color: var(--card-dark); min-width: 300px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 10; border: 1px solid var(--border-dark); border-radius: 4px; max-height: 400px; overflow-y: auto; }
+    .dropdown-content.show { display: block; }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // 관리자일 경우에만 알림 로직 실행
+    {% if session.user_role == 'admin' %}
+    const notifBtn = document.getElementById('notification-btn');
+    const notifDot = document.getElementById('notification-dot');
+    const notifDropdown = document.getElementById('notification-dropdown');
+    const notifList = document.getElementById('notification-list');
+
+    async function fetchNotifications() {
+        try {
+            const response = await fetch('/api/notifications');
+            if (!response.ok) return;
+            const notifications = await response.json();
+
+            notifDot.classList.toggle('hidden', notifications.length === 0);
+
+            notifList.innerHTML = '';
+            if (notifications.length === 0) {
+                notifList.innerHTML = '<div class="p-4 text-sm text-gray-400">새로운 알림이 없습니다.</div>';
+                return;
+            }
+
+            notifications.forEach(notif => {
+                const item = document.createElement('div');
+                item.className = 'p-3 border-b border-border-dark';
+                let contentHtml = '';
+                if (notif.type === 'new_user_request') {
+                    contentHtml = `<p class="font-bold">${notif.details.name} 님의 신규 가입 요청</p><p class="text-xs text-gray-400">${notif.details.email}</p>`;
+                } else if (notif.type === 'account_link_request') {
+                    contentHtml = `<p class="font-bold">${notif.details.original_name} 님의 계정 연결 요청</p><p class="text-xs text-gray-400">소셜: ${notif.details.social_name} (${notif.details.social_email})</p>`;
+                }
+
+                item.innerHTML = `${contentHtml}
+                    <div class="mt-2 text-right space-x-2">
+                        <button data-id="${notif.id}" data-action="deny" class="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 rounded">거절</button>
+                        <button data-id="${notif.id}" data-action="approve" class="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 rounded">승인</button>
+                    </div>`;
+                notifList.appendChild(item);
+            });
+        } catch (error) {
+            console.error("Failed to fetch notifications:", error);
+        }
+    }
+
+    if (notifBtn) {
+        notifBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isShown = notifList.classList.toggle('show');
+            if (isShown) fetchNotifications();
+        });
+
+        notifList.addEventListener('click', async (e) => {
+            const target = e.target;
+            if (target.tagName === 'BUTTON' && target.dataset.id) {
+                e.stopPropagation();
+                const notifId = target.dataset.id;
+                const action = target.dataset.action;
+                target.textContent = '처리 중...';
+                target.disabled = true;
+
+                try {
+                    const response = await fetch(`/api/notifications/${notifId}/handle`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ action: action })
+                    });
+                    const result = await response.json();
+                    if (result.status !== 'success') throw new Error(result.message);
+
+                    target.closest('.p-3').remove();
+                    if (notifList.childElementCount === 0) {
+                         notifDot.classList.add('hidden');
+                         notifList.innerHTML = '<div class="p-4 text-sm text-gray-400">새로운 알림이 없습니다.</div>';
+                    }
+                } catch (error) {
+                    alert(`처리 실패: ${error.message}`);
+                    target.textContent = action === 'approve' ? '승인' : '거절';
+                    target.disabled = false;
+                }
+            }
+        });
+
+        // 초기 로드
+        fetchNotifications();
+    }
+
+    window.addEventListener('click', (e) => {
+        if (notifDropdown && !notifDropdown.contains(e.target)) {
+            notifList.classList.remove('show');
+        }
+    });
+    {% endif %}
+});
+</script>

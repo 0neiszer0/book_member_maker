@@ -37,16 +37,8 @@
     </style>
 </head>
 <body class="min-h-screen">
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-            <h1 class="text-3xl font-bold text-eva-green">Admin Dashboard</h1>
-            <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                <a href="/making_team" class="w-full sm:w-auto text-center eva-button-primary font-bold py-2 px-4 rounded-md">독서 모임 조 편성</a>
-                <a href="{{ url_for('manual_entry') }}" class="w-full sm:w-auto text-center eva-button-secondary font-bold py-2 px-4 rounded-md">수동 기록 추가</a>
-                <a href="/logout" class="w-full sm:w-auto text-center eva-button-secondary font-bold py-2 px-4 rounded-md">Logout</a>
-            </div>
-            </div>
-
+        {% include '_header.html' %}
+        <div class="container mx-auto p-4 sm:p-6 lg:p-8">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}{% for category, message in messages %}
                 <div class="p-4 mb-4 text-sm rounded-lg {{ 'bg-green-900 text-green-200' if category == 'success' else 'bg-red-900 text-red-200' }}" role="alert">{{ message }}</div>
@@ -104,6 +96,26 @@
                         <div class="flex items-center"><input type="checkbox" name="is_active" id="is_active" checked class="h-4 w-4 text-eva-purple bg-gray-700 border-gray-600 rounded focus:ring-eva-purple"><label for="is_active" class="ml-2 block text-sm">즉시 활성화</label></div>
                         <button type="submit" class="w-full eva-button-primary font-bold py-2 px-4 rounded-lg">생성하기</button>
                     </form>
+                </div>
+
+                                <div class="eva-card p-6 rounded-lg">
+                    <h2 class="text-xl font-bold mb-4 text-eva-green">Member Status</h2>
+                    <div id="member-status-list" class="space-y-2 max-h-96 overflow-y-auto pr-2">
+                        {% for member in all_members %}
+                        <label class="flex justify-between items-center p-3 bg-gray-700 rounded-lg cursor-pointer transition-colors duration-200">
+                            <span class="font-semibold">{{ member.name }}</span>
+                            <div class="relative">
+                                <input type="checkbox" class="sr-only member-toggle"
+                                       data-member-id="{{ member.id }}"
+                                       {% if member.is_active %}checked{% endif %}>
+                                <div class="block w-12 h-6 rounded-full {% if member.is_active %}bg-eva-green{% else %}bg-gray-600{% endif %}"></div>
+                                <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform {% if member.is_active %}transform translate-x-6{% endif %}"></div>
+                            </div>
+                        </label>
+                        {% else %}
+                        <p class="text-center text-sm text-gray-500">등록된 멤버가 없습니다.</p>
+                        {% endfor %}
+                    </div>
                 </div>
 
                 <div class="eva-card p-6 rounded-lg">
@@ -194,6 +206,43 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 })
                 .catch(error => console.error('Error:', error));
+            }
+        });
+    }
+
+        // [추가] 멤버 상태 토글 스위치 이벤트 리스너
+    const memberList = document.getElementById('member-status-list');
+    if(memberList) {
+        memberList.addEventListener('change', async (e) => {
+            if (e.target.matches('.member-toggle')) {
+                const checkbox = e.target;
+                const memberId = checkbox.dataset.memberId;
+                const newActiveState = checkbox.checked;
+
+                try {
+                    const response = await fetch(`/api/admin/members/${memberId}/toggle_active`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ is_active: newActiveState })
+                    });
+
+                    const result = await response.json();
+                    if (!response.ok) {
+                        // 실패 시 스위치를 원상태로 되돌림
+                        checkbox.checked = !newActiveState;
+                        throw new Error(result.message || '상태 변경에 실패했습니다.');
+                    }
+
+                    // 성공 시 UI 즉시 업데이트
+                    const bg = checkbox.nextElementSibling;
+                    const dot = bg.nextElementSibling;
+                    bg.classList.toggle('bg-eva-green', newActiveState);
+                    bg.classList.toggle('bg-gray-600', !newActiveState);
+                    dot.classList.toggle('translate-x-6', newActiveState);
+
+                } catch (error) {
+                    alert('오류: ' + error.message);
+                }
             }
         });
     }
