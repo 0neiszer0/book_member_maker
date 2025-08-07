@@ -6,3 +6,4 @@ requests
 pandas
 numpy
 deap
+mwparserfromhell
