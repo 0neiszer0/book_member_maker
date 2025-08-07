@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>멤버 보드</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A;
+            --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444;
+        }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
+        h1, h2 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; }
+        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
+        .form-check-lg { display: flex; align-items: center; padding: 0.75rem; border: 2px solid var(--border-dark); border-radius: 0.5rem; cursor: pointer; transition: all 0.2s; }
+        .form-check-lg:hover { border-color: var(--eva-purple); }
+        .form-check-lg input:checked { background-color: var(--eva-green); border-color: var(--eva-green); }
+        .form-check-lg input:checked + label { color: var(--eva-green); }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="container mx-auto max-w-7xl">
+        <header class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-eva-green">Member Board</h1>
+            <a href="{{ url_for('main_index') }}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md">메인으로</a>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-1 space-y-8">
+                <section class="eva-card p-6 rounded-lg">
+                    <h2 class="text-xl font-bold text-eva-purple mb-4">{{ meeting_date.strftime('%m월 %d일') }} 모임 참석 여부</h2>
+                    <div id="attendance-choice" class="space-y-3">
+                        <div class="form-check-lg">
+                            <input id="seminar-check" type="checkbox" class="h-6 w-6 rounded text-eva-green bg-bg-dark border-border-dark focus:ring-0 cursor-pointer">
+                            <label for="seminar-check" class="ml-3 font-bold text-lg cursor-pointer">세미나 참석</label>
+                        </div>
+                        <div class="form-check-lg">
+                            <input id="afterparty-check" type="checkbox" class="h-6 w-6 rounded text-eva-green bg-bg-dark border-border-dark focus:ring-0 cursor-pointer">
+                            <label for="afterparty-check" class="ml-3 font-bold text-lg cursor-pointer">뒷풀이 참석</label>
+                        </div>
+                    </div>
+                    <div id="attendance-status" class="text-center text-gray-400 h-6 mt-4"></div>
+                </section>
+
+                <section class="eva-card p-6 rounded-lg">
+                    <h2 id="attendees-title" class="text-xl font-bold text-eva-purple mb-4">세미나 참석 명단 ({{ attendees|length }}명)</h2>
+                    <ul id="attendees-list" class="space-y-2 text-sm">
+                        {% for person in attendees %}
+                        <li data-user-id="{{ person.user_id }}">
+                            <span class="font-semibold">{{ person.members.name }}</span>
+                            <span class="text-xs font-mono rounded px-1.5 py-0.5 ml-2 {{ 'bg-green-800 text-green-200' if person.attending_afterparty else 'bg-red-800 text-red-200' }}">
+                                {{ '뒷풀이 O' if person.attending_afterparty else '뒷풀이 X' }}
+                            </span>
+                        </li>
+                        {% else %}
+                        <li id="no-attendees">아직 참석자가 없습니다.</li>
+                        {% endfor %}
+                    </ul>
+                </section>
+            </div>
+
+            <div class="lg:col-span-2 eva-card p-6 rounded-lg">
+                <h2 class="text-xl font-bold text-eva-purple mb-4">토론 질문</h2>
+                <div id="questions-list" class="space-y-4">
+                    {% for q in questions %}
+                    <div class="p-4 bg-bg-dark rounded-lg" data-question-id="{{ q.id }}">
+                        <p class="text-gray-300">{{ q.content }}</p>
+                        <div class="text-right text-xs text-gray-500 mt-2">
+                            - {{ q.members.name }}
+                            {% if q.user_id == session.user_id %}
+                            <button class="ml-2 text-blue-400 hover:underline edit-question-btn">수정</button>
+                            <button class="ml-1 text-red-400 hover:underline delete-question-btn">삭제</button>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="mt-6 border-t border-border-dark pt-6">
+                    <textarea id="new-question-content" class="eva-input w-full p-2 rounded-md" rows="3" placeholder="새로운 토론 질문을 입력하세요..."></textarea>
+                    <button id="submit-question-btn" class="mt-2 w-full bg-eva-purple hover:opacity-90 text-white font-bold py-2 px-4 rounded">질문 등록</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const myAttendance = {{ my_attendance|tojson|safe }};
+    const currentUserId = {{ session.user_id }};
+    const currentUserName = "{{ session.user_name }}";
+
+    // --- 1. 참석 여부 관리 ---
+    const seminarCheck = document.getElementById('seminar-check');
+    const afterpartyCheck = document.getElementById('afterparty-check');
+    const statusText = document.getElementById('attendance-status');
+
+    function updateAttendanceUI() {
+        if (myAttendance) {
+            seminarCheck.checked = myAttendance.attending_seminar;
+            afterpartyCheck.checked = myAttendance.attending_afterparty;
+        }
+    }
+
+    async function sendAttendanceUpdate() {
+        statusText.textContent = '저장 중...';
+        try {
+            const response = await fetch('/api/attendance', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    attending_seminar: seminarCheck.checked,
+                    attending_afterparty: afterpartyCheck.checked
+                })
+            });
+            if (!response.ok) throw new Error('서버 응답 오류');
+            statusText.textContent = '✅ 저장되었습니다.';
+
+            // 실시간 반영을 위해 페이지를 새로고침하는 대신, JS로 명단을 직접 업데이트 할 수 있으나
+            // 현재 구조에서는 새로고침이 가장 간단하고 확실한 방법입니다.
+            setTimeout(() => { window.location.reload(); }, 1000);
+        } catch (error) {
+            statusText.textContent = '❌ 저장 실패';
+            console.error('참석 여부 업데이트 실패:', error);
+        }
+    }
+
+    updateAttendanceUI();
+    seminarCheck.addEventListener('change', sendAttendanceUpdate);
+    afterpartyCheck.addEventListener('change', sendAttendanceUpdate);
+
+    // --- 2. 질문 관리 (기존 로직) ---
+    const questionsList = document.getElementById('questions-list');
+    const newQuestionContent = document.getElementById('new-question-content');
+    const submitQuestionBtn = document.getElementById('submit-question-btn');
+
+    // 질문 등록
+    submitQuestionBtn.addEventListener('click', async () => {
+        const content = newQuestionContent.value.trim();
+        if (!content) return;
+
+        try {
+            const response = await fetch('/api/questions', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ content })
+            });
+            const result = await response.json();
+            if(result.status === 'success') {
+                window.location.reload();
+            } else {
+                alert('질문 등록 실패: ' + result.message);
+            }
+        } catch (error) {
+            console.error('질문 등록 오류:', error);
+        }
+    });
+
+    // 질문 수정 및 삭제
+    questionsList.addEventListener('click', async (e) => {
+        const target = e.target;
+        const questionDiv = target.closest('[data-question-id]');
+        if (!questionDiv) return;
+
+        const questionId = questionDiv.dataset.questionId;
+
+        if (target.matches('.edit-question-btn')) {
+            const currentContent = questionDiv.querySelector('p').textContent;
+            const newContent = prompt('질문 내용을 수정하세요:', currentContent);
+            if (newContent && newContent.trim() !== currentContent) {
+                try {
+                    await fetch(`/api/questions/${questionId}`, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ content: newContent.trim() })
+                    });
+                    questionDiv.querySelector('p').textContent = newContent.trim();
+                } catch(err) { console.error(err); }
+            }
+        }
+
+        if (target.matches('.delete-question-btn')) {
+            if (confirm('정말로 이 질문을 삭제하시겠습니까?')) {
+                 try {
+                    await fetch(`/api/questions/${questionId}`, { method: 'DELETE' });
+                    questionDiv.remove();
+                } catch(err) { console.error(err); }
+            }
+        }
+    });
+});
+</script>
+</body>
+</html>

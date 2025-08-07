@@ -3,6 +3,7 @@
 
 # --- 1. 기본 라이브러리 및 설정 ---
 import os
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 import itertools
 import random
 import math
@@ -18,6 +19,8 @@ import pandas as pd
 import numpy as np
 from deap import base, creator, tools, algorithms
 import uuid
+import mwparserfromhell
+import bleach
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
@@ -30,7 +33,7 @@ if not app.secret_key:
 
 # Supabase 클라이언트 초기화
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("Supabase URL과 Key가 .env 파일에 설정되지 않았습니다.")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -39,6 +42,56 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # ==============================================================================
 # --- 2. 헬퍼 함수 및 공용 시스템 ---
 # ==============================================================================
+
+# app.py 의 wiki_parser 함수를 아래 코드로 교체
+
+def wiki_parser(wiki_text):
+    """
+    mwparserfromhell 라이브러리를 사용해 위키 텍스트를 안전한 HTML로 변환합니다.
+    """
+    if not wiki_text:
+        return ""
+
+    # 1. mwparserfromhell을 사용해 위키 텍스트를 파싱합니다.
+    wikicode = mwparserfromhell.parse(wiki_text)
+
+    # 2. 파싱된 코드를 HTML로 변환합니다.
+    #    (strip_code는 태그 등을 제거하지만, 기본 HTML 변환에 사용될 수 있습니다.
+    #     또는 to_html과 같은 커스텀 변환기를 만들 수도 있습니다.)
+    #    여기서는 간단하게 문자열로 변환하여 기본 태그를 유지합니다.
+    html = str(wikicode)
+
+    # mwparserfromhell은 [[링크]] 등을 <wikilink> 같은 커스텀 태그로 만들 수 있으나,
+    # 여기서는 간단한 문자열 치환으로 링크를 변환합니다.
+    # (더 복잡한 변환은 mwparserfromhell의 node 탐색 기능을 사용해야 합니다)
+
+    # 간단한 정규식으로 링크와 강조 등 기본 문법을 HTML 태그로 변환
+    # (mwparserfromhell이 구조를 잡아주고, 세부 렌더링은 정규식으로 보완)
+    html = re.sub(r"'''(.*?)'''", r'<strong>\1</strong>', html)
+    html = re.sub(r"''(.*?)''", r'<em>\1</em>', html)
+    html = re.sub(r'\[\[([^\]|]+?)\|([^\]]+?)\]\]', r'<a href="/docs/\1" class="wiki-link">\2</a>', html)
+    html = re.sub(r'\[\[([^\]]+?)\]\]', r'<a href="/docs/\1" class="wiki-link">\1</a>', html)
+    html = re.sub(r'\[(https?://\S+?)\s+([^\]]+?)\]', r'<a href="\1" target="_blank" rel="noopener noreferrer">\2</a>',
+                  html)
+    html = re.sub(r'==\s*(.*?)\s*==', r'<h2>\1</h2>', html, flags=re.MULTILINE)
+
+    # 3. 보안을 위해 허용할 태그와 속성을 지정하여 Sanitize 처리
+    allowed_tags = {
+        'p', 'br', 'strong', 'em', 's', 'blockquote', 'hr',
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'ul', 'ol', 'li',
+        'table', 'thead', 'tbody', 'tr', 'th', 'td',
+        'pre', 'code', 'img', 'a', 'div'
+    }
+    allowed_attrs = {
+        '*': ['class', 'align'],
+        'img': ['src', 'alt', 'title'],
+        'a': ['href', 'title', 'target', 'rel', 'class'],
+    }
+
+    safe_html = bleach.clean(html, tags=allowed_tags, attributes=allowed_attrs, strip=True)
+    return safe_html
+
 
 # Jinja2 템플릿에서 날짜 형식을 예쁘게 보여주기 위한 필터
 def format_datetime_filter(value, format_str="%Y년 %m월 %d일 %p %I:%M"):
@@ -63,7 +116,8 @@ def format_datetime_filter(value, format_str="%Y년 %m월 %d일 %p %I:%M"):
         # 혹시 모를 오류 발생 시, 원래 값을 그대로 보여줍니다.
         return value
 
-
+# 2. 생성한 함수를 Jinja2 필터로 등록
+app.jinja_env.filters['wiki_to_html'] = wiki_parser
 app.jinja_env.filters['datetime'] = format_datetime_filter
 
 
@@ -114,6 +168,15 @@ def send_telegram_notification(message):
         except Exception as e:
             app.logger.error(f"{chat_id}로 텔레그램 알림 발송 실패: {e}")
 
+def get_next_monday():
+    """오늘을 기준으로 다음 돌아오는 월요일의 날짜를 계산합니다."""
+    today = datetime.now(timezone(timedelta(hours=9))).date()
+    # today.weekday()는 월요일=0, 일요일=6
+    days_until_monday = (0 - today.weekday() + 7) % 7
+    if days_until_monday == 0: # 오늘이 월요일이면 다음 주 월요일을 대상으로 함
+        days_until_monday = 7
+    return today + timedelta(days=days_until_monday)
+
 
 # ==============================================================================
 # --- 3. 로그인, 로그아웃, 메인 페이지 라우트 ---
@@ -125,7 +188,7 @@ def main_index():
     # --- [수정] D-데이 계산 로직 추가 ---
     try:
         # 모집 마감일을 설정합니다. (년, 월, 일)
-        end_date_str = "2025-07-04"
+        end_date_str = "2025-08-31"
         # templates/main_index.html 파일의 모집 기간 마지막 날짜와 일치시킵니다.
         end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
 
@@ -143,76 +206,278 @@ def main_index():
     # 계산된 d_day 값을 템플릿으로 전달합니다.
     return render_template('main_index.html', d_day=d_day)
 
-@app.route('/login', methods=['GET', 'POST'])
+
+class KakaoOauth:
+    def __init__(self):
+        self.client_id = os.environ.get("KAKAO_OAUTH_CLIENT_ID")
+        self.redirect_uri = os.environ.get("KAKAO_REDIRECT_URI")
+        self.token_url = "https://kauth.kakao.com/oauth/token"
+        self.user_info_url = "https://kapi.kakao.com/v2/user/me"
+
+    def get_token(self, code):
+        """인가 코드로 Access Token을 요청합니다."""
+        data = {
+            "grant_type": "authorization_code",
+            "client_id": self.client_id,
+            "redirect_uri": self.redirect_uri,
+            "code": code,
+        }
+        # [수정] Client Secret을 활성화했으므로, 이 줄의 주석을 반드시 해제하고 값을 추가합니다.
+        if os.environ.get("KAKAO_OAUTH_CLIENT_SECRET"):
+            data["client_secret"] = os.environ.get("KAKAO_OAUTH_CLIENT_SECRET")
+
+        response = requests.post(self.token_url, data=data)
+        response.raise_for_status()  # 오류 발생 시 예외 발생
+        return response.json()
+
+    def get_user_info(self, access_token):
+        """Access Token으로 사용자 정보를 요청합니다."""
+        headers = {"Authorization": f"Bearer {access_token}"}
+        response = requests.post(self.user_info_url, headers=headers)
+        response.raise_for_status()
+        return response.json()
+
+
+# --- 기존 로그인 라우트들을 아래 코드로 교체합니다 ---
+
+@app.route('/login')
 def login():
-    if request.method == 'POST':
-        role = request.form.get('role')
-        password = request.form.get('password')
-        ADMIN_PASS = os.environ.get("ADMIN_PASSWORD")
-        INTERVIEWER_PASS = os.environ.get("INTERVIEWER_PASSWORD")
-        APPLICANT_PASS = os.environ.get("APPLICANT_PASSWORD")
-
-        # 역할 1: 관리자 로그인 (기존과 동일)
-        if role == 'admin' and password == ADMIN_PASS:
-            session.clear()
-            session['user_role'] = 'admin'
-            session['user_name'] = '관리자'
-            flash('관리자님, 환영합니다!', 'success')
-            return redirect(url_for('admin_dashboard'))
-
-        # 역할 2: 면접관 로그인
-        elif role == 'interviewer' and password == INTERVIEWER_PASS:
-            interviewer_name = request.form.get('name')
-            if not interviewer_name:
-                flash('면접관 이름을 입력해주세요.', 'danger')
-                return redirect(url_for('login'))
-
-            # [추가] 입력한 이름이 'members' 테이블에 존재하는지 확인합니다.
-            try:
-                member_res = supabase.table('members').select('name').eq('name', interviewer_name).execute()
-                if not member_res.data:
-                    flash('등록된 모임원이 아닙니다. 관리자에게 문의하세요.', 'danger')
-                    return redirect(url_for('login'))
-            except Exception as e:
-                flash('사용자 확인 중 오류가 발생했습니다.', 'danger')
-                app.logger.error(f"Error checking member: {e}")
-                return redirect(url_for('login'))
-
-            session.clear()
-            session['user_role'] = 'interviewer'
-            session['user_name'] = interviewer_name
-            flash(f"{session['user_name']} 면접관님, 환영합니다!", 'success')
-            return redirect(url_for('interviewer_events_list'))
-
-        # 역할 3: 면접자 로그인
-        elif role == 'applicant' and password == APPLICANT_PASS:
-            name = request.form.get('name')
-            phone = request.form.get('phone_number')
-
-            # [추가] 이름과 전화번호 형식 유효성 검사
-            if not (name and phone):
-                flash('이름과 연락처를 모두 입력해주세요.', 'danger')
-                return redirect(url_for('login'))
-
-            if not re.match(r'^[가-힣]{2,4}$', name):
-                flash('이름은 2~4자의 한글로 입력해주세요.', 'danger')
-                return redirect(url_for('login'))
-
-            if not re.match(r'^\d{11}$', phone):
-                flash('연락처는 11자리 숫자로 입력해주세요. (예: 01012345678)', 'danger')
-                return redirect(url_for('login'))
-
-            session.clear()
-            session['user_role'] = 'applicant'
-            session['user_name'] = name
-            session['user_phone'] = phone
-            flash(f"{session['user_name']}님, 환영합니다!", 'success')
-            return redirect(url_for('interview_index'))
-
-        else:
-            flash('입력 정보가 올바르지 않습니다.', 'danger')
-
+    # 이 페이지는 이제 카카오 로그인 버튼만 보여줍니다.
     return render_template('login.html')
+
+
+# 1. 로그인 시작 라우트
+@app.route('/login/kakao')
+def kakao_login():
+    kakao_oauth = KakaoOauth()
+    # 사용자를 카카오 인증 페이지로 리디렉션합니다.
+    login_url = f"https://kauth.kakao.com/oauth/authorize?client_id={kakao_oauth.client_id}&redirect_uri={kakao_oauth.redirect_uri}&response_type=code"
+
+    # [수정] 로그인 후 돌아올 목적지를 세션에 저장합니다.
+    session['next_url'] = request.args.get('next')
+
+    return redirect(login_url)
+
+
+# 2. 로그인 후 콜백을 처리할 라우트
+@app.route('/login/kakao/callback')
+def kakao_callback():
+    try:
+        code = request.args.get("code")
+        if not code:
+            flash("인증 코드를 받는데 실패했습니다.", "danger")
+            return redirect(url_for("login"))
+
+        kakao_oauth = KakaoOauth()
+        # 인가 코드로 토큰 발급
+        token_info = kakao_oauth.get_token(code)
+        access_token = token_info.get("access_token")
+
+        # 토큰으로 사용자 정보 조회
+        user_info = kakao_oauth.get_user_info(access_token)
+
+        social_id = str(user_info["id"])
+        kakao_account = user_info.get("kakao_account", {})
+        profile = kakao_account.get("profile", {})
+        email = kakao_account.get("email")
+
+        # 기존 회원인지 확인
+        member_res = supabase.table("members").select("*").eq("social_id", social_id).execute()
+        member = member_res.data[0] if member_res.data else None
+
+        if member:
+            # [추가] 계정 상태 확인
+            if member.get('account_status') != 'active':
+                flash("아직 관리자의 승인을 받지 않은 계정입니다.", "warning")
+                return redirect(url_for('login'))
+
+            if not member.get('is_active', True):  # is_active가 false이면
+                flash("비활성화된 계정입니다. 관리자에게 문의하세요.", "danger")
+                return redirect(url_for('login'))  # 세션을 만들지 않고 로그인 페이지로 돌려보냄
+            # 아래는 기존의 세션 설정 및 리디렉션 로직
+            pass
+        else:
+            # 연동되지 않았으면, '계정 연결' 페이지로 보낼 정보 준비
+            social_data = {
+                "social_id": social_id, "email": email,
+                "social_name": profile.get("nickname"), "profile_pic": profile.get("profile_image_url")
+            }
+            session['temp_social_data'] = social_data
+            return redirect(url_for('link_account_page'))
+
+        # 세션 설정
+        session["user_id"] = member["id"]
+        session["user_role"] = member["role"]
+        session["user_name"] = member["name"]
+        flash(f"{member['name']}님, 환영합니다!", "success")
+
+        # 원래 가려던 목적지로 리디렉션
+        next_url = session.pop('next_url', None)
+        if next_url:
+            return redirect(next_url)
+        if member["role"] == "admin":
+            return redirect(url_for("admin_dashboard"))
+        return redirect(url_for("main_index"))
+
+    except Exception as e:
+        flash("카카오 로그인 중 오류가 발생했습니다.", "danger")
+        app.logger.error(f"Kakao callback error: {e}", exc_info=True)
+        return redirect(url_for("login"))
+
+
+@app.route('/link_account')
+def link_account_page():
+    # kakao_callback에서 임시 저장한 소셜 데이터가 없으면 로그인 페이지로
+    if 'temp_social_data' not in session:
+        return redirect(url_for('login'))
+    return render_template('link_account.html', **session['temp_social_data'])
+
+
+@app.route('/link_account', methods=['POST'])
+def link_account_submit():
+    if 'temp_social_data' not in session:
+        return redirect(url_for('login'))
+
+    form = request.form
+    action = form.get('action')
+    social_info = session['temp_social_data']
+
+    member = None
+    if action == 'link':
+        existing_name = form.get('existing_name')
+        if not existing_name:
+            flash("기존 활동명을 입력해주세요.", "danger")
+            return redirect(url_for('link_account_page'))
+
+        member_res = supabase.table("members").select("*").eq("name", existing_name).is_("social_id", None).execute()
+        member_to_link = member_res.data[0] if member_res.data else None
+
+        if member_to_link:
+            update_data = {
+                "social_id": social_info['social_id'],
+                "email": social_info['email'],
+                "profile_pic": social_info['profile_pic'],
+                "account_status": 'pending'
+            }
+            # [수정] .update() 뒤에 .select()를 제거하고, 실행 결과에서 바로 .data를 사용합니다.
+            updated_member_response = supabase.table("members").update(update_data).eq("id",
+                                                                                       member_to_link['id']).execute()
+            member = updated_member_response.data[0]
+
+            # notifications 테이블에 알림 생성
+            supabase.table('notifications').insert({
+                'type': 'account_link_request',
+                'related_member_id': member['id'],
+                'details': {
+                    'original_name': member['name'],
+                    'social_name': social_info['social_name'],
+                    'social_email': social_info['email']
+                }
+            }).execute()
+
+            flash("기존 계정 연결 요청이 완료되었습니다. 관리자 승인 후 로그인 가능합니다.", "success")
+            return redirect(url_for('login'))
+        else:
+            flash("해당 이름의 기존 계정을 찾을 수 없습니다. 신규 회원으로 가입해주세요.", "danger")
+            return redirect(url_for('link_account_page'))
+
+    elif action == 'create':
+        new_member_data = {
+            "name": social_info['social_name'],
+            "email": social_info['email'],
+            "social_id": social_info['social_id'],
+            "profile_pic": social_info['profile_pic'],
+            "role": "member",
+            "account_status": 'pending'
+        }
+        # [수정] .insert() 뒤에 .select()를 제거하고, 실행 결과에서 바로 .data를 사용합니다.
+        new_member_response = supabase.table("members").insert(new_member_data).execute()
+        member = new_member_response.data[0]
+
+        # notifications 테이블에 알림 생성
+        supabase.table('notifications').insert({
+            'type': 'new_user_request',
+            'related_member_id': member['id'],
+            'details': {
+                'name': member['name'],
+                'email': member['email']
+            }
+        }).execute()
+
+        flash("회원가입 요청이 완료되었습니다. 관리자 승인 후 활동 가능합니다.", "success")
+        return redirect(url_for('login'))
+
+
+# @app.route('/login', methods=['GET', 'POST'])
+# def login():
+#     if request.method == 'POST':
+#         role = request.form.get('role')
+#         password = request.form.get('password')
+#         ADMIN_PASS = os.environ.get("ADMIN_PASSWORD")
+#         INTERVIEWER_PASS = os.environ.get("INTERVIEWER_PASSWORD")
+#         APPLICANT_PASS = os.environ.get("APPLICANT_PASSWORD")
+#
+#         # 역할 1: 관리자 로그인 (기존과 동일)
+#         if role == 'admin' and password == ADMIN_PASS:
+#             session.clear()
+#             session['user_role'] = 'admin'
+#             session['user_name'] = '관리자'
+#             flash('관리자님, 환영합니다!', 'success')
+#             return redirect(url_for('admin_dashboard'))
+#
+#         # 역할 2: 면접관 로그인
+#         elif role == 'interviewer' and password == INTERVIEWER_PASS:
+#             interviewer_name = request.form.get('name')
+#             if not interviewer_name:
+#                 flash('면접관 이름을 입력해주세요.', 'danger')
+#                 return redirect(url_for('login'))
+#
+#             # [추가] 입력한 이름이 'members' 테이블에 존재하는지 확인합니다.
+#             try:
+#                 member_res = supabase.table('members').select('name').eq('name', interviewer_name).execute()
+#                 if not member_res.data:
+#                     flash('등록된 모임원이 아닙니다. 관리자에게 문의하세요.', 'danger')
+#                     return redirect(url_for('login'))
+#             except Exception as e:
+#                 flash('사용자 확인 중 오류가 발생했습니다.', 'danger')
+#                 app.logger.error(f"Error checking member: {e}")
+#                 return redirect(url_for('login'))
+#
+#             session.clear()
+#             session['user_role'] = 'interviewer'
+#             session['user_name'] = interviewer_name
+#             flash(f"{session['user_name']} 면접관님, 환영합니다!", 'success')
+#             return redirect(url_for('interviewer_events_list'))
+#
+#         # 역할 3: 면접자 로그인
+#         elif role == 'applicant' and password == APPLICANT_PASS:
+#             name = request.form.get('name')
+#             phone = request.form.get('phone_number')
+#
+#             # [추가] 이름과 전화번호 형식 유효성 검사
+#             if not (name and phone):
+#                 flash('이름과 연락처를 모두 입력해주세요.', 'danger')
+#                 return redirect(url_for('login'))
+#
+#             if not re.match(r'^[가-힣]{2,4}$', name):
+#                 flash('이름은 2~4자의 한글로 입력해주세요.', 'danger')
+#                 return redirect(url_for('login'))
+#
+#             if not re.match(r'^\d{11}$', phone):
+#                 flash('연락처는 11자리 숫자로 입력해주세요. (예: 01012345678)', 'danger')
+#                 return redirect(url_for('login'))
+#
+#             session.clear()
+#             session['user_role'] = 'applicant'
+#             session['user_name'] = name
+#             session['user_phone'] = phone
+#             flash(f"{session['user_name']}님, 환영합니다!", 'success')
+#             return redirect(url_for('interview_index'))
+#
+#         else:
+#             flash('입력 정보가 올바르지 않습니다.', 'danger')
+#
+#     return render_template('login.html')
 
 
 # --- [신규] 접근 키가 포함된 링크를 처리하는 라우트 ---
@@ -307,6 +572,164 @@ def logout():
     flash('성공적으로 로그아웃되었습니다.', 'info')
     return redirect(url_for('main_index'))
 
+
+@app.route('/board')
+@login_required(role="ANY")
+def member_board():
+    user_id = session.get('user_id')
+    next_monday = get_next_monday()
+    try:
+        # [수정] status, drink_order 대신 attending_seminar, attending_afterparty 조회
+        my_attendance_res = supabase.table('attendance').select('attending_seminar, attending_afterparty') \
+            .eq('user_id', user_id).eq('meeting_date', next_monday.isoformat()).execute()
+        my_attendance = my_attendance_res.data[0] if my_attendance_res.data else None
+
+        questions_res = supabase.table('questions').select('*, members(name)').eq('meeting_date',
+                                                                                  next_monday.isoformat()).order(
+            'created_at').execute()
+        all_questions = questions_res.data if questions_res.data else []
+
+        # [수정] 세미나 참석자 명단만 조회 (뒷풀이 참석 여부도 함께 가져옴)
+        attendees_res = supabase.table('attendance').select('user_id, attending_afterparty, members(name)') \
+            .eq('meeting_date', next_monday.isoformat()).eq('attending_seminar', True).execute()
+        attendees = attendees_res.data if attendees_res.data else []
+
+    except Exception as e:
+        flash(f"데이터를 불러오는 중 오류 발생: {e}", "danger")
+        my_attendance, all_questions, attendees = None, [], []
+
+    return render_template(
+        'member_board.html',
+        meeting_date=next_monday,
+        my_attendance=my_attendance,
+        questions=all_questions,
+        attendees=attendees
+    )
+
+
+@app.route('/api/attendance', methods=['POST'])
+@login_required(role="ANY")
+def update_attendance():
+    data = request.json
+    user_id = session.get('user_id')
+    next_monday = get_next_monday().isoformat()
+    try:
+        # [수정] status, drink_order 대신 attending_seminar, attending_afterparty 를 upsert
+        supabase.table('attendance').upsert({
+            'user_id': user_id,
+            'meeting_date': next_monday,
+            'attending_seminar': data.get('attending_seminar'),
+            'attending_afterparty': data.get('attending_afterparty')
+        }, on_conflict='user_id, meeting_date').execute()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/questions', methods=['POST'])
+@login_required(role="ANY")
+def create_question():
+    """JavaScript(fetch) 요청을 처리하는 API 라우트"""
+    data = request.json
+    user_id = session.get('user_id')
+    try:
+        new_question = supabase.table('questions').insert({
+            'user_id': user_id,
+            'meeting_date': get_next_monday().isoformat(),
+            'content': data.get('content')
+        }).execute().data[0]
+
+        member_res = supabase.table('members').select('name').eq('id', user_id).execute().data[0]
+        new_question['members'] = member_res
+
+        return jsonify({"status": "success", "question": new_question})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/questions/<int:question_id>', methods=['PUT', 'DELETE'])
+@login_required(role="ANY")
+def manage_question(question_id):
+    """JavaScript(fetch) 요청을 처리하는 API 라우트"""
+    user_id = session.get('user_id')
+    try:
+        question_res = supabase.table('questions').select('user_id').eq('id', question_id).single().execute()
+        if not question_res.data or question_res.data['user_id'] != user_id:
+            return jsonify({"status": "error", "message": "권한이 없습니다."}), 403
+
+        if request.method == 'PUT':
+            content = request.json.get('content')
+            supabase.table('questions').update({'content': content}).eq('id', question_id).execute()
+            return jsonify({"status": "success", "message": "질문이 수정되었습니다."})
+        elif request.method == 'DELETE':
+            supabase.table('questions').delete().eq('id', question_id).execute()
+            return jsonify({"status": "success", "message": "질문이 삭제되었습니다."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/profiles')
+@login_required(role="ANY")
+def profiles_page():
+    """모든 멤버의 프로필 목록을 보여주는 페이지"""
+    try:
+        all_members = supabase.table('members').select('*').eq('is_active', True).order('name').execute().data
+    except Exception as e:
+        flash(f"프로필 로딩 중 오류: {e}", "danger")
+        all_members = []
+    return render_template('profiles.html', all_members=all_members)
+
+
+@app.route('/api/profiles/update', methods=['POST'])
+@login_required(role="ANY")
+def update_profile():
+    """프로필의 '한 줄 소개'와 '상세 프로필(BBCode)'을 업데이트합니다."""
+    user_id = session.get('user_id')
+    data = request.json
+
+    try:
+        # 1. 클라이언트로부터 필요한 데이터만 추출합니다.
+        update_data = {
+            'profile_intro': data.get('intro'),
+            'profile_content': data.get('content')  # BBCode 원문을 그대로 저장
+        }
+
+        # 2. 값이 없는 필드는 업데이트 대상에서 제외합니다.
+        update_data = {k: v for k, v in update_data.items() if v is not None}
+
+        # 3. 업데이트할 데이터가 없으면 오류를 반환합니다.
+        if not update_data:
+            return jsonify({"status": "error", "message": "전송된 데이터가 없습니다."}), 400
+
+        # 4. 데이터베이스를 업데이트합니다.
+        supabase.table('members').update(update_data).eq('id', user_id).execute()
+
+        # 5. 프론트엔드가 페이지를 새로고침하므로 간단한 성공 메시지만 반환합니다.
+        return jsonify({"status": "success", "message": "프로필이 저장되었습니다."})
+
+    except Exception as e:
+        app.logger.error(f"Profile update error: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": "프로필 저장 중 서버 오류가 발생했습니다."}), 500
+
+
+@app.route('/profile/<int:member_id>')
+@login_required(role="ANY")
+def profile_detail_page(member_id):
+    """특정 멤버의 상세 프로필 페이지를 보여줍니다."""
+    try:
+        # DB에서 요청된 ID의 멤버 정보를 조회합니다.
+        member_res = supabase.table('members').select('*').eq('id', member_id).single().execute()
+        member_data = member_res.data
+        if not member_data:
+            flash("존재하지 않는 회원입니다.", "danger")
+            return redirect(url_for('profiles_page'))
+
+    except Exception as e:
+        flash(f"프로필 로딩 중 오류: {e}", "danger")
+        return redirect(url_for('profiles_page'))
+
+    # 새로 만들 profile_detail.html 템플릿으로 데이터를 전달합니다.
+    return render_template('profile_detail.html', member=member_data)
+
 # ==============================================================================
 # <editor-fold desc="4. 관리자 (Admin) 전용 기능">
 # --- 4.1. 관리자 대시보드 및 이벤트 관리 ---
@@ -314,23 +737,53 @@ def logout():
 @login_required(role="admin")
 def admin_dashboard():
     try:
-        events_res = supabase.table('events').select('*').order('created_at', desc=True).execute()
-        interviewers_res = supabase.table('interviewers').select('name').execute()
-        members_res = supabase.table('members').select('name').order('name').execute()
+        events_res = supabase.table('events').select('*').order('created_at', desc=True).execute().data
 
-        # 현재 면접관인 사람들의 이름만 Set으로 만들어 효율적으로 사용
-        interviewer_names = {i['name'] for i in interviewers_res.data}
+        # [수정] interviewer 목록과 별개로, 모든 멤버의 id, name, is_active 상태를 가져옵니다.
+        all_members_res = supabase.table('members').select('id, name, is_active').order('name').execute().data
 
-        return render_template(
-            'admin_dashboard.html',
-            events=events_res.data,
-            all_members=members_res.data,
-            interviewer_names=interviewer_names
-        )
+        interviewers_res = supabase.table('interviewers').select('name').execute().data
+        interviewer_names = {i['name'] for i in interviewers_res}
+        next_monday = get_next_monday()
+
     except Exception as e:
         flash(f"대시보드 로딩 중 오류 발생: {e}", "danger")
-        return render_template('admin_dashboard.html', events=[], all_members=[], interviewer_names=set())
+        events_res, all_members_res, interviewer_names = [], [], set()
 
+    return render_template(
+        'admin_dashboard.html',
+        events=events_res,
+        # [수정] 기존 all_members 대신 모든 멤버 정보를 전달합니다.
+        all_members=all_members_res,
+        interviewer_names=interviewer_names,
+        meeting_date=next_monday
+    )
+
+
+@app.route('/api/admin/members/<int:member_id>/toggle_active', methods=['POST'])
+@login_required(role="admin")
+def toggle_member_active(member_id):
+    """관리자가 특정 멤버의 활성/비활성 상태를 변경합니다."""
+    data = request.json
+    new_status = data.get('is_active')
+
+    if new_status is None:
+        return jsonify({"status": "error", "message": "is_active 값이 필요합니다."}), 400
+
+    try:
+        # 자기 자신을 비활성화하지 못하도록 방지
+        if member_id == session.get('user_id') and not new_status:
+            return jsonify({"status": "error", "message": "자기 자신을 비활성화할 수 없습니다."}), 403
+
+        supabase.table('members').update({
+            'is_active': new_status
+        }).eq('id', member_id).execute()
+
+        return jsonify({"status": "success", "message": "멤버 상태가 변경되었습니다."})
+
+    except Exception as e:
+        app.logger.error(f"Error toggling active status for member {member_id}: {e}")
+        return jsonify({"status": "error", "message": "상태 변경 중 오류 발생"}), 500
 
 # 2. 기존의 add_interviewer 와 delete_interviewer 함수 2개를 삭제하고,
 #    아래의 새로운 toggle_interviewer 함수 1개로 교체합니다.
@@ -864,6 +1317,74 @@ def update_active_slots_for_clustering(event_id):
     except Exception as e:
         app.logger.error(f"Error updating slots for clustering (Event ID: {event_id}): {e}")
 
+
+@app.route('/api/notifications')
+@login_required(role="admin")
+def get_notifications():
+    """관리자에게 보여줄 승인 대기 중인 알림 목록을 반환합니다."""
+    try:
+        notifications = supabase.table('notifications') \
+            .select('*') \
+            .eq('status', 'pending') \
+            .order('created_at', desc=True) \
+            .execute().data
+        return jsonify(notifications)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/notifications/<int:notif_id>/handle', methods=['POST'])
+@login_required(role="admin")
+def handle_notification(notif_id):
+    data = request.json
+    action = data.get('action')
+    print(f"\n--- [DEBUG] Handling Notification ID: {notif_id}, Action: {action} ---")
+
+    if action not in ['approve', 'deny']:
+        return jsonify({"error": "Invalid action"}), 400
+
+    try:
+        # 1. 알림 정보 조회
+        print("[DEBUG] 1. Fetching notification details...")
+        notification_to_handle_res = supabase.table('notifications').select('related_member_id') \
+            .eq('id', notif_id).single().execute()
+
+        notification_to_handle = notification_to_handle_res.data
+
+        if not notification_to_handle:
+            print("[DEBUG] ERROR: Notification not found.")
+            return jsonify({"error": "Notification not found"}), 404
+        print(f"[DEBUG]    -> Found. Member ID to update: {notification_to_handle.get('related_member_id')}")
+
+        # 2. 알림 상태 업데이트
+        print("[DEBUG] 2. Updating notification status...")
+        supabase.table('notifications').update({
+            'status': 'approved' if action == 'approve' else 'denied'
+        }).eq('id', notif_id).execute()
+        print("[DEBUG]    -> Notification status updated successfully.")
+
+        # 3. 'approve' 액션일 경우, 멤버 상태를 'active'로 변경
+        if action == 'approve':
+            member_id = notification_to_handle.get('related_member_id')
+
+            # [수정] member_id가 0인 경우도 유효한 값으로 처리하도록 조건문 변경
+            if member_id is not None:
+                print(f"[DEBUG] 3. Approving member. Attempting to update members table for ID: {member_id}")
+                update_response = supabase.table('members').update({
+                    'account_status': 'active'
+                }).eq('id', member_id).execute()
+                print(f"[DEBUG]    -> Update response from Supabase: {update_response.data}")
+            else:
+                print("[DEBUG]    -> No valid member_id found in notification, skipping member update.")
+
+        print("[DEBUG] --- Request handled successfully. ---")
+        return jsonify({"status": "success", "message": f"요청이 {action}되었습니다."})
+
+    except Exception as e:
+        print(f"[DEBUG] !!! AN EXCEPTION OCCURRED !!!\n{e}")
+        app.logger.error(f"Error handling notification {notif_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+
 # --- 4.2. 독서 모임 조 편성 (관리자 전용) ---
 def gender_balance_score(group, members):
     m = sum(1 for name in group if members.get(name, {}).get('gender') == 'M')
@@ -934,15 +1455,41 @@ def generate_groups(participants, facilitators, members, co_matrix, group_count_
     suggestions.sort(key=lambda x: x[0], reverse=True)
     return [g for _, g in suggestions[:top_n]]
 
-@app.route('/making_team', methods=['GET']) # POST를 제거
+
+@app.route('/making_team', methods=['GET'])
 @login_required(role="admin")
 def bookclub_index():
     try:
-        members_res = supabase.table("members").select("*").order("name").execute().data
+        # 1. 전체 회원 목록을 가져옵니다.
+        all_members = supabase.table("members").select("id, name").eq('is_active', True).order("name").execute().data
+
+        # 2. 다음 주 월요일의 출석 정보를 가져옵니다.
+        next_monday = get_next_monday()
+        attendees_res = supabase.table('attendance').select('user_id, attending_seminar, attending_afterparty') \
+            .eq('meeting_date', next_monday.isoformat()).execute()
+
+        # 3. 출석 정보를 user_id를 키로 하는 딕셔너리로 변환하여 쉽게 찾을 수 있게 합니다.
+        attendance_map = {att['user_id']: att for att in attendees_res.data}
+
+        # 4. 전체 회원 목록에 각자의 출석 정보를 합칩니다.
+        for member in all_members:
+            attendance_info = attendance_map.get(member['id'])
+            if attendance_info:
+                member['attending_seminar'] = attendance_info['attending_seminar']
+                member['attending_afterparty'] = attendance_info['attending_afterparty']
+            else:  # 출석 정보가 없으면 기본값(불참)으로 설정
+                member['attending_seminar'] = False
+                member['attending_afterparty'] = False
+
     except Exception as e:
-        return "<h3>회원 정보를 불러오는 중 오류가 발생했습니다.</h3>", 500
-    # POST 로직을 모두 제거하고 템플릿만 렌더링
-    return render_template('bookclub_index.html', members=members_res)
+        flash(f"데이터를 불러오는 중 오류가 발생했습니다: {e}", "danger")
+        all_members = []
+
+    return render_template(
+        'bookclub_index.html',
+        # [수정] 출석 정보가 포함된 전체 멤버 목록을 전달
+        members_with_attendance=all_members
+    )
 
 
 @app.route('/start_group_generation')
@@ -1340,7 +1887,7 @@ def save_group_record_to_db(date, present, facilitators, groups):
 def manual_entry():
     """수동으로 조 편성을 입력하는 페이지를 렌더링합니다."""
     try:
-        members_res = supabase.table("members").select("name").order("name").execute().data
+        members_res = supabase.table("members").select("name").eq('is_active', True).order("name").execute().data
         all_members = [m['name'] for m in members_res]
     except Exception as e:
         flash(f"회원 정보를 불러오는 중 오류 발생: {e}", "danger")
@@ -1694,6 +2241,269 @@ def interview_check_reservation():
         app.logger.debug(f"Reservation check for {phone} found no data: {e}")
         return jsonify({"error": "예약 정보를 찾을 수 없습니다."}), 404
 
+
+#=== 위키 관련 모음
+
+@app.route('/docs/<doc_title>')
+@login_required(role="ANY")
+def view_document(doc_title):
+    """
+    데이터베이스에서 문서를 찾아 제목과 내용을 보여주는 페이지.
+    """
+    try:
+        doc_res = supabase.table('documents').select('*').eq('title', doc_title).single().execute()
+        document = doc_res.data
+
+        if not document:
+            flash(f"'{doc_title}' 문서를 찾을 수 없습니다.", "warning")
+            return render_template('doc_not_found.html', title=doc_title), 404
+
+        rendered_content = wiki_parser(document.get('content', ''))
+
+        return render_template('doc_view.html', doc=document, content=rendered_content)
+
+    except Exception as e:
+        app.logger.error(f"Error viewing document '{doc_title}': {e}")
+        flash("문서를 불러오는 중 오류가 발생했습니다.", "danger")
+        return redirect(url_for('main_index'))
+
+
+# 1. 문서 생성 페이지를 보여주는 라우트
+@app.route('/docs/create')
+@login_required(role="ANY")
+def create_document_page():
+    # doc_edit.html 템플릿을 렌더링. 'edit' 모드가 아니므로 doc 객체는 전달 안 함
+    return render_template('doc_edit.html')
+
+
+# 2. 문서 생성 요청을 처리하는 API 라우트
+@app.route('/api/docs/create', methods=['POST'])
+@login_required(role="ANY")
+def handle_create_document():
+    data = request.json
+    title = data.get('title')
+    content = data.get('content')
+    author_id = session.get('user_id')  # 세션에서 현재 로그인한 사용자의 ID를 가져옴
+
+    if not title or not content:
+        return jsonify({"status": "error", "message": "제목과 내용을 모두 입력해야 합니다."}), 400
+
+    try:
+        # DB에 새로운 문서 삽입
+        supabase.table('documents').insert({
+            'title': title,
+            'content': content,
+            'author_id': author_id
+        }).execute()
+
+        # 성공 시, 새로 만들어진 문서 페이지로 바로 이동할 수 있도록 URL 반환
+        return jsonify({"status": "success", "message": "문서가 성공적으로 생성되었습니다.", "doc_title": title})
+
+    except Exception as e:
+        # Supabase에서 title UNIQUE 제약 조건 위반 시 특정 에러 코드를 반환합니다.
+        if '23505' in str(e):  # UNIQUE VIOLATION
+            return jsonify({"status": "error", "message": f"이미 '{title}' 제목의 문서가 존재합니다."}), 409
+        app.logger.error(f"Error creating document: {e}")
+        return jsonify({"status": "error", "message": "문서 생성 중 오류 발생"}), 500
+
+
+# 3. 전체 문서 목록을 보여주는 라우트
+@app.route('/docs')
+@login_required(role="ANY")
+def view_all_documents():
+    """
+    지금까지 생성된 모든 문서의 목록을 보여주는 페이지.
+    """
+    try:
+        # 문서의 제목, 마지막 수정일, 그리고 작성자(members 테이블과 join)의 이름을 가져옵니다.
+        # 최근 수정된 문서가 위로 오도록 정렬합니다.
+        docs_res = supabase.table('documents').select('title, updated_at, members(name)') \
+            .order('updated_at', desc=True).execute()
+
+        documents = docs_res.data
+
+        return render_template('doc_list.html', documents=documents)
+
+    except Exception as e:
+        app.logger.error(f"Error fetching document list: {e}")
+        flash("문서 목록을 불러오는 중 오류가 발생했습니다.", "danger")
+        return redirect(url_for('main_index'))
+
+
+# 4. 문서 수정 페이지를 보여주는 라우트
+@app.route('/docs/edit/<doc_title>')
+@login_required(role="ANY")
+def edit_document_page(doc_title):
+    try:
+        doc_res = supabase.table('documents').select('*').eq('title', doc_title).single().execute()
+        document = doc_res.data
+
+        if not document:
+            flash(f"'{doc_title}' 문서를 찾을 수 없습니다.", "warning")
+            return redirect(url_for('view_all_documents'))
+
+        # 권한 확인: 작성자 본인이거나 관리자인지 확인
+        # if document['author_id'] != session.get('user_id') and session.get('user_role') != 'admin':
+        #     flash("이 문서를 수정할 권한이 없습니다.", "danger")
+        #     return redirect(url_for('view_document', doc_title=doc_title))
+
+        # 생성 시 사용했던 doc_edit.html 템플릿을 재사용하되,
+        # 기존 문서 데이터를 함께 전달하여 폼을 채워넣음
+        return render_template('doc_edit.html', doc=document)
+
+    except Exception as e:
+        app.logger.error(f"Error loading edit page for document '{doc_title}': {e}")
+        flash("편집 페이지를 불러오는 중 오류가 발생했습니다.", "danger")
+        return redirect(url_for('view_all_documents'))
+
+
+# 5. 문서 수정 요청을 처리하는 API 라우트
+@app.route('/api/docs/edit/<doc_id>', methods=['POST'])
+@login_required(role="ANY")
+def handle_edit_document(doc_id):
+    data = request.json
+    content = data.get('content')
+    editor_id = session.get('user_id')
+
+    if not content:
+        return jsonify({"status": "error", "message": "내용이 없습니다."}), 400
+
+    try:
+        # [수정] 권한 및 문서 존재 여부 확인을 위해 먼저 title을 가져옵니다.
+        doc_res = supabase.table('documents').select('author_id, title').eq('id', doc_id).single().execute()
+        document = doc_res.data
+
+        if not document:
+            return jsonify({"status": "error", "message": "수정할 문서를 찾을 수 없습니다."}), 404
+
+        # 1. 'documents' 테이블의 내용을 업데이트합니다. (반환값은 사용하지 않음)
+        supabase.table('documents').update({
+            'content': content,
+            'updated_at': 'now()'
+        }).eq('id', doc_id).execute()
+
+        # 2. 'document_logs' 테이블에 변경 이력을 삽입합니다.
+        supabase.table('document_logs').insert({
+            'document_id': doc_id,
+            'editor_id': editor_id,
+            'content': content
+        }).execute()
+
+        # 3. 바로 화면에 반영할 수 있도록 렌더링된 HTML을 생성합니다.
+        rendered_html = wiki_parser(content)
+
+        return jsonify({
+            "status": "success",
+            "message": "문서가 성공적으로 수정되었습니다.",
+            "doc_title": document['title'],  # [수정] 기존에 조회한 문서의 title을 사용합니다.
+            "rendered_html": rendered_html
+        })
+
+    except Exception as e:
+        app.logger.error(f"Error updating document id {doc_id}: {e}")
+        return jsonify({"status": "error", "message": "문서 수정 중 오류 발생"}), 500
+
+
+# 2. [신규] 문서 수정 로그를 가져오는 API 라우트
+@app.route('/api/docs/<doc_id>/history')
+@login_required(role="ANY")
+def get_document_history(doc_id):
+    try:
+        logs_res = supabase.table('document_logs').select('created_at, content, members(name)') \
+            .eq('document_id', doc_id).order('created_at', desc=True).execute()
+
+        return jsonify(logs_res.data)
+    except Exception as e:
+        app.logger.error(f"Error fetching history for doc id {doc_id}: {e}")
+        return jsonify({"error": "로그를 불러오는 중 오류 발생"}), 500
+
+
+# 6. [신규] 문서 삭제 요청을 처리하는 API 라우트
+@app.route('/api/docs/delete/<doc_id>', methods=['POST'])
+@login_required(role="ANY")
+def handle_delete_document(doc_id):
+    try:
+        # 삭제 권한 확인을 위해 먼저 문서의 작성자 정보를 가져옵니다.
+        doc_res = supabase.table('documents').select('author_id, title').eq('id', doc_id).single().execute()
+        document = doc_res.data
+
+        if not document:
+            return jsonify({"status": "error", "message": "삭제할 문서를 찾을 수 없습니다."}), 404
+
+        # 권한 확인: 작성자 본인이거나 관리자가 아니면 삭제 불가
+        if document['author_id'] != session.get('user_id') and session.get('user_role') != 'admin':
+            return jsonify({"status": "error", "message": "이 문서를 삭제할 권한이 없습니다."}), 403
+
+        # 문서 삭제 실행
+        # 'document_logs' 테이블에 ON DELETE CASCADE를 설정했기 때문에,
+        # 원본 문서만 삭제해도 관련 로그가 모두 자동으로 삭제됩니다.
+        supabase.table('documents').delete().eq('id', doc_id).execute()
+
+        flash(f"'{document['title']}' 문서가 성공적으로 삭제되었습니다.", "success")
+        return jsonify({"status": "success", "message": "문서가 삭제되었습니다."})
+
+    except Exception as e:
+        app.logger.error(f"Error deleting document id {doc_id}: {e}")
+        return jsonify({"status": "error", "message": "문서 삭제 중 오류 발생"}), 500
+
+
+#=== 마이페이지
+@app.route('/mypage')
+@login_required(role="ANY")
+def my_page():
+    user_id = session.get('user_id')
+    user_name = session.get('user_name')
+
+    try:
+        # 1. 내 정보 조회
+        user_res = supabase.table('members').select('*').eq('id', user_id).single().execute()
+        user_data = user_res.data
+        if not user_data:
+            flash("사용자 정보를 찾을 수 없습니다.", "danger")
+            return redirect(url_for('main_index'))
+
+        # 2. 총 참석 횟수 집계 로직
+
+        # 2-1. 'attendance' 테이블에서 참석 횟수 집계
+        attendance_res = supabase.table('attendance').select('count', count='exact') \
+            .eq('user_id', user_id).eq('attending_seminar', True).execute()
+        attendance_count_new = attendance_res.count
+
+        # 2-2. 'history' 테이블에서 과거 참석 횟수 집계
+        # [수정] user_name 리스트를 json.dumps()를 사용해 json 문자열로 변환하여 전달
+        history_res = supabase.table('history').select('count', count='exact') \
+            .contains('present', json.dumps([user_name])).execute()
+        attendance_count_old = history_res.count
+
+        # 2-3. 두 횟수를 합산
+        total_attendance_count = attendance_count_new + attendance_count_old
+
+        # ... (나머지 코드들은 이전과 동일) ...
+        question_res = supabase.table('questions').select('count', count='exact') \
+            .eq('user_id', user_id).execute()
+        question_count = question_res.count
+
+        my_docs_res = supabase.table('documents').select('title') \
+            .eq('author_id', user_id).order('created_at', desc=True).execute()
+        my_documents = my_docs_res.data
+
+        edited_docs_res = supabase.table('document_logs').select('document_id', count='exact') \
+            .eq('editor_id', user_id).execute()
+        edited_docs_count = len(set(log['document_id'] for log in edited_docs_res.data))
+
+        return render_template(
+            'my_page_member.html',
+            user=user_data,
+            attendance_count=total_attendance_count,
+            question_count=question_count,
+            my_documents=my_documents,
+            edited_docs_count=edited_docs_count
+        )
+
+    except Exception as e:
+        app.logger.error(f"Error loading my page for user {user_id}: {e}")
+        flash("마이페이지를 불러오는 중 오류가 발생했습니다.", "danger")
+        return redirect(url_for('main_index'))
 
 # ==============================================================================
 # --- 7. 서버 실행 ---

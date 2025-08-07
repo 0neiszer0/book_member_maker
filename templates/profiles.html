@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>멤버 프로필</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A; --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444; }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
+        h1, h2 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; }
+        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); transition: all 0.2s; }
+        .eva-card:hover { transform: translateY(-4px); border-color: var(--eva-green); }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="container mx-auto max-w-5xl">
+        <header class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-eva-green">Member Profiles</h1>
+            <a href="{{ url_for('main_index') }}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md">메인으로</a>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for member in all_members %}
+            <a href="{{ url_for('profile_detail_page', member_id=member.id) }}" class="block">
+                <div class="eva-card p-6 rounded-lg h-full flex flex-col">
+                    <div class="flex items-center mb-4">
+                        <img src="{{ member.profile_pic or 'https://via.placeholder.com/150' }}" alt="{{ member.name }}" class="w-16 h-16 rounded-full mr-4 border-2 border-eva-purple">
+                        <div>
+                            <h2 class="text-xl font-bold">{{ member.name }}</h2>
+                        </div>
+                    </div>
+                    <div class="flex-grow">
+                        <p class="text-sm text-gray-300 italic">"{{ member.profile_intro or '한 줄 소개가 없습니다.' }}"</p>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>
