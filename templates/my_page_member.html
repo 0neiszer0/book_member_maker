@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>마이페이지</title>
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A;
+            --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444;
+            --wiki-link-blue: #60a5fa;
+        }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
+        h1, h2 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; }
+        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="container mx-auto max-w-4xl">
+        <header class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-eva-green">My Page</h1>
+            <a href="{{ url_for('main_index') }}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md">메인으로</a>
+        </header>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+            <div class="p-4 mb-4 text-sm rounded-lg border {{'bg-red-900/50 text-red-300 border-red-500/50'}}" role="alert">
+                {{ message }}
+            </div>
+            {% endfor %}
+        {% endwith %}
+
+        <div class="eva-card p-6 rounded-lg mb-8">
+            <h2 class="text-xl font-bold text-eva-purple mb-4">내 정보</h2>
+            <div class="space-y-2">
+                <p><strong>이름:</strong> {{ user.name }}</p>
+                <p><strong>이메일:</strong> {{ user.email or '이메일 정보 없음' }}</p>
+                <p><strong>한 줄 소개:</strong> "{{ user.profile_intro or '...' }}"</p>
+            </div>
+            <div class="mt-6">
+                <a href="{{ url_for('profile_detail_page', member_id=user.id) }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">내 프로필 보기/편집</a>
+            </div>
+        </div>
+
+        <div class="eva-card p-6 rounded-lg mb-8">
+            <h2 class="text-xl font-bold text-eva-purple mb-4">나의 활동 요약</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                <div class="p-4 bg-bg-dark rounded">
+                    <p class="text-3xl font-bold text-eva-green">{{ attendance_count }}</p>
+                    <p class="text-sm text-gray-400">총 참석 횟수</p>
+                </div>
+                <div class="p-4 bg-bg-dark rounded">
+                    <p class="text-3xl font-bold text-eva-green">{{ question_count }}</p>
+                    <p class="text-sm text-gray-400">작성한 질문 수</p>
+                </div>
+                <div class="p-4 bg-bg-dark rounded">
+                    <p class="text-3xl font-bold text-eva-green">{{ edited_docs_count }}</p>
+                    <p class="text-sm text-gray-400">기여한 위키 수</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="eva-card p-6 rounded-lg">
+            <h2 class="text-xl font-bold text-eva-purple mb-4">내가 작성한 위키 문서</h2>
+            <ul class="space-y-2">
+                {% for doc in my_documents %}
+                    <li><a href="{{ url_for('view_document', doc_title=doc.title) }}" class="text-wiki-link-blue hover:underline">{{ doc.title }}</a></li>
+                {% else %}
+                    <p class="text-gray-500">아직 직접 작성한 위키 문서가 없습니다.</p>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

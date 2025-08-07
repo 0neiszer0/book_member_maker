@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <title>문서를 찾을 수 없음</title>
+</head>
+<body class="p-4 md:p-8">
+    <div class="container mx-auto max-w-4xl text-center">
+        <h1 class="text-3xl font-bold text-red-500 mb-4">404 - Not Found</h1>
+        <div class="eva-card p-8 rounded-lg">
+            <p class="text-lg">요청하신 '<strong class="text-eva-green">{{ title }}</strong>' 문서를 찾을 수 없습니다.</p>
+            <div class="mt-8">
+                <a href="{{ url_for('main_index') }}" class="bg-gray-600 text-white font-bold py-2 px-4 rounded">메인으로 돌아가기</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -5,146 +5,192 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --eva-purple: #6A0DAD;
-            --eva-green: #00FF7F;
-            --bg-dark: #1A1A1A;
-            --card-dark: #2D2D2D;
-            --text-light: #E5E5E5;
-            --border-dark: #444444;
-        }
-        body {
-            font-family: 'Noto Sans KR', sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-light);
-        }
-        h1, h2, label {
-            font-family: 'Orbitron', sans-serif;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-        .eva-card {
-            background-color: var(--card-dark);
-            border: 1px solid var(--border-dark);
-            box-shadow: 0 0 20px rgba(0, 255, 127, 0.2);
-        }
-        .eva-button {
-            background-color: var(--eva-green);
-            color: black;
-            font-weight: bold;
-            transition: all 0.2s ease-in-out;
-        }
-        .eva-button:hover {
-            box-shadow: 0 0 15px var(--eva-green);
-            transform: translateY(-1px);
-        }
-        .eva-input {
-            background-color: #1A1A1A;
-            border-color: var(--border-dark);
-            color: var(--text-light);
-        }
-        .eva-input:focus {
-            border-color: var(--eva-green);
-            outline: none;
-            box-shadow: 0 0 0 2px var(--eva-green);
-            --tw-ring-color: var(--eva-green); /* Tailwind focus ring color */
-        }
+        :root { --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A; --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444; }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
+        h1 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; }
+        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); box-shadow: 0 0 20px rgba(0, 255, 127, 0.2); }
     </style>
 </head>
 <body class="flex items-center justify-center h-screen p-4">
     <div class="w-full max-w-md">
-
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="p-4 mb-4 text-sm rounded-lg border
-                        {% if category == 'danger' %} bg-red-900/50 text-red-300 border-red-500/50
-                        {% elif category == 'success' %} bg-green-900/50 text-green-300 border-green-500/50
-                        {% else %} bg-blue-900/50 text-blue-300 border-blue-500/50 {% endif %}"
-                        role="alert">
-                        <strong class="font-bold">SYSTEM:</strong> {{ message }}
-                    </div>
+                <div class="p-4 mb-4 text-sm rounded-lg border {{'bg-red-900/50 text-red-300 border-red-500/50' if category=='danger' else 'bg-yellow-900/50 text-yellow-300 border-yellow-500/50'}}" role="alert">
+                    {{ message }}
+                </div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
 
-        <form action="/login" method="post" class="eva-card shadow-lg rounded-xl px-8 pt-6 pb-8 mb-4">
+        <div class="eva-card shadow-lg rounded-xl px-8 pt-6 pb-8 mb-4">
             <h1 class="text-3xl font-bold text-center text-eva-green mb-8">LOGIN</h1>
-
-            <div class="mb-4">
-                <label for="role" class="block text-sm font-bold mb-2">ROLE SELECT</label>
-                <select id="role" name="role" class="eva-input shadow border rounded w-full py-2 px-3 leading-tight focus:outline-none focus:shadow-outline">
-                    <option value="applicant">면접자</option>
-                    <option value="interviewer">면접관</option>
-                    <option value="admin">관리자</option>
-                </select>
-            </div>
-
-            <div id="additional-fields">
-                <!-- JS로 추가 필드가 여기에 삽입됩니다 -->
-            </div>
-
-            <div class="mb-6">
-                <label for="password" class="block text-sm font-bold mb-2">PASSWORD</label>
-                <input type="password" id="password" name="password" required class="eva-input shadow appearance-none border rounded w-full py-2 px-3 mb-3 leading-tight focus:outline-none focus:shadow-outline">
-            </div>
-
-            <div class="flex items-center justify-between">
-                <button type="submit" class="eva-button w-full font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                    ENTER
-                </button>
-            </div>
-             <div class="text-center mt-6">
+            <div class="text-center space-y-4">
+                <a href="{{ url_for('kakao_login') }}"
+                   class="inline-flex items-center justify-center bg-[#FEE500] text-black font-bold py-3 px-6 rounded-lg w-full max-w-xs hover:opacity-90 transition-opacity">
+                    <svg class="w-6 h-6 mr-3" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 4.44c-4.42 0-8 3.22-8 7.22 0 2.89 1.83 5.42 4.5 6.63l-1.03 3.42 3.42-2.14c.37.07.75.1 1.12.1 4.42 0 8-3.22 8-7.22S16.42 4.44 12 4.44z" fill-opacity="0.9"></path></svg>
+                    <span>카카오 계정으로 로그인</span>
+                </a>
+                </div>
+             <div class="text-center mt-8">
                 <a class="inline-block align-baseline font-bold text-sm text-gray-500 hover:text-eva-green" href="/">
                     &lt;&lt; BACK TO MAIN
                 </a>
             </div>
-        </form>
+        </div>
     </div>
-
-    <script>
-        const roleSelect = document.getElementById('role');
-        const additionalFields = document.getElementById('additional-fields');
-
-        const fields = {
-            admin: '',
-            interviewer: `
-                <div class="mb-4">
-                    <label for="name" class="block text-sm font-bold mb-2">NAME</label>
-                    <input type="text" id="name" name="name" required
-                           pattern="^[가-힣]{2,4}$"
-                           title="이름은 2~4자의 한글로 입력해주세요."
-                           class="eva-input shadow appearance-none border rounded w-full py-2 px-3 leading-tight focus:outline-none focus:shadow-outline">
-                </div>`,
-            applicant: `
-                <div class="mb-4">
-                    <label for="name" class="block text-sm font-bold mb-2">NAME</label>
-                    <input type="text" id="name" name="name" required
-                           pattern="^[가-힣]{2,4}$"
-                           title="이름은 2~4자의 한글로 입력해주세요."
-                           class="eva-input shadow appearance-none border rounded w-full py-2 px-3 leading-tight focus:outline-none focus:shadow-outline">
-                </div>
-                <div class="mb-4">
-                    <label for="phone_number" class="block text-sm font-bold mb-2">PHONE</label>
-                    <input type="tel" id="phone_number" name="phone_number" required
-                           placeholder="01012345678"
-                           pattern="^\\d{11}$"
-                           title="연락처는 11자리 숫자로 입력해주세요. (예: 01012345678)"
-                           class="eva-input shadow appearance-none border rounded w-full py-2 px-3 leading-tight focus:outline-none focus:shadow-outline">
-                </div>`
-        };
-
-        function updateFields() {
-            const selectedRole = roleSelect.value;
-            additionalFields.innerHTML = fields[selectedRole];
-        }
-
-        roleSelect.addEventListener('change', updateFields);
-        updateFields();
-    </script>
 </body>
 </html>
+
+<!--<!DOCTYPE html>-->
+<!--<html lang="ko">-->
+<!--<head>-->
+<!--    <meta charset="UTF-8">-->
+<!--    <meta name="viewport" content="width=device-width, initial-scale=1.0">-->
+<!--    <title>Login</title>-->
+<!--    <script src="https://cdn.tailwindcss.com"></script>-->
+<!--    <link rel="preconnect" href="https://fonts.googleapis.com">-->
+<!--    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>-->
+<!--    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">-->
+<!--    <style>-->
+<!--        :root {-->
+<!--            &#45;&#45;eva-purple: #6A0DAD;-->
+<!--            &#45;&#45;eva-green: #00FF7F;-->
+<!--            &#45;&#45;bg-dark: #1A1A1A;-->
+<!--            &#45;&#45;card-dark: #2D2D2D;-->
+<!--            &#45;&#45;text-light: #E5E5E5;-->
+<!--            &#45;&#45;border-dark: #444444;-->
+<!--        }-->
+<!--        body {-->
+<!--            font-family: 'Noto Sans KR', sans-serif;-->
+<!--            background-color: var(&#45;&#45;bg-dark);-->
+<!--            color: var(&#45;&#45;text-light);-->
+<!--        }-->
+<!--        h1, h2, label {-->
+<!--            font-family: 'Orbitron', sans-serif;-->
+<!--            text-transform: uppercase;-->
+<!--            letter-spacing: 0.05em;-->
+<!--        }-->
+<!--        .eva-card {-->
+<!--            background-color: var(&#45;&#45;card-dark);-->
+<!--            border: 1px solid var(&#45;&#45;border-dark);-->
+<!--            box-shadow: 0 0 20px rgba(0, 255, 127, 0.2);-->
+<!--        }-->
+<!--        .eva-button {-->
+<!--            background-color: var(&#45;&#45;eva-green);-->
+<!--            color: black;-->
+<!--            font-weight: bold;-->
+<!--            transition: all 0.2s ease-in-out;-->
+<!--        }-->
+<!--        .eva-button:hover {-->
+<!--            box-shadow: 0 0 15px var(&#45;&#45;eva-green);-->
+<!--            transform: translateY(-1px);-->
+<!--        }-->
+<!--        .eva-input {-->
+<!--            background-color: #1A1A1A;-->
+<!--            border-color: var(&#45;&#45;border-dark);-->
+<!--            color: var(&#45;&#45;text-light);-->
+<!--        }-->
+<!--        .eva-input:focus {-->
+<!--            border-color: var(&#45;&#45;eva-green);-->
+<!--            outline: none;-->
+<!--            box-shadow: 0 0 0 2px var(&#45;&#45;eva-green);-->
+<!--            &#45;&#45;tw-ring-color: var(&#45;&#45;eva-green); /* Tailwind focus ring color */-->
+<!--        }-->
+<!--    </style>-->
+<!--</head>-->
+<!--<body class="flex items-center justify-center h-screen p-4">-->
+<!--    <div class="w-full max-w-md">-->
+
+<!--        {% with messages = get_flashed_messages(with_categories=true) %}-->
+<!--            {% if messages %}-->
+<!--                {% for category, message in messages %}-->
+<!--                    <div class="p-4 mb-4 text-sm rounded-lg border-->
+<!--                        {% if category == 'danger' %} bg-red-900/50 text-red-300 border-red-500/50-->
+<!--                        {% elif category == 'success' %} bg-green-900/50 text-green-300 border-green-500/50-->
+<!--                        {% else %} bg-blue-900/50 text-blue-300 border-blue-500/50 {% endif %}"-->
+<!--                        role="alert">-->
+<!--                        <strong class="font-bold">SYSTEM:</strong> {{ message }}-->
+<!--                    </div>-->
+<!--                {% endfor %}-->
+<!--            {% endif %}-->
+<!--        {% endwith %}-->
+
+<!--        <form action="/login" method="post" class="eva-card shadow-lg rounded-xl px-8 pt-6 pb-8 mb-4">-->
+<!--            <h1 class="text-3xl font-bold text-center text-eva-green mb-8">LOGIN</h1>-->
+
+<!--            <div class="mb-4">-->
+<!--                <label for="role" class="block text-sm font-bold mb-2">ROLE SELECT</label>-->
+<!--                <select id="role" name="role" class="eva-input shadow border rounded w-full py-2 px-3 leading-tight focus:outline-none focus:shadow-outline">-->
+<!--                    <option value="applicant">면접자</option>-->
+<!--                    <option value="interviewer">면접관</option>-->
+<!--                    <option value="admin">관리자</option>-->
+<!--                </select>-->
+<!--            </div>-->
+
+<!--            <div id="additional-fields">-->
+<!--                &lt;!&ndash; JS로 추가 필드가 여기에 삽입됩니다 &ndash;&gt;-->
+<!--            </div>-->
+
+<!--            <div class="mb-6">-->
+<!--                <label for="password" class="block text-sm font-bold mb-2">PASSWORD</label>-->
+<!--                <input type="password" id="password" name="password" required class="eva-input shadow appearance-none border rounded w-full py-2 px-3 mb-3 leading-tight focus:outline-none focus:shadow-outline">-->
+<!--            </div>-->
+
+<!--            <div class="flex items-center justify-between">-->
+<!--                <button type="submit" class="eva-button w-full font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">-->
+<!--                    ENTER-->
+<!--                </button>-->
+<!--            </div>-->
+<!--             <div class="text-center mt-6">-->
+<!--                <a class="inline-block align-baseline font-bold text-sm text-gray-500 hover:text-eva-green" href="/">-->
+<!--                    &lt;&lt; BACK TO MAIN-->
+<!--                </a>-->
+<!--            </div>-->
+<!--        </form>-->
+<!--    </div>-->
+
+<!--    <script>-->
+<!--        const roleSelect = document.getElementById('role');-->
+<!--        const additionalFields = document.getElementById('additional-fields');-->
+
+<!--        const fields = {-->
+<!--            admin: '',-->
+<!--            interviewer: `-->
+<!--                <div class="mb-4">-->
+<!--                    <label for="name" class="block text-sm font-bold mb-2">NAME</label>-->
+<!--                    <input type="text" id="name" name="name" required-->
+<!--                           pattern="^[가-힣]{2,4}$"-->
+<!--                           title="이름은 2~4자의 한글로 입력해주세요."-->
+<!--                           class="eva-input shadow appearance-none border rounded w-full py-2 px-3 leading-tight focus:outline-none focus:shadow-outline">-->
+<!--                </div>`,-->
+<!--            applicant: `-->
+<!--                <div class="mb-4">-->
+<!--                    <label for="name" class="block text-sm font-bold mb-2">NAME</label>-->
+<!--                    <input type="text" id="name" name="name" required-->
+<!--                           pattern="^[가-힣]{2,4}$"-->
+<!--                           title="이름은 2~4자의 한글로 입력해주세요."-->
+<!--                           class="eva-input shadow appearance-none border rounded w-full py-2 px-3 leading-tight focus:outline-none focus:shadow-outline">-->
+<!--                </div>-->
+<!--                <div class="mb-4">-->
+<!--                    <label for="phone_number" class="block text-sm font-bold mb-2">PHONE</label>-->
+<!--                    <input type="tel" id="phone_number" name="phone_number" required-->
+<!--                           placeholder="01012345678"-->
+<!--                           pattern="^\\d{11}$"-->
+<!--                           title="연락처는 11자리 숫자로 입력해주세요. (예: 01012345678)"-->
+<!--                           class="eva-input shadow appearance-none border rounded w-full py-2 px-3 leading-tight focus:outline-none focus:shadow-outline">-->
+<!--                </div>`-->
+<!--        };-->
+
+<!--        function updateFields() {-->
+<!--            const selectedRole = roleSelect.value;-->
+<!--            additionalFields.innerHTML = fields[selectedRole];-->
+<!--        }-->
+
+<!--        roleSelect.addEventListener('change', updateFields);-->
+<!--        updateFields();-->
+<!--    </script>-->
+<!--</body>-->
+<!--</html>-->

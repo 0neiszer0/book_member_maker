@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>계정 연결</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A; --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444; }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
+        h1 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; }
+        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
+        .eva-input { background-color: var(--bg-dark); border-color: var(--border-dark); color: var(--text-light); }
+        .eva-button { background-color: var(--eva-green); color: black; font-weight: bold; }
+        .eva-button-secondary { background-color: #4A4A4A; color: var(--text-light); }
+    </style>
+</head>
+<body class="flex items-center justify-center h-screen p-4">
+    <div class="w-full max-w-md">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="p-4 mb-4 text-sm rounded-lg border bg-red-900/50 text-red-300 border-red-500/50" role="alert">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="eva-card shadow-lg rounded-xl px-8 pt-6 pb-8 mb-4">
+            <div class="text-center mb-6">
+                <h1 class="text-2xl font-bold text-eva-green">Link Account</h1>
+                <p class="mt-2 text-gray-300">{{ social_name }}님, 반갑습니다! 첫 방문이신가요?</p>
+            </div>
+
+            <form action="{{ url_for('link_account_submit') }}" method="POST" class="space-y-4">
+                <input type="hidden" name="provider" value="{{ provider }}">
+                <input type="hidden" name="social_id" value="{{ social_id }}">
+                <input type="hidden" name="email" value="{{ email }}">
+                <input type="hidden" name="social_name" value="{{ social_name }}">
+                <input type="hidden" name="profile_pic" value="{{ profile_pic }}">
+
+                <div>
+                    <label for="existing_name" class="block text-sm font-bold mb-2">기존 활동명</label>
+                    <input type="text" id="existing_name" name="existing_name" class="eva-input shadow rounded w-full py-2 px-3" placeholder="기존에 사용하시던 이름을 입력하세요">
+                </div>
+
+                <button type="submit" name="action" value="link" class="eva-button w-full font-bold py-3 px-4 rounded text-base">
+                    기존 계정과 연결하기
+                </button>
+
+                <div class="text-center text-gray-400 text-sm">또는</div>
+
+                <button type="submit" name="action" value="create" class="eva-button-secondary w-full font-bold py-3 px-4 rounded text-base">
+                    신규 회원으로 가입하기
+                </button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

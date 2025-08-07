@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if doc %}문서 편집: {{ doc.title }}{% else %}새 문서 만들기{% endif %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <style>
+        :root { --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A; --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444; }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
+        h1, h2, h3 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; }
+        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
+        .eva-input { background-color: var(--bg-dark); border-color: var(--border-dark); color: var(--text-light); }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="container mx-auto max-w-4xl">
+        <h1 class="text-3xl font-bold text-eva-green mb-6">
+            {% if doc %}Edit Document{% else %}Create New Document{% endif %}
+        </h1>
+        <div class="eva-card p-6 md:p-8 rounded-lg">
+            <div class="space-y-6">
+                <div>
+                    <label for="doc-title" class="font-bold text-lg">문서 제목</label>
+                    <input type="text" id="doc-title" class="eva-input w-full p-2 mt-2 rounded-md {% if doc %}bg-gray-800 cursor-not-allowed{% endif %}"
+                           placeholder="새 문서의 제목을 입력하세요" value="{{ doc.title if doc else '' }}" {% if doc %}readonly{% endif %}>
+                </div>
+                <div>
+                    <label for="doc-content" class="font-bold text-lg">내용 (위키 문법 지원)</label>
+                    <textarea id="doc-content" class="eva-input w-full h-96 p-3 mt-2 rounded-md"
+                              placeholder="문서 내용을 입력하세요...">{{ doc.content if doc else '' }}</textarea>
+                    <div class="text-xs text-gray-500 mt-2">
+                        '''굵게''', ''기울임'', ==제목==, [[링크]], [[파일:URL]]
+                    </div>
+                </div>
+                <div>
+                    <button id="save-doc-btn" class="w-full bg-green-600 hover-bg-green-700 text-white font-bold py-3 px-4 rounded">
+                        {% if doc %}문서 저장{% else %}문서 생성{% endif %}
+                    </button>
+                    <p id="error-message" class="text-red-400 text-sm mt-2 h-4"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // [수정] doc 변수가 있을 때만 doc.id를 참조하도록 변경
+    const isEditMode = {{ 'true' if doc else 'false' }};
+    const docId = "{{ doc.id if doc else '' }}";
+
+    const saveBtn = document.getElementById('save-doc-btn');
+    const titleInput = document.getElementById('doc-title');
+    const contentInput = document.getElementById('doc-content');
+    const errorMsg = document.getElementById('error-message');
+
+    saveBtn.addEventListener('click', async () => {
+        const title = titleInput.value;
+        const content = contentInput.value;
+
+        if (!title.trim() || !content.trim()) {
+            errorMsg.textContent = '제목과 내용을 모두 입력해야 합니다.';
+            return;
+        }
+
+        errorMsg.textContent = '';
+        saveBtn.disabled = true;
+        saveBtn.textContent = '저장 중...';
+
+        const url = isEditMode ? `/api/docs/edit/${docId}` : '/api/docs/create';
+        const body = isEditMode ? JSON.stringify({ content }) : JSON.stringify({ title, content });
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: body
+            });
+
+            const result = await response.json();
+            if (result.status !== 'success') {
+                throw new Error(result.message);
+            }
+
+            alert(result.message);
+            window.location.href = `/docs/${result.doc_title}`;
+
+        } catch (error) {
+            errorMsg.textContent = error.message;
+            saveBtn.disabled = false;
+            saveBtn.textContent = isEditMode ? '문서 저장' : '문서 생성';
+        }
+    });
+});
+</script>
+</body>
+</html>
