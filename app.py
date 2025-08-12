@@ -21,6 +21,7 @@ from deap import base, creator, tools, algorithms
 import uuid
 import mwparserfromhell
 import bleach
+from collections import defaultdict
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
@@ -259,6 +260,23 @@ def kakao_login():
     return redirect(login_url)
 
 
+@app.route('/login/kakao/re-consent')
+@login_required(role="ANY")
+def kakao_reconsent_login():
+    """
+    사용자가 카카오 정보 제공에 다시 동의하도록 요청하는 라우트.
+    """
+    kakao_oauth = KakaoOauth()
+
+    # [핵심] &prompt=consent 파라미터를 추가하여 재동의 화면을 강제로 표시
+    login_url = f"https://kauth.kakao.com/oauth/authorize?client_id={kakao_oauth.client_id}&redirect_uri={kakao_oauth.redirect_uri}&response_type=code&prompt=consent"
+
+    # 재동의 후 돌아올 페이지를 '마이페이지'로 설정
+    session['next_url'] = url_for('my_page')
+
+    return redirect(login_url)
+
+
 # 2. 로그인 후 콜백을 처리할 라우트
 @app.route('/login/kakao/callback')
 def kakao_callback():
@@ -269,11 +287,8 @@ def kakao_callback():
             return redirect(url_for("login"))
 
         kakao_oauth = KakaoOauth()
-        # 인가 코드로 토큰 발급
         token_info = kakao_oauth.get_token(code)
         access_token = token_info.get("access_token")
-
-        # 토큰으로 사용자 정보 조회
         user_info = kakao_oauth.get_user_info(access_token)
 
         social_id = str(user_info["id"])
@@ -281,23 +296,36 @@ def kakao_callback():
         profile = kakao_account.get("profile", {})
         email = kakao_account.get("email")
 
-        # 기존 회원인지 확인
         member_res = supabase.table("members").select("*").eq("social_id", social_id).execute()
         member = member_res.data[0] if member_res.data else None
 
         if member:
-            # [추가] 계정 상태 확인
+            # [수정] 세션 업데이트 로직 추가
+            update_data = {}
+            new_name = member['name']  # 기본값은 기존 이름
+
+            if profile.get("profile_image_url"):
+                update_data['profile_pic'] = profile.get("profile_image_url")
+
+            if profile.get("nickname"):
+                new_name = profile.get("nickname")
+                update_data['name'] = new_name  # 닉네임도 함께 업데이트
+
+            if update_data:
+                supabase.table("members").update(update_data).eq("id", member['id']).execute()
+                flash("카카오 프로필 정보가 업데이트되었습니다.", "success")
+                # [핵심] DB 업데이트 후, 세션에 저장된 이름도 새로운 이름으로 갱신
+                session['user_name'] = new_name
+
+            # ... (계정 상태 및 활성 상태 체크 로직은 기존과 동일) ...
             if member.get('account_status') != 'active':
                 flash("아직 관리자의 승인을 받지 않은 계정입니다.", "warning")
                 return redirect(url_for('login'))
-
-            if not member.get('is_active', True):  # is_active가 false이면
+            if not member.get('is_active', True):
                 flash("비활성화된 계정입니다. 관리자에게 문의하세요.", "danger")
-                return redirect(url_for('login'))  # 세션을 만들지 않고 로그인 페이지로 돌려보냄
-            # 아래는 기존의 세션 설정 및 리디렉션 로직
-            pass
+                return redirect(url_for('login'))
         else:
-            # 연동되지 않았으면, '계정 연결' 페이지로 보낼 정보 준비
+            # ... (신규 사용자 '계정 연결' 로직은 기존과 동일) ...
             social_data = {
                 "social_id": social_id, "email": email,
                 "social_name": profile.get("nickname"), "profile_pic": profile.get("profile_image_url")
@@ -305,13 +333,11 @@ def kakao_callback():
             session['temp_social_data'] = social_data
             return redirect(url_for('link_account_page'))
 
-        # 세션 설정
+        # 세션 설정 (이미 로그인된 상태에서 재동의한 경우, 기존 세션 정보 일부 덮어쓰기)
         session["user_id"] = member["id"]
         session["user_role"] = member["role"]
-        session["user_name"] = member["name"]
-        flash(f"{member['name']}님, 환영합니다!", "success")
+        # session['user_name']은 위에서 이미 갱신되었음
 
-        # 원래 가려던 목적지로 리디렉션
         next_url = session.pop('next_url', None)
         if next_url:
             return redirect(next_url)
@@ -572,39 +598,39 @@ def logout():
     flash('성공적으로 로그아웃되었습니다.', 'info')
     return redirect(url_for('main_index'))
 
-
-@app.route('/board')
-@login_required(role="ANY")
-def member_board():
-    user_id = session.get('user_id')
-    next_monday = get_next_monday()
-    try:
-        # [수정] status, drink_order 대신 attending_seminar, attending_afterparty 조회
-        my_attendance_res = supabase.table('attendance').select('attending_seminar, attending_afterparty') \
-            .eq('user_id', user_id).eq('meeting_date', next_monday.isoformat()).execute()
-        my_attendance = my_attendance_res.data[0] if my_attendance_res.data else None
-
-        questions_res = supabase.table('questions').select('*, members(name)').eq('meeting_date',
-                                                                                  next_monday.isoformat()).order(
-            'created_at').execute()
-        all_questions = questions_res.data if questions_res.data else []
-
-        # [수정] 세미나 참석자 명단만 조회 (뒷풀이 참석 여부도 함께 가져옴)
-        attendees_res = supabase.table('attendance').select('user_id, attending_afterparty, members(name)') \
-            .eq('meeting_date', next_monday.isoformat()).eq('attending_seminar', True).execute()
-        attendees = attendees_res.data if attendees_res.data else []
-
-    except Exception as e:
-        flash(f"데이터를 불러오는 중 오류 발생: {e}", "danger")
-        my_attendance, all_questions, attendees = None, [], []
-
-    return render_template(
-        'member_board.html',
-        meeting_date=next_monday,
-        my_attendance=my_attendance,
-        questions=all_questions,
-        attendees=attendees
-    )
+#
+# @app.route('/board')
+# @login_required(role="ANY")
+# def member_board():
+#     user_id = session.get('user_id')
+#     next_monday = get_next_monday()
+#     try:
+#         # [수정] status, drink_order 대신 attending_seminar, attending_afterparty 조회
+#         my_attendance_res = supabase.table('attendance').select('attending_seminar, attending_afterparty') \
+#             .eq('user_id', user_id).eq('meeting_date', next_monday.isoformat()).execute()
+#         my_attendance = my_attendance_res.data[0] if my_attendance_res.data else None
+#
+#         questions_res = supabase.table('questions').select('*, members(name)').eq('meeting_date',
+#                                                                                   next_monday.isoformat()).order(
+#             'created_at').execute()
+#         all_questions = questions_res.data if questions_res.data else []
+#
+#         # [수정] 세미나 참석자 명단만 조회 (뒷풀이 참석 여부도 함께 가져옴)
+#         attendees_res = supabase.table('attendance').select('user_id, attending_afterparty, members(name)') \
+#             .eq('meeting_date', next_monday.isoformat()).eq('attending_seminar', True).execute()
+#         attendees = attendees_res.data if attendees_res.data else []
+#
+#     except Exception as e:
+#         flash(f"데이터를 불러오는 중 오류 발생: {e}", "danger")
+#         my_attendance, all_questions, attendees = None, [], []
+#
+#     return render_template(
+#         'member_board.html',
+#         meeting_date=next_monday,
+#         my_attendance=my_attendance,
+#         questions=all_questions,
+#         attendees=attendees
+#     )
 
 
 @app.route('/api/attendance', methods=['POST'])
@@ -739,25 +765,62 @@ def admin_dashboard():
     try:
         events_res = supabase.table('events').select('*').order('created_at', desc=True).execute().data
 
-        # [수정] interviewer 목록과 별개로, 모든 멤버의 id, name, is_active 상태를 가져옵니다.
-        all_members_res = supabase.table('members').select('id, name, is_active').order('name').execute().data
+        # [수정] 모든 멤버 정보에 'demerit_points'를 추가로 가져옵니다.
+        all_members_res = supabase.table('members').select('id, name, is_active, demerit_points').order(
+            'name').execute().data
 
         interviewers_res = supabase.table('interviewers').select('name').execute().data
         interviewer_names = {i['name'] for i in interviewers_res}
         next_monday = get_next_monday()
 
+        # [추가] 최근 벌점 부과 기록 5개를 가져옵니다.
+        demerit_logs_res = supabase.table('demerit_logs') \
+            .select('points, reason, created_at, member:member_id(name), admin:admin_id(name)') \
+            .order('created_at', desc=True) \
+            .limit(5) \
+            .execute().data
+
     except Exception as e:
         flash(f"대시보드 로딩 중 오류 발생: {e}", "danger")
-        events_res, all_members_res, interviewer_names = [], [], set()
+        events_res, all_members_res, interviewer_names, demerit_logs_res = [], [], set(), []
 
     return render_template(
         'admin_dashboard.html',
         events=events_res,
-        # [수정] 기존 all_members 대신 모든 멤버 정보를 전달합니다.
         all_members=all_members_res,
         interviewer_names=interviewer_names,
+        demerit_logs=demerit_logs_res,  # [추가] 벌점 기록 전달
         meeting_date=next_monday
     )
+
+
+@app.route('/api/admin/members/<int:member_id>/remove_demerit', methods=['POST'])
+@login_required(role="admin")
+def remove_demerit(member_id):
+    admin_id = session.get('user_id')
+    data = request.json
+    points = data.get('points')
+    reason = data.get('reason')
+
+    if not points or not isinstance(points, int) or points <= 0:
+        return jsonify({"error": "벌점(points)은 0보다 큰 숫자여야 합니다."}), 400
+
+    try:
+        # 1. 벌점 기록(log)을 생성 (차감 기록은 음수로 저장)
+        supabase.table('demerit_logs').insert({
+            'member_id': member_id,
+            'admin_id': admin_id,
+            'points': -points,  # 차감은 음수로 기록
+            'reason': reason
+        }).execute()
+
+        # 2. members 테이블의 demerit_points를 차감
+        supabase.rpc('decrement_demerit', {'member_id_in': member_id, 'points_in': points}).execute()
+
+        return jsonify({"status": "success", "message": f"{points}점의 벌점이 차감되었습니다."})
+    except Exception as e:
+        app.logger.error(f"Error removing demerit for member {member_id}: {e}")
+        return jsonify({"error": "벌점 차감 중 오류 발생"}), 500
 
 
 @app.route('/api/admin/members/<int:member_id>/toggle_active', methods=['POST'])
@@ -1258,61 +1321,61 @@ def update_applicant_info(applicant_id):
 
 def update_active_slots_for_clustering(event_id):
     """
-    특정 이벤트의 예약 현황을 기반으로 슬롯을 클러스터링(군집화)하도록
-    is_active 상태를 동적으로 업데이트하는 함수.
+    [최종 수정] 예약된 슬롯 주변만 활성화하고, 관리자가 수동으로 연 슬롯은
+    예약 전까지 그대로 유지하는, 더 정교한 클러스터링 함수.
     """
     try:
         # 1. 해당 이벤트의 모든 슬롯 정보를 가져옵니다.
-        all_slots_res = supabase.table('time_slots').select('id, slot_datetime, is_booked').eq('event_id',
-                                                                                               event_id).order(
-            'slot_datetime').execute()
+        all_slots_res = supabase.table('time_slots') \
+            .select('id, slot_datetime, is_booked, is_active') \
+            .eq('event_id', event_id) \
+            .order('slot_datetime') \
+            .execute()
+
         all_slots = all_slots_res.data
         if not all_slots:
-            return  # 슬롯이 없으면 아무것도 하지 않음
-
-        # 2. 예약된 슬롯들의 시간만 추출합니다.
-        booked_times = [datetime.fromisoformat(slot['slot_datetime'].replace('Z', '+00:00')) for slot in all_slots if
-                        slot['is_booked']]
-
-        # 3. 예약이 하나도 없으면, 모든 슬롯을 활성화 상태로 두고 종료 (관리자가 설정한 초기 상태 유지)
-        if not booked_times:
-            supabase.table('time_slots').update({'is_active': True}).eq('event_id', event_id).execute()
-            app.logger.info(f"Event {event_id}: No bookings found. All slots activated.")
             return
 
-        # 4. 예약된 시간 앞뒤로 활성화할 버퍼(시간 간격)를 설정합니다. (예: 30분)
-        buffer = timedelta(minutes=15)
+        # 최종적으로 활성화 상태여야 할 슬롯들의 ID를 저장할 Set
+        final_active_ids = set()
 
-        slots_to_activate = set()
-        slots_to_deactivate = set()
+        # 2. 관리자가 수동으로 열어둔 슬롯 ID를 먼저 저장합니다.
+        # 이 슬롯들은 예약이 없더라도 항상 열려있어야 합니다.
+        manually_activated_ids = {slot['id'] for slot in all_slots if slot['is_active']}
+        final_active_ids.update(manually_activated_ids)
 
-        # 5. 모든 슬롯을 순회하며 활성화/비활성화 여부 결정
-        for slot in all_slots:
-            # 이미 예약된 슬롯은 항상 활성 상태로 둡니다.
-            if slot['is_booked']:
-                slots_to_activate.add(slot['id'])
-                continue
+        # 3. 예약된 슬롯과 그 주변 슬롯을 활성화 목록에 추가합니다.
+        for i, current_slot in enumerate(all_slots):
+            if current_slot['is_booked']:
+                # 예약된 슬롯 자체를 활성화 목록에 추가
+                final_active_ids.add(current_slot['id'])
 
-            slot_time = datetime.fromisoformat(slot['slot_datetime'].replace('Z', '+00:00'))
-            is_near_booking = False
-            # 현재 슬롯이 예약된 시간들의 버퍼 안에 있는지 확인
-            for booked_time in booked_times:
-                if (booked_time - buffer) <= slot_time <= (booked_time + buffer):
-                    is_near_booking = True
-                    break
+                # 바로 이전 슬롯을 활성화 목록에 추가
+                if i > 0:
+                    previous_slot = all_slots[i - 1]
+                    final_active_ids.add(previous_slot['id'])
 
-            if is_near_booking:
-                slots_to_activate.add(slot['id'])
-            else:
-                slots_to_deactivate.add(slot['id'])
+                # 바로 다음 슬롯을 활성화 목록에 추가
+                if i < len(all_slots) - 1:
+                    next_slot = all_slots[i + 1]
+                    final_active_ids.add(next_slot['id'])
 
-        # 6. 데이터베이스 업데이트 실행
+        # 4. 전체 슬롯 ID 목록을 만듭니다.
+        all_slot_ids = {slot['id'] for slot in all_slots}
+
+        # 5. 활성화할 슬롯과 비활성화할 슬롯을 최종적으로 결정합니다.
+        slots_to_activate = list(final_active_ids)
+        slots_to_deactivate = list(all_slot_ids - final_active_ids)
+
+        # 6. 데이터베이스 업데이트를 실행합니다.
         if slots_to_activate:
-            supabase.table('time_slots').update({'is_active': True}).in_('id', list(slots_to_activate)).execute()
-        if slots_to_deactivate:
-            supabase.table('time_slots').update({'is_active': False}).in_('id', list(slots_to_deactivate)).execute()
+            supabase.table('time_slots').update({'is_active': True}).in_('id', slots_to_activate).execute()
 
-        app.logger.info(f"Event {event_id}: Clustered slots around bookings.")
+        if slots_to_deactivate:
+            supabase.table('time_slots').update({'is_active': False}).in_('id', slots_to_deactivate).execute()
+
+        app.logger.info(
+            f"Event {event_id}: Re-clustered slots based on new logic. Activated: {len(slots_to_activate)}, Deactivated: {len(slots_to_deactivate)}")
 
     except Exception as e:
         app.logger.error(f"Error updating slots for clustering (Event ID: {event_id}): {e}")
@@ -1333,57 +1396,71 @@ def get_notifications():
         return jsonify({"error": str(e)}), 500
 
 
+# app.py의 handle_notification 함수를 아래 코드로 교체
+
 @app.route('/api/notifications/<int:notif_id>/handle', methods=['POST'])
 @login_required(role="admin")
 def handle_notification(notif_id):
     data = request.json
-    action = data.get('action')
-    print(f"\n--- [DEBUG] Handling Notification ID: {notif_id}, Action: {action} ---")
+    action = data.get('action')  # 'approve' or 'deny'
 
     if action not in ['approve', 'deny']:
         return jsonify({"error": "Invalid action"}), 400
 
     try:
-        # 1. 알림 정보 조회
-        print("[DEBUG] 1. Fetching notification details...")
-        notification_to_handle_res = supabase.table('notifications').select('related_member_id') \
+        # 1. 알림 정보를 먼저 조회
+        notification_to_handle_res = supabase.table('notifications').select('related_member_id, type') \
             .eq('id', notif_id).single().execute()
 
         notification_to_handle = notification_to_handle_res.data
-
         if not notification_to_handle:
-            print("[DEBUG] ERROR: Notification not found.")
             return jsonify({"error": "Notification not found"}), 404
-        print(f"[DEBUG]    -> Found. Member ID to update: {notification_to_handle.get('related_member_id')}")
 
-        # 2. 알림 상태 업데이트
-        print("[DEBUG] 2. Updating notification status...")
+        member_id = notification_to_handle.get('related_member_id')
+        notif_type = notification_to_handle.get('type')
+
+        # 2. 알림의 상태를 'approved' 또는 'denied'로 업데이트
         supabase.table('notifications').update({
             'status': 'approved' if action == 'approve' else 'denied'
         }).eq('id', notif_id).execute()
-        print("[DEBUG]    -> Notification status updated successfully.")
 
-        # 3. 'approve' 액션일 경우, 멤버 상태를 'active'로 변경
-        if action == 'approve':
-            member_id = notification_to_handle.get('related_member_id')
+        # 3. 알림 유형에 따라 후속 조치 실행
+        if member_id:
+            # 가입 또는 계정 연결 요청 처리
+            if notif_type in ['new_user_request', 'account_link_request']:
+                if action == 'approve':
+                    supabase.table('members').update({'account_status': 'active'}).eq('id', member_id).execute()
 
-            # [수정] member_id가 0인 경우도 유효한 값으로 처리하도록 조건문 변경
-            if member_id is not None:
-                print(f"[DEBUG] 3. Approving member. Attempting to update members table for ID: {member_id}")
-                update_response = supabase.table('members').update({
-                    'account_status': 'active'
-                }).eq('id', member_id).execute()
-                print(f"[DEBUG]    -> Update response from Supabase: {update_response.data}")
-            else:
-                print("[DEBUG]    -> No valid member_id found in notification, skipping member update.")
+            # 불참 요청 처리
+            elif notif_type == 'absence_request':
+                next_monday = get_next_monday()
 
-        print("[DEBUG] --- Request handled successfully. ---")
+                # [핵심 수정] update_data를 정의하고, where 절을 명확하게 지정하여 업데이트
+                if action == 'approve':
+                    # 불참 승인: 불참 확정 및 상태 변경
+                    update_data = {
+                        'absence_request_status': 'approved',
+                        'attending_seminar': False
+                    }
+                else:  # action == 'deny'
+                    # 불참 반려: 요청 상태만 변경
+                    update_data = {
+                        'absence_request_status': 'denied'
+                    }
+
+                # 업데이트할 행을 명확하게 지정
+                supabase.table('attendance').update(update_data) \
+                    .eq('user_id', member_id) \
+                    .eq('meeting_date', next_monday.isoformat()) \
+                    .eq('absence_request_status', 'pending') \
+                    .execute()
+
         return jsonify({"status": "success", "message": f"요청이 {action}되었습니다."})
 
     except Exception as e:
-        print(f"[DEBUG] !!! AN EXCEPTION OCCURRED !!!\n{e}")
         app.logger.error(f"Error handling notification {notif_id}: {e}")
         return jsonify({"error": str(e)}), 500
+
 
 # --- 4.2. 독서 모임 조 편성 (관리자 전용) ---
 def gender_balance_score(group, members):
@@ -1460,37 +1537,36 @@ def generate_groups(participants, facilitators, members, co_matrix, group_count_
 @login_required(role="admin")
 def bookclub_index():
     try:
-        # 1. 전체 회원 목록을 가져옵니다.
-        all_members = supabase.table("members").select("id, name").eq('is_active', True).order("name").execute().data
-
-        # 2. 다음 주 월요일의 출석 정보를 가져옵니다.
         next_monday = get_next_monday()
-        attendees_res = supabase.table('attendance').select('user_id, attending_seminar, attending_afterparty') \
+
+        # 1. 모든 활성 멤버 목록을 가져옵니다.
+        all_active_members = supabase.table("members").select("id, name") \
+            .eq('is_active', True).order("name").execute().data
+
+        # 2. 다음 모임 날짜의 출석 기록을 모두 가져옵니다.
+        attendance_res = supabase.table('attendance').select('user_id, attending_seminar') \
             .eq('meeting_date', next_monday.isoformat()).execute()
 
-        # 3. 출석 정보를 user_id를 키로 하는 딕셔너리로 변환하여 쉽게 찾을 수 있게 합니다.
-        attendance_map = {att['user_id']: att for att in attendees_res.data}
+        # 3. '불참' 의사를 밝힌 멤버들의 ID만 따로 저장합니다.
+        absentee_ids = {
+            att['user_id'] for att in attendance_res.data if att.get('attending_seminar') is False
+        }
 
-        # 4. 전체 회원 목록에 각자의 출석 정보를 합칩니다.
-        for member in all_members:
-            attendance_info = attendance_map.get(member['id'])
-            if attendance_info:
-                member['attending_seminar'] = attendance_info['attending_seminar']
-                member['attending_afterparty'] = attendance_info['attending_afterparty']
-            else:  # 출석 정보가 없으면 기본값(불참)으로 설정
-                member['attending_seminar'] = False
-                member['attending_afterparty'] = False
+        # 4. 미리 체크될 참석자는 (모든 활성 멤버 - 불참 요청 멤버) 입니다.
+        pre_checked_attendee_ids = {
+            member['id'] for member in all_active_members if member['id'] not in absentee_ids
+        }
 
     except Exception as e:
         flash(f"데이터를 불러오는 중 오류가 발생했습니다: {e}", "danger")
-        all_members = []
+        all_active_members = []
+        pre_checked_attendee_ids = set()
 
     return render_template(
         'bookclub_index.html',
-        # [수정] 출석 정보가 포함된 전체 멤버 목록을 전달
-        members_with_attendance=all_members
+        all_members=all_active_members,
+        pre_checked_attendee_ids=pre_checked_attendee_ids
     )
-
 
 @app.route('/start_group_generation')
 @login_required(role="admin")
@@ -2455,55 +2531,118 @@ def my_page():
     user_name = session.get('user_name')
 
     try:
-        # 1. 내 정보 조회
-        user_res = supabase.table('members').select('*').eq('id', user_id).single().execute()
+        # 1. 내 정보 조회 (벌점 포함)
+        user_res = supabase.table('members').select('*, demerit_points').eq('id', user_id).single().execute()
         user_data = user_res.data
         if not user_data:
             flash("사용자 정보를 찾을 수 없습니다.", "danger")
             return redirect(url_for('main_index'))
 
-        # 2. 총 참석 횟수 집계 로직
+        attendance_records_res = supabase.table('attendance').select('meeting_date') \
+            .eq('user_id', user_id).eq('attending_seminar', True).order('meeting_date', desc=True).execute()
+        attendance_records = attendance_records_res.data
 
-        # 2-1. 'attendance' 테이블에서 참석 횟수 집계
-        attendance_res = supabase.table('attendance').select('count', count='exact') \
-            .eq('user_id', user_id).eq('attending_seminar', True).execute()
-        attendance_count_new = attendance_res.count
+        demerit_logs_res = supabase.table('demerit_logs').select('points, reason, created_at, admin:admin_id(name)') \
+            .eq('member_id', user_id).order('created_at', desc=True).execute()
+        demerit_logs = demerit_logs_res.data
 
-        # 2-2. 'history' 테이블에서 과거 참석 횟수 집계
-        # [수정] user_name 리스트를 json.dumps()를 사용해 json 문자열로 변환하여 전달
-        history_res = supabase.table('history').select('count', count='exact') \
-            .contains('present', json.dumps([user_name])).execute()
-        attendance_count_old = history_res.count
+        # [수정] 출석 기록과 불참 요청 상태를 별도로, 더 명확하게 조회
+        next_monday = get_next_monday()
 
-        # 2-3. 두 횟수를 합산
-        total_attendance_count = attendance_count_new + attendance_count_old
+        # 전체 출석 기록 (과거 포함)
+        attendance_records_res = supabase.table('attendance').select('meeting_date') \
+            .eq('user_id', user_id).eq('attending_seminar', True).order('meeting_date', desc=True).execute()
+        attendance_records = attendance_records_res.data
 
-        # ... (나머지 코드들은 이전과 동일) ...
-        question_res = supabase.table('questions').select('count', count='exact') \
-            .eq('user_id', user_id).execute()
-        question_count = question_res.count
+        # '다음 모임'에 대한 나의 출석 상태
+        my_attendance_res = supabase.table('attendance').select('attending_seminar, absence_request_status') \
+            .eq('user_id', user_id).eq('meeting_date', next_monday.isoformat()).execute()
+        my_attendance = my_attendance_res.data[0] if my_attendance_res.data else None
 
-        my_docs_res = supabase.table('documents').select('title') \
-            .eq('author_id', user_id).order('created_at', desc=True).execute()
-        my_documents = my_docs_res.data
-
-        edited_docs_res = supabase.table('document_logs').select('document_id', count='exact') \
-            .eq('editor_id', user_id).execute()
-        edited_docs_count = len(set(log['document_id'] for log in edited_docs_res.data))
+        is_monday = datetime.now(timezone(timedelta(hours=9))).date().weekday() == 0
 
         return render_template(
             'my_page_member.html',
             user=user_data,
-            attendance_count=total_attendance_count,
-            question_count=question_count,
-            my_documents=my_documents,
-            edited_docs_count=edited_docs_count
+            attendance_records=attendance_records,
+            demerit_logs=demerit_logs,
+            my_attendance=my_attendance,
+            is_monday=is_monday
         )
 
     except Exception as e:
         app.logger.error(f"Error loading my page for user {user_id}: {e}")
         flash("마이페이지를 불러오는 중 오류가 발생했습니다.", "danger")
         return redirect(url_for('main_index'))
+
+
+@app.route('/api/request_absence', methods=['POST'])
+@login_required(role="ANY")
+def request_absence():
+    user_id = session.get('user_id')
+    reason = request.json.get('reason')
+    next_monday = get_next_monday()
+
+    if datetime.now(timezone(timedelta(hours=9))).date().weekday() == 0:
+        return jsonify({"error": "당일에는 불참 요청을 할 수 없습니다. 관리자에게 직접 문의하세요."}), 403
+
+    if not reason or not reason.strip():
+        return jsonify({"error": "불참 사유를 입력해야 합니다."}), 400
+
+    try:
+        # 1. [수정] attendance 테이블의 상태를 'pending'으로 설정
+        supabase.table('attendance').upsert({
+            'user_id': user_id,
+            'meeting_date': next_monday.isoformat(),
+            'attending_seminar': False,  # 우선 불참으로 설정
+            'attending_afterparty': False,
+            'absence_reason': reason,
+            'absence_request_status': 'pending'  # 승인 대기 상태
+        }, on_conflict='user_id, meeting_date').execute()
+
+        # 2. [수정] 관리자에게 '승인/반려'가 필요한 알림 생성
+        supabase.table('notifications').insert({
+            'type': 'absence_request',  # 승인/반려가 필요한 타입으로 변경
+            'related_member_id': user_id,
+            'details': {'name': session.get('user_name'), 'reason': reason}
+        }).execute()
+
+        return jsonify({"status": "success", "message": "불참 요청이 관리자에게 전달되었습니다."})
+    except Exception as e:
+        app.logger.error(f"Error on absence request for user {user_id}: {e}")
+        return jsonify({"error": "처리 중 오류가 발생했습니다."}), 500
+
+
+
+#=== 벌점 추가
+@app.route('/api/admin/members/<int:member_id>/add_demerit', methods=['POST'])
+@login_required(role="admin")
+def add_demerit(member_id):
+    admin_id = session.get('user_id')
+    data = request.json
+    points = data.get('points')
+    reason = data.get('reason')
+
+    if not points or not isinstance(points, int):
+        return jsonify({"error": "벌점(points)은 숫자여야 합니다."}), 400
+
+    try:
+        # 1. 벌점 기록(log)을 생성
+        supabase.table('demerit_logs').insert({
+            'member_id': member_id,
+            'admin_id': admin_id,
+            'points': points,
+            'reason': reason
+        }).execute()
+
+        # 2. members 테이블의 demerit_points를 증가시킴 (Postgres의 increment 기능 사용)
+        # Supabase-py v2 에서는 rpc를 직접 호출하는 방식으로 구현해야 합니다.
+        supabase.rpc('increment_demerit', {'member_id_in': member_id, 'points_in': points}).execute()
+
+        return jsonify({"status": "success", "message": f"{points}점의 벌점이 부과되었습니다."})
+    except Exception as e:
+        app.logger.error(f"Error adding demerit for member {member_id}: {e}")
+        return jsonify({"error": "벌점 부과 중 오류 발생"}), 500
 
 # ==============================================================================
 # --- 7. 서버 실행 ---

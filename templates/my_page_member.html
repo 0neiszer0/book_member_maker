@@ -18,11 +18,10 @@
     </style>
 </head>
 <body class="p-4 md:p-8">
-    <div class="container mx-auto max-w-4xl">
-        <header class="flex justify-between items-center mb-8">
-            <h1 class="text-3xl font-bold text-eva-green">My Page</h1>
-            <a href="{{ url_for('main_index') }}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md">메인으로</a>
-        </header>
+    {% include '_header.html' %}
+
+    <div class="container mx-auto max-w-4xl mt-8">
+        <h1 class="text-3xl font-bold text-eva-green mb-8">{{ user.name }}님의 마이페이지</h1>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% for category, message in messages %}
@@ -44,34 +43,137 @@
             </div>
         </div>
 
+        <div id="absence-request-section" class="eva-card p-6 rounded-lg mb-8">
+            <h2 class="text-xl font-bold text-eva-purple mb-4">다음 모임 참석 관리</h2>
+
+            {% if is_monday == false %}
+                <p class="text-sm text-gray-400 mb-4">모든 멤버는 다음 모임에 자동으로 '참석' 처리됩니다. 불참 시 아래 버튼을 눌러 사유를 제출해주세요.</p>
+
+                {% if my_attendance and my_attendance.absence_request_status == 'pending' %}
+                    <button class="bg-yellow-600 text-white font-bold py-2 px-4 rounded cursor-not-allowed" disabled>승인 대기 중</button>
+                {% elif my_attendance and my_attendance.absence_request_status == 'approved' %}
+                    <button class="bg-gray-500 text-white font-bold py-2 px-4 rounded cursor-not-allowed" disabled>불참 처리 완료</button>
+                {% elif my_attendance and my_attendance.absence_request_status == 'denied' %}
+                    <div class="p-4 bg-red-900/50 border border-red-500/50 rounded-lg">
+                        <p class="text-red-300">이전 불참 요청이 관리자에 의해 반려되었습니다. 다시 요청하시려면 아래 버튼을 눌러주세요.</p>
+                        <button id="request-absence-btns" class="mt-3 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">다시 불참 요청하기</button>
+                    </div>
+                {% else %}
+                    <button id="request-absence-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">불참 요청하기</button>
+                {% endif %}
+
+            {% else %}
+                <p class="text-yellow-400">오늘은 모임 당일입니다. 불참하시려면 관리자에게 직접 연락해주세요.</p>
+            {% endif %}
+        </div>
+
         <div class="eva-card p-6 rounded-lg mb-8">
-            <h2 class="text-xl font-bold text-eva-purple mb-4">나의 활동 요약</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+            <h2 class="text-xl font-bold text-eva-purple mb-4">출석 및 벌점 현황</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
                 <div class="p-4 bg-bg-dark rounded">
-                    <p class="text-3xl font-bold text-eva-green">{{ attendance_count }}</p>
+                    <p class="text-3xl font-bold text-eva-green">{{ attendance_records|length }}</p>
                     <p class="text-sm text-gray-400">총 참석 횟수</p>
                 </div>
                 <div class="p-4 bg-bg-dark rounded">
-                    <p class="text-3xl font-bold text-eva-green">{{ question_count }}</p>
-                    <p class="text-sm text-gray-400">작성한 질문 수</p>
-                </div>
-                <div class="p-4 bg-bg-dark rounded">
-                    <p class="text-3xl font-bold text-eva-green">{{ edited_docs_count }}</p>
-                    <p class="text-sm text-gray-400">기여한 위키 수</p>
+                    <p class="text-3xl font-bold text-red-400">{{ user.demerit_points }}</p>
+                    <p class="text-sm text-gray-400">누적 벌점</p>
                 </div>
             </div>
         </div>
 
+        <div class="eva-card p-6 rounded-lg mb-8">
+            <h2 class="text-xl font-bold text-eva-purple mb-4">참석 기록</h2>
+            <div class="max-h-60 overflow-y-auto pr-2">
+                <ul class="space-y-2 text-sm">
+                    {% for record in attendance_records %}
+                        <li class="p-2 bg-bg-dark rounded">{{ record.meeting_date }}</li>
+                    {% else %}
+                        <p class="text-gray-500">아직 참석 기록이 없습니다.</p>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
         <div class="eva-card p-6 rounded-lg">
-            <h2 class="text-xl font-bold text-eva-purple mb-4">내가 작성한 위키 문서</h2>
-            <ul class="space-y-2">
-                {% for doc in my_documents %}
-                    <li><a href="{{ url_for('view_document', doc_title=doc.title) }}" class="text-wiki-link-blue hover:underline">{{ doc.title }}</a></li>
-                {% else %}
-                    <p class="text-gray-500">아직 직접 작성한 위키 문서가 없습니다.</p>
-                {% endfor %}
-            </ul>
+            <h2 class="text-xl font-bold text-eva-purple mb-4">벌점 기록</h2>
+            <div class="max-h-60 overflow-y-auto pr-2">
+                <ul class="space-y-3 text-sm">
+                    {% for log in demerit_logs %}
+                        <li class="p-3 bg-bg-dark rounded">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold {{ 'text-red-400' if log.points > 0 else 'text-blue-400' }}">
+                                    {{ log.points }}점 {{ '부과' if log.points > 0 else '차감' }}
+                                </span>
+                                <span class="text-xs text-gray-500">{{ log.created_at | datetime('%Y-%m-%d') }}</span>
+                            </div>
+                            <p class="mt-1 text-gray-300">사유: {{ log.reason }}</p>
+                            <p class="text-right text-xs text-gray-500 mt-1">- {{ log.admin.name if log.admin else '관리자' }}</p>
+                        </li>
+                    {% else %}
+                        <p class="text-gray-500">벌점 기록이 없습니다.</p>
+                    {% endfor %}
+                </ul>
+            </div>
         </div>
     </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const absenceSection = document.getElementById('absence-request-section');
+
+    // 이벤트 위임을 사용하여 섹션 전체에 하나의 이벤트 리스너만 추가
+    absenceSection.addEventListener('click', async (e) => {
+        // 'request-absence-btn' ID를 가진 버튼이 클릭되었을 때만 로직 실행
+        if (e.target.id === 'request-absence-btn') {
+            const requestAbsenceBtn = e.target;
+            const reason = prompt("불참 사유를 간단히 입력해주세요:");
+
+            if (reason && reason.trim() !== '') {
+                requestAbsenceBtn.textContent = '처리 중...';
+                requestAbsenceBtn.disabled = true;
+                try {
+                    const response = await fetch('/api/request_absence', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ reason: reason })
+                    });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.error);
+
+                    alert(result.message);
+
+                    // 성공 시, 새로고침 없이 UI를 '승인 대기 중' 상태로 즉시 변경
+                    const parentContainer = requestAbsenceBtn.parentElement;
+                    // 부모가 div.p-4인 경우와 아닌 경우를 모두 처리
+                    const buttonContainer = parentContainer.tagName === 'DIV' ? parentContainer : absenceSection;
+
+                    // 기존 p 태그와 버튼을 모두 지우고 새로운 버튼 삽입
+                    const introParagraph = buttonContainer.querySelector('p');
+                    if(introParagraph) {
+                        buttonContainer.innerHTML = ''; // 자식 요소 모두 삭제
+                        buttonContainer.appendChild(introParagraph); // p태그 다시 추가
+                    } else {
+                         buttonContainer.innerHTML = '';
+                    }
+
+                    const newButton = document.createElement('button');
+                    newButton.className = 'bg-yellow-600 text-white font-bold py-2 px-4 rounded cursor-not-allowed';
+                    newButton.disabled = true;
+                    newButton.textContent = '승인 대기 중';
+                    buttonContainer.appendChild(newButton);
+
+
+                } catch (error) {
+                    alert('오류: ' + error.message);
+                    requestAbsenceBtn.textContent = '불참 요청하기';
+                    requestAbsenceBtn.disabled = false;
+                }
+            } else if (reason !== null) {
+                alert('불참 사유를 반드시 입력해야 합니다.');
+            }
+        }
+    });
+});
+</script>
 </body>
 </html>

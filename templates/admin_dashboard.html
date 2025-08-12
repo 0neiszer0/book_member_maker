@@ -31,14 +31,15 @@
         .eva-input:focus { border-color: var(--eva-green); outline: none; box-shadow: 0 0 0 2px var(--eva-green); }
         .eva-toggle-bg { background-color: #4A4A4A; }
         input.event-toggle:checked + .eva-toggle-bg { background-color: var(--eva-green); }
-        .interviewer-toggle ~ .dot { transition: transform .2s ease-in-out; }
-        .interviewer-toggle:checked ~ .dot { transform: translateX(1.5rem); }
+        .interviewer-toggle ~ .dot, .member-toggle ~ .dot { transition: transform .2s ease-in-out; }
+        .interviewer-toggle:checked ~ .dot, .member-toggle:checked ~ .dot { transform: translateX(1.5rem); }
         .interviewer-toggle:checked ~ .block { background-color: var(--eva-purple); }
     </style>
 </head>
 <body class="min-h-screen">
-        {% include '_header.html' %}
-        <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+    {% include '_header.html' %}
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}{% for category, message in messages %}
                 <div class="p-4 mb-4 text-sm rounded-lg {{ 'bg-green-900 text-green-200' if category == 'success' else 'bg-red-900 text-red-200' }}" role="alert">{{ message }}</div>
@@ -46,43 +47,76 @@
         {% endwith %}
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div class="lg:col-span-2 eva-card p-6 rounded-lg">
-                <h2 class="text-xl font-bold mb-4 text-eva-green">Event List</h2>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-border-dark" id="events-table">
-                        <thead class="eva-table-header">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">Event</th>
-                                <th class="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">기간</th>
-                                <th class="px-4 py-3 text-center text-xs font-medium text-gray-300 uppercase">활성화</th>
-                                <th class="px-4 py-3 text-right text-xs font-medium text-gray-300 uppercase">관리</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border-dark">
-                            {% for event in events %}
-                            <tr data-event-id="{{ event.id }}" class="eva-table-row">
-                                <td class="px-4 py-4 whitespace-nowrap text-sm font-medium">{{ event.event_name }}</td>
-                                <td class="hidden md:table-cell px-4 py-4 whitespace-nowrap text-sm text-gray-400">{{ event.start_date }} ~ {{ event.end_date }}</td>
-                                <td class="px-4 py-4 whitespace-nowrap text-center">
-                                    <label class="relative inline-flex items-center cursor-pointer">
-                                        <input type="checkbox" class="sr-only peer event-toggle" data-event-id="{{ event.id }}" {% if event.is_active %}checked{% endif %}>
-                                        <div class="w-11 h-6 eva-toggle-bg rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
-                                    </label>
-                                </td>
-                                <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <a href="{{ url_for('admin_event_timetable', event_id=event.id) }}" class="eva-link mr-2">타임테이블</a>
-                                    <a href="{{ url_for('manage_event', event_id=event.id) }}" class="text-gray-400 hover:text-gray-200 mr-2">슬롯관리</a>
+            <div class="lg:col-span-2 space-y-8">
+                <div class="eva-card p-6 rounded-lg">
+                    <h2 class="text-xl font-bold mb-4 text-eva-green">Event List</h2>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-border-dark" id="events-table">
+                            <thead class="eva-table-header">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">Event</th>
+                                    <th class="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">기간</th>
+                                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-300 uppercase">활성화</th>
+                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-300 uppercase">관리</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-border-dark">
+                                {% for event in events %}
+                                <tr data-event-id="{{ event.id }}" class="eva-table-row">
+                                    <td class="px-4 py-4 whitespace-nowrap text-sm font-medium">{{ event.event_name }}</td>
+                                    <td class="hidden md:table-cell px-4 py-4 whitespace-nowrap text-sm text-gray-400">{{ event.start_date }} ~ {{ event.end_date }}</td>
+                                    <td class="px-4 py-4 whitespace-nowrap text-center">
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" class="sr-only peer event-toggle" data-event-id="{{ event.id }}" {% if event.is_active %}checked{% endif %}>
+                                            <div class="w-11 h-6 eva-toggle-bg rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                                        </label>
+                                    </td>
+                                    <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <a href="{{ url_for('admin_event_timetable', event_id=event.id) }}" class="eva-link mr-2">타임테이블</a>
+                                        <a href="{{ url_for('manage_event', event_id=event.id) }}" class="text-gray-400 hover:text-gray-200 mr-2">슬롯관리</a>
+                                        <button class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-2 rounded-md mr-2 share-link-btn" data-event-id="{{ event.id }}">공유</button>
+                                        <button class="eva-button-delete delete-event-btn text-xs font-bold py-1 px-2 rounded-md" data-event-id="{{ event.id }}" data-event-name="{{ event.event_name }}">삭제</button>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">생성된 이벤트가 없습니다.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
 
-                                    <button class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-2 rounded-md mr-2 share-link-btn" data-event-id="{{ event.id }}">공유</button>
-
-                                    <button class="eva-button-delete delete-event-btn text-xs font-bold py-1 px-2 rounded-md" data-event-id="{{ event.id }}" data-event-name="{{ event.event_name }}">삭제</button>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr><td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">생성된 이벤트가 없습니다.</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div class="eva-card p-6 rounded-lg">
+                    <h2 class="text-xl font-bold mb-4 text-eva-green">Member Status</h2>
+                    <div id="member-status-list" class="space-y-2 max-h-96 overflow-y-auto pr-2">
+                        {% for member in all_members %}
+                        <div class="flex justify-between items-center p-3 bg-gray-700 rounded-lg">
+                            <div>
+                                <span class="font-semibold">{{ member.name }}</span>
+                                <span class="ml-2 text-xs font-mono rounded px-1.5 py-0.5 {{ 'bg-red-800 text-red-200' if member.demerit_points > 0 else 'bg-gray-600 text-gray-300' }}">
+                                    벌점 {{ member.demerit_points }}
+                                </span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <button class="remove-demerit-btn text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded"
+                                        data-member-id="{{ member.id }}" data-member-name="{{ member.name }}">
+                                    차감
+                                </button>
+                                <button class="add-demerit-btn text-xs bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-2 rounded"
+                                        data-member-id="{{ member.id }}" data-member-name="{{ member.name }}">
+                                    부과
+                                </button>
+                                <label class="relative cursor-pointer">
+                                    <input type="checkbox" class="sr-only member-toggle" data-member-id="{{ member.id }}" {% if member.is_active %}checked{% endif %}>
+                                    <div class="block w-12 h-6 rounded-full {% if member.is_active %}bg-eva-green{% else %}bg-gray-600{% endif %}"></div>
+                                    <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform {% if member.is_active %}transform translate-x-6{% endif %}"></div>
+                                </label>
+                            </div>
+                        </div>
+                        {% else %}
+                        <p class="text-center text-sm text-gray-500">등록된 멤버가 없습니다.</p>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
 
@@ -98,39 +132,39 @@
                     </form>
                 </div>
 
-                                <div class="eva-card p-6 rounded-lg">
-                    <h2 class="text-xl font-bold mb-4 text-eva-green">Member Status</h2>
-                    <div id="member-status-list" class="space-y-2 max-h-96 overflow-y-auto pr-2">
-                        {% for member in all_members %}
-                        <label class="flex justify-between items-center p-3 bg-gray-700 rounded-lg cursor-pointer transition-colors duration-200">
-                            <span class="font-semibold">{{ member.name }}</span>
-                            <div class="relative">
-                                <input type="checkbox" class="sr-only member-toggle"
-                                       data-member-id="{{ member.id }}"
-                                       {% if member.is_active %}checked{% endif %}>
-                                <div class="block w-12 h-6 rounded-full {% if member.is_active %}bg-eva-green{% else %}bg-gray-600{% endif %}"></div>
-                                <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform {% if member.is_active %}transform translate-x-6{% endif %}"></div>
+                <div class="eva-card p-6 rounded-lg">
+                    <h2 class="text-xl font-bold mb-4 text-eva-green">Recent Demerit Log</h2>
+                    <div class="space-y-3 text-sm">
+                        {% for log in demerit_logs %}
+                        <div class="p-3 bg-bg-dark rounded-lg">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-yellow-400">{{ log.member.name if log.member else '알 수 없음' }}</span>
+                                <span class="text-xs text-gray-500">{{ log.created_at | datetime('%y-%m-%d') }}</span>
                             </div>
-                        </label>
+                            <p class="mt-1 text-gray-300">"{{ log.reason }}"</p>
+                            <p class="text-right text-xs text-gray-500 mt-1">- {{ log.admin.name if log.admin else '관리자' }} ({{ log.points }}점)</p>
+                        </div>
                         {% else %}
-                        <p class="text-center text-sm text-gray-500">등록된 멤버가 없습니다.</p>
+                        <p class="text-center text-sm text-gray-500">최근 벌점 기록이 없습니다.</p>
                         {% endfor %}
                     </div>
                 </div>
 
                 <div class="eva-card p-6 rounded-lg">
-                    <h2 class="text-xl font-bold mb-4 text-eva-green">Interviewer</h2>
-                    <p class="text-sm text-gray-400 mb-4">독서 모임 회원 목록에서 면접관을 지정합니다.</p>
+                   <h2 class="text-xl font-bold mb-4 text-eva-green">Interviewer</h2>
+                   <p class="text-sm text-gray-400 mb-4">활성 멤버 중에서 면접관을 지정합니다.</p>
                     <div id="interviewer-toggle-list" class="space-y-2 max-h-96 overflow-y-auto pr-2">
                         {% for member in all_members %}
-                        <label class="interviewer-label flex justify-between items-center p-3 bg-gray-700 rounded-lg cursor-pointer transition-colors duration-200">
-                            <span class="font-semibold">{{ member.name }}</span>
-                            <div class="relative">
-                                <input type="checkbox" class="sr-only interviewer-toggle" data-name="{{ member.name }}" {% if member.name in interviewer_names %}checked{% endif %}>
-                                <div class="block bg-gray-600 w-12 h-6 rounded-full"></div>
-                                <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full"></div>
-                            </div>
-                        </label>
+                            {% if member.is_active %}
+                            <label class="interviewer-label flex justify-between items-center p-3 bg-gray-700 rounded-lg cursor-pointer transition-colors duration-200">
+                                <span class="font-semibold">{{ member.name }}</span>
+                                <div class="relative">
+                                    <input type="checkbox" class="sr-only interviewer-toggle" data-name="{{ member.name }}" {% if member.name in interviewer_names %}checked{% endif %}>
+                                    <div class="block bg-gray-600 w-12 h-6 rounded-full"></div>
+                                    <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full"></div>
+                                </div>
+                            </label>
+                            {% endif %}
                         {% else %}
                         <p class="text-center text-sm text-gray-500">등록된 독서 모임 회원이 없습니다.</p>
                         {% endfor %}
@@ -144,11 +178,9 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     // 달력 초기화
-    flatpickr(".datepicker", {
-        "locale": "ko",
-        dateFormat: "Y-m-d",
-    });
+    flatpickr(".datepicker", { "locale": "ko", dateFormat: "Y-m-d" });
 
+    // 면접관 토글
     const toggleList = document.getElementById('interviewer-toggle-list');
     if(toggleList) {
         toggleList.addEventListener('change', (e) => {
@@ -163,8 +195,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // 이벤트 테이블 액션
     const eventsTable = document.getElementById('events-table');
     if (eventsTable) {
+        // 이벤트 활성화 토글
         eventsTable.addEventListener('change', (e) => {
             if (e.target.matches('.event-toggle')) {
                 const checkbox = e.target;
@@ -175,12 +209,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        // 이벤트 삭제 및 공유 버튼
         eventsTable.addEventListener('click', (e) => {
             if (e.target.matches('.delete-event-btn')) {
                 const button = e.target;
                 const eventId = button.dataset.eventId;
                 const eventName = button.dataset.eventName;
-                if (confirm(`정말로 '${eventName}' 이벤트를 삭제하시겠습니까?\n이벤트에 속한 모든 시간 슬롯과 예약 정보가 함께 삭제되며, 이 작업은 되돌릴 수 없습니다.`)) {
+                if (confirm(`정말로 '${eventName}' 이벤트를 삭제하시겠습니까?\n모든 슬롯과 예약 정보가 함께 삭제됩니다.`)) {
                     fetch(`/api/admin/events/${eventId}/delete`, { method: 'POST' })
                     .then(response => response.json())
                     .then(data => {
@@ -193,7 +228,6 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (e.target.matches('.share-link-btn')) {
                 const button = e.target;
                 const eventId = button.dataset.eventId;
-
                 fetch(`/api/admin/events/${eventId}/generate_share_link`, { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
@@ -201,19 +235,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         navigator.clipboard.writeText(data.link).then(() => {
                             alert('공유 링크가 클립보드에 복사되었습니다.\n' + data.link);
                         });
-                    } else {
-                        alert('링크 생성 실패: ' + data.message);
-                    }
+                    } else { alert('링크 생성 실패: ' + data.message); }
                 })
                 .catch(error => console.error('Error:', error));
             }
         });
     }
 
-        // [추가] 멤버 상태 토글 스위치 이벤트 리스너
+    // 멤버 상태 관리
     const memberList = document.getElementById('member-status-list');
     if(memberList) {
-        memberList.addEventListener('change', async (e) => {
+        memberList.addEventListener('click', async (e) => {
+            // 활성/비활성 토글
             if (e.target.matches('.member-toggle')) {
                 const checkbox = e.target;
                 const memberId = checkbox.dataset.memberId;
@@ -225,29 +258,89 @@ document.addEventListener('DOMContentLoaded', () => {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ is_active: newActiveState })
                     });
-
                     const result = await response.json();
                     if (!response.ok) {
-                        // 실패 시 스위치를 원상태로 되돌림
                         checkbox.checked = !newActiveState;
                         throw new Error(result.message || '상태 변경에 실패했습니다.');
                     }
-
-                    // 성공 시 UI 즉시 업데이트
                     const bg = checkbox.nextElementSibling;
                     const dot = bg.nextElementSibling;
                     bg.classList.toggle('bg-eva-green', newActiveState);
                     bg.classList.toggle('bg-gray-600', !newActiveState);
                     dot.classList.toggle('translate-x-6', newActiveState);
-
                 } catch (error) {
                     alert('오류: ' + error.message);
+                }
+            }
+            // 벌점 부과 버튼
+            if (e.target.matches('.add-demerit-btn')) {
+                const btn = e.target;
+                const memberId = btn.dataset.memberId;
+                const memberName = btn.dataset.memberName;
+
+                const pointsStr = prompt(`${memberName}님에게 부과할 벌점을 숫자로 입력하세요:`);
+                if (pointsStr) {
+                    const points = parseInt(pointsStr, 10);
+                    if (isNaN(points) || points === 0) {
+                        alert('벌점은 0이 아닌 숫자만 입력해야 합니다.');
+                        return;
+                    }
+                    const reason = prompt(`벌점(${points}점) 부과 사유를 입력하세요:`);
+                    if (reason && reason.trim() !== '') {
+                        try {
+                            const response = await fetch(`/api/admin/members/${memberId}/add_demerit`, {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({ points, reason })
+                            });
+                            const result = await response.json();
+                            if (!response.ok) throw new Error(result.error || '알 수 없는 오류');
+                            alert(result.message);
+                            window.location.reload();
+                        } catch (error) {
+                            alert('오류: ' + error.message);
+                        }
+                    } else if (reason !== null) {
+                        alert('벌점 부과 사유를 반드시 입력해야 합니다.');
+                    }
+                }
+            }
+            // 벌점 차감 버튼
+            if (e.target.matches('.remove-demerit-btn')) {
+                const btn = e.target;
+                const memberId = btn.dataset.memberId;
+                const memberName = btn.dataset.memberName;
+
+                const pointsStr = prompt(`${memberName}님에게 차감할 벌점을 숫자로 입력하세요:`);
+                if (pointsStr) {
+                    const points = parseInt(pointsStr, 10);
+                    if (isNaN(points) || points <= 0) {
+                        alert('차감할 벌점은 0보다 큰 숫자여야 합니다.');
+                        return;
+                    }
+                    const reason = prompt(`벌점(${points}점) 차감 사유를 입력하세요: (예: 우수 활동 보상)`);
+                    if (reason && reason.trim() !== '') {
+                        try {
+                            const response = await fetch(`/api/admin/members/${memberId}/remove_demerit`, {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({ points, reason })
+                            });
+                            const result = await response.json();
+                            if (!response.ok) throw new Error(result.error || '알 수 없는 오류');
+                            alert(result.message);
+                            window.location.reload();
+                        } catch (error) {
+                            alert('오류: ' + error.message);
+                        }
+                    } else if (reason !== null) {
+                        alert('벌점 차감 사유를 반드시 입력해야 합니다.');
+                    }
                 }
             }
         });
     }
 });
-
 </script>
 </body>
 </html>
