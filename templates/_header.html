@@ -1,40 +1,56 @@
 <header class="bg-card-dark shadow-md sticky top-0 z-50 border-b border-border-dark">
     <div class="container mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between items-center py-4">
-            <a href="/" class="text-xl font-bold text-eva-green">책 먹는 호반우</a>
+            <a href="/" class="text-xl font-bold text-eva-green flex-shrink-0">책 먹는 호반우</a>
 
-            <div class="flex items-center space-x-4">
-            {% if session.user_role %}
-                <a href="{{ url_for('member_board') }}" class="text-sm text-gray-300 hover:text-eva-green font-bold">멤버 보드</a>
-                <a href="{{ url_for('view_all_documents') }}" class="text-sm text-gray-300 hover:text-eva-green font-bold">위키</a>
-                <a href="{{ url_for('profiles_page') }}" class="text-sm text-gray-300 hover:text-eva-green font-bold">멤버 프로필</a>
+            <div class="hidden md:flex items-center space-x-4">
+                {% if session.user_role %}
+                    <a href="{{ url_for('view_all_documents') }}" class="text-sm text-gray-300 hover:text-eva-green font-bold">위키</a>
+                    <a href="{{ url_for('profiles_page') }}" class="text-sm text-gray-300 hover:text-eva-green font-bold">멤버 프로필</a>
 
-                {% if session.user_role == 'admin' %}
-                    <div id="notification-dropdown" class="dropdown">
-                        <button id="notification-btn" type="button" class="relative text-yellow-400 hover:text-yellow-300">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                            </svg>
-                            <span id="notification-dot" class="notification-dot hidden"></span>
-                        </button>
-                        <div id="notification-list" class="dropdown-content">
-                            </div>
-                    </div>
+                    {% if session.user_role == 'admin' %}
+                        <div id="notification-dropdown" class="dropdown">
+                            <button id="notification-btn" type="button" class="relative text-yellow-400 hover:text-yellow-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                                <span id="notification-dot" class="notification-dot hidden"></span>
+                            </button>
+                            <div id="notification-list" class="dropdown-content"></div>
+                        </div>
+                        <a href="{{ url_for('admin_dashboard') }}" class="text-sm text-yellow-400 hover:text-yellow-300 font-bold">관리자</a>
+                        <a href="{{ url_for('bookclub_index') }}" class="text-sm text-yellow-400 hover:text-yellow-300 font-bold">조 편성</a>
+                    {% endif %}
 
-                    <a href="{{ url_for('admin_dashboard') }}" class="text-sm text-yellow-400 hover:text-yellow-300 font-bold">관리자</a>
-                    <a href="{{ url_for('bookclub_index') }}" class="text-sm text-yellow-400 hover:text-yellow-300 font-bold">조 편성</a>
+                    <a href="{{ url_for('logout') }}" class="text-sm text-gray-400 hover:text-eva-green">로그아웃</a>
+                    <a href="{{ url_for('my_page') }}" class="eva-button-secondary text-sm font-bold py-2 px-4 rounded-md">마이페이지</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="eva-button text-sm font-bold py-2 px-4 rounded-md">로그인</a>
                 {% endif %}
-
-                <a href="{{ url_for('logout') }}" class="text-sm text-gray-400 hover:text-eva-green">로그아웃</a>
-                <a href="{{ url_for('my_page') }}" class="eva-button-secondary text-sm font-bold py-2 px-4 rounded-md">
-                    마이페이지
-                </a>
-            {% else %}
-                <a href="{{ url_for('login') }}" class="eva-button text-sm font-bold py-2 px-4 rounded-md">
-                    로그인
-                </a>
-            {% endif %}
             </div>
+
+            <div class="md:hidden">
+                <button id="mobile-menu-btn" class="text-gray-300 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="mobile-menu" class="hidden md:hidden bg-card-dark border-t border-border-dark">
+        <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+            {% if session.user_role %}
+                <a href="{{ url_for('view_all_documents') }}" class="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700">위키</a>
+                <a href="{{ url_for('profiles_page') }}" class="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700">멤버 프로필</a>
+                {% if session.user_role == 'admin' %}
+                    <a href="{{ url_for('admin_dashboard') }}" class="block px-3 py-2 rounded-md text-base font-medium text-yellow-400 hover:text-white hover:bg-gray-700">관리자</a>
+                    <a href="{{ url_for('bookclub_index') }}" class="block px-3 py-2 rounded-md text-base font-medium text-yellow-400 hover:text-white hover:bg-gray-700">조 편성</a>
+                {% endif %}
+                <a href="{{ url_for('my_page') }}" class="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700">마이페이지</a>
+                <a href="{{ url_for('logout') }}" class="block px-3 py-2 rounded-md text-base font-medium text-gray-400 hover:text-white hover:bg-gray-700">로그아웃</a>
+            {% else %}
+                <a href="{{ url_for('login') }}" class="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700">로그인</a>
+            {% endif %}
         </div>
     </div>
 </header>
@@ -48,7 +64,16 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // 관리자일 경우에만 알림 로직 실행
+    // --- 모바일 메뉴 토글 로직 ---
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    const mobileMenu = document.getElementById('mobile-menu');
+    if (mobileMenuBtn) {
+        mobileMenuBtn.addEventListener('click', () => {
+            mobileMenu.classList.toggle('hidden');
+        });
+    }
+
+    // --- 관리자 알림 로직 ---
     {% if session.user_role == 'admin' %}
     const notifBtn = document.getElementById('notification-btn');
     const notifDot = document.getElementById('notification-dot');
@@ -58,7 +83,11 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchNotifications() {
         try {
             const response = await fetch('/api/notifications');
-            if (!response.ok) return;
+            if (!response.ok) {
+                console.error("Failed to fetch notifications, server responded with status: " + response.status);
+                notifList.innerHTML = '<div class="p-4 text-sm text-red-400">알림 로딩 실패</div>';
+                return;
+            };
             const notifications = await response.json();
 
             notifDot.classList.toggle('hidden', notifications.length === 0);
@@ -77,6 +106,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     contentHtml = `<p class="font-bold">${notif.details.name} 님의 신규 가입 요청</p><p class="text-xs text-gray-400">${notif.details.email}</p>`;
                 } else if (notif.type === 'account_link_request') {
                     contentHtml = `<p class="font-bold">${notif.details.original_name} 님의 계정 연결 요청</p><p class="text-xs text-gray-400">소셜: ${notif.details.social_name} (${notif.details.social_email})</p>`;
+                } else if (notif.type === 'absence_request') {
+                    contentHtml = `<p class="font-bold">${notif.details.name} 님의 불참 요청</p><p class="text-xs text-gray-400">사유: ${notif.details.reason}</p>`;
+                } else if (notif.type === 'absence_request') {
+                    contentHtml = `<p class="font-bold">${notif.details.name} 님의 불참 요청</p><p class="text-xs text-gray-400">사유: ${notif.details.reason}</p>`;
                 }
 
                 item.innerHTML = `${contentHtml}
@@ -88,6 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         } catch (error) {
             console.error("Failed to fetch notifications:", error);
+            notifList.innerHTML = '<div class="p-4 text-sm text-red-400">알림을 불러오는 중 오류 발생</div>';
         }
     }
 
@@ -135,7 +169,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.addEventListener('click', (e) => {
         if (notifDropdown && !notifDropdown.contains(e.target)) {
-            notifList.classList.remove('show');
+            if (notifList) {
+                notifList.classList.remove('show');
+            }
         }
     });
     {% endif %}

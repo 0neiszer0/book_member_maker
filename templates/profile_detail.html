@@ -13,8 +13,9 @@
         .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
         .eva-input { background-color: var(--bg-dark); border-color: var(--border-dark); color: var(--text-light); }
         .profile-content { color: var(--text-light); }
-        .profile-content h1, .profile-content h2, .profile-content h3 { color: var(--eva-green); }
-        .profile-content a { color: var(--eva-purple); }
+        /* [수정] doc_view.html과 동일한 위키 스타일 적용 */
+        .profile-content h2, .profile-content h3 { color: #f1f5f9; border-bottom: 1px solid var(--border-dark); padding-bottom: 0.5rem; margin-top: 2rem; }
+        .profile-content a { color: #60a5fa; text-decoration: underline; }
         .profile-content strong { color: white; }
     </style>
 </head>
@@ -58,7 +59,7 @@
                     <label class="font-bold text-sm">상세 프로필 (위키 문법 지원)</label>
                     <textarea id="content-editor" class="eva-input w-full h-96 p-3 rounded-md">{{ member.profile_content or '' }}</textarea>
                     <div class="text-xs text-gray-500 mt-2">
-                        '''굵게''', ''기울임'', ~~취소선~~, ==제목2==, [[http..|링크]], [[파일:http..]]
+                        '''굵게''', ''기울임'', ==제목==, [[링크]], [[파일:URL]]
                     </div>
                 </div>
             </div>
@@ -95,7 +96,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     editBtn.addEventListener('click', () => toggleEditMode(true));
-    cancelBtn.addEventListener('click', () => toggleEditMode(false));
+    cancelBtn.addEventListener('click', () => {
+        // 취소 시 원본 값으로 복원
+        introEditor.value = `{{ member.profile_intro | tojson }}`;
+        contentEditor.value = `{{ member.profile_content | tojson }}`;
+        toggleEditMode(false);
+    });
 
     // 저장 버튼 클릭 이벤트
     saveBtn.addEventListener('click', async () => {
