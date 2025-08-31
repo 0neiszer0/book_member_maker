@@ -1052,45 +1052,36 @@ def generate_slots(event_id):
 
 @app.route('/api/events/<event_id>/timetable_data')
 def get_timetable_data(event_id):
-    """[수정] 로깅을 추가하여 데이터 흐름을 추적합니다."""
+    """[수정] 각 슬롯이 현재 시간보다 과거인지 판별하는 is_past 플래그를 추가합니다."""
     app.logger.info(f"--- 타임테이블 데이터 요청 시작 (Event ID: {event_id}) ---")
     try:
-        # --- 1. 슬롯 정보 조회 ---
         response_slots = supabase.table('time_slots').select('*').eq('event_id', event_id).order(
             'slot_datetime').execute()
         slots_res = response_slots.data if hasattr(response_slots, 'data') and response_slots.data else []
-        app.logger.info(f"1. 슬롯 조회 완료: {len(slots_res)}개 슬롯 발견")
 
-        # --- 중간 데이터 확인 (로깅) ---
-        # 로깅을 위해 필요한 데이터만 간추려서 확인합니다.
+        # [추가] 현재 시간을 UTC 기준으로 설정
+        now_utc = datetime.now(timezone.utc)
+
         interviewer_ids_to_fetch = set()
         for s in slots_res:
             if s.get('interviewer_ids'):
                 interviewer_ids_to_fetch.update(s['interviewer_ids'])
-
         booked_slot_ids = [s['id'] for s in slots_res if s['is_booked']]
-        app.logger.info(f"2. 예약된 슬롯 ID: {booked_slot_ids}")
-        app.logger.info(f"3. 필요한 면접관 ID: {interviewer_ids_to_fetch}")
 
-        # --- 2. 관련 정보 조회 ---
         reservations_data = []
         if booked_slot_ids:
             response_reservations = supabase.table('reservations').select('slot_id, applicant_id').in_('slot_id',
                                                                                                        booked_slot_ids).execute()
             reservations_data = response_reservations.data if hasattr(response_reservations,
                                                                       'data') and response_reservations.data else []
-        app.logger.info(f"4. 예약 정보 조회 완료: {len(reservations_data)}개 예약 발견")
 
         applicant_ids_to_fetch = {r['applicant_id'] for r in reservations_data}
-        app.logger.info(f"5. 필요한 지원자 ID: {applicant_ids_to_fetch}")
-
         applicants_data = []
         if applicant_ids_to_fetch:
             response_applicants = supabase.table('applicants').select('*').in_('id',
                                                                                list(applicant_ids_to_fetch)).execute()
             applicants_data = response_applicants.data if hasattr(response_applicants,
                                                                   'data') and response_applicants.data else []
-        app.logger.info(f"6. 지원자 정보 조회 완료: {len(applicants_data)}명 정보 발견")
 
         interviewers_data = []
         if interviewer_ids_to_fetch:
@@ -1098,10 +1089,7 @@ def get_timetable_data(event_id):
                 interviewer_ids_to_fetch)).execute()
             interviewers_data = response_interviewers.data if hasattr(response_interviewers,
                                                                       'data') and response_interviewers.data else []
-        app.logger.info(f"7. 면접관 정보 조회 완료: {len(interviewers_data)}명 정보 발견")
 
-        # --- 3. 데이터 가공 ---
-        app.logger.info("8. 데이터 가공 시작...")
         applicants_map = {a['id']: a for a in applicants_data}
         interviewers_map = {i['id']: i['name'] for i in interviewers_data}
         reservation_map = {r['slot_id']: r['applicant_id'] for r in reservations_data}
@@ -1109,20 +1097,21 @@ def get_timetable_data(event_id):
         for slot in slots_res:
             if slot.get('slot_datetime'):
                 slot['time_display'] = format_datetime_filter(slot['slot_datetime'], format_str="%p %I:%M")
+                # [추가] is_past 플래그 계산
+                slot_dt_utc = datetime.fromisoformat(slot['slot_datetime'].replace('Z', '+00:00'))
+                slot['is_past'] = slot_dt_utc < now_utc
+
             if slot.get('interviewer_ids'):
                 slot['interviewer_names'] = ', '.join(
                     [interviewers_map.get(i_id, "알 수 없음") for i_id in slot['interviewer_ids']])
             if slot['id'] in reservation_map:
                 applicant_id = reservation_map[slot['id']]
-                slot['applicant'] = applicants_map.get(applicant_id)  # .get()은 키가 없으면 None을 반환하여 안전
-
-        app.logger.info("9. 데이터 가공 완료. JSON 변환 시도...")
-        app.logger.info(f"최종 데이터: {slots_res}")  # 최종 데이터를 로그로 출력
+                slot['applicant'] = applicants_map.get(applicant_id)
 
         return jsonify(slots_res)
 
     except Exception as e:
-        app.logger.error(f"!!! get_timetable_data 함수에서 오류 발생: {e}", exc_info=True)  # exc_info=True로 상세한 오류 위치 추적
+        app.logger.error(f"!!! get_timetable_data 함수에서 오류 발생: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 
@@ -1321,11 +1310,11 @@ def update_applicant_info(applicant_id):
 
 def update_active_slots_for_clustering(event_id):
     """
-    [최종 수정] 예약된 슬롯 주변만 활성화하고, 관리자가 수동으로 연 슬롯은
-    예약 전까지 그대로 유지하는, 더 정교한 클러스터링 함수.
+    [최종 수정 로직] 예약 발생 시 주변 슬롯을 열어주되, 관리자의 수동 조작을 최우선으로 존중하는 함수.
+    1. 관리자가 수동으로 '열어둔' 슬롯은 예약과 무관하게 항상 열린 상태를 유지합니다.
+    2. 관리자가 수동으로 '닫아둔' 슬롯은 예약이 근처에 생겨도 절대 자동으로 열리지 않습니다.
     """
     try:
-        # 1. 해당 이벤트의 모든 슬롯 정보를 가져옵니다.
         all_slots_res = supabase.table('time_slots') \
             .select('id, slot_datetime, is_booked, is_active') \
             .eq('event_id', event_id) \
@@ -1336,38 +1325,37 @@ def update_active_slots_for_clustering(event_id):
         if not all_slots:
             return
 
-        # 최종적으로 활성화 상태여야 할 슬롯들의 ID를 저장할 Set
         final_active_ids = set()
-
-        # 2. 관리자가 수동으로 열어둔 슬롯 ID를 먼저 저장합니다.
-        # 이 슬롯들은 예약이 없더라도 항상 열려있어야 합니다.
-        manually_activated_ids = {slot['id'] for slot in all_slots if slot['is_active']}
-        final_active_ids.update(manually_activated_ids)
-
-        # 3. 예약된 슬롯과 그 주변 슬롯을 활성화 목록에 추가합니다.
-        for i, current_slot in enumerate(all_slots):
-            if current_slot['is_booked']:
-                # 예약된 슬롯 자체를 활성화 목록에 추가
-                final_active_ids.add(current_slot['id'])
-
-                # 바로 이전 슬롯을 활성화 목록에 추가
-                if i > 0:
-                    previous_slot = all_slots[i - 1]
-                    final_active_ids.add(previous_slot['id'])
-
-                # 바로 다음 슬롯을 활성화 목록에 추가
-                if i < len(all_slots) - 1:
-                    next_slot = all_slots[i + 1]
-                    final_active_ids.add(next_slot['id'])
-
-        # 4. 전체 슬롯 ID 목록을 만듭니다.
         all_slot_ids = {slot['id'] for slot in all_slots}
 
-        # 5. 활성화할 슬롯과 비활성화할 슬롯을 최종적으로 결정합니다.
-        slots_to_activate = list(final_active_ids)
-        slots_to_deactivate = list(all_slot_ids - final_active_ids)
+        # 1. 관리자가 '수동으로 열어둔' 슬롯과, '이미 예약된' 슬롯 ID를 먼저 저장합니다.
+        # 이 슬롯들은 항상 활성화 상태를 유지해야 합니다.
+        base_active_ids = {
+            slot['id'] for slot in all_slots if slot['is_active'] or slot['is_booked']
+        }
+        final_active_ids.update(base_active_ids)
 
-        # 6. 데이터베이스 업데이트를 실행합니다.
+        # 2. 예약된 슬롯의 주변 슬롯을 활성화 목록에 '추가'합니다.
+        #    - 조건 1: 주변 슬롯이 이미 예약되어 있지 않아야 합니다.
+        #    - 조건 2: 주변 슬롯이 현재 닫혀있는 경우(is_active=False),
+        #             관리자의 수동 '닫기'로 간주하여 열지 않습니다. (가장 중요한 변경점)
+        for i, current_slot in enumerate(all_slots):
+            if current_slot['is_booked']:
+                # 이전 슬롯 확인
+                if i > 0:
+                    prev_slot = all_slots[i - 1]
+                    if not prev_slot['is_booked'] and prev_slot['is_active']:
+                        final_active_ids.add(prev_slot['id'])
+                # 다음 슬롯 확인
+                if i < len(all_slots) - 1:
+                    next_slot = all_slots[i + 1]
+                    if not next_slot['is_booked'] and next_slot['is_active']:
+                        final_active_ids.add(next_slot['id'])
+
+        # 3. 최종 목록에 없는 슬롯들은 모두 비활성화합니다.
+        slots_to_deactivate = list(all_slot_ids - final_active_ids)
+        slots_to_activate = list(final_active_ids)  # 가독성을 위해 변수명 변경
+
         if slots_to_activate:
             supabase.table('time_slots').update({'is_active': True}).in_('id', slots_to_activate).execute()
 
@@ -1375,7 +1363,7 @@ def update_active_slots_for_clustering(event_id):
             supabase.table('time_slots').update({'is_active': False}).in_('id', slots_to_deactivate).execute()
 
         app.logger.info(
-            f"Event {event_id}: Re-clustered slots based on new logic. Activated: {len(slots_to_activate)}, Deactivated: {len(slots_to_deactivate)}")
+            f"Event {event_id}: Re-clustered slots. Activated: {len(slots_to_activate)}, Deactivated: {len(slots_to_deactivate)}")
 
     except Exception as e:
         app.logger.error(f"Error updating slots for clustering (Event ID: {event_id}): {e}")
