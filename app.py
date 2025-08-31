@@ -949,8 +949,31 @@ def delete_single_slot(slot_id):
         app.logger.error(f"Error deleting slot {slot_id}: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+@app.route('/api/admin/slots/delete_bulk', methods=['POST'])
+@login_required(role="admin")
+def delete_bulk_slots():
+    """관리자가 여러 시간 슬롯을 한 번에 삭제합니다."""
+    data = request.get_json()
+    slot_ids = data.get('slot_ids')
 
-# app.py
+    if not slot_ids or not isinstance(slot_ids, list):
+        return jsonify({'status': 'error', 'message': '슬롯 ID 목록이 필요합니다.'}), 400
+
+    try:
+        # 1. Foreign Key 제약 조건을 위해 연결된 '예약'을 먼저 삭제합니다.
+        supabase.table('reservations').delete().in_('slot_id', slot_ids).execute()
+
+        # 2. 이제 '시간 슬롯'을 삭제합니다.
+        result = supabase.table('time_slots').delete().in_('id', slot_ids).execute()
+
+        if not result.data:
+            return jsonify({'status': 'error', 'message': '삭제할 슬롯을 찾을 수 없거나 이미 삭제되었습니다.'}), 404
+
+        return jsonify({'status': 'success', 'message': f'{len(result.data)}개의 슬롯이 성공적으로 삭제되었습니다.'})
+    except Exception as e:
+        app.logger.error(f"Error deleting bulk slots: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 
 @app.route('/admin/events/<event_id>/timetable')
 @login_required(role="admin")
@@ -2153,32 +2176,30 @@ def interview_index():
 @login_required()
 def interview_get_slots(event_id):
     """
-    [최종 수정] 면접자 페이지의 시간 표시 오류를 해결하기 위해,
-    잘못된 시간 계산(+ timedelta) 대신 올바른 시간대 변환(astimezone)을 사용합니다.
+    [수정] 지원자에게 보여줄 슬롯 목록에 is_past 플래그를 추가하여
+    시간이 지났는지 여부를 프론트엔드에서 알 수 있도록 합니다.
     """
     try:
         response = supabase.table('time_slots').select('*').eq('event_id', event_id).eq('is_active', True).order(
             'slot_datetime', desc=False).execute()
 
-        # supabase-py v1, v2 라이브러리 호환성 확보
         slots_data = response.data if hasattr(response, 'data') else response
-
         slots_by_date = {}
 
-        # 한국 시간대(KST, UTC+9)를 명확하게 정의합니다.
+        # 한국 시간대(KST)와 현재 UTC 시간 정의
         KST = timezone(timedelta(hours=9))
+        now_utc = datetime.now(timezone.utc)
 
         for slot in slots_data:
             if not slot.get('slot_datetime'):
                 continue
 
-            # 데이터베이스에서 가져온 UTC 시간 문자열을 datetime 객체로 변환
             utc_dt = datetime.fromisoformat(slot['slot_datetime'].replace('Z', '+00:00'))
-
-            # UTC 시간을 KST 시간으로 정확하게 변환
             kst_dt = utc_dt.astimezone(KST)
 
-            # [핵심] 표시용 시간과 날짜 키를 모두 KST 기준으로 생성합니다.
+            # [추가] is_past 플래그 계산
+            slot['is_past'] = utc_dt < now_utc
+
             slot['time_display'] = kst_dt.strftime("%p %I:%M").replace("AM", "오전").replace("PM", "오후")
             date_key = kst_dt.strftime("%Y-%m-%d")
 
