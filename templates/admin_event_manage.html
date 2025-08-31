@@ -109,12 +109,18 @@
                 <div class="eva-card p-6 rounded-lg">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-xl font-bold text-eva-green">개별 슬롯 관리</h2>
-                        <a href="{{ url_for('admin_event_timetable', event_id=event.id) }}" class="eva-link font-semibold text-sm">전체 타임테이블 &rarr;</a>
+                        <div class="flex items-center gap-4">
+                            <button id="bulk-delete-btn" class="hidden eva-button-delete font-bold py-2 px-4 rounded-md">선택 항목 삭제</button>
+                            <a href="{{ url_for('admin_event_timetable', event_id=event.id) }}" class="eva-link font-semibold text-sm">전체 타임테이블 &rarr;</a>
+                        </div>
                     </div>
                     <div class="max-h-[80vh] overflow-y-auto">
                         <table class="min-w-full divide-y divide-border-dark" id="slots-table">
                             <thead class="eva-table-header sticky top-0">
                                 <tr>
+                                    <th class="w-12 px-4 py-3 text-center">
+                                        <input type="checkbox" id="select-all-slots" class="rounded text-eva-green bg-bg-dark border-border-dark focus:ring-0 cursor-pointer">
+                                    </th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">시간</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">상태</th>
                                     <th class="px-4 py-3 text-center text-xs font-medium text-gray-300 uppercase">관리</th>
@@ -123,9 +129,11 @@
                             <tbody class="divide-y divide-border-dark">
                                 {% for slot in all_slots %}
                                 <tr id="slot-row-{{ slot.id }}" class="eva-table-row">
+                                    <td class="px-4 py-3 text-center">
+                                        <input type="checkbox" name="slot_checkbox" value="{{ slot.id }}" class="slot-checkbox rounded text-eva-green bg-bg-dark border-border-dark focus:ring-0 cursor-pointer">
+                                    </td>
                                     <td class="px-4 py-3 whitespace-nowrap text-sm font-medium">{{ slot.slot_datetime | datetime }}</td>
                                     <td class="px-4 py-3 whitespace-nowrap text-sm">
-                                        {# --- [오류 해결] slot.reservations[0].applicants 까지 모두 존재하는지 확인 --- #}
                                         {% if slot.is_booked and slot.reservations and slot.reservations[0] and slot.reservations[0].applicants %}
                                             <span class="font-bold text-eva-orange">예약 완료</span>
                                             <span class="text-gray-400 text-xs ml-2">({{ slot.reservations[0].applicants.name }})</span>
@@ -140,7 +148,7 @@
                                     </td>
                                 </tr>
                                 {% else %}
-                                <tr><td colspan="3" class="px-6 py-10 text-center text-sm text-gray-500">생성된 슬롯이 없습니다.</td></tr>
+                                <tr><td colspan="4" class="px-6 py-10 text-center text-sm text-gray-500">생성된 슬롯이 없습니다.</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -154,12 +162,9 @@
 <script src="https://npmcdn.com/flatpickr/dist/l10n/ko.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // 날짜 선택기
     flatpickr(".datepicker", { "locale": "ko", dateFormat: "Y-m-d" });
-    // 시간 선택기
     flatpickr(".timepicker", { enableTime: true, noCalendar: true, dateFormat: "H:i", time_24hr: true });
 
-    // 전체 슬롯 일괄 삭제 함수
     window.deleteAllSlots = (eventId) => {
         if (!confirm('정말로 이 이벤트의 모든 슬롯과 예약 정보를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
         fetch(`/api/admin/events/${eventId}/delete_all_slots`, { method: 'POST', headers: {'Content-Type': 'application/json'} })
@@ -169,9 +174,83 @@ document.addEventListener('DOMContentLoaded', () => {
         }).catch(error => alert('슬롯 삭제 중 오류가 발생했습니다.'));
     };
 
-    // 개별 슬롯 삭제 이벤트 리스너
     const slotsTable = document.getElementById('slots-table');
     if (slotsTable) {
+        // --- [수정 시작] 체크박스 및 일괄 삭제 로직 ---
+        const selectAllCheckbox = document.getElementById('select-all-slots');
+        const rowCheckboxes = document.querySelectorAll('.slot-checkbox');
+        const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
+        let selectedIds = new Set();
+
+        // UI 업데이트 함수
+        function updateBulkDeleteUI() {
+            if (selectedIds.size > 0) {
+                bulkDeleteBtn.classList.remove('hidden');
+                bulkDeleteBtn.textContent = `${selectedIds.size}개 항목 삭제`;
+            } else {
+                bulkDeleteBtn.classList.add('hidden');
+            }
+            // 전체 선택 체크박스 상태 동기화
+            selectAllCheckbox.checked = rowCheckboxes.length > 0 && selectedIds.size === rowCheckboxes.length;
+        }
+
+        // '전체 선택' 체크박스 클릭 이벤트
+        selectAllCheckbox.addEventListener('change', () => {
+            rowCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+                if (selectAllCheckbox.checked) {
+                    selectedIds.add(checkbox.value);
+                } else {
+                    selectedIds.delete(checkbox.value);
+                }
+            });
+            updateBulkDeleteUI();
+        });
+
+        // '개별' 체크박스 클릭 이벤트
+        rowCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                if (checkbox.checked) {
+                    selectedIds.add(checkbox.value);
+                } else {
+                    selectedIds.delete(checkbox.value);
+                }
+                updateBulkDeleteUI();
+            });
+        });
+
+        // '선택 항목 삭제' 버튼 클릭 이벤트
+        bulkDeleteBtn.addEventListener('click', () => {
+            const idsToDelete = Array.from(selectedIds);
+            if (idsToDelete.length === 0) return;
+
+            if (confirm(`정말로 선택된 ${idsToDelete.length}개의 슬롯을 삭제하시겠습니까?\n연결된 예약 정보도 함께 삭제됩니다.`)) {
+                fetch('/api/admin/slots/delete_bulk', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ slot_ids: idsToDelete })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert(data.message);
+                        // 성공적으로 삭제된 항목들을 화면에서 제거
+                        idsToDelete.forEach(id => {
+                            document.getElementById(`slot-row-${id}`)?.remove();
+                        });
+                        selectedIds.clear();
+                        updateBulkDeleteUI();
+                    } else {
+                        alert('삭제 실패: ' + data.message);
+                    }
+                })
+                .catch(error => alert('삭제 처리 중 오류가 발생했습니다.'));
+            }
+        });
+
+        // --- [수정 끝] ---
+
+        // 개별 슬롯 '삭제' 버튼 이벤트 리스너 (기존 로직 유지)
         slotsTable.addEventListener('click', (e) => {
             if (e.target.matches('.delete-slot-btn')) {
                 const button = e.target;
@@ -179,12 +258,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 const isBooked = button.dataset.isBooked === 'true';
                 let confirmMessage = '정말로 이 슬롯을 삭제하시겠습니까?';
                 if (isBooked) { confirmMessage += '\n\n경고: 이 슬롯은 이미 예약되었습니다. 삭제 시 예약 정보도 함께 사라집니다.'; }
+
                 if (confirm(confirmMessage)) {
                     fetch(`/api/admin/slots/${slotId}/delete`, { method: 'POST' })
                     .then(response => response.json())
                     .then(data => {
                         if (data.status === 'success') {
                             document.getElementById(`slot-row-${slotId}`).remove();
+                            // 만약 선택된 항목이었다면 Set에서도 제거
+                            if(selectedIds.has(slotId)) {
+                                selectedIds.delete(slotId);
+                                updateBulkDeleteUI();
+                            }
                         } else {
                             alert('삭제 실패: ' + data.message);
                         }

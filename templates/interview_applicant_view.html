@@ -40,31 +40,46 @@
 
     <main class="container mx-auto p-4 sm:p-6 lg:p-8">
         {% if event %}
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div class="lg:col-span-2 eva-card p-6 rounded-xl shadow-lg">
-                <h2 class="text-2xl font-bold text-eva-green">{{ event.event_name }}</h2>
+        <div class="flex flex-col lg:flex-row gap-8">
 
-                <p id="info-text-dynamic" class="mt-1 text-gray-400">아래에서 원하시는 면접 날짜와 시간을 선택해주세요.</p>
-                <p class="mt-2 text-sm text-yellow-300 bg-yellow-900/50 p-3 rounded-lg">
-                    <strong>⚠️ 주의:</strong> 한번 예약을 확정하면 직접 수정하거나 취소할 수 없습니다. 변경이 필요하신 경우 반드시 관리자에게 문의해주세요.
-                </p>
-
-                <div id="slots-container" class="mt-6 space-y-6"><div class="loader"></div></div>
-            </div>
-            <div class="lg:col-span-1">
-                <div class="eva-card p-6 rounded-xl shadow-lg sticky top-24">
+            <div class="w-full lg:w-1/3 order-first lg:order-last">
+                <div class="eva-card p-6 rounded-xl shadow-lg lg:sticky top-24">
                     <h3 class="text-lg font-bold text-eva-green">My Reservation</h3>
-
                     <p class="text-xs text-gray-500 mt-2 border-b border-border-dark pb-3">
                         예약 후 페이지를 나가셨다면, 동일한 이름과 연락처로 다시 로그인하여 예약 정보를 확인할 수 있습니다.
                     </p>
-
                     <div id="my-reservation-info" class="mt-4"><p class="text-gray-500">예약 정보를 불러오는 중...</p></div>
                 </div>
             </div>
+
+            <div class="w-full lg:w-2/3 order-last lg:order-first">
+                <div class="eva-card p-6 rounded-xl shadow-lg">
+                    <div class="flex flex-wrap justify-between items-center gap-y-2 mb-1">
+                        <h2 class="text-2xl font-bold text-eva-green">{{ event.event_name }}</h2>
+                        <div class="flex items-center space-x-2 text-sm">
+                            <label for="past-slots-toggle" class="text-gray-400">지난 시간 숨기기</label>
+                            <input type="checkbox" id="past-slots-toggle" class="h-4 w-8 appearance-none bg-gray-600 rounded-full checked:bg-eva-green transition-colors duration-200 ease-in-out cursor-pointer relative
+                                    before:content-[''] before:h-3 before:w-3 before:bg-white before:rounded-full before:absolute before:top-0.5 before:left-0.5
+                                    before:transition-transform before:duration-200 before:ease-in-out checked:before:translate-x-4" checked>
+                        </div>
+                    </div>
+
+                    <p id="info-text-dynamic" class="mt-1 text-gray-400">아래에서 원하시는 면접 날짜와 시간을 선택해주세요.</p>
+                    <p class="mt-2 text-sm text-yellow-300 bg-yellow-900/50 p-3 rounded-lg">
+                        <strong>⚠️ 주의:</strong> 한번 예약을 확정하면 직접 수정하거나 취소할 수 없습니다. 변경이 필요하신 경우 반드시 관리자에게 문의해주세요.
+                    </p>
+
+                    <div id="slots-container" class="mt-6 space-y-6"><div class="loader"></div></div>
+                </div>
+            </div>
+
         </div>
         {% else %}
-            {% endif %}
+            <div class="text-center p-10 eva-card rounded-lg">
+                <h2 class="text-2xl font-bold text-yellow-400">No Active Events</h2>
+                <p class="mt-4 text-gray-400">현재 예약 가능한 면접 일정이 없습니다.</p>
+            </div>
+        {% endif %}
     </main>
 
     <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-80 overflow-y-auto h-full w-full hidden z-50"></div>
@@ -79,14 +94,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const slotsContainer = document.getElementById('slots-container');
     const myReservationInfo = document.getElementById('my-reservation-info');
-    const modalContainer = document.getElementById('modal-container');
-
-    // [수정] 동적으로 제어할 안내 문구의 ID를 변경합니다.
     const infoText = document.getElementById('info-text-dynamic');
+    const pastSlotsToggle = document.getElementById('past-slots-toggle');
 
     let hasReservation = false;
 
-    // ... 나머지 함수들(showModal, showAlert, showConfirmModal, handleReservation 등)은 기존과 동일 ...
+    // 모달 관련 함수들 (기존과 동일)
     function showModal(content) {
         const modalContainer = document.getElementById('modal-container');
         modalContainer.innerHTML = `<div class="relative top-20 mx-auto p-5 border border-border-dark w-full max-w-sm shadow-lg rounded-md eva-card">${content}</div>`;
@@ -94,31 +107,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     function hideModal() { document.getElementById('modal-container').classList.add('hidden'); }
     function showAlert(title, message, isSuccess = true) {
-        const icon = isSuccess ?
-            `<svg class="h-6 w-6 text-eva-green" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>` :
-            `<svg class="h-6 w-6 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>`;
+        const icon = isSuccess ? `<svg class="h-6 w-6 text-eva-green" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>` : `<svg class="h-6 w-6 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>`;
         const iconBg = isSuccess ? 'bg-green-900/50' : 'bg-orange-900/50';
-
-        const alertContent = `
-            <div class="mt-3 text-center">
-                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full ${iconBg}">${icon}</div>
-                <h3 class="text-lg leading-6 font-medium text-eva-green mt-4">${title}</h3>
-                <div class="mt-2 px-7 py-3"><p class="text-sm text-gray-400">${message}</p></div>
-                <div class="items-center px-4 py-3"><button id="alert-close-btn" class="px-4 py-2 bg-eva-purple text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-purple-700">닫기</button></div>
-            </div>`;
+        const alertContent = `<div class="mt-3 text-center"><div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full ${iconBg}">${icon}</div><h3 class="text-lg leading-6 font-medium text-eva-green mt-4">${title}</h3><div class="mt-2 px-7 py-3"><p class="text-sm text-gray-400">${message}</p></div><div class="items-center px-4 py-3"><button id="alert-close-btn" class="px-4 py-2 bg-eva-purple text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-purple-700">닫기</button></div></div>`;
         showModal(alertContent);
         document.getElementById('alert-close-btn').onclick = hideModal;
     }
     function showConfirmModal(slotId, slotTime) {
-        const modalContent = `
-            <div class="mt-3 text-center">
-                <h3 class="text-lg leading-6 font-medium text-eva-green">예약 확인</h3>
-                <div class="mt-2 px-7 py-3"><p class="text-sm text-gray-400"><strong>${slotTime}</strong><br>이 시간으로 면접을 예약하시겠습니까?</p><input type="text" class="eva-input mt-4 w-full px-3 py-2 border rounded-md" value="${userName}" readonly><input type="tel" class="eva-input mt-2 w-full px-3 py-2 border rounded-md" value="${userPhone}" readonly></div>
-                <div class="items-center px-4 py-3 space-y-2">
-                    <button id="confirm-reservation-btn" data-slot-id="${slotId}" class="px-4 py-2 bg-gray-200 text-black font-bold text-base rounded-md w-full shadow-sm hover:bg-white transition-colors">예약하기</button>
-                    <button id="cancel-modal-btn" class="px-4 py-2 bg-transparent border border-gray-500 text-gray-300 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-700 hover:text-white transition-colors">취소</button>
-                </div>
-            </div>`;
+        const modalContent = `<div class="mt-3 text-center"><h3 class="text-lg leading-6 font-medium text-eva-green">예약 확인</h3><div class="mt-2 px-7 py-3"><p class="text-sm text-gray-400"><strong>${slotTime}</strong><br>이 시간으로 면접을 예약하시겠습니까?</p><input type="text" class="eva-input mt-4 w-full px-3 py-2 border rounded-md" value="${userName}" readonly><input type="tel" class="eva-input mt-2 w-full px-3 py-2 border rounded-md" value="${userPhone}" readonly></div><div class="items-center px-4 py-3 space-y-2"><button id="confirm-reservation-btn" data-slot-id="${slotId}" class="px-4 py-2 bg-gray-200 text-black font-bold text-base rounded-md w-full shadow-sm hover:bg-white transition-colors">예약하기</button><button id="cancel-modal-btn" class="px-4 py-2 bg-transparent border border-gray-500 text-gray-300 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-700 hover:text-white transition-colors">취소</button></div></div>`;
         showModal(modalContent);
         document.getElementById('confirm-reservation-btn').onclick = handleReservation;
         document.getElementById('cancel-modal-btn').onclick = hideModal;
@@ -142,6 +138,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function togglePastSlots() {
+        const shouldHide = pastSlotsToggle.checked;
+        const pastSlots = slotsContainer.querySelectorAll('.past-slot');
+        pastSlots.forEach(slot => {
+            slot.style.display = shouldHide ? 'none' : 'block';
+        });
+    }
 
     async function fetchAndRenderSlots() {
         try {
@@ -158,21 +161,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 const dateContainer = document.createElement('div');
                 const dateObj = new Date(date);
                 const dateString = dateObj.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
-                dateContainer.innerHTML = `<h3 class="text-lg font-bold text-eva-purple mb-3 sticky top-[6.5rem] py-2" style="background-color: var(--card-dark);">${dateString}</h3>`;
+                // [수정] sticky 헤더는 중간 크기 화면(md) 이상에서만 동작하도록 변경
+                dateContainer.innerHTML = `<h3 class="text-lg font-bold text-eva-purple mb-3 bg-card-dark py-2 md:sticky top-[6.5rem]">${dateString}</h3>`;
                 const grid = document.createElement('div');
                 grid.className = 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2';
+
                 slotsByDate[date].forEach(slot => {
                     const button = document.createElement('button');
                     button.className = 'slot-btn font-medium py-2 px-2 rounded-lg text-sm';
                     button.textContent = slot.time_display;
                     button.dataset.slotId = slot.id;
                     button.dataset.slotTime = `${dateString} ${slot.time_display}`;
-                    if (slot.is_booked || hasReservation) { button.disabled = true; }
+
+                    if (slot.is_booked || hasReservation || slot.is_past) {
+                        button.disabled = true;
+                    }
+                    if (slot.is_past) {
+                        button.classList.add('past-slot');
+                    }
+
                     grid.appendChild(button);
                 });
                 dateContainer.appendChild(grid);
                 slotsContainer.appendChild(dateContainer);
             });
+
+            togglePastSlots();
+
         } catch (error) { slotsContainer.innerHTML = `<div class="text-center p-6 eva-card rounded-lg"><p class="text-red-400">오류: ${error.message}</p></div>`; }
     }
 
@@ -183,22 +198,16 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!response.ok) {
                 hasReservation = false;
                 myReservationInfo.innerHTML = '<p class="text-gray-500">아직 예약된 면접이 없습니다.</p>';
-                // [수정] JS가 제어하는 동적 안내 문구의 내용을 변경
                 infoText.textContent = "아래에서 원하시는 면접 날짜와 시간을 선택해주세요.";
                 return;
             }
             hasReservation = true;
-            // [수정] JS가 제어하는 동적 안내 문구의 내용을 변경
             infoText.textContent = "예약이 완료되었습니다. 시간 슬롯을 다시 선택할 수 없습니다.";
             const result = await response.json();
             const localTime = new Date(result.slot_datetime);
             const dateString = localTime.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'});
             const timeString = localTime.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: true });
-            myReservationInfo.innerHTML = `
-                <div class="p-4 rounded-lg border border-eva-green bg-bg-dark">
-                    <p class="text-sm text-gray-400">이벤트: <strong class="text-text-light">${result.event_name}</strong></p>
-                    <p class="text-sm text-gray-400 mt-1">예약 시간: <strong class="text-text-light">${dateString} ${timeString}</strong></p>
-                </div>`;
+            myReservationInfo.innerHTML = `<div class="p-4 rounded-lg border border-eva-green bg-bg-dark"><p class="text-sm text-gray-400">이벤트: <strong class="text-text-light">${result.event_name}</strong></p><p class="text-sm text-gray-400 mt-1">예약 시간: <strong class="text-text-light">${dateString} ${timeString}</strong></p></div>`;
         } catch(error) {
             hasReservation = false;
             myReservationInfo.innerHTML = '<p class="text-sm text-red-500">예약 정보 확인 중 오류가 발생했습니다.</p>';
@@ -217,6 +226,8 @@ document.addEventListener('DOMContentLoaded', function() {
             showConfirmModal(e.target.dataset.slotId, e.target.dataset.slotTime);
         }
     });
+
+    pastSlotsToggle.addEventListener('change', togglePastSlots);
 
     initializePage();
 });
