@@ -1547,28 +1547,37 @@ def generate_groups(participants, facilitators, members, co_matrix, group_count_
 @app.route('/making_team', methods=['GET'])
 @login_required(role="admin")
 def bookclub_index():
+    app.logger.info("---/making_team 경로 함수 실행 시작---")
     try:
         next_monday = get_next_monday()
+        app.logger.info(f"[1] 다음 주 월요일 날짜: {next_monday.isoformat()}")
 
         # 1. 모든 활성 멤버 목록을 가져옵니다.
-        all_active_members = supabase.table("members").select("id, name") \
-            .eq('is_active', True).order("name").execute().data
+        all_active_members_res = supabase.table("members").select("id, name") \
+            .eq('is_active', True).order("name").execute()
+        all_active_members = all_active_members_res.data
+        app.logger.info(f"[2] DB에서 가져온 전체 활성 멤버 수: {len(all_active_members)}명")
 
-        # 2. 다음 모임 날짜의 출석 기록을 모두 가져옵니다.
-        attendance_res = supabase.table('attendance').select('user_id, attending_seminar') \
-            .eq('meeting_date', next_monday.isoformat()).execute()
+        # 2. 다음 모임 날짜에 '불참(attending_seminar = False)' 의사를 밝힌 기록만 가져옵니다.
+        attendance_res = supabase.table('attendance').select('user_id') \
+            .eq('meeting_date', next_monday.isoformat()) \
+            .eq('attending_seminar', False) \
+            .execute()
+        app.logger.info(f"[3] DB에서 가져온 불참 응답 기록: {attendance_res.data}")
 
-        # 3. '불참' 의사를 밝힌 멤버들의 ID만 따로 저장합니다.
-        absentee_ids = {
-            att['user_id'] for att in attendance_res.data if att.get('attending_seminar') is False
-        }
+        # 3. 불참자들의 ID만 따로 저장합니다.
+        absentee_ids = {att['user_id'] for att in attendance_res.data}
+        app.logger.info(f"[4] 불참자로 처리된 ID 목록: {absentee_ids}")
 
-        # 4. 미리 체크될 참석자는 (모든 활성 멤버 - 불참 요청 멤버) 입니다.
+        # 4. 미리 체크될 참석자는 (모든 활성 멤버 - 불참자) 입니다.
         pre_checked_attendee_ids = {
             member['id'] for member in all_active_members if member['id'] not in absentee_ids
         }
+        app.logger.info(f"[5] 최종적으로 미리 체크될 참석자 수: {len(pre_checked_attendee_ids)}명")
+        # app.logger.info(f"최종 참석자 ID 목록: {pre_checked_attendee_ids}") # 필요시 이 줄의 주석을 해제하여 전체 ID를 볼 수 있습니다.
 
     except Exception as e:
+        app.logger.error(f"!!! /making_team 경로에서 오류 발생: {e}", exc_info=True)
         flash(f"데이터를 불러오는 중 오류가 발생했습니다: {e}", "danger")
         all_active_members = []
         pre_checked_attendee_ids = set()
@@ -1579,30 +1588,36 @@ def bookclub_index():
         pre_checked_attendee_ids=pre_checked_attendee_ids
     )
 
+
 @app.route('/start_group_generation')
 @login_required(role="admin")
 def start_group_generation():
+    # --- [수정] 로그 추가 ---
+    app.logger.info("\n---/start_group_generation 경로 함수 실행 시작---")
     present_names = request.args.getlist('present')
     facilitator_names = request.args.getlist('facilitators')
     group_count_str = request.args.get('group_count')
     group_names_str = request.args.get('group_names', '')
+    app.logger.info(f"[1] 전달받은 참석자 명단 (총 {len(present_names)}명): {present_names}")
+    app.logger.info(f"[2] 전달받은 발제자 명단: {facilitator_names}")
+    app.logger.info(f"[3] 전달받은 그룹 수: '{group_count_str}'")
+    # --- [수정 끝] ---
 
-    # 요청 컨텍스트가 활성 상태일 때 '편집' 페이지 URL을 미리 생성합니다.
     manual_entry_url = url_for('manual_entry')
 
     def generate_events(manual_url):
         try:
-            # DB에서 데이터 로드
+            app.logger.info("[4] DB에서 전체 회원 및 히스토리 데이터 로드 시작")
             members_res = supabase.table("members").select("*").order("name").execute().data
             members_df = pd.DataFrame(members_res)
             history_res = supabase.table("history").select("groups").execute().data
             history_df = pd.DataFrame(history_res if history_res else [])
+            app.logger.info(f"[5] 데이터 로드 완료: 회원 {len(members_df)}명, 히스토리 {len(history_df)}건")
 
             group_count_override = None
             if group_count_str and group_count_str.isdigit():
                 group_count_override = int(group_count_str)
 
-            # 제너레이터의 최종 반환 값(return)을 처리하는 헬퍼 함수
             def get_final_result_from_generator(generator, progress_offset=0, progress_scale=0.5):
                 final_result = []
                 while True:
@@ -1611,26 +1626,26 @@ def start_group_generation():
                         progress_data = json.dumps({'progress': int(progress_offset + (progress * progress_scale))})
                         yield f"event: progress\ndata: {progress_data}\n\n"
                     except StopIteration as e:
-                        # 웹사이트에서는 결과 1개만 반환되므로, 그대로 할당합니다.
                         final_result = e.value
                         break
                 return final_result
 
-            # '성비 우선' 알고리즘 실행
+            app.logger.info("[6] '성비 우선' 알고리즘 실행 시작")
             gender_generator = run_genetic_algorithm(
                 members_df, history_df, present_names, facilitator_names,
                 (10.0, 6.0, 3.0, 2.0, -1000.0), 20, group_count_override, test_mode=False
             )
             gender_solutions = yield from get_final_result_from_generator(gender_generator, 0, 0.5)
+            app.logger.info(f"[7] '성비 우선' 알고리즘 완료, {len(gender_solutions)}개의 결과 도출")
 
-            # '새로운 만남 우선' 알고리즘 실행
+            app.logger.info("[8] '새로운 만남 우선' 알고리즘 실행 시작")
             new_face_generator = run_genetic_algorithm(
                 members_df, history_df, present_names, facilitator_names,
                 (6.0, 10.0, 3.0, 2.0, -1000.0), 20, group_count_override, test_mode=False
             )
             new_face_solutions = yield from get_final_result_from_generator(new_face_generator, 50, 0.5)
+            app.logger.info(f"[9] '새로운 만남 우선' 알고리즘 완료, {len(new_face_solutions)}개의 결과 도출")
 
-            # 프론트엔드에 전달할 '만남 횟수 기록' 데이터 생성
             meeting_history = {}
             if not history_df.empty and 'groups' in history_df.columns:
                 for _, row in history_df.iterrows():
@@ -1642,7 +1657,7 @@ def start_group_generation():
                                 pair_key = '-'.join(sorted([group[i], group[j]]))
                                 meeting_history[pair_key] = meeting_history.get(pair_key, 0) + 1
 
-            # 최종 결과 페이지 렌더링
+            app.logger.info("[10] 최종 결과 페이지(HTML) 렌더링 시작")
             with app.app_context():
                 group_names = [name.strip() for name in group_names_str.split(',') if name.strip()]
                 final_html = render_template(
@@ -1657,21 +1672,22 @@ def start_group_generation():
                 )
                 complete_data = json.dumps({'html': final_html})
                 yield f"event: complete\ndata: {complete_data}\n\n"
+            app.logger.info("[11] 성공적으로 최종 HTML을 브라우저로 전송 완료")
 
         except Exception as e:
-            app.logger.error(f"조 편성 중 오류 발생: {e}", exc_info=True)
+            app.logger.error(f"!!! 조 편성 중 심각한 오류 발생: {e}", exc_info=True)
             error_data = json.dumps({'error': str(e)})
             yield f"event: error\ndata: {error_data}\n\n"
 
     return Response(generate_events(manual_entry_url), mimetype='text/event-stream')
 
 
-# app.py 파일에서 이 함수 전체를 아래 코드로 교체해주세요.
-
 def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_names, weights, num_results=3,
                           group_count_override=None, test_mode=False):
-    # --- 1, 2, 3 단계는 기존과 동일하게 유지 ---
-    # ... (데이터 전처리, 시나리오 설정, evaluate 함수 등은 생략) ...
+    # --- [로그 추가] ---
+    app.logger.info("---[GA] 조 편성 알고리즘 시작---")
+    app.logger.info(f"[GA] 가중치: (성비:{weights[0]}, 새얼굴:{weights[1]}, 발제자:{weights[2]}, 선호도:{weights[3]})")
+
     # --- 1. 데이터 전처리 ---
     members_info = members_df.set_index('id').to_dict('index')
     name_to_id_map = pd.Series(members_df.id.values, index=members_df.name).to_dict()
@@ -1695,72 +1711,62 @@ def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_name
     TODAY_ATTENDEE_IDS = [name_to_id_map[name] for name in attendee_names if name in name_to_id_map]
     TODAY_PRESENTER_IDS = [name_to_id_map[name] for name in presenter_names if name in name_to_id_map]
     num_attendees = len(TODAY_ATTENDEE_IDS)
+
+    # --- [로그 추가] ---
+    app.logger.info(f"[GA] 처리할 최종 참석자 ID 수: {num_attendees}명")
+
     if num_attendees < 3:
+        app.logger.warning("[GA] 참석자가 3명 미만이므로, 알고리즘을 중단하고 빈 결과를 반환합니다.")
         return [], None
 
     if group_count_override and group_count_override > 0:
         num_groups = group_count_override
     else:
-        if num_attendees <= 5:
-            num_groups = 1
-        elif num_attendees <= 10:
-            num_groups = 2
-        else:
-            num_groups = round(num_attendees / 4.5)
+        # [수정] 4~5명으로 조를 구성하는데 가장 이상적인 그룹 수를 계산하는 로직
+        q, r = divmod(num_attendees, 4)
+        if r == 0: # 4로 나누어 떨어지면, 모든 조를 4명으로 구성
+            num_groups = q
+        else: # 4로 나누어 떨어지지 않으면, 일부 조를 5명으로 구성
+            num_groups = q + 1
+
+    # --- [로그 추가] ---
+    app.logger.info(f"[GA] 목표 그룹 수: {num_groups}개")
 
     attendee_id_map = {idx: member_id for idx, member_id in enumerate(TODAY_ATTENDEE_IDS)}
 
     # --- 3. 적합도 평가 함수 (evaluate) ---
     MIN_GROUP_SIZE = 3
-
-    # [수정] 최대 그룹 인원 수를 동적으로 계산합니다.
     DEFAULT_MAX_GROUP_SIZE = 5
-    # 수학적으로 필요한 최소한의 최대 인원 수를 계산합니다 (예: 17명/3그룹 -> 5.33 -> 6명)
     required_max_size = math.ceil(num_attendees / num_groups) if num_groups > 0 else 0
-    # 기본값과 필요값 중 더 큰 값을 실제 최대 인원 수로 사용합니다.
     MAX_GROUP_SIZE = max(DEFAULT_MAX_GROUP_SIZE, required_max_size)
+    app.logger.info(f"[GA] 그룹별 최소/최대 인원: {MIN_GROUP_SIZE}명 / {MAX_GROUP_SIZE}명")
 
     RECENT_MEETING_THRESHOLD = 2
 
     def calculate_total_score(ind_fitness_values, W):
         total = sum(v * w for v, w in zip(ind_fitness_values, W))
-
-        # [디버깅] 비정상적으로 큰 점수가 계산될 때만 내부 계산 과정을 출력합니다.
         if total > 1000:
             raw_scores_str = ", ".join([f"{v:.2f}" for v in ind_fitness_values])
             print(f"[SCORE_DEBUG] Raw Scores: [{raw_scores_str}] -> Total: {total:.2f}")
-
         return total
 
     def evaluate(individual):
         groups = {i: [] for i in range(num_groups)}
         for i, g in enumerate(individual):
             groups[g].append(attendee_id_map[i])
-
-        # [수정] size_penalty를 계산만 하고, 조기 return하지 않습니다.
         size_penalty = sum(1 for g in groups.values() if 0 < len(g) < MIN_GROUP_SIZE or len(g) > MAX_GROUP_SIZE)
-
-        # 만약 유효하지 않은 그룹 크기라면, 다른 점수 계산 없이 바로 페널티만 적용된 값을 반환합니다.
-        # 이렇게 하면 계산 시간을 절약하고 로직이 명확해집니다.
         if size_penalty > 0:
-            return 0, 0, 0, 0, size_penalty  # 페널티는 양수로 반환
-
-        # --- 유효한 그룹일 경우에만 아래 점수들을 계산 ---
+            return 0, 0, 0, 0, size_penalty
         new_face_score, preference_score, total_pairs = 0, 0, 0
         group_gender_scores = []
-
         for group_members in groups.values():
             if not group_members: continue
-
-            # 성비 점수 계산
             males = sum(1 for mid in group_members if members_info.get(mid, {}).get('gender') == 'M')
             females = len(group_members) - males
             if males > 0 and females > 0:
                 group_gender_scores.append(min(males, females) / max(males, females))
             else:
                 group_gender_scores.append(0)
-
-            # 새얼굴, 선호도 점수 계산
             for i, member_id in enumerate(group_members):
                 member_prefs = members_info.get(member_id)
                 if member_prefs:
@@ -1778,16 +1784,12 @@ def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_name
                             'preferred_member_id') == member_id and meet_count < RECENT_MEETING_THRESHOLD: preference_score += 1
                         if other_member_id == avoided_id: preference_score -= 1.5
                         if other_prefs and other_prefs.get('avoided_member_id') == member_id: preference_score -= 1.5
-
-        # 최종 정규화된 점수 계산
         gender_score = np.mean(group_gender_scores) if group_gender_scores else 0
         norm_new_face = new_face_score / total_pairs if total_pairs > 0 else 0
         max_pref_score = len(TODAY_ATTENDEE_IDS) * 2
         norm_pref = (preference_score + max_pref_score) / (max_pref_score * 2) if max_pref_score > 0 else 0
         presenters_per_group = [sum(1 for mid in g if mid in TODAY_PRESENTER_IDS) for g in groups.values()]
         presenter_score = 1 / (np.var(presenters_per_group) + 0.1) if len(presenters_per_group) > 1 else 10.0
-
-        # [수정] 마지막에 모든 점수를 함께 반환합니다. 페널티는 양수(0, 1, 2...) 입니다.
         return gender_score, norm_new_face, presenter_score, norm_pref, size_penalty
 
     # --- 4. 유전 알고리즘 실행 ---
@@ -1810,23 +1812,21 @@ def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_name
     pop_size, ngen, cxpb, mutpb = 1200, 100, 0.7, 0.6
     population = toolbox.population(n=pop_size)
     hall_of_fame = tools.HallOfFame(50)
-
-    # [수정] Logbook 객체 대신 단순 파이썬 리스트 사용
     manual_log = []
 
-    # 초기 집단 평가
+    app.logger.info(f"[GA] GA 파라미터: pop_size={pop_size}, ngen={ngen}, cxpb={cxpb}, mutpb={mutpb}")
+    app.logger.info("[GA] GA 연산 시작 (최대 10~20초 소요될 수 있습니다)...")
+
     invalid_ind = [ind for ind in population if not ind.fitness.valid]
     fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
     for ind, fit in zip(invalid_ind, fitnesses):
         ind.fitness.values = fit
     hall_of_fame.update(population)
 
-    # 세대 진화 시작
     for gen in range(1, ngen + 1):
         if not test_mode:
             if gen % 10 == 0 or gen == ngen:
                 yield int((gen / ngen) * 100)
-
         offspring = toolbox.select(population, len(population))
         offspring = algorithms.varAnd(offspring, toolbox, cxpb, mutpb)
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
@@ -1835,24 +1835,39 @@ def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_name
             ind.fitness.values = fit
         hall_of_fame.update(offspring)
         population[:] = offspring
-
-        # [수정] Statistics 객체 대신 직접 최고 점수를 계산하고 리스트에 추가
         current_scores = [calculate_total_score(ind.fitness.values, weights) for ind in population]
         max_score = np.max(current_scores)
         manual_log.append({'gen': gen, 'max_score': max_score})
 
+    app.logger.info("[GA] GA 연산 종료. 결과 포맷팅 시작.")
+
     # --- 5. 중복 제거 및 결과 포맷팅 ---
     def normalized_hamming_distance(ind1, ind2):
-        labels1 = sorted(list(set(ind1)));
-        labels2 = sorted(list(set(ind2)))
-        if len(labels1) != len(labels2): return len(ind1)
-        min_dist = len(ind1)
-        for p_labels in itertools.permutations(labels2):
-            label_map = {original: permuted for original, permuted in zip(labels2, p_labels)}
-            permuted_ind2 = [label_map[label] for label in ind2]
-            dist = sum(c1 != c2 for c1, c2 in zip(ind1, permuted_ind2))
-            if dist < min_dist: min_dist = dist
-        return min_dist
+        """
+        [수정된 로직] 두 조 편성안(individual)이 얼마나 다른지 효율적으로 계산합니다.
+        그룹 번호 대신, 각 멤버가 누구와 함께 조를 이루는지를 기준으로 비교합니다.
+        """
+        # 각 individual을 {멤버 ID: 그룹 번호} 형태의 딕셔너리로 변환
+        map1 = {attendee_id_map[i]: g for i, g in enumerate(ind1)}
+        map2 = {attendee_id_map[i]: g for i, g in enumerate(ind2)}
+
+        distance = 0
+        all_member_ids = list(attendee_id_map.values())
+
+        # 모든 멤버 쌍에 대해, 두 편성안에서 같은 조에 속하는지 확인
+        for i in range(len(all_member_ids)):
+            for j in range(i + 1, len(all_member_ids)):
+                member_a = all_member_ids[i]
+                member_b = all_member_ids[j]
+
+                # 한 편성안에서는 같은 조였는데, 다른 편성안에서는 다른 조인 경우 distance 증가
+                in_same_group1 = (map1[member_a] == map1[member_b])
+                in_same_group2 = (map2[member_a] == map2[member_b])
+
+                if in_same_group1 != in_same_group2:
+                    distance += 1
+
+        return distance
 
     def get_groups_from_individual(individual, attendee_id_map):
         groups_dict = {}
@@ -1862,42 +1877,62 @@ def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_name
         return {frozenset(v) for v in groups_dict.values() if v}
 
     def select_diverse_solutions(sorted_solutions, num_to_select, min_distance, attendee_id_map):
+        # --- [수정] 상세 로그 추가 ---
+        app.logger.info(
+            f"[GA-DEBUG-SELECT] 최종 추천안 선택 시작. 목표: {num_to_select}개, 후보: {len(sorted_solutions)}개, 최소유사도거리: {min_distance}")
         if not sorted_solutions:
             return []
 
-        diverse_selection = []
-        # 가장 점수가 높은 첫 번째 추천안은 무조건 포함합니다.
-        diverse_selection.append(sorted_solutions[0])
+        diverse_selection = [sorted_solutions[0]]
+        app.logger.info("[GA-DEBUG-SELECT] -> 1순위(가장 점수 높은) 추천안은 자동 선택.")
 
-        # 나머지 추천안들을 순회하며 비교합니다.
-        for sol in sorted_solutions[1:]:
-            # 목표 개수에 도달하면 중단합니다.
+        # 나머지 후보들을 순회하며 비교
+        for i, sol in enumerate(sorted_solutions[1:], 1):
             if len(diverse_selection) >= num_to_select:
+                app.logger.info(f"[GA-DEBUG-SELECT] 목표 개수인 {num_to_select}개를 모두 찾았으므로 선택을 중단합니다.")
                 break
 
+            app.logger.info(f"[GA-DEBUG-SELECT] ----> 후보 {i + 1}번 추천안을 검토합니다.")
             is_diverse_enough = True
-            # 이미 선택된 모든 추천안들과 하나씩 비교합니다.
-            for selected_sol in diverse_selection:
+
+            # 이미 선택된 추천안들과 하나씩 비교
+            for j, selected_sol in enumerate(diverse_selection):
                 dist = normalized_hamming_distance(sol, selected_sol)
-                # 너무 유사한 추천안이 하나라도 발견되면 탈락시킵니다.
+                app.logger.info(f"[GA-DEBUG-SELECT]      (vs {j + 1}번 추천안) 유사도 거리: {dist}")
+
                 if dist < min_distance:
                     is_diverse_enough = False
+                    app.logger.info(f"[GA-DEBUG-SELECT]      결과: 너무 유사하여 기각 (거리 {dist} < 최소거리 {min_distance})")
                     break
 
-            # 모든 기존 추천안들과 충분히 다르다고 판단되면, 최종 목록에 추가합니다.
             if is_diverse_enough:
                 diverse_selection.append(sol)
+                app.logger.info(f"[GA-DEBUG-SELECT] ----> 결과: 충분히 달라서 최종 추천안으로 채택!")
 
+        app.logger.info(f"[GA-DEBUG-SELECT] 최종 추천안 선택 완료. 총 {len(diverse_selection)}개를 반환합니다.")
         return diverse_selection
 
     valid_solutions = [ind for ind in hall_of_fame if ind.fitness.values[4] == 0]
+    app.logger.info(f"[GA] 유효한 결과(그룹 크기 준수) {len(valid_solutions)}개 발견.")
     if not valid_solutions:
+        app.logger.warning("[GA] 유효한 조 편성 결과를 찾지 못했습니다.")
         return [], manual_log
 
-    sorted_solutions = sorted(valid_solutions, key=lambda ind: calculate_total_score(ind.fitness.values, weights),
-                              reverse=True)
-    final_solutions_indices = select_diverse_solutions(sorted_solutions, num_results, int(num_attendees * 0.15),
-                                                       attendee_id_map)
+    try:
+        app.logger.info("[GA-DEBUG] valid_solutions 정렬 시작...")
+        sorted_solutions = sorted(valid_solutions, key=lambda ind: calculate_total_score(ind.fitness.values, weights),
+                                  reverse=True)
+        app.logger.info(f"[GA-DEBUG] 정렬 완료. 총 {len(sorted_solutions)}개의 결과.")
+
+        app.logger.info("[GA-DEBUG] diverse solution 선택 시작...")
+        final_solutions_indices = select_diverse_solutions(sorted_solutions, num_results, int(num_attendees * 0.15),
+                                                           attendee_id_map)
+        app.logger.info(f"[GA-DEBUG] diverse solution 선택 완료. {len(final_solutions_indices)}개 선택됨.")
+
+    except Exception as e:
+        app.logger.error(f"!!! [GA-DEBUG] 결과 처리 중 심각한 오류 발생: {e}", exc_info=True)
+        # 오류가 발생해도 빈 결과를 반환하여 전체 시스템이 멈추지 않도록 함
+        return [], manual_log
 
     output_results = []
     id_to_name_map = {v: k for k, v in name_to_id_map.items()}
@@ -1915,11 +1950,11 @@ def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_name
             "groups": formatted_groups
         })
 
+    app.logger.info(f"[GA] 최종적으로 {len(output_results)}개의 다양한 추천안을 반환합니다.")
+
     if test_mode:
-        # 테스트 스크립트에서는 결과와 로그를 모두 반환
         return output_results, manual_log
     else:
-        # 웹사이트에서는 최종 결과만 반환
         return output_results
 
 
@@ -1987,26 +2022,34 @@ def manual_entry():
 def save_manual_groups():
     try:
         form_data = request.form
-
         meeting_date = form_data.get('meeting_date')
-        present_members = form_data.getlist('present')
-        # [수정] 발제자 정보도 폼에서 가져옵니다.
-        facilitator_members = form_data.getlist('facilitators')
 
         groups = []
-        for i in range(1, 6):
+        present_members_set = set()
+
+        # [수정] 15개의 그룹 입력란을 모두 확인
+        for i in range(1, 16):
             group_text = form_data.get(f'group_{i}')
             if group_text:
+                # 쉼표, 공백, 세미콜론, 줄바꿈 등 다양한 구분자로 멤버 이름 분리
                 member_names = re.split(r'[,;\s\n]+', group_text)
+                # 앞뒤 공백 제거 및 빈 이름 제외
                 cleaned_group = [name.strip() for name in member_names if name.strip()]
                 if cleaned_group:
                     groups.append(cleaned_group)
+                    # 그룹에 포함된 모든 인원을 참석자 Set에 추가 (자동으로 중복 제거)
+                    present_members_set.update(cleaned_group)
+
+        present_members = sorted(list(present_members_set))
+
+        # [수정] 발제자 목록은 현재 로직상 별도로 받지 않으므로 빈 리스트로 처리
+        # (필요시, 이름 뒤에 '*'를 붙이면 발제자로 인식하는 등의 규칙 추가 가능)
+        facilitator_members = []
 
         if not all([meeting_date, present_members, groups]):
-            flash("날짜, 참석자, 최소 1개 이상의 그룹을 모두 입력해야 합니다.", "danger")
+            flash("날짜와 최소 1명 이상의 그룹 멤버를 모두 입력해야 합니다.", "danger")
             return redirect(url_for('manual_entry'))
 
-        # [수정] 헬퍼 함수에 발제자 정보를 전달합니다.
         result = save_group_record_to_db(meeting_date, present_members, facilitator_members, groups)
 
         if result["status"] == "ok":

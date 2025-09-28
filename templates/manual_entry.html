@@ -15,8 +15,6 @@
         .eva-input { background-color: var(--bg-dark); border-color: var(--border-dark); color: var(--text-light); }
         .eva-button { background-color: var(--eva-green); color: black; font-weight: bold; transition: opacity 0.2s; }
         .eva-button:hover { opacity: 0.85; }
-        .form-check { display: flex; align-items: center; background-color: var(--bg-dark); padding: 0.5rem; border-radius:4px; }
-        .form-check input { margin-right: 0.5rem; accent-color: var(--eva-green); }
         #image-modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.9); justify-content: center; align-items: center; }
         #image-modal-content { max-width: 90%; max-height: 80%; border-radius: 8px; }
         #modal-caption { text-align: center; color: #ccc; padding: 10px 0; font-size: 1rem;}
@@ -25,7 +23,7 @@
     </style>
 </head>
 <body class="p-4 md:p-8">
-    <div class="container mx-auto max-w-4xl">
+    <div class="container mx-auto max-w-7xl">
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-2xl md:text-3xl font-bold text-eva-green">Manual Group Entry</h1>
             <a href="{{ url_for('admin_dashboard') }}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md">대시보드로</a>
@@ -47,40 +45,13 @@
                 <input type="date" id="meeting_date" name="meeting_date" required class="eva-input w-full md:w-1/2 p-2 rounded-md">
             </div>
 
-            <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                <div>
-                    <h2 class="text-lg font-bold text-eva-purple mb-2">참석자 선택</h2>
-                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {% for member in all_members %}
-                        <label class="form-check">
-                            <input type="checkbox" name="present" value="{{ member }}">
-                            {{ member }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                </div>
-                <div>
-                    <h2 class="text-lg font-bold text-eva-purple mb-2">발제자 선택 (선택사항)</h2>
-                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {% for member in all_members %}
-                        <label class="form-check">
-                            <input type="checkbox" name="facilitators" value="{{ member }}">
-                            {{ member }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-
             <div>
-                <h2 class="text-lg font-bold text-eva-purple mb-2">그룹 입력</h2>
-                <p class="text-sm text-gray-400 mb-4">각 그룹의 멤버 이름을 쉼표(,)나 공백, 줄바꿈으로 구분하여 입력하세요.</p>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <textarea name="group_1" placeholder="그룹 1 멤버..." rows="5" class="eva-input w-full p-2 rounded-md"></textarea>
-                    <textarea name="group_2" placeholder="그룹 2 멤버..." rows="5" class="eva-input w-full p-2 rounded-md"></textarea>
-                    <textarea name="group_3" placeholder="그룹 3 멤버..." rows="5" class="eva-input w-full p-2 rounded-md"></textarea>
-                    <textarea name="group_4" placeholder="그룹 4 멤버..." rows="5" class="eva-input w-full p-2 rounded-md"></textarea>
-                    <textarea name="group_5" placeholder="그룹 5 멤버..." rows="5" class="eva-input w-full p-2 rounded-md"></textarea>
+                <h2 class="text-lg font-bold text-eva-purple mb-2">그룹 입력 (최대 15개)</h2>
+                <p class="text-sm text-gray-400 mb-4">각 그룹의 멤버 이름을 쉼표(,), 공백, 줄바꿈으로 구분하여 입력하세요. 입력된 모든 인원은 자동으로 참석자로 처리됩니다.</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    {% for i in range(1, 16) %}
+                    <textarea name="group_{{ i }}" placeholder="그룹 {{ i }} 멤버..." rows="6" class="eva-input w-full p-2 rounded-md"></textarea>
+                    {% endfor %}
                 </div>
             </div>
 
@@ -99,12 +70,11 @@
 
     <script>
     document.addEventListener('DOMContentLoaded', () => {
+        // [수정] GA 결과 연동 시, 그룹 정보만 채우도록 변경
         const dataToEditJSON = sessionStorage.getItem('manualEntryData');
         if (dataToEditJSON) {
             const data = JSON.parse(dataToEditJSON);
             document.getElementById('meeting_date').value = data.date;
-            document.querySelectorAll('input[name="present"]').forEach(cb => { if (data.present.includes(cb.value)) { cb.checked = true; } });
-            document.querySelectorAll('input[name="facilitators"]').forEach(cb => { if (data.facilitators.includes(cb.value)) { cb.checked = true; } });
             data.groups.forEach((group, index) => {
                 const textarea = document.querySelector(`textarea[name="group_${index + 1}"]`);
                 if (textarea) { textarea.value = group.join(', '); }
@@ -114,17 +84,15 @@
             document.getElementById('meeting_date').valueAsDate = new Date();
         }
 
+        // [수정] 캡쳐 기능 로직은 기존과 유사하게 유지
         const captureBtn = document.getElementById('capture-btn');
         captureBtn.addEventListener('click', async () => {
             if (typeof html2canvas === 'undefined') {
                 alert('오류: 캡쳐 라이브러리를 로드하지 못했습니다.'); return;
             }
-
             const captureContainer = document.createElement('div');
             try {
                 const meetingDate = document.getElementById('meeting_date').value;
-                const presentMembers = Array.from(document.querySelectorAll('input[name="present"]:checked')).map(cb => cb.value);
-                const facilitatorMembers = Array.from(document.querySelectorAll('input[name="facilitators"]:checked')).map(cb => cb.value);
                 const groupTexts = Array.from(document.querySelectorAll('textarea[name^="group_"]')).map(textarea => textarea.value);
                 const groups = groupTexts.map(text => text.split(/[,;\s\n]+/g).map(name => name.trim()).filter(name => name !== ''));
 
@@ -136,15 +104,11 @@
                 });
 
                 let innerHTML = '<h3 style="font-family: \'Orbitron\', sans-serif; font-size: 20px; font-weight: bold; color: #00FF7F; margin-bottom: 16px; text-transform: uppercase;">수동 기록</h3>';
-                if (meetingDate) { innerHTML += `<p style="font-size: 14px; margin-bottom: 8px;"><strong>날짜:</strong> ${meetingDate}</p>`; }
-                if (presentMembers.length > 0) { innerHTML += `<p style="font-size: 14px; margin-bottom: 8px;"><strong>참석자:</strong> ${presentMembers.sort().join(', ')}</p>`; }
-                if (facilitatorMembers.length > 0) { innerHTML += `<p style="font-size: 14px; margin-bottom: 8px;"><strong>발제자:</strong> <span style="color: #ADFF2F;">${facilitatorMembers.sort().join(', ')}</span></p>`; }
-                innerHTML += '<div style="margin-top: 16px;"></div>';
+                if (meetingDate) { innerHTML += `<p style="font-size: 14px; margin-bottom: 16px;"><strong>날짜:</strong> ${meetingDate}</p>`; }
+
                 groups.forEach((group, index) => {
                     if (group.length > 0) {
-                        const memberNames = [...group].sort().map(name =>
-                            facilitatorMembers.includes(name) ? `<strong style="font-weight: bold; color: #ADFF2F;">${name}</strong>` : name
-                        ).join(', ');
+                        const memberNames = [...group].sort().join(', ');
                         innerHTML += `<div style="background-color: #1A1A1A; padding: 12px; border-radius: 8px; margin-bottom: 10px;"><strong style="color: #E5E5E5;">그룹 ${index + 1}:</strong> ${memberNames}</div>`;
                     }
                 });
@@ -152,7 +116,6 @@
                 document.body.appendChild(captureContainer);
 
                 const canvas = await html2canvas(captureContainer, { scale: 2 });
-
                 const modal = document.getElementById('image-modal');
                 const modalImg = document.getElementById('image-modal-content');
                 modalImg.src = canvas.toDataURL("image/png");
@@ -160,7 +123,6 @@
 
             } catch (err) {
                 alert('캡쳐 중 오류가 발생했습니다: ' + err.message);
-                console.error(err);
             } finally {
                 if (document.body.contains(captureContainer)) {
                     document.body.removeChild(captureContainer);
