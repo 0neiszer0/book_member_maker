@@ -1,0 +1,30 @@
+# .github/workflows/keep-alive.yml
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    # 매일 자정(UTC 기준)에 스크립트를 실행합니다.
+    - cron: '0 0 * * *'
+
+jobs:
+  run-keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11' # 프로젝트와 동일한 Python 버전 사용
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install python-dotenv supabase
+
+      - name: Run keep-alive script
+        run: python keep_alive.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}

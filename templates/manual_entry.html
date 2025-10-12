@@ -10,11 +10,13 @@
     <style>
         :root { --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A; --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444; }
         body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
-        h1, h2 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; }
+        h1, h2, h3 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; }
         .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
         .eva-input { background-color: var(--bg-dark); border-color: var(--border-dark); color: var(--text-light); }
-        .eva-button { background-color: var(--eva-green); color: black; font-weight: bold; transition: opacity 0.2s; }
-        .eva-button:hover { opacity: 0.85; }
+        .eva-button { font-weight: bold; transition: opacity 0.2s; }
+        .eva-button-green { background-color: var(--eva-green); color: black; }
+        .eva-button-green:hover { opacity: 0.85; }
+        dialog::backdrop { background-color: rgba(0,0,0,0.7); }
         #image-modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.9); justify-content: center; align-items: center; }
         #image-modal-content { max-width: 90%; max-height: 80%; border-radius: 8px; }
         #modal-caption { text-align: center; color: #ccc; padding: 10px 0; font-size: 1rem;}
@@ -47,20 +49,34 @@
 
             <div>
                 <h2 class="text-lg font-bold text-eva-purple mb-2">그룹 입력 (최대 15개)</h2>
-                <p class="text-sm text-gray-400 mb-4">각 그룹의 멤버 이름을 쉼표(,), 공백, 줄바꿈으로 구분하여 입력하세요. 입력된 모든 인원은 자동으로 참석자로 처리됩니다.</p>
+                <p class="text-sm text-gray-400 mb-4">
+                    멤버 이름을 쉼표(,), 공백, 줄바꿈으로 구분하여 입력하세요. <br>
+                    <strong class="text-yellow-300">발제자 이름 뒤에는 `*` (별표)를 붙여주세요. (예: 홍길동*)</strong>
+                </p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                     {% for i in range(1, 16) %}
-                    <textarea name="group_{{ i }}" placeholder="그룹 {{ i }} 멤버..." rows="6" class="eva-input w-full p-2 rounded-md"></textarea>
+                    <textarea name="group_{{ i }}" placeholder="그룹 {{ i }} 멤버..." rows="6" class="eva-input w-full p-2 rounded-md group-textarea"></textarea>
                     {% endfor %}
                 </div>
             </div>
 
-            <div class="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button type="button" id="capture-btn" class="eva-button w-full text-lg py-3 rounded-md" style="background-color: #4A4A4A; color: white;">화면 캡쳐</button>
-                <button type="submit" class="eva-button w-full text-lg py-3 rounded-md">기록 저장하기</button>
+            <div class="pt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <button type="button" id="capture-btn" class="eva-button w-full text-lg py-3 rounded-md bg-gray-600 hover:bg-gray-700 text-white">화면 캡쳐</button>
+                <button type="button" id="preview-btn" class="eva-button w-full text-lg py-3 rounded-md bg-blue-600 hover:bg-blue-700 text-white">미리보기</button>
+                <button type="submit" class="eva-button eva-button-green w-full text-lg py-3 rounded-md">기록 저장하기</button>
             </div>
         </form>
     </div>
+
+    <dialog id="preview-dialog" class="bg-card-dark text-text-light border border-border-dark rounded-lg p-0 w-full max-w-4xl">
+        <header class="p-4 border-b border-border-dark flex justify-between items-center">
+            <h2 class="text-xl font-bold text-eva-purple">편성 결과 미리보기</h2>
+            <button id="preview-close-btn" class="text-2xl hover:text-red-500">&times;</button>
+        </header>
+        <div id="preview-content" class="p-6 max-h-[70vh] overflow-y-auto">
+            <p>데이터를 분석 중입니다...</p>
+        </div>
+    </dialog>
 
     <div id="image-modal">
         <span id="modal-close">&times;</span>
@@ -70,22 +86,68 @@
 
     <script>
     document.addEventListener('DOMContentLoaded', () => {
-        // [수정] GA 결과 연동 시, 그룹 정보만 채우도록 변경
-        const dataToEditJSON = sessionStorage.getItem('manualEntryData');
-        if (dataToEditJSON) {
-            const data = JSON.parse(dataToEditJSON);
-            document.getElementById('meeting_date').value = data.date;
-            data.groups.forEach((group, index) => {
-                const textarea = document.querySelector(`textarea[name="group_${index + 1}"]`);
-                if (textarea) { textarea.value = group.join(', '); }
+        document.getElementById('meeting_date').valueAsDate = new Date();
+
+        const previewBtn = document.getElementById('preview-btn');
+        const previewDialog = document.getElementById('preview-dialog');
+        const previewContent = document.getElementById('preview-content');
+        const previewCloseBtn = document.getElementById('preview-close-btn');
+        const captureBtn = document.getElementById('capture-btn');
+
+        // 미리보기 버튼 이벤트 (기존과 동일)
+        previewBtn.addEventListener('click', async () => {
+            previewContent.innerHTML = '<p>데이터를 분석 중입니다...</p>';
+            previewDialog.showModal();
+            const groupTextareas = document.querySelectorAll('.group-textarea');
+            const groups = Array.from(groupTextareas).map(textarea => {
+                return textarea.value.trim().split(/[,;\s\n]+/).map(name => name.trim()).filter(Boolean);
+            }).filter(group => group.length > 0);
+
+            if (groups.length === 0) {
+                previewContent.innerHTML = '<p class="text-yellow-400">분석할 그룹 정보가 없습니다. 먼저 그룹을 입력해주세요.</p>';
+                return;
+            }
+            try {
+                const response = await fetch('/api/bookclub/preview_manual_groups', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ groups: groups })
+                });
+                if (!response.ok) {
+                    const errorResult = await response.json();
+                    throw new Error(errorResult.error || '서버 응답 오류');
+                }
+                const result = await response.json();
+                renderPreview(result);
+            } catch (error) {
+                previewContent.innerHTML = `<p class="text-red-400">미리보기 생성 실패: ${error.message}</p>`;
+            }
+        });
+        previewCloseBtn.addEventListener('click', () => previewDialog.close());
+
+        function renderPreview(data) {
+            // ... (미리보기 렌더링 로직은 기존과 동일) ...
+            if (!data.group_analysis || data.group_analysis.length === 0) {
+                previewContent.innerHTML = '<p class="text-gray-500">분석할 그룹 데이터가 없습니다.</p>';
+                return;
+            }
+            let html = '<div class="space-y-6">';
+            data.group_analysis.forEach(groupData => {
+                html += `<div class="p-4 rounded-lg bg-bg-dark border border-border-dark"><div class="flex justify-between items-center mb-3 border-b border-border-dark pb-2"><h3 class="text-lg font-bold text-eva-green">그룹 ${groupData.group_index} 분석</h3><p class="text-sm text-gray-300">남: ${groupData.gender_balance.M}명, 여: ${groupData.gender_balance.W}명</p></div><div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm"><div><h4 class="font-bold text-yellow-300 mb-2">과거 만남 기록</h4><div class="space-y-1 text-gray-300">`;
+                if (groupData.encounters.past.length > 0) {
+                    groupData.encounters.past.forEach(past => { html += `<p><span class="font-semibold">${past.pair}:</span> <span class="text-eva-green font-bold">${past.count}회</span> <span class="text-xs text-gray-500">(최근: ${past.last_met || '기록 없음'})</span></p>`; });
+                } else { html += '<p class="text-gray-400">모두 새로운 만남입니다.</p>'; }
+                html += `</div></div><div><h4 class="font-bold text-blue-300 mb-2">새로운 만남</h4><div class="space-y-1 text-gray-300">`;
+                if (groupData.encounters.new.length > 0) {
+                    groupData.encounters.new.forEach(newPair => { html += `<p>${newPair}</p>`; });
+                } else { html += '<p class="text-gray-400">새로운 만남이 없습니다.</p>'; }
+                html += `</div></div></div></div>`;
             });
-            sessionStorage.removeItem('manualEntryData');
-        } else {
-            document.getElementById('meeting_date').valueAsDate = new Date();
+            html += '</div>';
+            previewContent.innerHTML = html;
         }
 
-        // [수정] 캡쳐 기능 로직은 기존과 유사하게 유지
-        const captureBtn = document.getElementById('capture-btn');
+        // [수정] 화면 캡쳐 버튼 이벤트 로직 변경
         captureBtn.addEventListener('click', async () => {
             if (typeof html2canvas === 'undefined') {
                 alert('오류: 캡쳐 라이브러리를 로드하지 못했습니다.'); return;
@@ -93,8 +155,12 @@
             const captureContainer = document.createElement('div');
             try {
                 const meetingDate = document.getElementById('meeting_date').value;
-                const groupTexts = Array.from(document.querySelectorAll('textarea[name^="group_"]')).map(textarea => textarea.value);
-                const groups = groupTexts.map(text => text.split(/[,;\s\n]+/g).map(name => name.trim()).filter(name => name !== ''));
+                const groupTextareas = document.querySelectorAll('textarea[name^="group_"]');
+                const groupsData = Array.from(groupTextareas).map(textarea => {
+                    const text = textarea.value.trim();
+                    if (!text) return null;
+                    return text.split(/[,;\s\n]+/).map(name => name.trim()).filter(Boolean);
+                }).filter(Boolean);
 
                 Object.assign(captureContainer.style, {
                     position: 'absolute', top: '-9999px', left: '0px',
@@ -103,14 +169,20 @@
                     border: '1px solid #444444', borderRadius: '12px'
                 });
 
-                let innerHTML = '<h3 style="font-family: \'Orbitron\', sans-serif; font-size: 20px; font-weight: bold; color: #00FF7F; margin-bottom: 16px; text-transform: uppercase;">수동 기록</h3>';
+                let innerHTML = '<h3 style="font-family: \'Orbitron\', sans-serif; font-size: 20px; font-weight: bold; color: #00FF7F; margin-bottom: 16px; text-transform: uppercase;">수동 편성 결과</h3>';
                 if (meetingDate) { innerHTML += `<p style="font-size: 14px; margin-bottom: 16px;"><strong>날짜:</strong> ${meetingDate}</p>`; }
 
-                groups.forEach((group, index) => {
-                    if (group.length > 0) {
-                        const memberNames = [...group].sort().join(', ');
-                        innerHTML += `<div style="background-color: #1A1A1A; padding: 12px; border-radius: 8px; margin-bottom: 10px;"><strong style="color: #E5E5E5;">그룹 ${index + 1}:</strong> ${memberNames}</div>`;
-                    }
+                groupsData.forEach((group, index) => {
+                    // [수정] '*'를 확인하여 발제자 스타일 적용
+                    const memberNames = group.map(name => {
+                        if (name.endsWith('*')) {
+                            const cleanName = name.slice(0, -1);
+                            return `<strong style="font-weight: bold; color: #ADFF2F;">[발제자] ${cleanName}</strong>`;
+                        }
+                        return name;
+                    }).sort().join(', ');
+
+                    innerHTML += `<div style="background-color: #1A1A1A; padding: 12px; border-radius: 8px; margin-bottom: 10px;"><strong style="color: #E5E5E5;">그룹 ${index + 1}:</strong> ${memberNames}</div>`;
                 });
                 captureContainer.innerHTML = innerHTML;
                 document.body.appendChild(captureContainer);
@@ -123,6 +195,7 @@
 
             } catch (err) {
                 alert('캡쳐 중 오류가 발생했습니다: ' + err.message);
+                console.error(err);
             } finally {
                 if (document.body.contains(captureContainer)) {
                     document.body.removeChild(captureContainer);
@@ -130,11 +203,12 @@
             }
         });
 
-        const modal = document.getElementById('image-modal');
+        // 캡쳐 이미지 모달 닫기 이벤트 (기존과 동일)
+        const imageModal = document.getElementById('image-modal');
         const modalClose = document.getElementById('modal-close');
-        if(modal && modalClose) {
-            modalClose.onclick = () => { modal.style.display = "none"; }
-            modal.onclick = (e) => { if(e.target === modal) { modal.style.display = "none"; } }
+        if(imageModal && modalClose) {
+            modalClose.onclick = () => { imageModal.style.display = "none"; }
+            imageModal.onclick = (e) => { if(e.target === imageModal) { imageModal.style.display = "none"; } }
         }
     });
     </script>
