@@ -1957,6 +1957,7 @@ def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_name
     else:
         return output_results
 
+#todo 미리보기에서도 * 거르기
 
 @app.route('/api/bookclub/save', methods=['POST'])
 @login_required(role="admin")
@@ -2026,30 +2027,39 @@ def save_manual_groups():
 
         groups = []
         present_members_set = set()
+        facilitator_members_set = set()  # [수정] 발제자 목록을 저장할 Set
 
-        # [수정] 15개의 그룹 입력란을 모두 확인
         for i in range(1, 16):
             group_text = form_data.get(f'group_{i}')
             if group_text:
-                # 쉼표, 공백, 세미콜론, 줄바꿈 등 다양한 구분자로 멤버 이름 분리
-                member_names = re.split(r'[,;\s\n]+', group_text)
-                # 앞뒤 공백 제거 및 빈 이름 제외
-                cleaned_group = [name.strip() for name in member_names if name.strip()]
+                member_names_raw = re.split(r'[,;\s\n]+', group_text)
+
+                cleaned_group = []
+                for name_raw in member_names_raw:
+                    name = name_raw.strip()
+                    if not name:
+                        continue
+
+                    # [수정] 이름 뒤에 '*'가 있는지 확인
+                    if name.endswith('*'):
+                        clean_name = name[:-1]  # '*'를 제거한 순수 이름
+                        facilitator_members_set.add(clean_name)
+                        cleaned_group.append(clean_name)
+                    else:
+                        cleaned_group.append(name)
+
                 if cleaned_group:
                     groups.append(cleaned_group)
-                    # 그룹에 포함된 모든 인원을 참석자 Set에 추가 (자동으로 중복 제거)
                     present_members_set.update(cleaned_group)
 
         present_members = sorted(list(present_members_set))
-
-        # [수정] 발제자 목록은 현재 로직상 별도로 받지 않으므로 빈 리스트로 처리
-        # (필요시, 이름 뒤에 '*'를 붙이면 발제자로 인식하는 등의 규칙 추가 가능)
-        facilitator_members = []
+        facilitator_members = sorted(list(facilitator_members_set))  # [수정] 발제자 목록 정렬
 
         if not all([meeting_date, present_members, groups]):
             flash("날짜와 최소 1명 이상의 그룹 멤버를 모두 입력해야 합니다.", "danger")
             return redirect(url_for('manual_entry'))
 
+        # [수정] 발제자 정보도 함께 DB에 저장
         result = save_group_record_to_db(meeting_date, present_members, facilitator_members, groups)
 
         if result["status"] == "ok":
@@ -2062,7 +2072,6 @@ def save_manual_groups():
     except Exception as e:
         flash(f"처리 중 예외 발생: {e}", "danger")
         return redirect(url_for('manual_entry'))
-
 
 @app.route('/api/bookclub/history', methods=['GET'])
 @login_required(role="admin")
@@ -2573,6 +2582,75 @@ def handle_delete_document(doc_id):
     except Exception as e:
         app.logger.error(f"Error deleting document id {doc_id}: {e}")
         return jsonify({"status": "error", "message": "문서 삭제 중 오류 발생"}), 500
+
+
+# 수동 추가 시 정보 확인용
+@app.route('/api/bookclub/preview_manual_groups', methods=['POST'])
+@login_required(role="admin")
+def preview_manual_groups():
+    try:
+        data = request.get_json()
+        groups = data.get('groups')
+
+        if not groups:
+            return jsonify({"error": "그룹 정보가 없습니다."}), 400
+
+        # 1. DB에서 전체 회원 정보와 만남 기록을 가져옵니다.
+        all_members_res = supabase.table("members").select("name, gender").execute()
+        name_to_gender = {m['name']: m.get('gender') for m in all_members_res.data}
+
+        # [수정] last_met 컬럼도 함께 가져옵니다.
+        co_matrix_res = supabase.table("bookclub_co_matrix").select("pair_key, count, last_met").execute()
+        co_matrix = {item['pair_key']: {'count': item['count'], 'last_met': item.get('last_met')} for item in
+                     co_matrix_res.data}
+
+        # 2. 그룹별 분석 시작
+        group_analysis = []
+        for i, group in enumerate(groups):
+            # 성비 계산
+            gender_counts = {'M': 0, 'W': 0, 'Unknown': 0}
+            for name in group:
+                gender = name_to_gender.get(name)
+                if gender in ['M', 'W']:
+                    gender_counts[gender] += 1
+                else:
+                    gender_counts['Unknown'] += 1
+
+            # 만남 기록 분석
+            new_encounters = []
+            past_encounters = []
+
+            # itertools.combinations를 사용하여 그룹 내 모든 쌍을 생성
+            for name1, name2 in itertools.combinations(group, 2):
+                pair_key = '-'.join(sorted([name1, name2]))
+
+                if pair_key in co_matrix:
+                    # 만난 기록이 있는 경우
+                    record = co_matrix[pair_key]
+                    past_encounters.append({
+                        "pair": f"{name1} & {name2}",
+                        "count": record['count'],
+                        "last_met": record.get('last_met', 'N/A')  # last_met이 없을 경우 대비
+                    })
+                else:
+                    # 처음 만나는 경우
+                    new_encounters.append(f"{name1} & {name2}")
+
+            # 결과 구조화
+            group_analysis.append({
+                "group_index": i + 1,
+                "gender_balance": gender_counts,
+                "encounters": {
+                    "new": new_encounters,
+                    "past": sorted(past_encounters, key=lambda x: x['count'], reverse=True)  # 횟수 내림차순 정렬
+                }
+            })
+
+        return jsonify({"group_analysis": group_analysis})
+
+    except Exception as e:
+        app.logger.error(f"Error in preview_manual_groups: {e}", exc_info=True)
+        return jsonify({"error": "데이터 분석 중 오류가 발생했습니다."}), 500
 
 
 #=== 마이페이지
