@@ -1333,11 +1333,14 @@ def update_applicant_info(applicant_id):
 
 def update_active_slots_for_clustering(event_id):
     """
-    [최종 수정 로직] 예약 발생 시 주변 슬롯을 열어주되, 관리자의 수동 조작을 최우선으로 존중하는 함수.
-    1. 관리자가 수동으로 '열어둔' 슬롯은 예약과 무관하게 항상 열린 상태를 유지합니다.
-    2. 관리자가 수동으로 '닫아둔' 슬롯은 예약이 근처에 생겨도 절대 자동으로 열리지 않습니다.
+    [수정된 로직] 예약 발생 시 주변 슬롯을 자동으로 '활성화'하는 함수.
+
+    기존 로직의 문제점: "옆 슬롯이 이미 active일 때만 active로 유지한다"는 조건 때문에,
+                      닫혀있는 슬롯이 새로 열리지 않는 문제가 있었습니다.
+    수정 사항: 예약된 슬롯의 인접 슬롯은 현재 상태와 무관하게 '강제로' 활성화 목록에 추가합니다.
     """
     try:
+        # 시간순으로 슬롯 정렬하여 가져오기
         all_slots_res = supabase.table('time_slots') \
             .select('id, slot_datetime, is_booked, is_active') \
             .eq('event_id', event_id) \
@@ -1351,33 +1354,35 @@ def update_active_slots_for_clustering(event_id):
         final_active_ids = set()
         all_slot_ids = {slot['id'] for slot in all_slots}
 
-        # 1. 관리자가 '수동으로 열어둔' 슬롯과, '이미 예약된' 슬롯 ID를 먼저 저장합니다.
-        # 이 슬롯들은 항상 활성화 상태를 유지해야 합니다.
-        base_active_ids = {
-            slot['id'] for slot in all_slots if slot['is_active'] or slot['is_booked']
-        }
-        final_active_ids.update(base_active_ids)
+        # 1. [기본 유지] 이미 예약된 슬롯은 무조건 활성 상태 유지
+        booked_ids = {slot['id'] for slot in all_slots if slot['is_booked']}
+        final_active_ids.update(booked_ids)
 
-        # 2. 예약된 슬롯의 주변 슬롯을 활성화 목록에 '추가'합니다.
-        #    - 조건 1: 주변 슬롯이 이미 예약되어 있지 않아야 합니다.
-        #    - 조건 2: 주변 슬롯이 현재 닫혀있는 경우(is_active=False),
-        #             관리자의 수동 '닫기'로 간주하여 열지 않습니다. (가장 중요한 변경점)
+        # 2. [클러스터링 로직] 예약된 슬롯의 '앞/뒤' 슬롯을 활성화 대상에 추가
         for i, current_slot in enumerate(all_slots):
             if current_slot['is_booked']:
-                # 이전 슬롯 확인
+                # 이전 슬롯이 존재하고, 아직 예약되지 않았다면 -> 활성화
                 if i > 0:
                     prev_slot = all_slots[i - 1]
-                    if not prev_slot['is_booked'] and prev_slot['is_active']:
+                    if not prev_slot['is_booked']:
                         final_active_ids.add(prev_slot['id'])
-                # 다음 슬롯 확인
+
+                # 다음 슬롯이 존재하고, 아직 예약되지 않았다면 -> 활성화
                 if i < len(all_slots) - 1:
                     next_slot = all_slots[i + 1]
-                    if not next_slot['is_booked'] and next_slot['is_active']:
+                    if not next_slot['is_booked']:
                         final_active_ids.add(next_slot['id'])
 
-        # 3. 최종 목록에 없는 슬롯들은 모두 비활성화합니다.
+        # 3. [관리자 수동 오픈 유지]
+        # 예약이나 클러스터링과 관계없이, 관리자가 이미 수동으로 열어놓은(is_active=True)
+        # 슬롯 중, 주변에 예약이 없어도 닫히지 않게 하려면 아래 로직이 필요합니다.
+        # (단, 이 로직은 '자동으로 닫는 기능'과 충돌할 수 있으므로 정책에 따라 조정 가능합니다.
+        #  현재는 '예약 확산'이 우선이므로, 위 1, 2번 과정에서 포함되지 않은 슬롯은 닫는 것이 자연스럽습니다.)
+
+        # 현재 로직: final_active_ids에 포함된 것만 True, 나머지는 False로 업데이트
+
+        slots_to_activate = list(final_active_ids)
         slots_to_deactivate = list(all_slot_ids - final_active_ids)
-        slots_to_activate = list(final_active_ids)  # 가독성을 위해 변수명 변경
 
         if slots_to_activate:
             supabase.table('time_slots').update({'is_active': True}).in_('id', slots_to_activate).execute()
