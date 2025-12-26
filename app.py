@@ -1349,6 +1349,7 @@ def update_active_slots_for_clustering(event_id):
         if not all_slots:
             return
 
+
         slots_to_activate = set()
 
         for i, current_slot in enumerate(all_slots):
