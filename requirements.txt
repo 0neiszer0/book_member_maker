@@ -8,3 +8,4 @@ numpy
 deap
 mwparserfromhell
 bleach
+python-docx
