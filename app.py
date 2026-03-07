@@ -1,6 +1,3 @@
-# app.py
-# 모든 기능이 통합된 최종 버전의 Flask 애플리케이션 코드입니다.
-
 # --- 1. 기본 라이브러리 및 설정 ---
 import os
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
@@ -21,6 +18,10 @@ from deap import base, creator, tools, algorithms
 import uuid
 import mwparserfromhell
 import bleach
+from io import BytesIO
+from docx import Document
+from docx.shared import Pt, Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from collections import defaultdict
 
 # .env 파일에서 환경 변수 로드
@@ -780,6 +781,10 @@ def admin_dashboard():
             .limit(5) \
             .execute().data
 
+        # [추가할 부분] 생성된 발제문 취합 이벤트 목록 불러오기
+        topic_events_res = supabase.table('topic_events').select('*').order('created_at', desc=True).execute()
+        topic_events = topic_events_res.data
+
     except Exception as e:
         flash(f"대시보드 로딩 중 오류 발생: {e}", "danger")
         events_res, all_members_res, interviewer_names, demerit_logs_res = [], [], set(), []
@@ -790,7 +795,8 @@ def admin_dashboard():
         all_members=all_members_res,
         interviewer_names=interviewer_names,
         demerit_logs=demerit_logs_res,  # [추가] 벌점 기록 전달
-        meeting_date=next_monday
+        meeting_date=next_monday,
+        topic_events=topic_events
     )
 
 
@@ -2773,6 +2779,151 @@ def add_demerit(member_id):
     except Exception as e:
         app.logger.error(f"Error adding demerit for member {member_id}: {e}")
         return jsonify({"error": "벌점 부과 중 오류 발생"}), 500
+
+
+# ==============================================================================
+# --- [신규] 주간 발제문 수집 및 문서화 시스템 ---
+# ==============================================================================
+
+# 1. 관리자: 발제문 이벤트 생성 API
+@app.route('/api/admin/topic_events/create', methods=['POST'])
+@login_required(role="admin")
+def create_topic_event():
+    try:
+        data = request.json
+        token = str(uuid.uuid4())
+        supabase.table('topic_events').insert({
+            'meeting_date': data.get('meeting_date'),
+            'book_title': data.get('book_title'),
+            'share_token': token
+        }).execute()
+        return jsonify({"status": "success", "message": "발제문 수집 링크가 생성되었습니다."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# 2. 사용자: 공유 링크를 통한 발제문 작성 페이지
+@app.route('/shared_topics')
+def view_shared_topics():
+    token = request.args.get('token')
+    if not token:
+        flash("잘못된 접근입니다.", "danger")
+        return redirect(url_for('main_index'))
+
+    try:
+        event_res = supabase.table('topic_events').select('*').eq('share_token', token).single().execute()
+        event_data = event_res.data
+        if not event_data or not event_data.get('is_active'):
+            flash("마감되었거나 유효하지 않은 링크입니다.", "warning")
+            return redirect(url_for('main_index'))
+
+        return render_template('topic_submit.html', event=event_data, user_name=session.get('user_name'))
+    except Exception as e:
+        app.logger.error(f"Error loading topic event: {e}")
+        return "유효하지 않은 링크입니다.", 404
+
+
+# 3. 사용자: 발제문 제출/수정 API (PIN 검증 포함)
+@app.route('/api/topics/submit', methods=['POST'])
+def submit_topics():
+    data = request.json
+    event_id = data.get('event_id')
+    author_name = data.get('author_name')
+    department = data.get('department')
+    pin_code = data.get('pin_code')
+    topics = data.get('topics')  # JSON Array
+
+    # 로그인한 회원은 PIN 검증 패스 (세션 확인)
+    is_logged_in_member = session.get('user_name') == author_name
+
+    if not all([event_id, author_name, department, topics]):
+        return jsonify({"error": "필수 정보를 모두 입력해주세요."}), 400
+
+    if not is_logged_in_member and not pin_code:
+        return jsonify({"error": "비회원은 4자리 PIN 번호를 입력해야 합니다."}), 400
+
+    try:
+        # 기존 제출 내역 확인
+        existing_res = supabase.table('topic_submissions').select('id, pin_code').eq('event_id', event_id).eq(
+            'author_name', author_name).eq('department', department).execute()
+
+        if existing_res.data:
+            # 수정 모드: 로그인한 본인이거나 PIN 번호가 일치해야 함
+            existing_record = existing_res.data[0]
+            if not is_logged_in_member and existing_record['pin_code'] != pin_code:
+                return jsonify({"error": "PIN 번호가 일치하지 않습니다. (동명이인일 경우 학과를 다르게 입력해주세요)"}), 403
+
+            # 업데이트 실행
+            supabase.table('topic_submissions').update({
+                'topics': topics,
+                'updated_at': 'now()'
+            }).eq('id', existing_record['id']).execute()
+            return jsonify({"status": "success", "message": "발제문이 성공적으로 수정되었습니다."})
+        else:
+            # 신규 생성 모드
+            supabase.table('topic_submissions').insert({
+                'event_id': event_id,
+                'author_name': author_name,
+                'department': department,
+                'pin_code': pin_code if not is_logged_in_member else 'MEMBER',
+                'topics': topics
+            }).execute()
+            return jsonify({"status": "success", "message": "발제문이 성공적으로 제출되었습니다."})
+
+    except Exception as e:
+        app.logger.error(f"Error submitting topics: {e}")
+        return jsonify({"error": "제출 중 서버 오류가 발생했습니다."}), 500
+
+
+# 4. 관리자: Word 파일로 출력 (python-docx 사용)
+@app.route('/admin/topics/<event_id>/download_word')
+@login_required(role="admin")
+def download_topics_word(event_id):
+    try:
+        event = supabase.table('topic_events').select('*').eq('id', event_id).single().execute().data
+        submissions = supabase.table('topic_submissions').select('*').eq('event_id', event_id).order(
+            'created_at').execute().data
+
+        doc = Document()
+
+        # 문서 제목 세팅
+        title = doc.add_heading(f"발제문 취합 - {event['book_title']}", 0)
+        title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        doc.add_paragraph(f"모임 날짜: {event['meeting_date']}").alignment = WD_ALIGN_PARAGRAPH.CENTER
+        doc.add_paragraph()  # 빈 줄 추가
+
+        # 제출자별 발제문 작성
+        for sub in submissions:
+            # 작성자 & 학과
+            heading = doc.add_heading(f"👤 {sub['author_name']} ({sub['department']})", level=2)
+
+            for idx, topic_data in enumerate(sub['topics'], 1):
+                # 발제문 내용 (리스트 형태)
+                p = doc.add_paragraph(style='List Number')
+                p.add_run(f"{topic_data['topic']}").bold = True
+
+                # 페이지 및 참조 사항 (들여쓰기 적용)
+                ref_p = doc.add_paragraph()
+                ref_p.paragraph_format.left_indent = Inches(0.5)
+                ref_p.add_run(f"↳ 페이지: {topic_data['page']} | 참조: {topic_data['reference']}").italic = True
+
+            doc.add_paragraph()  # 각 제출자 사이에 빈 줄 추가
+
+        # 메모리 상에서 파일 생성 후 클라이언트로 전송
+        f = BytesIO()
+        doc.save(f)
+        f.seek(0)
+
+        filename = f"발제문_{event['book_title']}_{event['meeting_date']}.docx"
+
+        return Response(
+            f.getvalue(),
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            headers={"Content-disposition": f"attachment; filename={filename.encode('utf-8').decode('latin1')}"}
+        )
+    except Exception as e:
+        flash(f"문서 생성 중 오류 발생: {str(e)}", "danger")
+        return redirect(url_for('admin_dashboard'))
 
 # ==============================================================================
 # --- 7. 서버 실행 ---
