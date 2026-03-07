@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ event.book_title }} - 발제문 제출</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A; --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444; }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
+        h1, h2 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; }
+        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
+        .eva-input { background-color: #1A1A1A; border-color: var(--border-dark); color: var(--text-light); }
+        .eva-input:focus { border-color: var(--eva-green); outline: none; box-shadow: 0 0 0 2px rgba(0,255,127,0.2); }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-3xl mx-auto">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-eva-green">{{ event.book_title }}</h1>
+            <p class="text-gray-400 mt-2">모임 날짜: {{ event.meeting_date }}</p>
+            <p class="text-sm text-yellow-500 mt-2">동일한 이름과 학과, PIN 번호를 입력하면 작성한 발제문을 수정할 수 있습니다.</p>
+        </div>
+
+        <form id="topicForm" class="space-y-6">
+            <input type="hidden" id="eventId" value="{{ event.id }}">
+
+            <div class="eva-card p-6 rounded-lg grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-bold mb-2">이름</label>
+                    <input type="text" id="authorName" class="eva-input w-full rounded py-2 px-3" required
+                           {% if user_name %}value="{{ user_name }}" readonly class="bg-gray-800 text-gray-500 cursor-not-allowed"{% endif %}>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold mb-2">소속 (학과/직장 등)</label>
+                    <input type="text" id="department" class="eva-input w-full rounded py-2 px-3" required placeholder="예: 경영학과">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold mb-2">4자리 PIN (수정용)</label>
+                    <input type="password" id="pinCode" class="eva-input w-full rounded py-2 px-3"
+                           {% if user_name %}value="MEMBER" readonly class="bg-gray-800 cursor-not-allowed"{% else %}required pattern="[0-9]{4}" placeholder="숫자 4자리"{% endif %}>
+                </div>
+            </div>
+
+            <div id="topicsContainer" class="space-y-4">
+                </div>
+
+            <button type="button" id="addTopicBtn" class="w-full bg-gray-700 hover:bg-gray-600 font-bold py-3 rounded-lg border border-dashed border-gray-500">
+                + 발제문 추가하기 (최대 10개)
+            </button>
+
+            <button type="submit" id="submitBtn" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-lg text-lg transition-colors shadow-lg shadow-green-900/50">
+                발제문 제출 / 수정 완료
+            </button>
+        </form>
+    </div>
+
+    <script>
+        let topicCount = 0;
+        const container = document.getElementById('topicsContainer');
+        const addBtn = document.getElementById('addTopicBtn');
+
+        function addTopicField() {
+            if (topicCount >= 10) { alert("발제문은 최대 10개까지만 추가할 수 있습니다."); return; }
+            topicCount++;
+
+            const div = document.createElement('div');
+            div.className = 'eva-card p-4 rounded-lg relative';
+            div.innerHTML = `
+                <div class="absolute top-2 right-2">
+                    <button type="button" onclick="this.parentElement.parentElement.remove(); topicCount--;" class="text-red-500 hover:text-red-400 font-bold text-xl px-2">&times;</button>
+                </div>
+                <h3 class="text-eva-green font-bold mb-3">#${topicCount} 발제</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-xs text-gray-400 block mb-1">발제 내용</label>
+                        <textarea class="topic-text eva-input w-full rounded py-2 px-3 h-24 resize-none" required placeholder="논의하고 싶은 주제를 상세히 적어주세요"></textarea>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-xs text-gray-400 block mb-1">해당 페이지</label>
+                            <input type="text" class="topic-page eva-input w-full rounded py-1 px-3 text-sm" placeholder="예: p.123~125">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400 block mb-1">참조 사항</label>
+                            <input type="text" class="topic-ref eva-input w-full rounded py-1 px-3 text-sm" placeholder="특정 문단, 키워드 등">
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        // 초기 1개 생성
+        addTopicField();
+        addBtn.addEventListener('click', addTopicField);
+
+        document.getElementById('topicForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true; submitBtn.textContent = '처리 중...';
+
+            // 데이터 수집
+            const topics = [];
+            document.querySelectorAll('#topicsContainer > div').forEach(el => {
+                topics.push({
+                    topic: el.querySelector('.topic-text').value,
+                    page: el.querySelector('.topic-page').value,
+                    reference: el.querySelector('.topic-ref').value
+                });
+            });
+
+            const payload = {
+                event_id: document.getElementById('eventId').value,
+                author_name: document.getElementById('authorName').value,
+                department: document.getElementById('department').value,
+                pin_code: document.getElementById('pinCode').value,
+                topics: topics
+            };
+
+            try {
+                const response = await fetch('/api/topics/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (!response.ok) throw new Error(result.error);
+
+                alert(result.message);
+                if(!'{{ user_name }}') {
+                    // 비회원이면 작성 폼 초기화 후 이동
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                alert(`오류: ${error.message}`);
+            } finally {
+                submitBtn.disabled = false; submitBtn.textContent = '발제문 제출 / 수정 완료';
+            }
+        });
+    </script>
+</body>
+</html>
