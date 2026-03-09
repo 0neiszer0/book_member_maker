@@ -1,179 +1,287 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>마이페이지</title>
-    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Orbitron:wght@400;700&display=swap"
+        rel="stylesheet">
     <style>
         :root {
-            --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A;
-            --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444;
-            --wiki-link-blue: #60a5fa;
+            --eva-purple: #6A0DAD;
+            --eva-green: #00FF7F;
+            --bg-dark: #1A1A1A;
+            --card-dark: #2D2D2D;
+            --text-light: #E5E5E5;
+            --border-dark: #444444;
         }
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
-        h1, h2 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; }
-        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+        }
+
+        h1,
+        h2 {
+            font-family: 'Orbitron', sans-serif;
+            text-transform: uppercase;
+        }
+
+        .eva-card {
+            background-color: var(--card-dark);
+            border: 1px solid var(--border-dark);
+        }
+
+        .action-card {
+            background-color: var(--card-dark);
+            border: 1px solid var(--border-dark);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            transition: border-color 0.2s, transform 0.2s;
+        }
+
+        .action-card:hover {
+            border-color: var(--eva-green);
+            transform: translateY(-2px);
+        }
+
+        .action-card .icon {
+            font-size: 2rem;
+            line-height: 1;
+        }
+
+        .action-card .title {
+            font-weight: 700;
+            font-size: 1.05rem;
+        }
+
+        .action-card .desc {
+            font-size: 0.82rem;
+            color: #9ca3af;
+        }
+
+        .action-btn {
+            display: inline-block;
+            text-align: center;
+            font-weight: 700;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+            transition: all 0.15s;
+            cursor: pointer;
+            border: none;
+        }
+
+        .action-btn-green {
+            background-color: var(--eva-green);
+            color: #000;
+        }
+
+        .action-btn-green:hover {
+            box-shadow: 0 0 12px var(--eva-green);
+        }
+
+        .action-btn-purple {
+            background-color: var(--eva-purple);
+            color: #fff;
+        }
+
+        .action-btn-purple:hover {
+            box-shadow: 0 0 12px var(--eva-purple);
+        }
+
+        .action-btn-gray {
+            background-color: #4A4A4A;
+            color: #E5E5E5;
+        }
+
+        .action-btn-gray:hover {
+            background-color: #5a5a5a;
+        }
+
+        .action-btn-red {
+            background-color: #dc2626;
+            color: #fff;
+        }
+
+        .action-btn-red:hover {
+            background-color: #b91c1c;
+        }
+
+        .action-btn-yellow {
+            background-color: #d97706;
+            color: #fff;
+        }
+
+        .stat-number {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--eva-green);
+        }
     </style>
 </head>
-<body class="p-4 md:p-8">
+
+<body class="min-h-screen">
     {% include '_header.html' %}
 
-    <div class="container mx-auto max-w-4xl mt-8">
-        <h1 class="text-3xl font-bold text-eva-green mb-8">{{ user.name }}님의 마이페이지</h1>
+    <div class="container mx-auto max-w-4xl px-4 py-8">
+
+        <!-- 환영 헤더 -->
+        <div class="mb-8">
+            <h1 class="text-2xl md:text-3xl font-bold text-eva-green">{{ user.name }}님, 안녕하세요</h1>
+            <p class="text-gray-400 text-sm mt-1">{{ user.department or '' }} {{ user.email or '' }}</p>
+        </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
-            {% for category, message in messages %}
-            <div class="p-4 mb-4 text-sm rounded-lg border {{'bg-red-900/50 text-red-300 border-red-500/50'}}" role="alert">
-                {{ message }}
-            </div>
-            {% endfor %}
+        {% for category, message in messages %}
+        <div class="p-4 mb-4 text-sm rounded-lg border bg-red-900/50 text-red-300 border-red-500/50" role="alert">
+            {{ message }}
+        </div>
+        {% endfor %}
         {% endwith %}
 
-        <div class="eva-card p-6 rounded-lg mb-8">
-            <h2 class="text-xl font-bold text-eva-purple mb-4">내 정보</h2>
-            <div class="space-y-2">
-                <p><strong>이름:</strong> {{ user.name }}</p>
-                <p><strong>이메일:</strong> {{ user.email or '이메일 정보 없음' }}</p>
-                <p><strong>한 줄 소개:</strong> "{{ user.profile_intro or '...' }}"</p>
-            </div>
-            <div class="mt-6">
-                <a href="{{ url_for('profile_detail_page', member_id=user.id) }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">내 프로필 보기/편집</a>
-            </div>
-        </div>
+        <!-- 빠른 실행 카드 -->
+        <section class="mb-8">
+            <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">지금 할 수 있는 것</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 
-        <div id="absence-request-section" class="eva-card p-6 rounded-lg mb-8">
-            <h2 class="text-xl font-bold text-eva-purple mb-4">다음 모임 참석 관리</h2>
-
-            {% if is_monday == false %}
-                <p class="text-sm text-gray-400 mb-4">모든 멤버는 다음 모임에 자동으로 '참석' 처리됩니다. 불참 시 아래 버튼을 눌러 사유를 제출해주세요.</p>
-
-                {% if my_attendance and my_attendance.absence_request_status == 'pending' %}
-                    <button class="bg-yellow-600 text-white font-bold py-2 px-4 rounded cursor-not-allowed" disabled>승인 대기 중</button>
-                {% elif my_attendance and my_attendance.absence_request_status == 'approved' %}
-                    <button class="bg-gray-500 text-white font-bold py-2 px-4 rounded cursor-not-allowed" disabled>불참 처리 완료</button>
-                {% elif my_attendance and my_attendance.absence_request_status == 'denied' %}
-                    <div class="p-4 bg-red-900/50 border border-red-500/50 rounded-lg">
-                        <p class="text-red-300">이전 불참 요청이 관리자에 의해 반려되었습니다. 다시 요청하시려면 아래 버튼을 눌러주세요.</p>
-                        <button id="request-absence-btns" class="mt-3 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">다시 불참 요청하기</button>
+                <!-- 발제문 제출 -->
+                <div class="action-card">
+                    <div class="icon">📝</div>
+                    <div>
+                        <div class="title">발제문 제출</div>
+                        {% if active_topic_event %}
+                        <div class="desc">{{ active_topic_event.book_title }} ({{ active_topic_event.meeting_date }}) —
+                            현재 접수 중</div>
+                        {% else %}
+                        <div class="desc">현재 진행 중인 발제문 수집이 없습니다.</div>
+                        {% endif %}
                     </div>
-                {% else %}
-                    <button id="request-absence-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">불참 요청하기</button>
-                {% endif %}
-
-            {% else %}
-                <p class="text-yellow-400">오늘은 모임 당일입니다. 불참하시려면 관리자에게 직접 연락해주세요.</p>
-            {% endif %}
-        </div>
-
-        <div class="eva-card p-6 rounded-lg mb-8">
-            <h2 class="text-xl font-bold text-eva-purple mb-4">출석 및 벌점 현황</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
-                <div class="p-4 bg-bg-dark rounded">
-                    <p class="text-3xl font-bold text-eva-green">{{ attendance_records|length }}</p>
-                    <p class="text-sm text-gray-400">총 참석 횟수</p>
-                </div>
-                <div class="p-4 bg-bg-dark rounded">
-                    <p class="text-3xl font-bold text-red-400">{{ user.demerit_points }}</p>
-                    <p class="text-sm text-gray-400">누적 벌점</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="eva-card p-6 rounded-lg mb-8">
-            <h2 class="text-xl font-bold text-eva-purple mb-4">참석 기록</h2>
-            <div class="max-h-60 overflow-y-auto pr-2">
-                <ul class="space-y-2 text-sm">
-                    {% for record in attendance_records %}
-                        <li class="p-2 bg-bg-dark rounded">{{ record.meeting_date }}</li>
+                    {% if active_topic_event %}
+                    <a href="/shared_topics?token={{ active_topic_event.share_token }}"
+                        class="action-btn action-btn-green">제출하기</a>
                     {% else %}
-                        <p class="text-gray-500">아직 참석 기록이 없습니다.</p>
-                    {% endfor %}
-                </ul>
-            </div>
-        </div>
+                    <button class="action-btn action-btn-gray" disabled>접수 대기 중</button>
+                    {% endif %}
+                </div>
 
-        <div class="eva-card p-6 rounded-lg">
-            <h2 class="text-xl font-bold text-eva-purple mb-4">벌점 기록</h2>
-            <div class="max-h-60 overflow-y-auto pr-2">
-                <ul class="space-y-3 text-sm">
-                    {% for log in demerit_logs %}
-                        <li class="p-3 bg-bg-dark rounded">
-                            <div class="flex justify-between items-center">
-                                <span class="font-bold {{ 'text-red-400' if log.points > 0 else 'text-blue-400' }}">
-                                    {{ log.points }}점 {{ '부과' if log.points > 0 else '차감' }}
-                                </span>
-                                <span class="text-xs text-gray-500">{{ log.created_at | datetime('%Y-%m-%d') }}</span>
-                            </div>
-                            <p class="mt-1 text-gray-300">사유: {{ log.reason }}</p>
-                            <p class="text-right text-xs text-gray-500 mt-1">- {{ log.admin.name if log.admin else '관리자' }}</p>
-                        </li>
-                    {% else %}
-                        <p class="text-gray-500">벌점 기록이 없습니다.</p>
-                    {% endfor %}
-                </ul>
+                <!-- 참석 확인 카드 -->
+                <div class="action-card" id="attendance-card">
+                    <div class="icon">📅</div>
+                    <div>
+                        <div class="title">세미나 참석 확인</div>
+                        <div class="desc">다음 세미나 날짜 중 참석 가능한 날짜를 눌러주세요.</div>
+                    </div>
+                    <div class="flex flex-col gap-2" id="seminar-date-btns">
+                        {% for seminar in seminar_dates %}
+                        {% set is_confirmed = seminar.date in my_confirmed_dates %}
+                        <button
+                            class="attendance-toggle-btn action-btn {% if is_confirmed %}action-btn-green{% else %}action-btn-gray{% endif %}"
+                            data-date="{{ seminar.date }}" data-confirmed="{{ 'true' if is_confirmed else 'false' }}"
+                            style="justify-content: space-between; display: flex; align-items: center; gap: 8px;">
+                            <span>{{ seminar.label }} ({{ seminar.date }})</span>
+                            <span class="text-lg">{% if is_confirmed %}✅{% else %}☐{% endif %}</span>
+                        </button>
+                        {% else %}
+                        <p class="text-xs text-gray-500">예정된 세미나가 없습니다.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- 위키 -->
+                <div class="action-card">
+                    <div class="icon">📖</div>
+                    <div>
+                        <div class="title">독서모임 위키</div>
+                        <div class="desc">지식 위키를 열람하고 새 문서를 작성해보세요.</div>
+                    </div>
+                    <a href="{{ url_for('view_all_documents') }}" class="action-btn action-btn-purple">위키 보기</a>
+                </div>
+
             </div>
-        </div>
+        </section>
+
+        <!-- 출석 현황 + 기록 -->
+        <section>
+            <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">내 활동</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                <!-- 출석 수 -->
+                <div class="eva-card rounded-xl p-6 text-center flex flex-col justify-center items-center">
+                    <div class="stat-number">{{ attendance_records|length }}</div>
+                    <div class="text-sm text-gray-400 mt-1">총 참석 횟수</div>
+                </div>
+
+                <!-- 참석 기록 목록 -->
+                <div class="eva-card rounded-xl p-6 md:col-span-2">
+                    <h3 class="text-sm font-bold text-gray-400 mb-3">참석 기록</h3>
+                    <div class="max-h-52 overflow-y-auto space-y-1 text-sm pr-1">
+                        {% for record in attendance_records %}
+                        <div class="px-3 py-2 rounded bg-gray-800/50 text-gray-300">{{ record.meeting_date }}</div>
+                        {% else %}
+                        <p class="text-gray-500 py-4 text-center">아직 참석 기록이 없습니다.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
     </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    const absenceSection = document.getElementById('absence-request-section');
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // 참석 토글 버튼들
+            document.querySelectorAll('.attendance-toggle-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const date = btn.dataset.date;
+                    const isConfirmed = btn.dataset.confirmed === 'true';
+                    const newState = !isConfirmed;  // 토글
 
-    // 이벤트 위임을 사용하여 섹션 전체에 하나의 이벤트 리스너만 추가
-    absenceSection.addEventListener('click', async (e) => {
-        // 'request-absence-btn' ID를 가진 버튼이 클릭되었을 때만 로직 실행
-        if (e.target.id === 'request-absence-btn') {
-            const requestAbsenceBtn = e.target;
-            const reason = prompt("불참 사유를 간단히 입력해주세요:");
+                    btn.disabled = true;
 
-            if (reason && reason.trim() !== '') {
-                requestAbsenceBtn.textContent = '처리 중...';
-                requestAbsenceBtn.disabled = true;
-                try {
-                    const response = await fetch('/api/request_absence', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ reason: reason })
-                    });
-                    const result = await response.json();
-                    if (!response.ok) throw new Error(result.error);
+                    try {
+                        const response = await fetch('/api/attendance', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                meeting_date: date,
+                                attending_seminar: newState
+                            })
+                        });
+                        const result = await response.json();
+                        if (result.status !== 'success') throw new Error(result.message || '오류');
 
-                    alert(result.message);
-
-                    // 성공 시, 새로고침 없이 UI를 '승인 대기 중' 상태로 즉시 변경
-                    const parentContainer = requestAbsenceBtn.parentElement;
-                    // 부모가 div.p-4인 경우와 아닌 경우를 모두 처리
-                    const buttonContainer = parentContainer.tagName === 'DIV' ? parentContainer : absenceSection;
-
-                    // 기존 p 태그와 버튼을 모두 지우고 새로운 버튼 삽입
-                    const introParagraph = buttonContainer.querySelector('p');
-                    if(introParagraph) {
-                        buttonContainer.innerHTML = ''; // 자식 요소 모두 삭제
-                        buttonContainer.appendChild(introParagraph); // p태그 다시 추가
-                    } else {
-                         buttonContainer.innerHTML = '';
+                        // 버튼 UI 업데이트
+                        btn.dataset.confirmed = newState ? 'true' : 'false';
+                        const label = btn.querySelector('span:first-child');
+                        const icon = btn.querySelector('span:last-child');
+                        if (newState) {
+                            btn.classList.remove('action-btn-gray');
+                            btn.classList.add('action-btn-green');
+                            icon.textContent = '✅';
+                        } else {
+                            btn.classList.remove('action-btn-green');
+                            btn.classList.add('action-btn-gray');
+                            icon.textContent = '☐';
+                        }
+                    } catch (err) {
+                        alert('오류: ' + err.message);
+                    } finally {
+                        btn.disabled = false;
                     }
-
-                    const newButton = document.createElement('button');
-                    newButton.className = 'bg-yellow-600 text-white font-bold py-2 px-4 rounded cursor-not-allowed';
-                    newButton.disabled = true;
-                    newButton.textContent = '승인 대기 중';
-                    buttonContainer.appendChild(newButton);
-
-
-                } catch (error) {
-                    alert('오류: ' + error.message);
-                    requestAbsenceBtn.textContent = '불참 요청하기';
-                    requestAbsenceBtn.disabled = false;
-                }
-            } else if (reason !== null) {
-                alert('불참 사유를 반드시 입력해야 합니다.');
-            }
-        }
-    });
-});
-</script>
+                });
+            });
+        });
+    </script>
 </body>
+
 </html>

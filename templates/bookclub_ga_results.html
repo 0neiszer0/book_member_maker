@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,117 +9,193 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap"
+        rel="stylesheet">
     <style>
         :root {
-            --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A;
-            --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444;
+            --eva-purple: #6A0DAD;
+            --eva-green: #00FF7F;
+            --bg-dark: #1A1A1A;
+            --card-dark: #2D2D2D;
+            --text-light: #E5E5E5;
+            --border-dark: #444444;
         }
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
-        h1, h2, h3 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; }
-        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
-        .eva-button { font-weight: bold; transition: all 0.2s; }
-        .eva-button:hover { transform: translateY(-1px); }
-        #image-modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.9); justify-content: center; align-items: center; }
-        #image-modal-content { max-width: 90%; max-height: 80%; border-radius: 8px; }
-        #modal-caption { text-align: center; color: #ccc; padding: 10px 0; font-size: 1rem;}
-        #modal-close { position: absolute; top: 15px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; transition: 0.3s; cursor: pointer; }
-        #modal-close:hover { color: #bbb; }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+        }
+
+        h1,
+        h2,
+        h3 {
+            font-family: 'Orbitron', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .eva-card {
+            background-color: var(--card-dark);
+            border: 1px solid var(--border-dark);
+        }
+
+        .eva-button {
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .eva-button:hover {
+            transform: translateY(-1px);
+        }
+
+        #image-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.9);
+            justify-content: center;
+            align-items: center;
+        }
+
+        #image-modal-content {
+            max-width: 90%;
+            max-height: 80%;
+            border-radius: 8px;
+        }
+
+        #modal-caption {
+            text-align: center;
+            color: #ccc;
+            padding: 10px 0;
+            font-size: 1rem;
+        }
+
+        #modal-close {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            transition: 0.3s;
+            cursor: pointer;
+        }
+
+        #modal-close:hover {
+            color: #bbb;
+        }
     </style>
 </head>
+
 <body class="min-h-screen">
     <div class="container mx-auto p-4 sm:p-6 lg:p-8">
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-3xl font-bold text-eva-green">Grouping Result</h1>
-            <a href="/making_team" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md">다시 편성하기</a>
+            <a href="/making_team" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md">다시
+                편성하기</a>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <section>
-                <h2 class="text-2xl font-semibold mb-4 text-center text-blue-400">성비 우선 조합</h2>
-                {% if gender_solutions %}
-                    {% for result in gender_solutions %}
-                        <div class="eva-card p-6 mb-6 rounded-lg result-card-gender" {% if loop.index > 6 %}style="display: none;"{% endif %}>
-                            <div class="flex justify-between items-center mb-3">
-                                <h3 class="text-lg font-bold">추천안 {{ loop.index }}</h3>
-                                <span class="text-sm font-semibold bg-blue-900 text-blue-200 px-3 py-1 rounded-full">총점: {{ result.score }}</span>
-                            </div>
-                            <p class="text-xs text-gray-400 mb-3">세부 점수 (성비, 새만남, 발제자, 선호도): {{ result.details|join(', ') }}</p>
-                            <div class="space-y-2">
-                                {% for group in result.groups %}
-                                <div class="p-2 bg-bg-dark rounded">
-                                    <div class="flex justify-between items-center">
-                                        <span class="pr-2">
-                                            <strong class="text-gray-300">
-                                                {% if group_names and group_names[loop.index0] %}{{ group_names[loop.index0] }}{% else %}그룹 {{ loop.index }}{% endif %}:
-                                            </strong>
-                                            {% set facilitators_in_group = [] %}{% for name in group %}{% if name in facilitators %}{% set _ = facilitators_in_group.append(name) %}{% endif %}{% endfor %}
-                                            {% set members_in_group = [] %}{% for name in group %}{% if name not in facilitators %}{% set _ = members_in_group.append(name) %}{% endif %}{% endfor %}
-                                            {% for name in facilitators_in_group %}<strong>{{ name }}</strong>{% if not loop.last or members_in_group %}, {% endif %}{% endfor %}
-                                            {% for name in members_in_group %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %}
-                                        </span>
-                                        <button class="show-history-btn text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded-md ml-2 flex-shrink-0" data-group='{{ group|tojson|safe }}'>기록 보기</button>
-                                    </div>
-                                    <div class="history-details mt-2 text-xs text-gray-400 border-t border-gray-700 pt-2" style="display: none;"></div>
-                                </div>
-                                {% endfor %}
-                            </div>
-                            <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mt-4">
-                                <button class="w-full eva-button bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg save-groups-btn" data-groups='{{ result.groups|tojson|safe }}'>이 조합으로 저장</button>
-                                <button class="w-full eva-button bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg capture-groups-btn" data-groups='{{ result.groups|tojson|safe }}'>결과 캡쳐</button>
-                                <button class="w-full md:col-span-1 eva-button bg-yellow-600 hover:bg-yellow-700 text-white py-2 rounded-lg edit-groups-btn" data-groups='{{ result.groups|tojson|safe }}'>편집</button>
-                            </div>
-                        </div>
-                    {% endfor %}
-                    {% if gender_solutions|length > 6 %}
-                    <button id="load-more-gender" class="w-full eva-button bg-gray-800 hover:bg-black text-white py-2 rounded-lg">더 보기</button>
-                    {% endif %}
-                {% else %}
-                    <p class="text-center text-gray-500">결과를 생성하지 못했습니다.</p>
-                {% endif %}
-            </section>
+        <div class="max-w-4xl mx-auto flex flex-col items-center">
+            <section class="w-full">
+                <h2 class="text-2xl font-semibold mb-6 text-center text-eva-green">최적화된 조 편성 추천안</h2>
+                {% if combined_solutions %}
+                {% for result in combined_solutions %}
+                <div class="eva-card p-6 mb-6 rounded-lg result-card-combined" {% if loop.index> 6 %}style="display:
+                    none;"{% endif %}>
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-lg font-bold text-eva-green">추천안 {{ loop.index }}</h3>
+                        <span class="text-sm font-semibold bg-green-900 text-green-200 px-3 py-1 rounded-full">총점: {{
+                            result.score }}</span>
+                    </div>
+                    <p class="text-xs text-gray-400 mb-3">세부 점수 (성비, 새만남, 발제자, 선호도): {{ result.details|join(', ') }}</p>
 
-            <section>
-                <h2 class="text-2xl font-semibold mb-4 text-center text-eva-green">새로운 만남 우선 조합</h2>
-                {% if new_face_solutions %}
-                    {% for result in new_face_solutions %}
-                        <div class="eva-card p-6 mb-6 rounded-lg result-card-newface" {% if loop.index > 6 %}style="display: none;"{% endif %}>
-                            <div class="flex justify-between items-center mb-3">
-                                <h3 class="text-lg font-bold">추천안 {{ loop.index }}</h3>
-                                <span class="text-sm font-semibold bg-green-900 text-green-200 px-3 py-1 rounded-full">총점: {{ result.score }}</span>
-                            </div>
-                            <p class="text-xs text-gray-400 mb-3">세부 점수 (성비, 새만남, 발제자, 선호도): {{ result.details|join(', ') }}</p>
-                            <div class="space-y-2">
-                                {% for group in result.groups %}
-                                <div class="p-2 bg-bg-dark rounded">
-                                    <div class="flex justify-between items-center">
-                                        <span class="pr-2">
-                                            <strong class="text-gray-300">
-                                                {% if group_names and group_names[loop.index0] %}{{ group_names[loop.index0] }}{% else %}그룹 {{ loop.index }}{% endif %}:
-                                            </strong>
-                                            {% set facilitators_in_group = [] %}{% for name in group %}{% if name in facilitators %}{% set _ = facilitators_in_group.append(name) %}{% endif %}{% endfor %}
-                                            {% set members_in_group = [] %}{% for name in group %}{% if name not in facilitators %}{% set _ = members_in_group.append(name) %}{% endif %}{% endfor %}
-                                            {% for name in facilitators_in_group %}<strong>{{ name }}</strong>{% if not loop.last or members_in_group %}, {% endif %}{% endfor %}
-                                            {% for name in members_in_group %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %}
-                                        </span>
-                                        <button class="show-history-btn text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded-md ml-2 flex-shrink-0" data-group='{{ group|tojson|safe }}'>기록 보기</button>
-                                    </div>
-                                    <div class="history-details mt-2 text-xs text-gray-400 border-t border-gray-700 pt-2" style="display: none;"></div>
+                    <!-- 렌더링 영역 (기본/수정 통합) -->
+                    <div class="space-y-2 group-render-area">
+                        {% for group in result.groups %}
+                        <div class="p-3 bg-bg-dark rounded border border-gray-700 group-row">
+                            <div class="flex justify-between items-center relative gap-2">
+                                <div class="flex-grow group-content-view">
+                                    <strong class="text-gray-300 mr-2 group-label" data-idx="{{ loop.index0 }}">
+                                        {% if group_names and group_names[loop.index0] %}{{ group_names[loop.index0]
+                                        }}{% else %}그룹 {{ loop.index }}{% endif %}:
+                                    </strong>
+                                    {% set m_count = namespace(value=0) %}
+                                    {% set f_count = namespace(value=0) %}
+                                    {% for name in group %}
+                                    {% set g_val = member_genders.get(name) %}
+                                    {% if g_val == 'M' %}
+                                    {% set m_count.value = m_count.value + 1 %}
+                                    {% elif g_val == 'W' %}
+                                    {% set f_count.value = f_count.value + 1 %}
+                                    {% endif %}
+                                    {% endfor %}
+                                    <span
+                                        class="text-xs font-semibold px-2 py-0.5 rounded-full mr-3 {% if m_count.value == f_count.value %}bg-blue-900 text-blue-200{% elif m_count.value > f_count.value + 1 or f_count.value > m_count.value + 1 %}bg-red-900 text-red-300{% else %}bg-gray-700 text-gray-300{% endif %}">남
+                                        {{ m_count.value }}명 / 여 {{ f_count.value }}명</span>
+
+                                    {% set facilitators_in_group = [] %}{% for name in group %}{% if name in
+                                    facilitators %}{% set _ = facilitators_in_group.append(name) %}{% endif %}{% endfor
+                                    %}
+                                    {% set members_in_group = [] %}{% for name in group %}{% if name not in facilitators
+                                    %}{% set _ = members_in_group.append(name) %}{% endif %}{% endfor %}
+                                    <span class="group-members-text">
+                                        {% for name in facilitators_in_group %}<strong>{{ name }}</strong>{% if not
+                                        loop.last or members_in_group %}, {% endif %}{% endfor %}
+                                        {% for name in members_in_group %}{{ name }}{% if not loop.last %}, {% endif
+                                        %}{% endfor %}
+                                    </span>
                                 </div>
-                                {% endfor %}
+                                <textarea
+                                    class="group-content-edit hidden w-full bg-gray-800 text-white rounded p-2 text-sm border-gray-600 focus:border-eva-green focus:outline-none"
+                                    rows="2"></textarea>
+                                <button
+                                    class="show-history-btn text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded-md ml-2 flex-shrink-0"
+                                    data-group='{{ group|tojson|safe }}'>기록 보기</button>
                             </div>
-                            <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mt-4">
-                                <button class="w-full eva-button bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg save-groups-btn" data-groups='{{ result.groups|tojson|safe }}'>이 조합으로 저장</button>
-                                <button class="w-full eva-button bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg capture-groups-btn" data-groups='{{ result.groups|tojson|safe }}'>결과 캡쳐</button>
-                                <button class="w-full md:col-span-1 eva-button bg-yellow-600 hover:bg-yellow-700 text-white py-2 rounded-lg edit-groups-btn" data-groups='{{ result.groups|tojson|safe }}'>편집</button>
-                            </div>
+                            <div class="history-details mt-2 text-xs text-gray-400 border-t border-gray-700 pt-2"
+                                style="display: none;"></div>
                         </div>
-                    {% endfor %}
-                    {% if new_face_solutions|length > 6 %}
-                    <button id="load-more-newface" class="w-full eva-button bg-gray-800 hover:bg-black text-white py-2 rounded-lg">더 보기</button>
-                    {% endif %}
+                        {% endfor %}
+                    </div>
+
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 mt-4 button-group-view">
+                        <button
+                            class="w-full lg:col-span-2 eva-button bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg save-groups-btn"
+                            data-groups='{{ result.groups|tojson|safe }}'>이 조합으로 저장</button>
+                        <button
+                            class="w-full eva-button bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg capture-groups-btn"
+                            data-groups='{{ result.groups|tojson|safe }}'>결과 캡쳐</button>
+                        <button
+                            class="w-full eva-button bg-yellow-600 hover:bg-yellow-700 text-white py-2 rounded-lg edit-inline-btn text-black">명단
+                            수정</button>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 mt-4 button-group-edit hidden">
+                        <button
+                            class="w-full eva-button bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg cancel-edit-btn">취소</button>
+                        <button
+                            class="w-full eva-button bg-yellow-500 hover:bg-yellow-600 text-black py-2 rounded-lg apply-edit-btn">수정
+                            적용</button>
+                    </div>
+                </div>
+                {% endfor %}
+                {% if combined_solutions|length > 6 %}
+                <button id="load-more-combined"
+                    class="w-full max-w-sm mx-auto block eva-button bg-gray-800 hover:bg-black text-white py-3 rounded-lg border border-gray-700">추천안
+                    더 보기</button>
+                {% endif %}
                 {% else %}
-                     <p class="text-center text-gray-500">결과를 생성하지 못했습니다.</p>
+                <div class="eva-card p-10 text-center rounded-lg max-w-sm mx-auto">
+                    <p class="text-xl text-yellow-500 mb-2">⚠ 결과를 찾지 못했습니다.</p>
+                    <p class="text-sm text-gray-400">조건이 너무 엄격하거나 인원수가 부족할 수 있습니다.<br>인원을 조정해 다시 시도해주세요.</p>
+                </div>
                 {% endif %}
             </section>
         </div>
@@ -130,166 +207,270 @@
         <div id="modal-caption">이미지를 길게 누르거나 우클릭하여 저장/공유하세요.</div>
     </div>
 
-<script>
-    const present = {{ present|tojson|safe }};
-    const facilitators = {{ facilitators|tojson|safe }};
-    const group_names = {{ group_names|tojson|safe }};
-    const meetingHistory = {{ meeting_history|tojson|safe }};
-    const manual_entry_url = "{{ manual_entry_url|safe }}";
+    <script id="data-present" type="application/json">{{ present|tojson|safe }}</script>
+    <script id="data-facilitators" type="application/json">{{ facilitators|tojson|safe }}</script>
+    <script id="data-group-names" type="application/json">{{ group_names|tojson|safe }}</script>
+    <script id="data-meeting-history" type="application/json">{{ meeting_history|tojson|safe }}</script>
+    <script id="data-member-genders" type="application/json">{{ member_genders|tojson|safe }}</script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const present = JSON.parse(document.getElementById('data-present').textContent);
+            const facilitators = JSON.parse(document.getElementById('data-facilitators').textContent);
+            const group_names = JSON.parse(document.getElementById('data-group-names').textContent);
+            const meetingHistory = JSON.parse(document.getElementById('data-meeting-history').textContent);
+            const manual_entry_url = "{{ manual_entry_url|safe }}";
 
-    async function saveGroups(groups) {
-        if (!confirm("이 조 편성 결과를 저장하시겠습니까?")) return;
-        const dataToSave = {
-            date: new Date().toISOString().slice(0, 10),
-            present: present,
-            facilitators: facilitators,
-            groups: groups
-        };
-        try {
-            const response = await fetch('/api/bookclub/save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(dataToSave)
-            });
-            const result = await response.json();
-            if (result.status === 'ok') {
-                alert('성공적으로 저장되었습니다!');
-                window.location.href = "/making_team";
-            } else { throw new Error(result.message || '저장에 실패했습니다.'); }
-        } catch (error) { alert('오류: ' + error.message); }
-    }
-
-    async function captureCleanGroups(groups) {
-        if (typeof html2canvas === 'undefined') {
-            alert('오류: 캡쳐 라이브러리(html2canvas)를 로드하지 못했습니다.'); return;
-        }
-
-        const captureContainer = document.createElement('div');
-        try {
-            Object.assign(captureContainer.style, {
-                position: 'absolute', top: '-9999px', left: '0px',
-                width: '550px', padding: '24px', backgroundColor: '#2D2D2D',
-                color: '#E5E5E5', fontFamily: "'Noto Sans KR', sans-serif",
-                border: '1px solid #444444', borderRadius: '12px'
-            });
-            let innerHTML = `<h3 style="font-family: 'Orbitron', sans-serif; font-size: 20px; font-weight: bold; color: #00FF7F; margin-bottom: 16px; text-transform: uppercase;">Grouping Result</h3>`;
-            groups.forEach((group, index) => {
-                const groupName = (group_names && group_names[index]) ? group_names[index] : `그룹 ${index + 1}`;
-                const memberNames = [...group].sort().map(name =>
-                    facilitators.includes(name) ? `<strong style="font-weight: bold; color: #ADFF2F;">[발제자] ${name}</strong>` : name
-                ).join(', ');
-                innerHTML += `<div style="background-color: #1A1A1A; padding: 12px; border-radius: 8px; margin-bottom: 10px;"><strong style="color: #E5E5E5;">${groupName}:</strong> ${memberNames}</div>`;
-            });
-            captureContainer.innerHTML = innerHTML;
-            document.body.appendChild(captureContainer);
-
-            const canvas = await html2canvas(captureContainer, { scale: 2 });
-
-            const modal = document.getElementById('image-modal');
-            const modalImg = document.getElementById('image-modal-content');
-            modalImg.src = canvas.toDataURL("image/png");
-            modal.style.display = 'flex';
-
-        } catch (err) {
-            console.error('캡쳐 실패:', err);
-            alert('캡쳐 이미지를 준비하는 중 오류가 발생했습니다: ' + err.message);
-        } finally {
-            if (document.body.contains(captureContainer)) {
-                document.body.removeChild(captureContainer);
+            async function saveGroups(groups) {
+                if (!confirm("이 조 편성 결과를 저장하시겠습니까?")) return;
+                const dataToSave = {
+                    date: new Date().toISOString().slice(0, 10),
+                    present: present,
+                    facilitators: facilitators,
+                    groups: groups
+                };
+                try {
+                    const response = await fetch('/api/bookclub/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(dataToSave)
+                    });
+                    const result = await response.json();
+                    if (result.status === 'ok') {
+                        alert('성공적으로 저장되었습니다!');
+                        window.location.href = "/making_team";
+                    } else { throw new Error(result.message || '저장에 실패했습니다.'); }
+                } catch (error) { alert('오류: ' + error.message); }
             }
-        }
-    }
 
-    function editGroups(groups) {
-        const dataToEdit = {
-            present: present, facilitators: facilitators, groups: groups,
-            group_names: group_names, date: new Date().toISOString().slice(0, 10)
-        };
-        sessionStorage.setItem('manualEntryData', JSON.stringify(dataToEdit));
-        window.location.href = manual_entry_url;
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        function setupLoadMore(buttonId, cardClass) {
-            const loadMoreBtn = document.getElementById(buttonId);
-            if (!loadMoreBtn) return;
-            const cards = document.querySelectorAll('.' + cardClass);
-            let visibleCount = 6;
-            loadMoreBtn.addEventListener('click', () => {
-                const nextVisibleCount = visibleCount + 6;
-                for (let i = visibleCount; i < nextVisibleCount && i < cards.length; i++) {
-                    cards[i].style.display = 'block';
+            async function captureCleanGroups(groups) {
+                if (typeof html2canvas === 'undefined') {
+                    alert('오류: 캡쳐 라이브러리(html2canvas)를 로드하지 못했습니다.'); return;
                 }
-                visibleCount = nextVisibleCount;
-                if (visibleCount >= cards.length) {
-                    loadMoreBtn.style.display = 'none';
+
+                const captureContainer = document.createElement('div');
+                try {
+                    Object.assign(captureContainer.style, {
+                        position: 'absolute', top: '-9999px', left: '0px',
+                        width: '550px', padding: '24px', backgroundColor: '#2D2D2D',
+                        color: '#E5E5E5', fontFamily: "'Noto Sans KR', sans-serif",
+                        border: '1px solid #444444', borderRadius: '12px'
+                    });
+                    let innerHTML = `<h3 style="font-family: 'Orbitron', sans-serif; font-size: 20px; font-weight: bold; color: #00FF7F; margin-bottom: 16px; text-transform: uppercase;">Grouping Result</h3>`;
+                    groups.forEach((group, index) => {
+                        const groupName = (group_names && group_names[index]) ? group_names[index] : `그룹 ${index + 1}`;
+                        const memberNames = [...group].sort().map(name =>
+                            facilitators.includes(name) ? `<strong style="font-weight: bold; color: #ADFF2F;">[발제자] ${name}</strong>` : name
+                        ).join(', ');
+                        innerHTML += `<div style="background-color: #1A1A1A; padding: 12px; border-radius: 8px; margin-bottom: 10px;"><strong style="color: #E5E5E5;">${groupName}:</strong> ${memberNames}</div>`;
+                    });
+                    captureContainer.innerHTML = innerHTML;
+                    document.body.appendChild(captureContainer);
+
+                    const canvas = await html2canvas(captureContainer, { scale: 2 });
+
+                    const modal = document.getElementById('image-modal');
+                    const modalImg = document.getElementById('image-modal-content');
+                    modalImg.src = canvas.toDataURL("image/png");
+                    modal.style.display = 'flex';
+
+                } catch (err) {
+                    console.error('캡쳐 실패:', err);
+                    alert('캡쳐 이미지를 준비하는 중 오류가 발생했습니다: ' + err.message);
+                } finally {
+                    if (document.body.contains(captureContainer)) {
+                        document.body.removeChild(captureContainer);
+                    }
                 }
-            });
-        }
+            }
 
-        document.querySelectorAll('.save-groups-btn').forEach(button => {
-            button.addEventListener('click', () => {
-                const groupsObject = JSON.parse(button.dataset.groups);
-                saveGroups(groupsObject);
-            });
-        });
-        document.querySelectorAll('.capture-groups-btn').forEach(button => {
-            button.addEventListener('click', () => {
-                const groupsObject = JSON.parse(button.dataset.groups);
-                captureCleanGroups(groupsObject);
-            });
-        });
-        document.querySelectorAll('.edit-groups-btn').forEach(button => {
-            button.addEventListener('click', () => {
-                const groupsObject = JSON.parse(button.dataset.groups);
-                editGroups(groupsObject);
-            });
-        });
+            // Event Delegation for all buttons within the container
+            document.querySelector('.container').addEventListener('click', (e) => {
 
-        setupLoadMore('load-more-gender', 'result-card-gender');
-        setupLoadMore('load-more-newface', 'result-card-newface');
-
-        document.querySelector('.container').addEventListener('click', (e) => {
-            if (e.target.matches('.show-history-btn')) {
-                const button = e.target;
-                const group = JSON.parse(button.dataset.group);
-                const detailsDiv = button.closest('.p-2.bg-bg-dark').querySelector('.history-details');
-
-                if (detailsDiv.style.display === 'block') {
-                    detailsDiv.style.display = 'none';
-                    detailsDiv.innerHTML = '';
-                    button.textContent = '기록 보기';
+                // --- 1. Save Groups ---
+                if (e.target.matches('.save-groups-btn')) {
+                    const groupsObject = JSON.parse(e.target.dataset.groups);
+                    saveGroups(groupsObject);
                     return;
                 }
 
-                const pairs = [];
-                for (let i = 0; i < group.length; i++) { for (let j = i + 1; j < group.length; j++) { pairs.push([group[i], group[j]]); } }
-
-                if (pairs.length < 1) {
-                    detailsDiv.innerHTML = '<span>비교할 기록이 없습니다.</span>';
-                } else {
-                    let html = '<ul class="list-disc list-inside space-y-1">';
-                    pairs.forEach(pair => {
-                        const key = pair.sort().join('-');
-                        const count = meetingHistory[key] || 0;
-                        html += `<li>${pair[0]} & ${pair[1]}: <span class="font-bold text-eva-green">${count}회</span> 만남</li>`;
-                    });
-                    html += '</ul>';
-                    detailsDiv.innerHTML = html;
+                // --- 2. Capture Groups ---
+                if (e.target.matches('.capture-groups-btn')) {
+                    const groupsObject = JSON.parse(e.target.dataset.groups);
+                    captureCleanGroups(groupsObject);
+                    return;
                 }
 
-                detailsDiv.style.display = 'block';
-                button.textContent = '기록 닫기';
+                // --- 3. Edit Inline ---
+                if (e.target.matches('.edit-inline-btn')) {
+                    const card = e.target.closest('.result-card-combined');
+                    const viewGroup = card.querySelector('.button-group-view');
+                    const editGroup = card.querySelector('.button-group-edit');
+                    const saveBtn = card.querySelector('.save-groups-btn');
+
+                    viewGroup.classList.add('hidden');
+                    editGroup.classList.remove('hidden');
+
+                    card.querySelectorAll('.group-render-area > div').forEach(row => {
+                        const contentView = row.querySelector('.group-content-view');
+                        const contentEdit = row.querySelector('.group-content-edit');
+                        const historyBtn = row.querySelector('.show-history-btn');
+
+                        contentView.classList.add('hidden');
+                        historyBtn.classList.add('hidden');
+                        contentEdit.classList.remove('hidden');
+
+                        const currentGroupsObj = JSON.parse(saveBtn.dataset.groups);
+                        const idx = parseInt(row.querySelector('.group-label').dataset.idx, 10);
+                        const groupMembers = currentGroupsObj[idx];
+
+                        const editableText = groupMembers.sort().map(name =>
+                            facilitators.includes(name) ? name + '*' : name
+                        ).join(', ');
+
+                        contentEdit.value = editableText;
+                    });
+                    return;
+                }
+
+                // --- 4. Cancel Edit ---
+                if (e.target.matches('.cancel-edit-btn')) {
+                    const card = e.target.closest('.result-card-combined');
+                    const viewGroup = card.querySelector('.button-group-view');
+                    const editGroup = card.querySelector('.button-group-edit');
+
+                    viewGroup.classList.remove('hidden');
+                    editGroup.classList.add('hidden');
+
+                    card.querySelectorAll('.group-render-area > div').forEach(row => {
+                        row.querySelector('.group-content-view').classList.remove('hidden');
+                        row.querySelector('.show-history-btn').classList.remove('hidden');
+                        row.querySelector('.group-content-edit').classList.add('hidden');
+                    });
+                    return;
+                }
+
+                // --- 5. Apply Edit ---
+                if (e.target.matches('.apply-edit-btn')) {
+                    const card = e.target.closest('.result-card-combined');
+                    const viewGroup = card.querySelector('.button-group-view');
+                    const editGroup = card.querySelector('.button-group-edit');
+                    const saveBtn = card.querySelector('.save-groups-btn');
+                    const captureBtn = card.querySelector('.capture-groups-btn');
+
+                    let newGroupsArray = [];
+                    let hasError = false;
+
+                    card.querySelectorAll('.group-render-area > div').forEach(row => {
+                        if (hasError) return;
+                        const contentEdit = row.querySelector('.group-content-edit');
+                        const text = contentEdit.value.trim();
+                        if (!text) {
+                            alert("비어있는 그룹이 있습니다. 적어도 한 명 이상 입력하거나 줄을 지우려면 다시 생성하세요.");
+                            hasError = true;
+                            return;
+                        }
+
+                        const membersRaw = text.split(/[,;\s\n]+/).map(n => n.trim()).filter(Boolean);
+                        const cleanMembers = membersRaw.map(n => n.endsWith('*') ? n.slice(0, -1) : n);
+                        newGroupsArray.push(cleanMembers);
+                    });
+
+                    if (hasError) return;
+
+                    saveBtn.dataset.groups = JSON.stringify(newGroupsArray);
+                    captureBtn.dataset.groups = JSON.stringify(newGroupsArray);
+
+                    // 화면 재생성 (단순화를 위해 성비 배지는 편집 시 즉각 업데이트하지 않고 서버 통신 전 명단만 보여줌)
+                    card.querySelectorAll('.group-render-area > div').forEach((row, idx) => {
+                        const groupMembers = newGroupsArray[idx];
+                        row.querySelector('.show-history-btn').dataset.group = JSON.stringify(groupMembers);
+
+                        const facilitatorsInGroup = groupMembers.filter(n => facilitators.includes(n));
+                        const normalsInGroup = groupMembers.filter(n => !facilitators.includes(n));
+
+                        let newHtml = '';
+                        facilitatorsInGroup.forEach((n, i) => {
+                            newHtml += `<strong>${n}</strong>`;
+                            if (i < facilitatorsInGroup.length - 1 || normalsInGroup.length > 0) newHtml += ', ';
+                        });
+                        normalsInGroup.forEach((n, i) => {
+                            newHtml += n;
+                            if (i < normalsInGroup.length - 1) newHtml += ', ';
+                        });
+
+                        row.querySelector('.group-members-text').innerHTML = newHtml;
+
+                        row.querySelector('.group-content-view').classList.remove('hidden');
+                        row.querySelector('.show-history-btn').classList.remove('hidden');
+                        row.querySelector('.group-content-edit').classList.add('hidden');
+                    });
+
+                    viewGroup.classList.remove('hidden');
+                    editGroup.classList.add('hidden');
+
+                    alert("명단이 성공적으로 적용되었습니다. 이제 이 조합으로 저장하거나 캡쳐할 수 있습니다.");
+                    return;
+                }
+
+                // --- 6. Show History ---
+                if (e.target.matches('.show-history-btn')) {
+                    const button = e.target;
+                    const group = JSON.parse(button.dataset.group);
+                    // .group-row 안의 .history-details를 찾음 (group-row 클래스로 탐색)
+                    const groupRow = button.closest('.group-row');
+                    if (!groupRow) return;
+                    const detailsDiv = groupRow.querySelector('.history-details');
+                    if (!detailsDiv) return;
+
+                    if (detailsDiv.style.display === 'block') {
+                        detailsDiv.style.display = 'none';
+                        detailsDiv.innerHTML = '';
+                        button.textContent = '기록 보기';
+                        return;
+                    }
+
+                    const pairs = [];
+                    for (let i = 0; i < group.length; i++) {
+                        for (let j = i + 1; j < group.length; j++) {
+                            pairs.push([group[i], group[j]]);
+                        }
+                    }
+
+                    if (pairs.length < 1) {
+                        detailsDiv.innerHTML = '<span>비교할 기록이 없습니다.</span>';
+                    } else {
+                        let html = '<ul class="list-none space-y-1">';
+                        pairs.forEach(pair => {
+                            const key = [...pair].sort().join('-');
+                            const entry = meetingHistory[key];
+                            if (entry && entry.count > 0) {
+                                const dateStr = entry.last_met ? `<span class="text-gray-400">(${entry.last_met.slice(0, 10)})</span>` : '';
+                                html += `<li class="text-red-400 font-bold">🚨 ${pair[0]} &amp; ${pair[1]}: <span class="text-red-500">${entry.count}회</span> 만남 ${dateStr}</li>`;
+                            } else {
+                                html += `<li class="text-gray-400">${pair[0]} &amp; ${pair[1]}: <span class="font-bold text-eva-green">실제 0회</span></li>`;
+                            }
+                        });
+                        html += '</ul>';
+                        detailsDiv.innerHTML = html;
+                    }
+
+                    detailsDiv.style.display = 'block';
+                    button.textContent = '기록 닫기';
+                    return;
+                }
+            });
+
+            setupLoadMore('load-more-combined', 'result-card-combined');
+
+            const modal = document.getElementById('image-modal');
+            const modalClose = document.getElementById('modal-close');
+            if (modal && modalClose) {
+                // Direct binds (not inside delegation) so X button always works
+                modalClose.onclick = (e) => { e.stopPropagation(); modal.style.display = "none"; }
+                modal.onclick = (e) => { if (e.target === modal) { modal.style.display = "none"; } }
             }
         });
-
-        const modal = document.getElementById('image-modal');
-        const modalClose = document.getElementById('modal-close');
-        if(modal && modalClose) {
-            modalClose.onclick = () => { modal.style.display = "none"; }
-            modal.onclick = (e) => { if(e.target === modal) { modal.style.display = "none"; } }
-        }
-    });
-</script>
+    </script>
 </body>
+
 </html>

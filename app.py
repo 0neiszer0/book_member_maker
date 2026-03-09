@@ -14,7 +14,7 @@ import requests
 import re
 import pandas as pd
 import numpy as np
-from deap import base, creator, tools, algorithms
+from ortools.sat.python import cp_model
 import uuid
 import mwparserfromhell
 import bleach
@@ -131,7 +131,12 @@ def login_required(role="ANY"):
             if "user_role" not in session:
                 flash("로그인이 필요합니다.", "warning")
                 return redirect(url_for('login'))
-            if role != "ANY" and session["user_role"] != role:
+            # admin과 officer 역할은 모든 admin 전용 경로에 접근 가능
+            user_role = session["user_role"]
+            if role == "admin" and user_role not in ("admin", "officer"):
+                flash("이 페이지에 접근할 권한이 없습니다.", "danger")
+                return redirect(url_for('main_index'))
+            elif role != "ANY" and role != "admin" and user_role != role:
                 flash("이 페이지에 접근할 권한이 없습니다.", "danger")
                 return redirect(url_for('main_index'))
             return f(*args, **kwargs)
@@ -173,11 +178,28 @@ def send_telegram_notification(message):
 def get_next_monday():
     """오늘을 기준으로 다음 돌아오는 월요일의 날짜를 계산합니다."""
     today = datetime.now(timezone(timedelta(hours=9))).date()
-    # today.weekday()는 월요일=0, 일요일=6
     days_until_monday = (0 - today.weekday() + 7) % 7
-    if days_until_monday == 0: # 오늘이 월요일이면 다음 주 월요일을 대상으로 함
+    if days_until_monday == 0:
         days_until_monday = 7
     return today + timedelta(days=days_until_monday)
+
+
+def get_next_seminar_dates():
+    """이번 주 또는 다음 주의 월요일+목요일을 한 쌍으로 반환.
+    - 오늘이 월~목 사이라면: 이번 주 월요일 + 목요일
+    - 오늘이 금/토/일이라면: 다음 주 월요일 + 목요일
+    """
+    today = datetime.now(timezone(timedelta(hours=9))).date()
+    wd = today.weekday()  # 0=월, 3=목, 4=금, ...
+    # 이번 주의 월요일 (0일 전~6일 전)
+    this_monday = today - timedelta(days=wd)
+    this_thursday = this_monday + timedelta(days=3)
+    if today <= this_thursday:  # 아직 목요일 전이면 이번 주 상당
+        return sorted([this_monday, this_thursday])
+    else:  # 목요일 이후(금/토/일)면 다음 주
+        next_monday = this_monday + timedelta(weeks=1)
+        next_thursday = next_monday + timedelta(days=3)
+        return [next_monday, next_thursday]
 
 
 # ==============================================================================
@@ -320,9 +342,9 @@ def kakao_callback():
 
             # ... (계정 상태 및 활성 상태 체크 로직은 기존과 동일) ...
             if member.get('account_status') != 'active':
-                flash("아직 관리자의 승인을 받지 않은 계정입니다.", "warning")
+                flash("승인 대기 중입니다. 관리자가 가입/연동 요청을 확인 중입니다.", "warning")
                 return redirect(url_for('login'))
-            if not member.get('is_active', True):
+            if member.get('member_status', 'active') == 'inactive':
                 flash("비활성화된 계정입니다. 관리자에게 문의하세요.", "danger")
                 return redirect(url_for('login'))
         else:
@@ -334,17 +356,17 @@ def kakao_callback():
             session['temp_social_data'] = social_data
             return redirect(url_for('link_account_page'))
 
-        # 세션 설정 (이미 로그인된 상태에서 재동의한 경우, 기존 세션 정보 일부 덮어쓰기)
+        # 세션 설정 (DB에서 읽은 최신 값으로 매번 갱신)
         session["user_id"] = member["id"]
         session["user_role"] = member["role"]
-        # session['user_name']은 위에서 이미 갱신되었음
+        session["user_name"] = member["name"]  # 항상 DB 최신값으로 갱신
 
         next_url = session.pop('next_url', None)
         if next_url:
             return redirect(next_url)
-        if member["role"] == "admin":
+        if member["role"] in ("admin", "officer"):
             return redirect(url_for("admin_dashboard"))
-        return redirect(url_for("main_index"))
+        return redirect(url_for("my_page"))
 
     except Exception as e:
         flash("카카오 로그인 중 오류가 발생했습니다.", "danger")
@@ -371,7 +393,8 @@ def link_account_submit():
 
     member = None
     if action == 'link':
-        existing_name = form.get('existing_name')
+        existing_name = form.get('existing_name', '').strip()
+        student_id = form.get('student_id', '').strip()
         if not existing_name:
             flash("기존 활동명을 입력해주세요.", "danger")
             return redirect(url_for('link_account_page'))
@@ -380,30 +403,50 @@ def link_account_submit():
         member_to_link = member_res.data[0] if member_res.data else None
 
         if member_to_link:
+            # 학번음 입력했고 DB 학번과 일치하면 자동 승인
+            db_student_id = member_to_link.get('student_id')
+            auto_approve = student_id and db_student_id and str(student_id).strip() == str(db_student_id).strip()
+
             update_data = {
                 "social_id": social_info['social_id'],
-                "email": social_info['email'],
                 "profile_pic": social_info['profile_pic'],
-                "account_status": 'pending'
+                "account_status": 'approved' if auto_approve else 'pending',
+                "is_active": True if auto_approve else member_to_link.get('is_active', False)
             }
-            # [수정] .update() 뒤에 .select()를 제거하고, 실행 결과에서 바로 .data를 사용합니다.
-            updated_member_response = supabase.table("members").update(update_data).eq("id",
-                                                                                       member_to_link['id']).execute()
+            # 이메일이 있고, 현재 멤버가 사용 중인 이메일이 아닌 경우에만 업데이트
+            # (다른 멤버가 이미 같은 이메일을 사용 중이면 UNIQUE 제약 위반 방지)
+            kakao_email = social_info.get('email')
+            if kakao_email:
+                email_conflict = supabase.table("members").select("id").eq("email", kakao_email).neq("id", member_to_link['id']).execute()
+                if not email_conflict.data:
+                    update_data["email"] = kakao_email
+                else:
+                    app.logger.warning(f"이메일 {kakao_email}이 이미 다른 멤버에게 사용 중 — 이메일 업데이트 생략")
+            updated_member_response = supabase.table("members").update(update_data).eq("id", member_to_link['id']).execute()
             member = updated_member_response.data[0]
 
-            # notifications 테이블에 알림 생성
-            supabase.table('notifications').insert({
-                'type': 'account_link_request',
-                'related_member_id': member['id'],
-                'details': {
-                    'original_name': member['name'],
-                    'social_name': social_info['social_name'],
-                    'social_email': social_info['email']
-                }
-            }).execute()
-
-            flash("기존 계정 연결 요청이 완료되었습니다. 관리자 승인 후 로그인 가능합니다.", "success")
-            return redirect(url_for('login'))
+            if auto_approve:
+                # 세션 설정 및 자동 로그인
+                session.pop('temp_social_data', None)
+                session['user_id'] = member['id']
+                session['user_name'] = member['name']
+                session['user_role'] = member.get('role', 'member')
+                session['profile_pic'] = member.get('profile_pic', '')
+                flash(f"학번 확인이 완료되었습니다. {member['name']}님, 환영합니다!", "success")
+                return redirect(url_for('my_page'))
+            else:
+                # notifications 테이블에 알림 생성
+                supabase.table('notifications').insert({
+                    'type': 'account_link_request',
+                    'related_member_id': member['id'],
+                    'details': {
+                        'original_name': member['name'],
+                        'social_name': social_info['social_name'],
+                        'social_email': social_info['email']
+                    }
+                }).execute()
+                flash("기존 계정 연결 요청이 완료되었습니다. 관리자 승인 후 로그인 가능합니다.", "success")
+                return redirect(url_for('login'))
         else:
             flash("해당 이름의 기존 계정을 찾을 수 없습니다. 신규 회원으로 가입해주세요.", "danger")
             return redirect(url_for('link_account_page'))
@@ -435,76 +478,7 @@ def link_account_submit():
         return redirect(url_for('login'))
 
 
-# @app.route('/login', methods=['GET', 'POST'])
-# def login():
-#     if request.method == 'POST':
-#         role = request.form.get('role')
-#         password = request.form.get('password')
-#         ADMIN_PASS = os.environ.get("ADMIN_PASSWORD")
-#         INTERVIEWER_PASS = os.environ.get("INTERVIEWER_PASSWORD")
-#         APPLICANT_PASS = os.environ.get("APPLICANT_PASSWORD")
-#
-#         # 역할 1: 관리자 로그인 (기존과 동일)
-#         if role == 'admin' and password == ADMIN_PASS:
-#             session.clear()
-#             session['user_role'] = 'admin'
-#             session['user_name'] = '관리자'
-#             flash('관리자님, 환영합니다!', 'success')
-#             return redirect(url_for('admin_dashboard'))
-#
-#         # 역할 2: 면접관 로그인
-#         elif role == 'interviewer' and password == INTERVIEWER_PASS:
-#             interviewer_name = request.form.get('name')
-#             if not interviewer_name:
-#                 flash('면접관 이름을 입력해주세요.', 'danger')
-#                 return redirect(url_for('login'))
-#
-#             # [추가] 입력한 이름이 'members' 테이블에 존재하는지 확인합니다.
-#             try:
-#                 member_res = supabase.table('members').select('name').eq('name', interviewer_name).execute()
-#                 if not member_res.data:
-#                     flash('등록된 모임원이 아닙니다. 관리자에게 문의하세요.', 'danger')
-#                     return redirect(url_for('login'))
-#             except Exception as e:
-#                 flash('사용자 확인 중 오류가 발생했습니다.', 'danger')
-#                 app.logger.error(f"Error checking member: {e}")
-#                 return redirect(url_for('login'))
-#
-#             session.clear()
-#             session['user_role'] = 'interviewer'
-#             session['user_name'] = interviewer_name
-#             flash(f"{session['user_name']} 면접관님, 환영합니다!", 'success')
-#             return redirect(url_for('interviewer_events_list'))
-#
-#         # 역할 3: 면접자 로그인
-#         elif role == 'applicant' and password == APPLICANT_PASS:
-#             name = request.form.get('name')
-#             phone = request.form.get('phone_number')
-#
-#             # [추가] 이름과 전화번호 형식 유효성 검사
-#             if not (name and phone):
-#                 flash('이름과 연락처를 모두 입력해주세요.', 'danger')
-#                 return redirect(url_for('login'))
-#
-#             if not re.match(r'^[가-힣]{2,4}$', name):
-#                 flash('이름은 2~4자의 한글로 입력해주세요.', 'danger')
-#                 return redirect(url_for('login'))
-#
-#             if not re.match(r'^\d{11}$', phone):
-#                 flash('연락처는 11자리 숫자로 입력해주세요. (예: 01012345678)', 'danger')
-#                 return redirect(url_for('login'))
-#
-#             session.clear()
-#             session['user_role'] = 'applicant'
-#             session['user_name'] = name
-#             session['user_phone'] = phone
-#             flash(f"{session['user_name']}님, 환영합니다!", 'success')
-#             return redirect(url_for('interview_index'))
-#
-#         else:
-#             flash('입력 정보가 올바르지 않습니다.', 'danger')
-#
-#     return render_template('login.html')
+
 
 
 # --- [신규] 접근 키가 포함된 링크를 처리하는 라우트 ---
@@ -599,39 +573,8 @@ def logout():
     flash('성공적으로 로그아웃되었습니다.', 'info')
     return redirect(url_for('main_index'))
 
-#
-# @app.route('/board')
-# @login_required(role="ANY")
-# def member_board():
-#     user_id = session.get('user_id')
-#     next_monday = get_next_monday()
-#     try:
-#         # [수정] status, drink_order 대신 attending_seminar, attending_afterparty 조회
-#         my_attendance_res = supabase.table('attendance').select('attending_seminar, attending_afterparty') \
-#             .eq('user_id', user_id).eq('meeting_date', next_monday.isoformat()).execute()
-#         my_attendance = my_attendance_res.data[0] if my_attendance_res.data else None
-#
-#         questions_res = supabase.table('questions').select('*, members(name)').eq('meeting_date',
-#                                                                                   next_monday.isoformat()).order(
-#             'created_at').execute()
-#         all_questions = questions_res.data if questions_res.data else []
-#
-#         # [수정] 세미나 참석자 명단만 조회 (뒷풀이 참석 여부도 함께 가져옴)
-#         attendees_res = supabase.table('attendance').select('user_id, attending_afterparty, members(name)') \
-#             .eq('meeting_date', next_monday.isoformat()).eq('attending_seminar', True).execute()
-#         attendees = attendees_res.data if attendees_res.data else []
-#
-#     except Exception as e:
-#         flash(f"데이터를 불러오는 중 오류 발생: {e}", "danger")
-#         my_attendance, all_questions, attendees = None, [], []
-#
-#     return render_template(
-#         'member_board.html',
-#         meeting_date=next_monday,
-#         my_attendance=my_attendance,
-#         questions=all_questions,
-#         attendees=attendees
-#     )
+
+
 
 
 @app.route('/api/attendance', methods=['POST'])
@@ -639,14 +582,14 @@ def logout():
 def update_attendance():
     data = request.json
     user_id = session.get('user_id')
-    next_monday = get_next_monday().isoformat()
+    # 클라이언트가 특정 날짜를 보내면 해당 날짜, 아니면 다음 월요일 fallback
+    meeting_date = data.get('meeting_date') or get_next_monday().isoformat()
     try:
-        # [수정] status, drink_order 대신 attending_seminar, attending_afterparty 를 upsert
         supabase.table('attendance').upsert({
             'user_id': user_id,
-            'meeting_date': next_monday,
+            'meeting_date': meeting_date,
             'attending_seminar': data.get('attending_seminar'),
-            'attending_afterparty': data.get('attending_afterparty')
+            'attending_afterparty': data.get('attending_afterparty', False)
         }, on_conflict='user_id, meeting_date').execute()
         return jsonify({"status": "success"})
     except Exception as e:
@@ -764,127 +707,120 @@ def profile_detail_page(member_id):
 @login_required(role="admin")
 def admin_dashboard():
     try:
+        next_monday = get_next_monday()
+    except Exception:
+        next_monday = None
+
+    try:
         events_res = supabase.table('events').select('*').order('created_at', desc=True).execute().data
 
-        # [수정] 모든 멤버 정보에 'demerit_points'를 추가로 가져옵니다.
-        all_members_res = supabase.table('members').select('id, name, is_active, demerit_points').order(
-            'name').execute().data
+        # 기존 demerit_points 및 interviewer 쿼리 제거
+        # department 컬럼이 DB에 없어 발생하는 42703 오류를 임시로 방지하기 위해 쿼리에서 제거
+        all_members_res = supabase.table('members').select(
+            'id, name, is_active, member_status, role, email, department, gender, student_id, recruiting_class'
+        ).order('name').execute().data
 
-        interviewers_res = supabase.table('interviewers').select('name').execute().data
-        interviewer_names = {i['name'] for i in interviewers_res}
-        next_monday = get_next_monday()
-
-        # [추가] 최근 벌점 부과 기록 5개를 가져옵니다.
-        demerit_logs_res = supabase.table('demerit_logs') \
-            .select('points, reason, created_at, member:member_id(name), admin:admin_id(name)') \
-            .order('created_at', desc=True) \
-            .limit(5) \
-            .execute().data
-
-        # [추가할 부분] 생성된 발제문 취합 이벤트 목록 불러오기
+        # 생성된 발제문 취합 이벤트 목록 불러오기
         topic_events_res = supabase.table('topic_events').select('*').order('created_at', desc=True).execute()
         topic_events = topic_events_res.data
 
     except Exception as e:
         flash(f"대시보드 로딩 중 오류 발생: {e}", "danger")
-        events_res, all_members_res, interviewer_names, demerit_logs_res = [], [], set(), []
+        events_res, all_members_res = [], []
+        topic_events = []
 
     return render_template(
         'admin_dashboard.html',
         events=events_res,
         all_members=all_members_res,
-        interviewer_names=interviewer_names,
-        demerit_logs=demerit_logs_res,  # [추가] 벌점 기록 전달
         meeting_date=next_monday,
         topic_events=topic_events
     )
 
 
-@app.route('/api/admin/members/<int:member_id>/remove_demerit', methods=['POST'])
+
+
+
+@app.route('/api/admin/members/<int:member_id>/set_status', methods=['POST'])
 @login_required(role="admin")
-def remove_demerit(member_id):
-    admin_id = session.get('user_id')
+def set_member_status(member_id):
+    """관리자가 특정 멤버의 상태를 active / dormant / inactive 중 하나로 설정합니다."""
     data = request.json
-    points = data.get('points')
-    reason = data.get('reason')
-
-    if not points or not isinstance(points, int) or points <= 0:
-        return jsonify({"error": "벌점(points)은 0보다 큰 숫자여야 합니다."}), 400
-
+    new_status = data.get('member_status')
+    if new_status not in ('active', 'dormant', 'inactive'):
+        return jsonify({"status": "error", "message": "유효하지 않은 상태입니다."}), 400
     try:
-        # 1. 벌점 기록(log)을 생성 (차감 기록은 음수로 저장)
-        supabase.table('demerit_logs').insert({
-            'member_id': member_id,
-            'admin_id': admin_id,
-            'points': -points,  # 차감은 음수로 기록
-            'reason': reason
-        }).execute()
-
-        # 2. members 테이블의 demerit_points를 차감
-        supabase.rpc('decrement_demerit', {'member_id_in': member_id, 'points_in': points}).execute()
-
-        return jsonify({"status": "success", "message": f"{points}점의 벌점이 차감되었습니다."})
-    except Exception as e:
-        app.logger.error(f"Error removing demerit for member {member_id}: {e}")
-        return jsonify({"error": "벌점 차감 중 오류 발생"}), 500
-
-
-@app.route('/api/admin/members/<int:member_id>/toggle_active', methods=['POST'])
-@login_required(role="admin")
-def toggle_member_active(member_id):
-    """관리자가 특정 멤버의 활성/비활성 상태를 변경합니다."""
-    data = request.json
-    new_status = data.get('is_active')
-
-    if new_status is None:
-        return jsonify({"status": "error", "message": "is_active 값이 필요합니다."}), 400
-
-    try:
-        # 자기 자신을 비활성화하지 못하도록 방지
-        if member_id == session.get('user_id') and not new_status:
+        if member_id == session.get('user_id') and new_status == 'inactive':
             return jsonify({"status": "error", "message": "자기 자신을 비활성화할 수 없습니다."}), 403
-
         supabase.table('members').update({
-            'is_active': new_status
+            'member_status': new_status,
+            'is_active': new_status == 'active'  # 하위 호환성 유지
         }).eq('id', member_id).execute()
-
         return jsonify({"status": "success", "message": "멤버 상태가 변경되었습니다."})
-
     except Exception as e:
-        app.logger.error(f"Error toggling active status for member {member_id}: {e}")
+        app.logger.error(f"Error setting member status for {member_id}: {e}")
         return jsonify({"status": "error", "message": "상태 변경 중 오류 발생"}), 500
 
-# 2. 기존의 add_interviewer 와 delete_interviewer 함수 2개를 삭제하고,
-#    아래의 새로운 toggle_interviewer 함수 1개로 교체합니다.
-@app.route('/api/admin/toggle_interviewer', methods=['POST'])
+
+@app.route('/api/admin/members/create', methods=['POST'])
 @login_required(role="admin")
-def toggle_interviewer():
+def create_member():
+    """관리자가 새 멤버를 등록합니다."""
+    data = request.json
     try:
-        name_to_toggle = request.json.get('name')
-        if not name_to_toggle:
-            return jsonify({'status': 'error', 'message': '이름이 필요합니다.'}), 400
-
-        # 해당 이름이 면접관 테이블에 이미 있는지 확인
-        existing_interviewer = supabase.table('interviewers').select('id').eq('name', name_to_toggle).execute()
-
-        # 이미 면접관이라면 -> 테이블에서 삭제
-        if existing_interviewer.data:
-            supabase.table('interviewers').delete().eq('name', name_to_toggle).execute()
-            return jsonify({'status': 'removed', 'message': f"'{name_to_toggle}' 님을 면접관에서 제외했습니다."})
-
-        # 면접관이 아니라면 -> 테이블에 추가
-        else:
-            # [수정] members 테이블에서 contact 정보를 가져오는 로직을 완전히 제거합니다.
-            # interviewers 테이블의 contact 필드는 비워둔 채로(null) 추가됩니다.
-            supabase.table('interviewers').insert({
-                'name': name_to_toggle,
-                'contact': None
-            }).execute()
-            return jsonify({'status': 'added', 'message': f"'{name_to_toggle}' 님을 면접관으로 추가했습니다."})
-
+        name = data.get('name', '').strip()
+        if not name:
+            return jsonify({"status": "error", "message": "이름은 필수입니다."}), 400
+        supabase.table('members').insert({
+            'name': name,
+            'email': data.get('email', ''),
+            'gender': data.get('gender', ''),
+            'role': data.get('role', 'member'),
+            'member_status': 'active',
+            'is_active': True,
+            'account_status': 'active'
+        }).execute()
+        return jsonify({"status": "success", "message": f"{name} 멤버가 추가되었습니다."})
     except Exception as e:
-        app.logger.error(f"Error toggling interviewer: {e}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        app.logger.error(f"Error creating member: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/admin/members/<int:member_id>/edit', methods=['POST'])
+@login_required(role="admin")
+def edit_member(member_id):
+    """관리자가 멤버 정보를 편집합니다."""
+    data = request.json
+    try:
+        update_fields = {}
+        for field in ('name', 'email', 'gender', 'role', 'department', 'student_id', 'recruiting_class'):
+            if field in data:
+                val = data[field]
+                if isinstance(val, str) and val.strip() == '':
+                    update_fields[field] = None  # 빈 문자열은 NULL로
+                else:
+                    update_fields[field] = val
+        if not update_fields:
+            return jsonify({"status": "error", "message": "변경할 내용이 없습니다."}), 400
+        supabase.table('members').update(update_fields).eq('id', member_id).execute()
+        return jsonify({"status": "success", "message": "멤버 정보가 수정되었습니다."})
+    except Exception as e:
+        app.logger.error(f"Error editing member {member_id}: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/admin/members/<int:member_id>/delete', methods=['POST'])
+@login_required(role="admin")
+def delete_member(member_id):
+    """관리자가 멤버를 삭제합니다."""
+    try:
+        if member_id == session.get('user_id'):
+            return jsonify({"status": "error", "message": "자기 자신을 삭제할 수 없습니다."}), 403
+        supabase.table('members').delete().eq('id', member_id).execute()
+        return jsonify({"status": "success", "message": "멤버가 삭제되었습니다."})
+    except Exception as e:
+        app.logger.error(f"Error deleting member {member_id}: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @app.route('/admin/events/create', methods=['POST'])
@@ -999,25 +935,16 @@ def admin_event_timetable(event_id):
         event_data = event_res.data[0]
         app.logger.info(f"이벤트 조회 성공: {event_data}")
 
-        # 2. 면접관 목록 조회
-        app.logger.info("면접관 목록 조회 시도...")
-        interviewers_res = supabase.table('interviewers').select('id, name').order('name').execute()
-
-        # 데이터가 있는지 확인 (가장 확실한 방법)
-        interviewers_data = interviewers_res.data if hasattr(interviewers_res, 'data') else []
-        app.logger.info(f"면접관 목록 조회 성공: {len(interviewers_data)}명")
-
         # 3. 템플릿 렌더링 시도
         app.logger.info("render_template 호출 직전...")
         app.logger.info(
-            f"전달할 데이터: event={event_data}, event_id={event_data['id']}, all_interviewers={interviewers_data}")
+            f"전달할 데이터: event={event_data}, event_id={event_data['id']}")
 
         return render_template(
             'timetable_view.html',
             event=event_data,
             event_id=event_data['id'],
             user_role=session['user_role'],
-            all_interviewers=interviewers_data,
             is_shared_view=False  # [수정] 이 값을 명시적으로 전달
         )
 
@@ -1091,10 +1018,7 @@ def get_timetable_data(event_id):
         # [추가] 현재 시간을 UTC 기준으로 설정
         now_utc = datetime.now(timezone.utc)
 
-        interviewer_ids_to_fetch = set()
-        for s in slots_res:
-            if s.get('interviewer_ids'):
-                interviewer_ids_to_fetch.update(s['interviewer_ids'])
+        # interviewer 쿼리 제거 (해결)
         booked_slot_ids = [s['id'] for s in slots_res if s['is_booked']]
 
         reservations_data = []
@@ -1112,15 +1036,7 @@ def get_timetable_data(event_id):
             applicants_data = response_applicants.data if hasattr(response_applicants,
                                                                   'data') and response_applicants.data else []
 
-        interviewers_data = []
-        if interviewer_ids_to_fetch:
-            response_interviewers = supabase.table('interviewers').select('id, name').in_('id', list(
-                interviewer_ids_to_fetch)).execute()
-            interviewers_data = response_interviewers.data if hasattr(response_interviewers,
-                                                                      'data') and response_interviewers.data else []
-
         applicants_map = {a['id']: a for a in applicants_data}
-        interviewers_map = {i['id']: i['name'] for i in interviewers_data}
         reservation_map = {r['slot_id']: r['applicant_id'] for r in reservations_data}
 
         for slot in slots_res:
@@ -1129,10 +1045,6 @@ def get_timetable_data(event_id):
                 # [추가] is_past 플래그 계산
                 slot_dt_utc = datetime.fromisoformat(slot['slot_datetime'].replace('Z', '+00:00'))
                 slot['is_past'] = slot_dt_utc < now_utc
-
-            if slot.get('interviewer_ids'):
-                slot['interviewer_names'] = ', '.join(
-                    [interviewers_map.get(i_id, "알 수 없음") for i_id in slot['interviewer_ids']])
             if slot['id'] in reservation_map:
                 applicant_id = reservation_map[slot['id']]
                 slot['applicant'] = applicants_map.get(applicant_id)
@@ -1176,18 +1088,6 @@ def cancel_reservation(slot_id):
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
-@app.route('/api/admin/slots/<slot_id>/update_interviewers', methods=['POST'])
-@login_required(role="admin")
-def admin_update_interviewers(slot_id):
-    """[신규] 관리자가 특정 슬롯의 면접관 목록 전체를 업데이트하는 API"""
-    try:
-        interviewer_ids = request.json.get('interviewer_ids', [])
-        update_data = {'interviewer_ids': interviewer_ids if interviewer_ids else None}
-        supabase.table('time_slots').update(update_data).eq('id', slot_id).execute()
-        return jsonify({'status': 'success', 'message': '면접관이 성공적으로 업데이트되었습니다.'})
-    except Exception as e:
-        app.logger.error(f"Error updating interviewers by admin: {e}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/admin/reservations/create', methods=['POST'])
 @login_required(role="admin")
@@ -1445,6 +1345,16 @@ def handle_notification(notif_id):
             if notif_type in ['new_user_request', 'account_link_request']:
                 if action == 'approve':
                     supabase.table('members').update({'account_status': 'active'}).eq('id', member_id).execute()
+                elif action == 'deny':
+                    if notif_type == 'account_link_request':
+                        # 연결 거절 시: 다시 시도할 수 있도록 social_id 해제 및 상태 원복
+                        supabase.table('members').update({
+                            'social_id': None, 
+                            'account_status': 'active'
+                        }).eq('id', member_id).execute()
+                    elif notif_type == 'new_user_request':
+                        # 신규 가입 거절 시: 임시로 생성된 pending 멤버 레코드 자체를 삭제하여 재가입 가능하도록 함
+                        supabase.table('members').delete().eq('id', member_id).execute()
 
             # 불참 요청 처리
             elif notif_type == 'absence_request':
@@ -1478,74 +1388,6 @@ def handle_notification(notif_id):
 
 
 # --- 4.2. 독서 모임 조 편성 (관리자 전용) ---
-def gender_balance_score(group, members):
-    m = sum(1 for name in group if members.get(name, {}).get('gender') == 'M')
-    f = sum(1 for name in group if members.get(name, {}).get('gender') == 'F')
-    return -abs(m - f)
-
-
-def preference_score(group, members):
-    score = 0
-    for a, b in itertools.permutations(group, 2):
-        preferred_list = members.get(a, {}).get('preferred') or []
-        avoided_list = members.get(a, {}).get('avoided') or []
-        if b in preferred_list: score += 2
-        if b in avoided_list: score -= 3
-    return score
-
-
-def history_score(group, co_matrix):
-    score = 0
-    for a, b in itertools.combinations(group, 2):
-        key = '-'.join(sorted([a, b]))
-        entry = co_matrix.get(key)
-        if entry: score -= entry['count']
-    return score
-
-
-def generate_groups(participants, facilitators, members, co_matrix, group_count_override=None, group_size_range=(3, 5),
-                    top_n=5):
-    total = len(participants := participants.copy())
-    min_size, max_size = group_size_range
-    if total == 0: return []
-    min_groups = math.ceil(total / max_size) if max_size > 0 else 1
-    max_groups = total // min_size if min_size > 0 else 1
-    if group_count_override is not None:
-        group_count = group_count_override
-    else:
-        group_count = min(max(min_groups, len(facilitators)), max_groups)
-    if group_count <= 0: group_count = min_groups if min_groups > 0 else 1
-    if group_count == 0: return []
-    base, extra = divmod(total, group_count)
-    sizes = [base + 1] * extra + [base] * (group_count - extra)
-    suggestions = []
-    for _ in range(top_n * 2):
-        random.shuffle(participants)
-        groups = [[] for _ in range(group_count)]
-        [groups[i].append(fac) for i, fac in enumerate(facilitators) if i < group_count]
-        remaining = [p for p in participants if p not in facilitators]
-        for person in remaining:
-            best_inc, best_i = None, None
-            for i, grp in enumerate(groups):
-                if len(grp) < sizes[i]:
-                    curr = (gender_balance_score(grp, members) + preference_score(grp, members) + history_score(grp,
-                                                                                                                co_matrix))
-                    new_grp = grp + [person]
-                    new = (gender_balance_score(new_grp, members) + preference_score(new_grp, members) + history_score(
-                        new_grp, co_matrix))
-                    inc = new - curr
-                    if best_inc is None or inc > best_inc: best_inc, best_i = inc, i
-            if best_i is None:
-                for i, grp in enumerate(groups):
-                    if len(grp) < sizes[i]: best_i = i; break
-                if best_i is None: best_i = 0
-            groups[best_i].append(person)
-        total_score = sum(
-            gender_balance_score(g, members) + preference_score(g, members) + history_score(g, co_matrix) for g in
-            groups)
-        suggestions.append((total_score, groups))
-    suggestions.sort(key=lambda x: x[0], reverse=True)
-    return [g for _, g in suggestions[:top_n]]
 
 
 @app.route('/making_team', methods=['GET'])
@@ -1553,8 +1395,8 @@ def generate_groups(participants, facilitators, members, co_matrix, group_count_
 def bookclub_index():
     app.logger.info("---/making_team 경로 함수 실행 시작---")
     try:
-        next_monday = get_next_monday()
-        app.logger.info(f"[1] 다음 주 월요일 날짜: {next_monday.isoformat()}")
+        seminar_dates = get_next_seminar_dates()
+        app.logger.info(f"[1] 다음 세미나 날짜: {[d.isoformat() for d in seminar_dates]}")
 
         # 1. 모든 활성 멤버 목록을 가져옵니다.
         all_active_members_res = supabase.table("members").select("id, name") \
@@ -1562,21 +1404,20 @@ def bookclub_index():
         all_active_members = all_active_members_res.data
         app.logger.info(f"[2] DB에서 가져온 전체 활성 멤버 수: {len(all_active_members)}명")
 
-        # 2. 다음 모임 날짜에 '불참(attending_seminar = False)' 의사를 밝힌 기록만 가져옵니다.
-        attendance_res = supabase.table('attendance').select('user_id') \
-            .eq('meeting_date', next_monday.isoformat()) \
-            .eq('attending_seminar', False) \
+        # 2. 다음 세미나 날짜들에 '참석(attending_seminar=True)' 의사를 발힙한 기록을 가져옵니다.
+        date_strs = [d.isoformat() for d in seminar_dates]
+        attendance_res = supabase.table('attendance').select('user_id, meeting_date') \
+            .in_('meeting_date', date_strs) \
+            .eq('attending_seminar', True) \
             .execute()
-        app.logger.info(f"[3] DB에서 가져온 불참 응답 기록: {attendance_res.data}")
+        app.logger.info(f"[3] DB에서 가져온 참석 응답 기록: {attendance_res.data}")
 
-        # 3. 불참자들의 ID만 따로 저장합니다.
-        absentee_ids = {att['user_id'] for att in attendance_res.data}
-        app.logger.info(f"[4] 불참자로 처리된 ID 목록: {absentee_ids}")
+        # 3. 참석자들의 ID만 따로 저장합니다.
+        attendee_ids = {att['user_id'] for att in attendance_res.data}
+        app.logger.info(f"[4] 참석자로 처리된 ID 목록: {attendee_ids}")
 
-        # 4. 미리 체크될 참석자는 (모든 활성 멤버 - 불참자) 입니다.
-        pre_checked_attendee_ids = {
-            member['id'] for member in all_active_members if member['id'] not in absentee_ids
-        }
+        # 4. 참석 의사를 밝힌 사람만 pre-check
+        pre_checked_attendee_ids = attendee_ids
         app.logger.info(f"[5] 최종적으로 미리 체크될 참석자 수: {len(pre_checked_attendee_ids)}명")
         # app.logger.info(f"최종 참석자 ID 목록: {pre_checked_attendee_ids}") # 필요시 이 줄의 주석을 해제하여 전체 ID를 볼 수 있습니다.
 
@@ -1622,56 +1463,60 @@ def start_group_generation():
             if group_count_str and group_count_str.isdigit():
                 group_count_override = int(group_count_str)
 
-            def get_final_result_from_generator(generator, progress_offset=0, progress_scale=0.5):
-                final_result = []
-                while True:
-                    try:
-                        progress = next(generator)
-                        progress_data = json.dumps({'progress': int(progress_offset + (progress * progress_scale))})
-                        yield f"event: progress\ndata: {progress_data}\n\n"
-                    except StopIteration as e:
-                        final_result = e.value
-                        break
-                return final_result
+            # co_matrix 로드
+            co_matrix_res = supabase.table("bookclub_co_matrix").select("pair_key, count").execute()
+            co_matrix = {r['pair_key']: r['count'] for r in (co_matrix_res.data or [])}
+            app.logger.info(f"[6] co_matrix {len(co_matrix)}개 항목 로드 완료")
 
-            app.logger.info("[6] '성비 우선' 알고리즘 실행 시작")
-            gender_generator = run_genetic_algorithm(
-                members_df, history_df, present_names, facilitator_names,
-                (10.0, 6.0, 3.0, 2.0, -1000.0), 20, group_count_override, test_mode=False
-            )
-            gender_solutions = yield from get_final_result_from_generator(gender_generator, 0, 0.5)
-            app.logger.info(f"[7] '성비 우선' 알고리즘 완료, {len(gender_solutions)}개의 결과 도출")
+            yield f"event: progress\ndata: {json.dumps({'progress': 10})}\n\n"
 
-            app.logger.info("[8] '새로운 만남 우선' 알고리즘 실행 시작")
-            new_face_generator = run_genetic_algorithm(
-                members_df, history_df, present_names, facilitator_names,
-                (6.0, 10.0, 3.0, 2.0, -1000.0), 20, group_count_override, test_mode=False
+            app.logger.info("[7] '종합 최적화(단일)' CP-SAT 알고리즘 실행 시작")
+            # 성비와 새로운 만남 우선순위를 합친 단일 최적화
+            def progress_callback(pct):
+                """SSE 진행률 콜백 함수. 솔버 반복 중 중간 통보를 제공."""
+                try:
+                    event_str = f"event: progress\ndata: {json.dumps({'progress': pct})}\n\n"
+                    # 제너레이터에서 yield는 비선형이므로 리스트에 담아 나중에 yield
+                    progress_events.append(event_str)
+                except Exception:
+                    pass
+
+            progress_events = []
+            combined_solutions = run_cp_grouping(
+                members_df, co_matrix, present_names, facilitator_names,
+                optimize_for='combined', top_n=12, group_count_override=group_count_override,
+                progress_callback=progress_callback
             )
-            new_face_solutions = yield from get_final_result_from_generator(new_face_generator, 50, 0.5)
-            app.logger.info(f"[9] '새로운 만남 우선' 알고리즘 완료, {len(new_face_solutions)}개의 결과 도출")
+            # 진도 이벤트들 전달
+            for evt in progress_events:
+                yield evt
+            app.logger.info(f"[8] '종합 최적화' 완료, {len(combined_solutions)}개")
+
+            yield f"event: progress\ndata: {json.dumps({'progress': 90})}\n\n"
+
+            member_genders = dict(zip(members_df['name'], members_df['gender']))
 
             meeting_history = {}
-            if not history_df.empty and 'groups' in history_df.columns:
-                for _, row in history_df.iterrows():
-                    groups_list = row['groups']
-                    if not isinstance(groups_list, list): continue
-                    for group in groups_list:
-                        for i in range(len(group)):
-                            for j in range(i + 1, len(group)):
-                                pair_key = '-'.join(sorted([group[i], group[j]]))
-                                meeting_history[pair_key] = meeting_history.get(pair_key, 0) + 1
+            # co_matrix에서 last_met도 함께 가져와서 {count, last_met} 형태로 저장
+            matrix_res = supabase.table('bookclub_co_matrix').select('pair_key, count, last_met').execute()
+            for row in (matrix_res.data or []):
+                if row.get('count', 0) > 0:
+                    meeting_history[row['pair_key']] = {
+                        'count': row['count'],
+                        'last_met': row.get('last_met', '')
+                    }
 
             app.logger.info("[10] 최종 결과 페이지(HTML) 렌더링 시작")
             with app.app_context():
                 group_names = [name.strip() for name in group_names_str.split(',') if name.strip()]
                 final_html = render_template(
                     'bookclub_ga_results.html',
-                    gender_solutions=gender_solutions,
-                    new_face_solutions=new_face_solutions,
+                    combined_solutions=combined_solutions,
                     present=present_names,
                     facilitators=facilitator_names,
                     group_names=group_names,
                     meeting_history=meeting_history,
+                    member_genders=member_genders,
                     manual_entry_url=manual_url
                 )
                 complete_data = json.dumps({'html': final_html})
@@ -1686,280 +1531,223 @@ def start_group_generation():
     return Response(generate_events(manual_entry_url), mimetype='text/event-stream')
 
 
-def run_genetic_algorithm(members_df, history_df, attendee_names, presenter_names, weights, num_results=3,
-                          group_count_override=None, test_mode=False):
-    # --- [로그 추가] ---
-    app.logger.info("---[GA] 조 편성 알고리즘 시작---")
-    app.logger.info(f"[GA] 가중치: (성비:{weights[0]}, 새얼굴:{weights[1]}, 발제자:{weights[2]}, 선호도:{weights[3]})")
 
-    # --- 1. 데이터 전처리 ---
-    members_info = members_df.set_index('id').to_dict('index')
-    name_to_id_map = pd.Series(members_df.id.values, index=members_df.name).to_dict()
-    meeting_history = {}
-    if not history_df.empty and 'groups' in history_df.columns:
-        for index, row in history_df.iterrows():
-            try:
-                groups_list = row['groups']
-                if not isinstance(groups_list, list): continue
-                for group in groups_list:
-                    member_ids_in_group = [name_to_id_map.get(name) for name in group if name in name_to_id_map]
-                    for i in range(len(member_ids_in_group)):
-                        for j in range(i + 1, len(member_ids_in_group)):
-                            if member_ids_in_group[i] is None or member_ids_in_group[j] is None: continue
-                            pair = tuple(sorted((member_ids_in_group[i], member_ids_in_group[j])))
-                            meeting_history[pair] = meeting_history.get(pair, 0) + 1
-            except Exception:
-                continue
+def run_cp_grouping(members_df, co_matrix, attendee_names, presenter_names,
+                    optimize_for='gender', top_n=10, group_count_override=None,
+                    progress_callback=None):
+    """
+    OR-Tools CP-SAT 기반 조 편성 알고리즘.
+    optimize_for: 'gender' (성비우선) or 'new_face' (새만남우선)
+    top_n: 반환할 다양한 조합 수
+    """
+    app.logger.info(f"[CP-SAT] 시작: optimize_for={optimize_for}, top_n={top_n}, attendees={len(attendee_names)}")
 
-    # --- 2. 시나리오 설정 ---
-    TODAY_ATTENDEE_IDS = [name_to_id_map[name] for name in attendee_names if name in name_to_id_map]
-    TODAY_PRESENTER_IDS = [name_to_id_map[name] for name in presenter_names if name in name_to_id_map]
-    num_attendees = len(TODAY_ATTENDEE_IDS)
+    names = list(attendee_names)
+    n = len(names)
 
-    # --- [로그 추가] ---
-    app.logger.info(f"[GA] 처리할 최종 참석자 ID 수: {num_attendees}명")
+    if n < 3:
+        app.logger.warning("[CP-SAT] 참석자 3명 미만, 중단")
+        return []
 
-    if num_attendees < 3:
-        app.logger.warning("[GA] 참석자가 3명 미만이므로, 알고리즘을 중단하고 빈 결과를 반환합니다.")
-        return [], None
+    # 멤버 정보 딕셔너리
+    name_to_info = {}
+    for _, row in members_df.iterrows():
+        name_to_info[row['name']] = row.to_dict()
 
+    # 그룹 수 결정
+    MIN_GROUP_SIZE = 4
     if group_count_override and group_count_override > 0:
         num_groups = group_count_override
     else:
-        # [수정] 4~5명으로 조를 구성하는데 가장 이상적인 그룹 수를 계산하는 로직
-        q, r = divmod(num_attendees, 4)
-        if r == 0: # 4로 나누어 떨어지면, 모든 조를 4명으로 구성
-            num_groups = q
-        else: # 4로 나누어 떨어지지 않으면, 일부 조를 5명으로 구성
-            num_groups = q + 1
+        q, r = divmod(n, 4)
+        num_groups = q if r == 0 else q + 1
+    # 모든 그룹이 최소 MIN_GROUP_SIZE명 이상 가질 수 있도록 그룹 수 상한선 적용
+    num_groups = max(1, min(num_groups, n // MIN_GROUP_SIZE))
 
-    # --- [로그 추가] ---
-    app.logger.info(f"[GA] 목표 그룹 수: {num_groups}개")
+    min_size = MIN_GROUP_SIZE
+    max_size = math.ceil(n / num_groups)  # +1 제거: 일부 조에 여유 생갈 경우 3인조 발생 방지
 
-    attendee_id_map = {idx: member_id for idx, member_id in enumerate(TODAY_ATTENDEE_IDS)}
+    app.logger.info(f"[CP-SAT] 그룹={num_groups}, 크기={min_size}~{max_size}")
 
-    # --- 3. 적합도 평가 함수 (evaluate) ---
-    MIN_GROUP_SIZE = 3
-    DEFAULT_MAX_GROUP_SIZE = 5
-    required_max_size = math.ceil(num_attendees / num_groups) if num_groups > 0 else 0
-    MAX_GROUP_SIZE = max(DEFAULT_MAX_GROUP_SIZE, required_max_size)
-    app.logger.info(f"[GA] 그룹별 최소/최대 인원: {MIN_GROUP_SIZE}명 / {MAX_GROUP_SIZE}명")
+    # 성별 배열 (0=여성, 1=남성) — DB가 'M'(남)/'W'(여) 문자열로 저장함
+    def is_male(info):
+        g = info.get('gender')
+        return g == 'M'
 
-    RECENT_MEETING_THRESHOLD = 2
+    genders = []
+    for name in names:
+        info = name_to_info.get(name, {})
+        genders.append(1 if is_male(info) else 0)
 
-    def calculate_total_score(ind_fitness_values, W):
-        total = sum(v * w for v, w in zip(ind_fitness_values, W))
-        if total > 1000:
-            raw_scores_str = ", ".join([f"{v:.2f}" for v in ind_fitness_values])
-            print(f"[SCORE_DEBUG] Raw Scores: [{raw_scores_str}] -> Total: {total:.2f}")
-        return total
+    # 발제자 인덱스
+    presenter_set = set(presenter_names)
+    presenter_indices = [i for i, nm in enumerate(names) if nm in presenter_set]
 
-    def evaluate(individual):
-        groups = {i: [] for i in range(num_groups)}
-        for i, g in enumerate(individual):
-            groups[g].append(attendee_id_map[i])
-        size_penalty = sum(1 for g in groups.values() if 0 < len(g) < MIN_GROUP_SIZE or len(g) > MAX_GROUP_SIZE)
-        if size_penalty > 0:
-            return 0, 0, 0, 0, size_penalty
-        new_face_score, preference_score, total_pairs = 0, 0, 0
-        group_gender_scores = []
-        for group_members in groups.values():
-            if not group_members: continue
-            males = sum(1 for mid in group_members if members_info.get(mid, {}).get('gender') == 'M')
-            females = len(group_members) - males
-            if males > 0 and females > 0:
-                group_gender_scores.append(min(males, females) / max(males, females))
-            else:
-                group_gender_scores.append(0)
-            for i, member_id in enumerate(group_members):
-                member_prefs = members_info.get(member_id)
-                if member_prefs:
-                    preferred_id = member_prefs.get('preferred_member_id')
-                    avoided_id = member_prefs.get('avoided_member_id')
-                    for j in range(i + 1, len(group_members)):
-                        other_member_id = group_members[j]
-                        total_pairs += 1
-                        pair = tuple(sorted((member_id, other_member_id)))
-                        meet_count = meeting_history.get(pair, 0)
-                        new_face_score += 1 / (meet_count + 1)
-                        if other_member_id == preferred_id and meet_count < RECENT_MEETING_THRESHOLD: preference_score += 1
-                        other_prefs = members_info.get(other_member_id)
-                        if other_prefs and other_prefs.get(
-                            'preferred_member_id') == member_id and meet_count < RECENT_MEETING_THRESHOLD: preference_score += 1
-                        if other_member_id == avoided_id: preference_score -= 1.5
-                        if other_prefs and other_prefs.get('avoided_member_id') == member_id: preference_score -= 1.5
-        gender_score = np.mean(group_gender_scores) if group_gender_scores else 0
-        norm_new_face = new_face_score / total_pairs if total_pairs > 0 else 0
-        max_pref_score = len(TODAY_ATTENDEE_IDS) * 2
-        norm_pref = (preference_score + max_pref_score) / (max_pref_score * 2) if max_pref_score > 0 else 0
-        presenters_per_group = [sum(1 for mid in g if mid in TODAY_PRESENTER_IDS) for g in groups.values()]
-        presenter_score = 1 / (np.var(presenters_per_group) + 0.1) if len(presenters_per_group) > 1 else 10.0
-        return gender_score, norm_new_face, presenter_score, norm_pref, size_penalty
+    # 쌍별 만남 횟수
+    def get_pair_count(a, b):
+        key = '-'.join(sorted([a, b]))
+        return co_matrix.get(key, 0)
 
-    # --- 4. 유전 알고리즘 실행 ---
-    fitness_name = f"FitnessGA_{abs(hash(weights))}"
-    individual_name = f"IndividualGA_{abs(hash(weights))}"
-    if hasattr(creator, fitness_name): delattr(creator, fitness_name)
-    if hasattr(creator, individual_name): delattr(creator, individual_name)
+    # objective 계산을 위한 쌍 사전
+    pair_counts = {}
+    for i in range(n):
+        for j in range(i + 1, n):
+            pair_counts[(i, j)] = get_pair_count(names[i], names[j])
 
-    creator.create(fitness_name, base.Fitness, weights=weights)
-    creator.create(individual_name, list, fitness=getattr(creator, fitness_name))
-    toolbox = base.Toolbox()
-    toolbox.register("individual", tools.initRepeat, getattr(creator, individual_name),
-                     lambda: random.randint(0, num_groups - 1), n=num_attendees)
-    toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-    toolbox.register("evaluate", evaluate)
-    toolbox.register("mate", tools.cxTwoPoint)
-    toolbox.register("mutate", tools.mutUniformInt, low=0, up=num_groups - 1, indpb=0.05)
-    toolbox.register("select", tools.selTournament, tournsize=3)
+    SCALE = 1000
+    results = []
+    # 金지 조합: 이미 찾은 조합들 (각각 frozenset of frozensets)
+    found_groupings = []
 
-    pop_size, ngen, cxpb, mutpb = 1200, 100, 0.7, 0.6
-    population = toolbox.population(n=pop_size)
-    hall_of_fame = tools.HallOfFame(50)
-    manual_log = []
+    for attempt in range(top_n * 2): # 최대 탐색 횟수 조정
+        if len(results) >= top_n:
+            break
 
-    app.logger.info(f"[GA] GA 파라미터: pop_size={pop_size}, ngen={ngen}, cxpb={cxpb}, mutpb={mutpb}")
-    app.logger.info("[GA] GA 연산 시작 (최대 10~20초 소요될 수 있습니다)...")
+        model = cp_model.CpModel()
 
-    invalid_ind = [ind for ind in population if not ind.fitness.valid]
-    fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-    for ind, fit in zip(invalid_ind, fitnesses):
-        ind.fitness.values = fit
-    hall_of_fame.update(population)
+        # x[i][g]: 멤버 i가 그룹 g에 소속
+        x = [[model.NewBoolVar(f'x_{i}_{g}') for g in range(num_groups)] for i in range(n)]
 
-    for gen in range(1, ngen + 1):
-        if not test_mode:
-            if gen % 10 == 0 or gen == ngen:
-                yield int((gen / ngen) * 100)
-        offspring = toolbox.select(population, len(population))
-        offspring = algorithms.varAnd(offspring, toolbox, cxpb, mutpb)
-        invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-        for ind, fit in zip(invalid_ind, fitnesses):
-            ind.fitness.values = fit
-        hall_of_fame.update(offspring)
-        population[:] = offspring
-        current_scores = [calculate_total_score(ind.fitness.values, weights) for ind in population]
-        max_score = np.max(current_scores)
-        manual_log.append({'gen': gen, 'max_score': max_score})
+        # --- [대칭성 파괴(Symmetry Breaking)] ---
+        # 첫 번째 사람을 무조건 그룹 0에 넣음으로써 불필요한 자리바꿈 탐색 공간을 기하급수적으로 줄임
+        if n > 0 and num_groups > 0:
+            model.Add(x[0][0] == 1)
 
-    app.logger.info("[GA] GA 연산 종료. 결과 포맷팅 시작.")
+        # 각 멤버는 정확히 하나의 그룹
+        for i in range(n):
+            model.AddExactlyOne(x[i][g] for g in range(num_groups))
 
-    # --- 5. 중복 제거 및 결과 포맷팅 ---
-    def normalized_hamming_distance(ind1, ind2):
-        """
-        [수정된 로직] 두 조 편성안(individual)이 얼마나 다른지 효율적으로 계산합니다.
-        그룹 번호 대신, 각 멤버가 누구와 함께 조를 이루는지를 기준으로 비교합니다.
-        """
-        # 각 individual을 {멤버 ID: 그룹 번호} 형태의 딕셔너리로 변환
-        map1 = {attendee_id_map[i]: g for i, g in enumerate(ind1)}
-        map2 = {attendee_id_map[i]: g for i, g in enumerate(ind2)}
+        # 그룹 크기 제약
+        for g in range(num_groups):
+            sz = sum(x[i][g] for i in range(n))
+            model.Add(sz >= min_size)
+            model.Add(sz <= max_size)
 
-        distance = 0
-        all_member_ids = list(attendee_id_map.values())
+        # 발제자 분산: 그룹 수 >= 발제자 수일 때 각 그룹에 1명씩
+        if len(presenter_indices) <= num_groups:
+            for pi in range(len(presenter_indices)):
+                for pj in range(pi + 1, len(presenter_indices)):
+                    for g in range(num_groups):
+                        model.Add(x[presenter_indices[pi]][g] + x[presenter_indices[pj]][g] <= 1)
 
-        # 모든 멤버 쌍에 대해, 두 편성안에서 같은 조에 속하는지 확인
-        for i in range(len(all_member_ids)):
-            for j in range(i + 1, len(all_member_ids)):
-                member_a = all_member_ids[i]
-                member_b = all_member_ids[j]
+        # 이전에 찾은 조합 금지: 동일한 pair grouping을 피하기 위해
+        for attempt_idx, found_pairs in enumerate(found_groupings):
+            if not found_pairs:
+                continue
+            same_g_vars = []
+            for (i, j) in found_pairs:
+                for g in range(num_groups):
+                    b = model.NewBoolVar(f'f_{attempt_idx}_{i}_{j}_{g}')
+                    # x[i][g] == 1 and x[j][g] == 1 이면 b >= 1 이어야 함
+                    model.Add(x[i][g] + x[j][g] - 1 <= b)
+                    same_g_vars.append(b)
+            # 이전에 같은 그룹이었던 쌍들 중 무조건 하나 이상은 이번엔 다른 그룹이어야 함
+            if same_g_vars:
+                model.Add(sum(same_g_vars) <= len(found_pairs) - 1)
 
-                # 한 편성안에서는 같은 조였는데, 다른 편성안에서는 다른 조인 경우 distance 증가
-                in_same_group1 = (map1[member_a] == map1[member_b])
-                in_same_group2 = (map2[member_a] == map2[member_b])
+        # --- 목적함수 ---
+        obj = []
 
-                if in_same_group1 != in_same_group2:
-                    distance += 1
+        # 성비 점수: 각 그룹 내 성별 불균형을 최소화
+        for g in range(num_groups):
+            males = model.NewIntVar(0, n, f'm_{g}')
+            model.Add(males == sum(genders[i] * x[i][g] for i in range(n)))
+            females = model.NewIntVar(0, n, f'f_{g}')
+            model.Add(females == sum((1 - genders[i]) * x[i][g] for i in range(n)))
+            diff = model.NewIntVar(-n, n, f'd_{g}')
+            model.Add(diff == males - females)
+            abs_diff = model.NewIntVar(0, n, f'ad_{g}')
+            model.AddAbsEquality(abs_diff, diff)
+            gender_w = 40 if optimize_for in ['gender', 'combined'] else 6
+            obj.append(abs_diff * (-SCALE * gender_w))
 
-        return distance
+        # 새만남 점수 (최적화 변환): 
+        # 기존: 모든 쌍에 대해 보너스를 주는 방식 (O(N^2) 변수 생성)
+        # 변경: 이미 만난 1~2단계 쌍에 대해서만 '페널티(loss)'를 부과 (O(E) 90% 이상 변수 축소)
+        new_face_w = 10 if optimize_for in ['new_face', 'combined'] else 6
+        max_nf_val = SCALE * new_face_w
+        for (i, j), cnt in pair_counts.items():
+            if cnt > 0:
+                nf_val = max_nf_val // (cnt + 1)
+                loss = max_nf_val - nf_val
+                if loss > 0:
+                    for g in range(num_groups):
+                        bv = model.NewBoolVar(f's_{attempt}_{i}_{j}_{g}')
+                        model.Add(x[i][g] + x[j][g] - 1 <= bv)
+                        obj.append(bv * (-loss))
 
-    def get_groups_from_individual(individual, attendee_id_map):
-        groups_dict = {}
-        for i, group_num in enumerate(individual):
-            if group_num not in groups_dict: groups_dict[group_num] = []
-            groups_dict[group_num].append(attendee_id_map[i])
-        return {frozenset(v) for v in groups_dict.values() if v}
+        model.Maximize(sum(obj))
 
-    def select_diverse_solutions(sorted_solutions, num_to_select, min_distance, attendee_id_map):
-        # --- [수정] 상세 로그 추가 ---
-        app.logger.info(
-            f"[GA-DEBUG-SELECT] 최종 추천안 선택 시작. 목표: {num_to_select}개, 후보: {len(sorted_solutions)}개, 최소유사도거리: {min_distance}")
-        if not sorted_solutions:
-            return []
+        solver = cp_model.CpSolver()
+        # 탐색 구조를 대폭 줄였으므로 1.5초만에 최적해/실현가능 영역에 도달
+        solver.parameters.max_time_in_seconds = 1.5
+        solver.parameters.num_workers = 4
+        solver.parameters.random_seed = attempt * 13 + 7
 
-        diverse_selection = [sorted_solutions[0]]
-        app.logger.info("[GA-DEBUG-SELECT] -> 1순위(가장 점수 높은) 추천안은 자동 선택.")
+        status = solver.Solve(model)
 
-        # 나머지 후보들을 순회하며 비교
-        for i, sol in enumerate(sorted_solutions[1:], 1):
-            if len(diverse_selection) >= num_to_select:
-                app.logger.info(f"[GA-DEBUG-SELECT] 목표 개수인 {num_to_select}개를 모두 찾았으므로 선택을 중단합니다.")
-                break
+        if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+            app.logger.warning(f"[CP-SAT] attempt {attempt}: 실패 status={status}")
+            continue
 
-            app.logger.info(f"[GA-DEBUG-SELECT] ----> 후보 {i + 1}번 추천안을 검토합니다.")
-            is_diverse_enough = True
-
-            # 이미 선택된 추천안들과 하나씩 비교
-            for j, selected_sol in enumerate(diverse_selection):
-                dist = normalized_hamming_distance(sol, selected_sol)
-                app.logger.info(f"[GA-DEBUG-SELECT]      (vs {j + 1}번 추천안) 유사도 거리: {dist}")
-
-                if dist < min_distance:
-                    is_diverse_enough = False
-                    app.logger.info(f"[GA-DEBUG-SELECT]      결과: 너무 유사하여 기각 (거리 {dist} < 최소거리 {min_distance})")
+        # 결과 추출
+        assignment = {}
+        for i in range(n):
+            for g in range(num_groups):
+                if solver.Value(x[i][g]) == 1:
+                    assignment[names[i]] = g
                     break
 
-            if is_diverse_enough:
-                diverse_selection.append(sol)
-                app.logger.info(f"[GA-DEBUG-SELECT] ----> 결과: 충분히 달라서 최종 추천안으로 채택!")
+        groups_dict = {g: [] for g in range(num_groups)}
+        for name, g in assignment.items():
+            groups_dict[g].append(name)
+        formatted_groups = [groups_dict[g] for g in sorted(groups_dict) if groups_dict[g]]
 
-        app.logger.info(f"[GA-DEBUG-SELECT] 최종 추천안 선택 완료. 총 {len(diverse_selection)}개를 반환합니다.")
-        return diverse_selection
+        # 중복 체크
+        frozen = frozenset(frozenset(grp) for grp in formatted_groups)
+        if frozen in [frozenset(frozenset(grp) for grp in r['groups']) for r in results]:
+            app.logger.info(f"[CP-SAT] attempt {attempt}: 중복, 스킵")
+            continue
 
-    valid_solutions = [ind for ind in hall_of_fame if ind.fitness.values[4] == 0]
-    app.logger.info(f"[GA] 유효한 결과(그룹 크기 준수) {len(valid_solutions)}개 발견.")
-    if not valid_solutions:
-        app.logger.warning("[GA] 유효한 조 편성 결과를 찾지 못했습니다.")
-        return [], manual_log
+        # 점수 계산 (표시용 — combined 가중치 40:10 적용)
+        gender_score = 0.0
+        for grp in formatted_groups:
+            m = sum(1 for nm in grp if is_male(name_to_info.get(nm, {})))
+            f = len(grp) - m
+            if m > 0 and f > 0:
+                gender_score += min(m, f) / max(m, f)
 
-    try:
-        app.logger.info("[GA-DEBUG] valid_solutions 정렬 시작...")
-        sorted_solutions = sorted(valid_solutions, key=lambda ind: calculate_total_score(ind.fitness.values, weights),
-                                  reverse=True)
-        app.logger.info(f"[GA-DEBUG] 정렬 완료. 총 {len(sorted_solutions)}개의 결과.")
+        new_face_score = 0.0
+        for (i, j), cnt in pair_counts.items():
+            if assignment.get(names[i]) == assignment.get(names[j]):
+                new_face_score += 1.0 / (cnt + 1)
 
-        app.logger.info("[GA-DEBUG] diverse solution 선택 시작...")
-        final_solutions_indices = select_diverse_solutions(sorted_solutions, num_results, int(num_attendees * 0.15),
-                                                           attendee_id_map)
-        app.logger.info(f"[GA-DEBUG] diverse solution 선택 완료. {len(final_solutions_indices)}개 선택됨.")
+        total_score = (gender_score * 40 + new_face_score * 10)
 
-    except Exception as e:
-        app.logger.error(f"!!! [GA-DEBUG] 결과 처리 중 심각한 오류 발생: {e}", exc_info=True)
-        # 오류가 발생해도 빈 결과를 반환하여 전체 시스템이 멈추지 않도록 함
-        return [], manual_log
-
-    output_results = []
-    id_to_name_map = {v: k for k, v in name_to_id_map.items()}
-    for sol in final_solutions_indices:
-        groups = {i: [] for i in range(num_groups)}
-        [groups[g].append(attendee_id_map[i]) for i, g in enumerate(sol)]
-        formatted_groups = []
-        for group_id in sorted(groups.keys()):
-            if not groups[group_id]: continue
-            member_names = [id_to_name_map.get(mid, "Unknown") for mid in groups[group_id]]
-            formatted_groups.append(member_names)
-        output_results.append({
-            "score": f"{calculate_total_score(sol.fitness.values, weights):.2f}",
-            "details": [f"{v:.2f}" for v in sol.fitness.values[:4]],
-            "groups": formatted_groups
+        results.append({
+            'score': f"{total_score:.2f}",
+            'details': [f"{gender_score:.2f}", f"{new_face_score:.2f}", "0.00", "0.00"],
+            'groups': formatted_groups
         })
+        app.logger.info(f"[CP-SAT] attempt {attempt}: 성공 {len(results)}/{top_n}, score={total_score:.2f}")
 
-    app.logger.info(f"[GA] 최종적으로 {len(output_results)}개의 다양한 추천안을 반환합니다.")
+        # 현재 진행률을 progress_callback으로 통보 (10~85% 범위를 results 수에 청해 비례 배분)
+        if progress_callback:
+            pct = min(85, 12 + int((len(results) / top_n) * 73))
+            progress_callback(pct)
 
-    if test_mode:
-        return output_results, manual_log
-    else:
-        return output_results
+        # 이 조합의 동일-그룹 쌍을 금지 목록에 추가
+        same_pairs = set()
+        for i in range(n):
+            for j in range(i + 1, n):
+                if assignment.get(names[i]) == assignment.get(names[j]):
+                    same_pairs.add((i, j))
+        found_groupings.append(same_pairs)
+
+    app.logger.info(f"[CP-SAT] 완료: {len(results)}개 반환")
+    return results
+
+
 
 #todo 미리보기에서도 * 거르기
 
@@ -2087,14 +1875,51 @@ def bookclub_api_get_history():
 @app.route('/api/bookclub/history/delete', methods=['POST'])
 @login_required(role="admin")
 def bookclub_api_delete_history():
-    idx = request.json.get("index")
-    response = supabase.table("history").select("id").order("date", desc=True).execute()
-    records = response.data
-    if isinstance(idx, int) and 0 <= idx < len(records):
-        record_id = records[idx]["id"]
+    """history 테이블에서 해당 ID의 기록을 삭제하고 co_matrix를 삭제된 만남 횟수를 바삼하여 재계산."""
+    record_id = request.json.get("id")
+    if not record_id:
+        return jsonify({"status": "error", "message": "record id required"}), 400
+    try:
+        # 1. 삭제할 기록 조회
+        del_res = supabase.table("history").select("groups, date").eq("id", record_id).execute()
+        if not del_res.data:
+            return jsonify({"status": "error", "message": "Record not found"}), 404
+        deleted_record = del_res.data[0]
+
+        # 2. 실제 삭제
         supabase.table("history").delete().eq("id", record_id).execute()
+
+        # 3. 삭제된 기록에 릴린 쫐들의 co_matrix 횟수 괐산
+        keys_to_decrement = {}
+        deleted_groups = deleted_record.get("groups", []) or []
+        for g in deleted_groups:
+            for a, b in itertools.combinations(g, 2):
+                key = '-'.join(sorted([a, b]))
+                keys_to_decrement[key] = keys_to_decrement.get(key, 0) + 1
+
+        if keys_to_decrement:
+            matrix_res = supabase.table('bookclub_co_matrix') \
+                .select('pair_key, count').in_('pair_key', list(keys_to_decrement.keys())).execute()
+            current_counts = {item['pair_key']: item['count'] for item in matrix_res.data}
+
+            upsert_rows = []
+            del_keys = []
+            for key, decrement in keys_to_decrement.items():
+                new_count = max(0, current_counts.get(key, 0) - decrement)
+                if new_count == 0:
+                    del_keys.append(key)
+                else:
+                    upsert_rows.append({"pair_key": key, "count": new_count})
+
+            if del_keys:
+                supabase.table('bookclub_co_matrix').delete().in_('pair_key', del_keys).execute()
+            if upsert_rows:
+                supabase.table('bookclub_co_matrix').upsert(upsert_rows).execute()
+
         return jsonify({"status": "ok"})
-    return jsonify({"status": "error", "message": "Invalid index"}), 400
+    except Exception as e:
+        app.logger.error(f"Error deleting history: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 # </editor-fold>
 # ==============================================================================
 
@@ -2665,8 +2490,8 @@ def my_page():
     user_name = session.get('user_name')
 
     try:
-        # 1. 내 정보 조회 (벌점 포함)
-        user_res = supabase.table('members').select('*, demerit_points').eq('id', user_id).single().execute()
+        # 1. 내 정보 조회
+        user_res = supabase.table('members').select('*').eq('id', user_id).single().execute()
         user_data = user_res.data
         if not user_data:
             flash("사용자 정보를 찾을 수 없습니다.", "danger")
@@ -2676,32 +2501,42 @@ def my_page():
             .eq('user_id', user_id).eq('attending_seminar', True).order('meeting_date', desc=True).execute()
         attendance_records = attendance_records_res.data
 
-        demerit_logs_res = supabase.table('demerit_logs').select('points, reason, created_at, admin:admin_id(name)') \
-            .eq('member_id', user_id).order('created_at', desc=True).execute()
-        demerit_logs = demerit_logs_res.data
 
-        # [수정] 출석 기록과 불참 요청 상태를 별도로, 더 명확하게 조회
-        next_monday = get_next_monday()
+        # 다음 세미나 날짜 계산 (월/목)
+        seminar_date_objs = get_next_seminar_dates()
+        weekday_labels = {0: '월', 1: '화', 2: '수', 3: '목', 4: '금', 5: '토', 6: '일'}
+        seminar_dates = [
+            {
+                'date': d.isoformat(),
+                'label': f"{d.strftime('%m/%d')} ({weekday_labels[d.weekday()]})"
+            }
+            for d in seminar_date_objs
+        ]
+        date_strs = [s['date'] for s in seminar_dates]
 
-        # 전체 출석 기록 (과거 포함)
-        attendance_records_res = supabase.table('attendance').select('meeting_date') \
-            .eq('user_id', user_id).eq('attending_seminar', True).order('meeting_date', desc=True).execute()
-        attendance_records = attendance_records_res.data
+        # 나의 참석 확인 날짜 목록
+        confirmed_res = supabase.table('attendance').select('meeting_date') \
+            .eq('user_id', user_id) \
+            .in_('meeting_date', date_strs) \
+            .eq('attending_seminar', True).execute()
+        my_confirmed_dates = {r['meeting_date'] for r in (confirmed_res.data or [])}
 
-        # '다음 모임'에 대한 나의 출석 상태
-        my_attendance_res = supabase.table('attendance').select('attending_seminar, absence_request_status') \
-            .eq('user_id', user_id).eq('meeting_date', next_monday.isoformat()).execute()
-        my_attendance = my_attendance_res.data[0] if my_attendance_res.data else None
-
-        is_monday = datetime.now(timezone(timedelta(hours=9))).date().weekday() == 0
+        # 현재 진행 중인 발제문 제출 이벤트 확인
+        active_topic_event = None
+        try:
+            topic_res = supabase.table('topic_events').select('*').eq('is_active', True).order('meeting_date', desc=True).limit(1).execute()
+            if topic_res.data:
+                active_topic_event = topic_res.data[0]
+        except Exception:
+            pass
 
         return render_template(
             'my_page_member.html',
             user=user_data,
             attendance_records=attendance_records,
-            demerit_logs=demerit_logs,
-            my_attendance=my_attendance,
-            is_monday=is_monday
+            seminar_dates=seminar_dates,
+            my_confirmed_dates=my_confirmed_dates,
+            active_topic_event=active_topic_event
         )
 
     except Exception as e:
@@ -2749,36 +2584,6 @@ def request_absence():
 
 
 #=== 벌점 추가
-@app.route('/api/admin/members/<int:member_id>/add_demerit', methods=['POST'])
-@login_required(role="admin")
-def add_demerit(member_id):
-    admin_id = session.get('user_id')
-    data = request.json
-    points = data.get('points')
-    reason = data.get('reason')
-
-    if not points or not isinstance(points, int):
-        return jsonify({"error": "벌점(points)은 숫자여야 합니다."}), 400
-
-    try:
-        # 1. 벌점 기록(log)을 생성
-        supabase.table('demerit_logs').insert({
-            'member_id': member_id,
-            'admin_id': admin_id,
-            'points': points,
-            'reason': reason
-        }).execute()
-
-        # 2. members 테이블의 demerit_points를 증가시킴 (Postgres의 increment 기능 사용)
-        # Supabase-py v2 에서는 rpc를 직접 호출하는 방식으로 구현해야 합니다.
-        supabase.rpc('increment_demerit', {'member_id_in': member_id, 'points_in': points}).execute()
-
-        return jsonify({"status": "success", "message": f"{points}점의 벌점이 부과되었습니다."})
-    except Exception as e:
-        app.logger.error(f"Error adding demerit for member {member_id}: {e}")
-        return jsonify({"error": "벌점 부과 중 오류 발생"}), 500
-
-
 # ==============================================================================
 # --- [신규] 주간 발제문 수집 및 문서화 시스템 ---
 # ==============================================================================
@@ -2793,11 +2598,27 @@ def create_topic_event():
         supabase.table('topic_events').insert({
             'meeting_date': data.get('meeting_date'),
             'book_title': data.get('book_title'),
+            'book_author': data.get('book_author'),
             'share_token': token
         }).execute()
         return jsonify({"status": "success", "message": "발제문 수집 링크가 생성되었습니다."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+# 1.5. 관리자: 발제문 이벤트 삭제 API
+@app.route('/api/admin/topic_events/<event_id>/delete', methods=['POST'])
+@login_required(role="admin")
+def delete_topic_event(event_id):
+    try:
+        # 먼저 연관된 발제문 제출 내역들을 모두 삭제
+        supabase.table('topic_submissions').delete().eq('event_id', event_id).execute()
+        # 이벤트 본체 삭제
+        supabase.table('topic_events').delete().eq('id', event_id).execute()
+        
+        return jsonify({"status": "success", "message": "발제문 수집 이벤트가 삭제되었습니다."})
+    except Exception as e:
+        app.logger.error(f"Error deleting topic event: {e}")
+        return jsonify({"error": "이벤트 삭제 중 서버 오류가 발생했습니다."}), 500
 
 
 # 2. 사용자: 공유 링크를 통한 발제문 작성 페이지
@@ -2815,7 +2636,15 @@ def view_shared_topics():
             flash("마감되었거나 유효하지 않은 링크입니다.", "warning")
             return redirect(url_for('main_index'))
 
-        return render_template('topic_submit.html', event=event_data, user_name=session.get('user_name'))
+        user_name = session.get('user_name')
+        user_department = None
+        if user_name:
+            try:
+                member_res = supabase.table('members').select('department').eq('name', user_name).single().execute()
+                user_department = member_res.data.get('department') if member_res.data else None
+            except Exception:
+                pass
+        return render_template('topic_submit.html', event=event_data, user_name=user_name, user_department=user_department)
     except Exception as e:
         app.logger.error(f"Error loading topic event: {e}")
         return "유효하지 않은 링크입니다.", 404
@@ -2873,39 +2702,104 @@ def submit_topics():
         return jsonify({"error": "제출 중 서버 오류가 발생했습니다."}), 500
 
 
-# 4. 관리자: Word 파일로 출력 (python-docx 사용)
-@app.route('/admin/topics/<event_id>/download_word')
+# 3.5. 사용자: 발제문 불러오기 API
+@app.route('/api/topics/load', methods=['POST'])
+def load_topics():
+    data = request.json
+    event_id = data.get('event_id')
+    author_name = data.get('author_name')
+    department = data.get('department')
+    pin_code = data.get('pin_code')
+
+    # 로그인한 회원은 PIN 검증 패스
+    is_logged_in_member = session.get('user_name') == author_name
+
+    if not all([event_id, author_name, department]):
+        return jsonify({"error": "이름과 소속을 모두 입력해주세요."}), 400
+
+    if not is_logged_in_member and not pin_code:
+        return jsonify({"error": "비회원은 4자리 PIN 번호를 입력해야 합니다."}), 400
+
+    try:
+        existing_res = supabase.table('topic_submissions').select('*').eq('event_id', event_id).eq(
+            'author_name', author_name).eq('department', department).execute()
+
+        if existing_res.data:
+            existing_record = existing_res.data[0]
+            if not is_logged_in_member and str(existing_record['pin_code']) != str(pin_code):
+                return jsonify({"error": "PIN 번호가 일치하지 않습니다. (동명이인일 경우 학과를 다르게 입력해주세요)"}), 403
+
+            return jsonify({"status": "success", "topics": existing_record['topics']})
+        else:
+            return jsonify({"error": "작성된 발제문 내역이 없습니다. 처음 작성하는 것이 맞나요?"}), 404
+
+    except Exception as e:
+        app.logger.error(f"Error loading topics: {e}")
+        return jsonify({"error": "불러오기 중 서버 오류가 발생했습니다."}), 500
+
+
+# 3.8 관리자: 발제문 상세 보기 및 취합 페이지
+@app.route('/admin/topics/<event_id>/view')
 @login_required(role="admin")
-def download_topics_word(event_id):
+def view_admin_topics(event_id):
     try:
         event = supabase.table('topic_events').select('*').eq('id', event_id).single().execute().data
         submissions = supabase.table('topic_submissions').select('*').eq('event_id', event_id).order(
             'created_at').execute().data
+        
+        return render_template('admin_topic_view.html', event=event, submissions=submissions)
+    except Exception as e:
+        flash(f"상세 정보를 불러오는 중 오류 발생: {str(e)}", "danger")
+        return redirect(url_for('admin_dashboard'))
 
-        doc = Document()
 
-        # 문서 제목 세팅
-        title = doc.add_heading(f"발제문 취합 - {event['book_title']}", 0)
-        title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        doc.add_paragraph(f"모임 날짜: {event['meeting_date']}").alignment = WD_ALIGN_PARAGRAPH.CENTER
-        doc.add_paragraph()  # 빈 줄 추가
+# 4. 관리자: Word 파일로 출력 (python-docx / docxtpl 사용)
+@app.route('/admin/topics/<event_id>/download_word')
+@login_required(role="admin")
+def download_topics_word(event_id):
+    try:
+        from docxtpl import DocxTemplate
+        import datetime
+        event = supabase.table('topic_events').select('*').eq('id', event_id).single().execute().data
+        submissions = supabase.table('topic_submissions').select('*').eq('event_id', event_id).order(
+            'created_at').execute().data
 
-        # 제출자별 발제문 작성
+        # 템플릿 경로 설정
+        template_path = os.path.join(app.root_path, 'templates', 'template.docx')
+        if not os.path.exists(template_path):
+            flash("템플릿 워드 파일(template.docx)을 templates 폴더에서 찾을 수 없습니다.", "danger")
+            return redirect(url_for('admin_dashboard'))
+
+        doc = DocxTemplate(template_path)
+        
+        # 템플릿에 주입할 컨텍스트 데이터 준비
+        date_str = event['meeting_date'].replace('-', '.')
+        context = {
+            'book_title': event['book_title'],
+            'meeting_date': date_str,
+            'book_author': event.get('book_author', ''),
+            'moderator_name': '',  
+            'submissions': []
+        }
+        
+        # 제출물 매핑
         for sub in submissions:
-            # 작성자 & 학과
-            heading = doc.add_heading(f"👤 {sub['author_name']} ({sub['department']})", level=2)
+            topics_list = []
+            for t in sub['topics']:
+                topics_list.append({
+                    'topic': t.get('topic', ''),
+                    'page': t.get('page', ''),
+                    'reference': t.get('reference', '')
+                })
+            
+            context['submissions'].append({
+                'department': sub.get('department', ''),
+                'author_name': sub.get('author_name', ''),
+                'topics': topics_list
+            })
 
-            for idx, topic_data in enumerate(sub['topics'], 1):
-                # 발제문 내용 (리스트 형태)
-                p = doc.add_paragraph(style='List Number')
-                p.add_run(f"{topic_data['topic']}").bold = True
-
-                # 페이지 및 참조 사항 (들여쓰기 적용)
-                ref_p = doc.add_paragraph()
-                ref_p.paragraph_format.left_indent = Inches(0.5)
-                ref_p.add_run(f"↳ 페이지: {topic_data['page']} | 참조: {topic_data['reference']}").italic = True
-
-            doc.add_paragraph()  # 각 제출자 사이에 빈 줄 추가
+        # 템플릿 렌더링
+        doc.render(context)
 
         # 메모리 상에서 파일 생성 후 클라이언트로 전송
         f = BytesIO()
