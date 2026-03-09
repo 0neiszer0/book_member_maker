@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ event.book_title }} - 발제문 모음</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --eva-purple: #6A0DAD;
+            --eva-green: #00FF7F;
+            --bg-dark: #1A1A1A;
+            --card-dark: #2D2D2D;
+            --text-light: #E5E5E5;
+            --border-dark: #444444;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+        }
+
+        h1,
+        h2,
+        h3 {
+            font-family: 'Orbitron', sans-serif;
+            text-transform: uppercase;
+        }
+
+        .eva-card {
+            background-color: var(--card-dark);
+            border: 1px solid var(--border-dark);
+        }
+    </style>
+</head>
+
+<body class="p-4 md:p-8">
+    {% include '_header.html' %}
+
+    <div class="container mx-auto max-w-5xl mt-8">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-eva-green">{{ event.book_title }}</h1>
+                <p class="text-gray-400 mt-2">모임 날짜: {{ event.meeting_date }} | 총 <strong class="text-white">{{
+                        submissions|length }}</strong>명 제출</p>
+            </div>
+            <div class="flex gap-2">
+                <a href="{{ url_for('admin_dashboard') }}"
+                    class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded shadow border border-gray-500">
+                    ◀ 대시보드
+                </a>
+                <a href="/admin/topics/{{ event.id }}/download_word"
+                    class="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded shadow border border-green-400">
+                    ⬇️ Word 다운로드
+                </a>
+            </div>
+        </div>
+
+        <div class="grid gap-6">
+            {% for sub in submissions %}
+            <div class="eva-card p-6 rounded-lg shadow-lg">
+                <div class="border-b border-border-dark pb-3 mb-4 flex justify-between items-center">
+                    <h2 class="text-xl font-bold text-eva-purple">👤 {{ sub.author_name }} <span
+                            class="text-sm text-gray-400 font-normal">({{ sub.department }})</span></h2>
+                    <span class="text-xs text-gray-500">{{ sub.created_at | datetime('%Y-%m-%d %H:%M') }}</span>
+                </div>
+
+                <div class="space-y-4">
+                    {% for t in sub.topics %}
+                    <div class="bg-bg-dark p-4 rounded border-l-4 border-eva-green">
+                        <p class="font-bold text-text-light whitespace-pre-wrap">{{ t.topic }}</p>
+                        <div class="mt-3 text-sm flex gap-4 bg-gray-800 p-2 rounded">
+                            {% if t.page %}<span class="text-gray-400">📍 페이지: <span class="text-gray-200 font-bold">{{
+                                    t.page }}</span></span>{% endif %}
+                            {% if t.reference %}<span class="text-gray-400">🔖 참조: <span
+                                    class="text-gray-200 font-bold">{{ t.reference }}</span></span>{% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="eva-card p-12 text-center rounded-lg text-gray-500">
+                아직 제출된 발제문이 없습니다.
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+
+</html>
