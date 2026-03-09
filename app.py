@@ -410,7 +410,7 @@ def link_account_submit():
             update_data = {
                 "social_id": social_info['social_id'],
                 "profile_pic": social_info['profile_pic'],
-                "account_status": 'approved' if auto_approve else 'pending',
+                "account_status": 'active' if auto_approve else 'pending',
                 "is_active": True if auto_approve else member_to_link.get('is_active', False)
             }
             # 이메일이 있고, 현재 멤버가 사용 중인 이메일이 아닌 경우에만 업데이트
