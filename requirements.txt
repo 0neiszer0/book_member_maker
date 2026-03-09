@@ -10,3 +10,4 @@ mwparserfromhell
 bleach
 python-docx
 docxtpl
+ortools==9.11.4210
