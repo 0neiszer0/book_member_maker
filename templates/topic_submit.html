@@ -1,20 +1,55 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ event.book_title }} - 발제문 제출</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap"
+        rel="stylesheet">
     <style>
-        :root { --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A; --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444; }
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
-        h1, h2 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; }
-        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
-        .eva-input { background-color: #1A1A1A; border-color: var(--border-dark); color: var(--text-light); }
-        .eva-input:focus { border-color: var(--eva-green); outline: none; box-shadow: 0 0 0 2px rgba(0,255,127,0.2); }
+        :root {
+            --eva-purple: #6A0DAD;
+            --eva-green: #00FF7F;
+            --bg-dark: #1A1A1A;
+            --card-dark: #2D2D2D;
+            --text-light: #E5E5E5;
+            --border-dark: #444444;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+        }
+
+        h1,
+        h2 {
+            font-family: 'Orbitron', sans-serif;
+            text-transform: uppercase;
+        }
+
+        .eva-card {
+            background-color: var(--card-dark);
+            border: 1px solid var(--border-dark);
+        }
+
+        .eva-input {
+            background-color: #1A1A1A;
+            border-color: var(--border-dark);
+            color: var(--text-light);
+        }
+
+        .eva-input:focus {
+            border-color: var(--eva-green);
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0, 255, 127, 0.2);
+        }
     </style>
 </head>
+
 <body class="p-4 md:p-8">
     <div class="max-w-3xl mx-auto">
         <div class="text-center mb-8">
@@ -28,29 +63,44 @@
 
             <div class="eva-card p-6 rounded-lg grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                    <label class="block text-sm font-bold mb-2">이름</label>
-                    <input type="text" id="authorName" class="eva-input w-full rounded py-2 px-3" required
-                           {% if user_name %}value="{{ user_name }}" readonly class="bg-gray-800 text-gray-500 cursor-not-allowed"{% endif %}>
+                    <label for="existing_name" class="block text-sm font-bold mb-2">이름</label>
+                    <input type="text" id="authorName" class="eva-input w-full rounded py-2 px-3" required {% if
+                        user_name %}value="{{ user_name }}" readonly style="opacity:0.6;cursor:not-allowed" {% endif %}>
                 </div>
                 <div>
-                    <label class="block text-sm font-bold mb-2">소속 (학과/직장 등)</label>
-                    <input type="text" id="department" class="eva-input w-full rounded py-2 px-3" required placeholder="예: 경영학과">
+                    <label for="department" class="block text-sm font-bold mb-2">소속 (학과/직장 등)</label>
+                    <input type="text" id="department" class="eva-input w-full rounded py-2 px-3" required
+                        placeholder="예: 경영학과" {% if user_department %}value="{{ user_department }}" {% endif %}>
                 </div>
+                {% if not user_name %}
                 <div>
                     <label class="block text-sm font-bold mb-2">4자리 PIN (수정용)</label>
-                    <input type="password" id="pinCode" class="eva-input w-full rounded py-2 px-3"
-                           {% if user_name %}value="MEMBER" readonly class="bg-gray-800 cursor-not-allowed"{% else %}required pattern="[0-9]{4}" placeholder="숫자 4자리"{% endif %}>
+                    <input type="password" id="pinCode" class="eva-input w-full rounded py-2 px-3" required
+                        pattern="[0-9]{4}" placeholder="숫자 4자리">
                 </div>
+                {% else %}
+                <div class="hidden">
+                    <input type="hidden" id="pinCode" value="">
+                </div>
+                {% endif %}
+            </div>
+            <div class="flex justify-end mt-2">
+                <button type="button" id="loadTopicBtn"
+                    class="bg-gray-700 hover:bg-gray-600 text-sm font-bold py-2 px-4 rounded border border-gray-500 transition-colors">
+                    🔄 이전에 작성한 내 발제문 불러오기
+                </button>
             </div>
 
             <div id="topicsContainer" class="space-y-4">
-                </div>
+            </div>
 
-            <button type="button" id="addTopicBtn" class="w-full bg-gray-700 hover:bg-gray-600 font-bold py-3 rounded-lg border border-dashed border-gray-500">
+            <button type="button" id="addTopicBtn"
+                class="w-full bg-gray-700 hover:bg-gray-600 font-bold py-3 rounded-lg border border-dashed border-gray-500">
                 + 발제문 추가하기 (최대 10개)
             </button>
 
-            <button type="submit" id="submitBtn" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-lg text-lg transition-colors shadow-lg shadow-green-900/50">
+            <button type="submit" id="submitBtn"
+                class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-lg text-lg transition-colors shadow-lg shadow-green-900/50">
                 발제문 제출 / 수정 완료
             </button>
         </form>
@@ -131,7 +181,7 @@
                 if (!response.ok) throw new Error(result.error);
 
                 alert(result.message);
-                if(!'{{ user_name }}') {
+                if (!'{{ user_name }}') {
                     // 비회원이면 작성 폼 초기화 후 이동
                     window.location.href = '/';
                 }
@@ -141,6 +191,54 @@
                 submitBtn.disabled = false; submitBtn.textContent = '발제문 제출 / 수정 완료';
             }
         });
+
+        // 작성된 발제문 불러오기 로직
+        document.getElementById('loadTopicBtn').addEventListener('click', async () => {
+            const author = document.getElementById('authorName').value;
+            const dept = document.getElementById('department').value;
+            const pin = document.getElementById('pinCode').value;
+
+            if (!author || !dept) { alert("이름과 소속을 먼저 입력해주세요."); return; }
+            if (!'{{ user_name }}' && !pin) { alert("PIN 번호를 입력해주세요."); return; }
+
+            const loadBtn = document.getElementById('loadTopicBtn');
+            loadBtn.textContent = '불러오는 중...';
+            loadBtn.disabled = true;
+
+            try {
+                const response = await fetch('/api/topics/load', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        event_id: document.getElementById('eventId').value,
+                        author_name: author,
+                        department: dept,
+                        pin_code: pin
+                    })
+                });
+                const result = await response.json();
+
+                if (!response.ok) throw new Error(result.error);
+
+                // 성공 시 기존 토픽 삭제 후 다시 생성
+                container.innerHTML = '';
+                topicCount = 0;
+                result.topics.forEach(t => {
+                    addTopicField();
+                    const currentDiv = container.lastElementChild;
+                    currentDiv.querySelector('.topic-text').value = t.topic;
+                    currentDiv.querySelector('.topic-page').value = t.page;
+                    currentDiv.querySelector('.topic-ref').value = t.reference;
+                });
+                alert("이전에 작성한 발제문을 성공적으로 불러왔습니다!");
+            } catch (error) {
+                alert(`오류: ${error.message}`);
+            } finally {
+                loadBtn.textContent = '🔄 이전에 작성한 내 발제문 불러오기';
+                loadBtn.disabled = false;
+            }
+        });
     </script>
 </body>
+
 </html>

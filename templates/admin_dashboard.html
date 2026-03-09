@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,42 +9,125 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap"
+        rel="stylesheet">
     <style>
         :root {
-            --eva-purple: #6A0DAD; --eva-green: #00FF7F; --eva-orange: #FF8C00;
-            --bg-dark: #1A1A1A; --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444;
+            --eva-purple: #6A0DAD;
+            --eva-green: #00FF7F;
+            --eva-orange: #FF8C00;
+            --bg-dark: #1A1A1A;
+            --card-dark: #2D2D2D;
+            --text-light: #E5E5E5;
+            --border-dark: #444444;
         }
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
-        h1, h2, h3, h4, h5, h6 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; }
-        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
-        .eva-button-primary { background-color: var(--eva-purple); color: white; }
-        .eva-button-primary:hover { background-color: #8A2BE2; }
-        .eva-button-secondary { background-color: #4A4A4A; color: var(--text-light); }
-        .eva-button-secondary:hover { background-color: #666666; }
-        .eva-button-delete { background-color: var(--eva-orange); color: black; }
-        .eva-button-delete:hover { background-color: #FFA500; }
-        .eva-link { color: var(--eva-green); }
-        .eva-link:hover { color: #ADFF2F; }
-        .eva-table-header { background-color: #333333; }
-        .eva-table-row:nth-child(even) { background-color: #383838; }
-        .eva-input { background-color: #1A1A1A; border-color: var(--border-dark); color: var(--text-light); cursor: pointer; }
-        .eva-input:focus { border-color: var(--eva-green); outline: none; box-shadow: 0 0 0 2px var(--eva-green); }
-        .eva-toggle-bg { background-color: #4A4A4A; }
-        input.event-toggle:checked + .eva-toggle-bg { background-color: var(--eva-green); }
-        .interviewer-toggle ~ .dot, .member-toggle ~ .dot { transition: transform .2s ease-in-out; }
-        .interviewer-toggle:checked ~ .dot, .member-toggle:checked ~ .dot { transform: translateX(1.5rem); }
-        .interviewer-toggle:checked ~ .block { background-color: var(--eva-purple); }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            font-family: 'Orbitron', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .eva-card {
+            background-color: var(--card-dark);
+            border: 1px solid var(--border-dark);
+        }
+
+        .eva-button-primary {
+            background-color: var(--eva-purple);
+            color: white;
+        }
+
+        .eva-button-primary:hover {
+            background-color: #8A2BE2;
+        }
+
+        .eva-button-secondary {
+            background-color: #4A4A4A;
+            color: var(--text-light);
+        }
+
+        .eva-button-secondary:hover {
+            background-color: #666666;
+        }
+
+        .eva-button-delete {
+            background-color: var(--eva-orange);
+            color: black;
+        }
+
+        .eva-button-delete:hover {
+            background-color: #FFA500;
+        }
+
+        .eva-link {
+            color: var(--eva-green);
+        }
+
+        .eva-link:hover {
+            color: #ADFF2F;
+        }
+
+        .eva-table-header {
+            background-color: #333333;
+        }
+
+        .eva-table-row:nth-child(even) {
+            background-color: #383838;
+        }
+
+        .eva-input {
+            background-color: #1A1A1A;
+            border-color: var(--border-dark);
+            color: var(--text-light);
+            cursor: pointer;
+        }
+
+        .eva-input:focus {
+            border-color: var(--eva-green);
+            outline: none;
+            box-shadow: 0 0 0 2px var(--eva-green);
+        }
+
+        .eva-toggle-bg {
+            background-color: #4A4A4A;
+        }
+
+        input.event-toggle:checked+.eva-toggle-bg {
+            background-color: var(--eva-green);
+        }
+
+        .member-toggle~.dot {
+            transition: transform .2s ease-in-out;
+        }
+
+        .member-toggle:checked~.dot {
+            transform: translateX(1.5rem);
+        }
     </style>
 </head>
+
 <body class="min-h-screen">
     {% include '_header.html' %}
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8">
         {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}{% for category, message in messages %}
-                <div class="p-4 mb-4 text-sm rounded-lg {{ 'bg-green-900 text-green-200' if category == 'success' else 'bg-red-900 text-red-200' }}" role="alert">{{ message }}</div>
-            {% endfor %}{% endif %}
+        {% if messages %}{% for category, message in messages %}
+        <div class="p-4 mb-4 text-sm rounded-lg {{ 'bg-green-900 text-green-200' if category == 'success' else 'bg-red-900 text-red-200' }}"
+            role="alert">{{ message }}</div>
+        {% endfor %}{% endif %}
         {% endwith %}
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -55,32 +139,52 @@
                         <table class="min-w-full divide-y divide-border-dark" id="events-table">
                             <thead class="eva-table-header">
                                 <tr>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">Event</th>
-                                    <th class="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">기간</th>
-                                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-300 uppercase">활성화</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">Event
+                                    </th>
+                                    <th
+                                        class="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">
+                                        기간</th>
+                                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-300 uppercase">활성화
+                                    </th>
                                     <th class="px-4 py-3 text-right text-xs font-medium text-gray-300 uppercase">관리</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-border-dark">
                                 {% for event in events %}
                                 <tr data-event-id="{{ event.id }}" class="eva-table-row">
-                                    <td class="px-4 py-4 whitespace-nowrap text-sm font-medium">{{ event.event_name }}</td>
-                                    <td class="hidden md:table-cell px-4 py-4 whitespace-nowrap text-sm text-gray-400">{{ event.start_date }} ~ {{ event.end_date }}</td>
+                                    <td class="px-4 py-4 whitespace-nowrap text-sm font-medium">{{ event.event_name }}
+                                    </td>
+                                    <td class="hidden md:table-cell px-4 py-4 whitespace-nowrap text-sm text-gray-400">
+                                        {{ event.start_date }} ~ {{ event.end_date }}</td>
                                     <td class="px-4 py-4 whitespace-nowrap text-center">
                                         <label class="relative inline-flex items-center cursor-pointer">
-                                            <input type="checkbox" class="sr-only peer event-toggle" data-event-id="{{ event.id }}" {% if event.is_active %}checked{% endif %}>
-                                            <div class="w-11 h-6 eva-toggle-bg rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                                            <input type="checkbox" class="sr-only peer event-toggle"
+                                                data-event-id="{{ event.id }}" {% if event.is_active %}checked{% endif
+                                                %}>
+                                            <div
+                                                class="w-11 h-6 eva-toggle-bg rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all">
+                                            </div>
                                         </label>
                                     </td>
                                     <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <a href="{{ url_for('admin_event_timetable', event_id=event.id) }}" class="eva-link mr-2">타임테이블</a>
-                                        <a href="{{ url_for('manage_event', event_id=event.id) }}" class="text-gray-400 hover:text-gray-200 mr-2">슬롯관리</a>
-                                        <button class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-2 rounded-md mr-2 share-link-btn" data-event-id="{{ event.id }}">공유</button>
-                                        <button class="eva-button-delete delete-event-btn text-xs font-bold py-1 px-2 rounded-md" data-event-id="{{ event.id }}" data-event-name="{{ event.event_name }}">삭제</button>
+                                        <a href="{{ url_for('admin_event_timetable', event_id=event.id) }}"
+                                            class="eva-link mr-2">타임테이블</a>
+                                        <a href="{{ url_for('manage_event', event_id=event.id) }}"
+                                            class="text-gray-400 hover:text-gray-200 mr-2">슬롯관리</a>
+                                        <button
+                                            class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-2 rounded-md mr-2 share-link-btn"
+                                            data-event-id="{{ event.id }}">공유</button>
+                                        <button
+                                            class="eva-button-delete delete-event-btn text-xs font-bold py-1 px-2 rounded-md"
+                                            data-event-id="{{ event.id }}"
+                                            data-event-name="{{ event.event_name }}">삭제</button>
                                     </td>
                                 </tr>
                                 {% else %}
-                                <tr><td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">생성된 이벤트가 없습니다.</td></tr>
+                                <tr>
+                                    <td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">생성된 이벤트가 없습니다.
+                                    </td>
+                                </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -88,7 +192,7 @@
                 </div>
 
                 <div class="eva-card p-6 rounded-lg shadow-lg border-eva-purple">
-                    <h2 class="text-xl font-bold text-eva-green mb-4 border-b border-border-dark pb-2">📖 주간 발제문 관리</h2>
+                    <h2 class="text-xl font-bold text-eva-green mb-4 border-b border-border-dark pb-2">주간 발제문 관리</h2>
 
                     <form id="createTopicEventForm" class="flex flex-col sm:flex-row gap-4 mb-6">
                         <div class="flex-1">
@@ -97,10 +201,17 @@
                         </div>
                         <div class="flex-[2]">
                             <label class="block text-xs text-gray-400 mb-1">책 제목</label>
-                            <input type="text" id="topicBookTitle" class="eva-input w-full rounded p-2" placeholder="예: 코스모스 (칼 세이건)" required>
+                            <input type="text" id="topicBookTitle" class="eva-input w-full rounded p-2"
+                                placeholder="예: 코스모스" required>
+                        </div>
+                        <div class="flex-[2]">
+                            <label class="block text-xs text-gray-400 mb-1">책 저자</label>
+                            <input type="text" id="topicBookAuthor" class="eva-input w-full rounded p-2"
+                                placeholder="예: 칼 세이건">
                         </div>
                         <div class="flex items-end">
-                            <button type="submit" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded transition-colors">
+                            <button type="submit"
+                                class="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded transition-colors">
                                 + 취합 링크 생성
                             </button>
                         </div>
@@ -123,18 +234,25 @@
                                     <td class="p-3 font-bold text-text-light">{{ event.book_title }}</td>
                                     <td class="p-3">
                                         {% if event.is_active %}
-                                        <span class="bg-green-900/50 text-green-400 px-2 py-1 rounded text-xs font-bold">진행중</span>
+                                        <span
+                                            class="bg-green-900/50 text-green-400 px-2 py-1 rounded text-xs font-bold">진행중</span>
                                         {% else %}
                                         <span class="bg-gray-700 text-gray-400 px-2 py-1 rounded text-xs">마감됨</span>
                                         {% endif %}
                                     </td>
                                     <td class="p-3 text-center space-x-2">
-                                        <button onclick="copyTopicLink('{{ event.share_token }}')" class="bg-gray-700 hover:bg-gray-600 text-white py-1.5 px-3 rounded shadow">
-                                            🔗 링크 복사
+                                        <button onclick="copyTopicLink('{{ event.share_token }}')"
+                                            class="bg-gray-700 hover:bg-gray-600 text-white py-1.5 px-3 rounded shadow">
+                                            링크 복사
                                         </button>
-                                        <a href="/admin/topics/{{ event.id }}/download_word" class="bg-green-700 hover:bg-green-600 text-white py-1.5 px-3 rounded shadow inline-block">
-                                            ⬇️ Word 문서 다운로드
+                                        <a href="/admin/topics/{{ event.id }}/view"
+                                            class="bg-blue-700 hover:bg-blue-600 text-white py-1.5 px-3 rounded shadow inline-block">
+                                            발제문 확인
                                         </a>
+                                        <button onclick="deleteTopicEvent('{{ event.id }}', '{{ event.book_title }}')"
+                                            class="bg-red-700 hover:bg-red-600 text-white py-1.5 px-3 rounded shadow">
+                                            삭제
+                                        </button>
                                     </td>
                                 </tr>
                                 {% else %}
@@ -150,31 +268,58 @@
                 </div>
 
                 <div class="eva-card p-6 rounded-lg">
-                    <h2 class="text-xl font-bold mb-4 text-eva-green">Member Status</h2>
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold text-eva-green">Member Management</h2>
+                        <button onclick="openAddMemberModal()"
+                            class="bg-eva-green text-black font-bold py-1.5 px-4 rounded text-sm hover:opacity-80">+ 멤버
+                            추가</button>
+                    </div>
+
+                    <!-- [신규] 탭 마크업 추가 -->
+                    <div class="flex border-b border-border-dark mb-4 space-x-4">
+                        <button class="member-tab active pb-2 border-b-2 border-eva-green text-eva-green font-bold px-2"
+                            data-target="active">활성 <span class="tab-count text-xs ml-1"></span></button>
+                        <button
+                            class="member-tab pb-2 border-b-2 border-transparent text-gray-400 hover:text-gray-200 px-2"
+                            data-target="dormant">휴면 <span class="tab-count text-xs ml-1"></span></button>
+                        <button
+                            class="member-tab pb-2 border-b-2 border-transparent text-gray-400 hover:text-gray-200 px-2"
+                            data-target="inactive">비활성 <span class="tab-count text-xs ml-1"></span></button>
+                    </div>
+
                     <div id="member-status-list" class="space-y-2 max-h-96 overflow-y-auto pr-2">
                         {% for member in all_members %}
-                        <div class="flex justify-between items-center p-3 bg-gray-700 rounded-lg">
-                            <div>
+                        <div class="member-row flex items-center justify-between p-3 bg-gray-700 rounded-lg gap-2"
+                            id="member-row-{{ member.id }}" data-status="{{ member.member_status or 'active' }}">
+                            <div class="flex-1 min-w-0">
                                 <span class="font-semibold">{{ member.name }}</span>
-                                <span class="ml-2 text-xs font-mono rounded px-1.5 py-0.5 {{ 'bg-red-800 text-red-200' if member.demerit_points > 0 else 'bg-gray-600 text-gray-300' }}">
-                                    벌점 {{ member.demerit_points }}
-                                </span>
+                                {% if member.role == 'admin' %}<span
+                                    class="ml-1 text-xs bg-red-700 text-white px-1.5 py-0.5 rounded">관리자</span>
+                                {% elif member.role == 'officer' %}<span
+                                    class="ml-1 text-xs bg-yellow-700 text-white px-1.5 py-0.5 rounded">임원</span>
+                                {% endif %}
+                                <div class="text-xs text-gray-400">{{ member.department or '' }}</div>
                             </div>
-                            <div class="flex items-center space-x-2">
-                                <button class="remove-demerit-btn text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded"
-                                        data-member-id="{{ member.id }}" data-member-name="{{ member.name }}">
-                                    차감
-                                </button>
-                                <button class="add-demerit-btn text-xs bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-2 rounded"
-                                        data-member-id="{{ member.id }}" data-member-name="{{ member.name }}">
-                                    부과
-                                </button>
-                                <label class="relative cursor-pointer">
-                                    <input type="checkbox" class="sr-only member-toggle" data-member-id="{{ member.id }}" {% if member.is_active %}checked{% endif %}>
-                                    <div class="block w-12 h-6 rounded-full {% if member.is_active %}bg-eva-green{% else %}bg-gray-600{% endif %}"></div>
-                                    <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform {% if member.is_active %}transform translate-x-6{% endif %}"></div>
-                                </label>
-                            </div>
+                            <select
+                                class="member-status-select bg-gray-800 border border-gray-600 text-sm rounded px-2 py-1"
+                                data-member-id="{{ member.id }}" onchange="setMemberStatus(this)">
+                                <option value="active" {% if member.member_status=='active' or not member.member_status
+                                    %}selected{% endif %} class="text-green-400">활성</option>
+                                <option value="dormant" {% if member.member_status=='dormant' %}selected{% endif %}
+                                    class="text-yellow-400">휴면</option>
+                                <option value="inactive" {% if member.member_status=='inactive' %}selected{% endif %}
+                                    class="text-gray-400">비활성</option>
+                            </select>
+                            <button
+                                class="edit-member-btn text-xs bg-blue-700 hover:bg-blue-600 text-white px-2 py-1 rounded"
+                                data-id="{{ member.id }}" data-name="{{ member.name }}"
+                                data-email="{{ member.email or '' }}" data-department="{{ member.department or '' }}"
+                                data-gender="{{ member.gender or '' }}" data-student_id="{{ member.student_id or '' }}"
+                                data-recruiting_class="{{ member.recruiting_class or '' }}"
+                                data-role="{{ member.role or 'member' }}">편집</button>
+                            <button
+                                class="delete-member-btn text-xs bg-red-800 hover:bg-red-700 text-white px-2 py-1 rounded"
+                                data-id="{{ member.id }}" data-name="{{ member.name }}">삭제</button>
                         </div>
                         {% else %}
                         <p class="text-center text-sm text-gray-500">등록된 멤버가 없습니다.</p>
@@ -189,260 +334,393 @@
                 <div class="eva-card p-6 rounded-lg">
                     <h2 class="text-xl font-bold mb-4 text-eva-green">New Event</h2>
                     <form action="/admin/events/create" method="post" class="space-y-4">
-                        <div><label for="event_name" class="block text-sm font-medium">이벤트 이름</label><input type="text" name="event_name" id="event_name" required class="eva-input mt-1 block w-full px-3 py-2 rounded-md shadow-sm"></div>
-                        <div><label for="start_date" class="block text-sm font-medium">시작일</label><input type="text" name="start_date" id="start_date" required class="eva-input mt-1 block w-full px-3 py-2 rounded-md shadow-sm datepicker" placeholder="날짜를 선택하세요"></div>
-                        <div><label for="end_date" class="block text-sm font-medium">종료일</label><input type="text" name="end_date" id="end_date" required class="eva-input mt-1 block w-full px-3 py-2 rounded-md shadow-sm datepicker" placeholder="날짜를 선택하세요"></div>
-                        <div class="flex items-center"><input type="checkbox" name="is_active" id="is_active" checked class="h-4 w-4 text-eva-purple bg-gray-700 border-gray-600 rounded focus:ring-eva-purple"><label for="is_active" class="ml-2 block text-sm">즉시 활성화</label></div>
-                        <button type="submit" class="w-full eva-button-primary font-bold py-2 px-4 rounded-lg">생성하기</button>
+                        <div><label for="event_name" class="block text-sm font-medium">이벤트 이름</label><input type="text"
+                                name="event_name" id="event_name" required
+                                class="eva-input mt-1 block w-full px-3 py-2 rounded-md shadow-sm"></div>
+                        <div><label for="start_date" class="block text-sm font-medium">시작일</label><input type="text"
+                                name="start_date" id="start_date" required
+                                class="eva-input mt-1 block w-full px-3 py-2 rounded-md shadow-sm datepicker"
+                                placeholder="날짜를 선택하세요"></div>
+                        <div><label for="end_date" class="block text-sm font-medium">종료일</label><input type="text"
+                                name="end_date" id="end_date" required
+                                class="eva-input mt-1 block w-full px-3 py-2 rounded-md shadow-sm datepicker"
+                                placeholder="날짜를 선택하세요"></div>
+                        <div class="flex items-center"><input type="checkbox" name="is_active" id="is_active" checked
+                                class="h-4 w-4 text-eva-purple bg-gray-700 border-gray-600 rounded focus:ring-eva-purple"><label
+                                for="is_active" class="ml-2 block text-sm">즉시 활성화</label></div>
+                        <button type="submit"
+                            class="w-full eva-button-primary font-bold py-2 px-4 rounded-lg">생성하기</button>
                     </form>
                 </div>
 
-                <div class="eva-card p-6 rounded-lg">
-                    <h2 class="text-xl font-bold mb-4 text-eva-green">Recent Demerit Log</h2>
-                    <div class="space-y-3 text-sm">
-                        {% for log in demerit_logs %}
-                        <div class="p-3 bg-bg-dark rounded-lg">
-                            <div class="flex justify-between items-center">
-                                <span class="font-bold text-yellow-400">{{ log.member.name if log.member else '알 수 없음' }}</span>
-                                <span class="text-xs text-gray-500">{{ log.created_at | datetime('%y-%m-%d') }}</span>
-                            </div>
-                            <p class="mt-1 text-gray-300">"{{ log.reason }}"</p>
-                            <p class="text-right text-xs text-gray-500 mt-1">- {{ log.admin.name if log.admin else '관리자' }} ({{ log.points }}점)</p>
-                        </div>
-                        {% else %}
-                        <p class="text-center text-sm text-gray-500">최근 벌점 기록이 없습니다.</p>
-                        {% endfor %}
-                    </div>
-                </div>
 
-                <div class="eva-card p-6 rounded-lg">
-                   <h2 class="text-xl font-bold mb-4 text-eva-green">Interviewer</h2>
-                   <p class="text-sm text-gray-400 mb-4">활성 멤버 중에서 면접관을 지정합니다.</p>
-                    <div id="interviewer-toggle-list" class="space-y-2 max-h-96 overflow-y-auto pr-2">
-                        {% for member in all_members %}
-                            {% if member.is_active %}
-                            <label class="interviewer-label flex justify-between items-center p-3 bg-gray-700 rounded-lg cursor-pointer transition-colors duration-200">
-                                <span class="font-semibold">{{ member.name }}</span>
-                                <div class="relative">
-                                    <input type="checkbox" class="sr-only interviewer-toggle" data-name="{{ member.name }}" {% if member.name in interviewer_names %}checked{% endif %}>
-                                    <div class="block bg-gray-600 w-12 h-6 rounded-full"></div>
-                                    <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full"></div>
-                                </div>
-                            </label>
-                            {% endif %}
-                        {% else %}
-                        <p class="text-center text-sm text-gray-500">등록된 독서 모임 회원이 없습니다.</p>
-                        {% endfor %}
-                    </div>
-                </div>
 
             </div>
         </div>
     </div>
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script src="https://npmcdn.com/flatpickr/dist/l10n/ko.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    // 달력 초기화
-    flatpickr(".datepicker", { "locale": "ko", dateFormat: "Y-m-d" });
 
-    // 면접관 토글
-    const toggleList = document.getElementById('interviewer-toggle-list');
-    if(toggleList) {
-        toggleList.addEventListener('change', (e) => {
-            if (e.target.matches('.interviewer-toggle')) {
-                const checkbox = e.target;
-                const memberName = checkbox.dataset.name;
-                fetch('/api/admin/toggle_interviewer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: memberName }) })
-                .then(response => { if (!response.ok) { checkbox.checked = !checkbox.checked; alert('오류가 발생했습니다.'); } return response.json(); })
-                .then(data => { if (data.status === 'error') { checkbox.checked = !checkbox.checked; alert('오류: ' + data.message); }})
-                .catch(error => { checkbox.checked = !checkbox.checked; console.error('Error:', error); });
-            }
-        });
-    }
+    <!-- 멤버 추가/편집 모달 -->
+    <div id="memberModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+        <div class="bg-gray-800 border border-gray-600 rounded-xl p-6 w-full max-w-md shadow-2xl">
+            <div class="flex justify-between items-center mb-5">
+                <h3 id="memberModalTitle" class="text-lg font-bold text-eva-green">멤버 추가</h3>
+                <button onclick="closeMemberModal()"
+                    class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+            </div>
+            <form id="memberForm" class="space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">이름 <span class="text-red-400">*</span></label>
+                        <input id="mName" type="text" required class="eva-input w-full px-3 py-2 rounded-md"
+                            placeholder="홍길동">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">학번</label>
+                        <input id="mStudentId" type="text" class="eva-input w-full px-3 py-2 rounded-md"
+                            placeholder="2024XXXXXX">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">이메일</label>
+                    <input id="mEmail" type="email" class="eva-input w-full px-3 py-2 rounded-md"
+                        placeholder="example@knu.ac.kr">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">학과</label>
+                    <input id="mDepartment" type="text" class="eva-input w-full px-3 py-2 rounded-md"
+                        placeholder="컴퓨터학부">
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">성별</label>
+                        <select id="mGender" class="eva-input w-full px-3 py-2 rounded-md">
+                            <option value="">선택</option>
+                            <option value="M">남성</option>
+                            <option value="W">여성</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">기수</label>
+                        <input id="mRecruitingClass" type="number" class="eva-input w-full px-3 py-2 rounded-md"
+                            placeholder="12">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">역할</label>
+                        <select id="mRole" class="eva-input w-full px-3 py-2 rounded-md">
+                            <option value="member">일반 멤버</option>
+                            <option value="officer">임원</option>
+                            <option value="admin">관리자</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit"
+                    class="w-full bg-eva-green text-black font-bold py-2 px-4 rounded-lg hover:opacity-80 mt-2">저장</button>
+            </form>
+        </div>
+    </div>
 
-    // 이벤트 테이블 액션
-    const eventsTable = document.getElementById('events-table');
-    if (eventsTable) {
-        // 이벤트 활성화 토글
-        eventsTable.addEventListener('change', (e) => {
-            if (e.target.matches('.event-toggle')) {
-                const checkbox = e.target;
-                const eventId = checkbox.dataset.eventId;
-                const newActiveState = checkbox.checked;
-                fetch(`/api/admin/events/${eventId}/toggle_active`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: newActiveState })})
-                .then(response => { if (!response.ok) { checkbox.checked = !newActiveState; alert('상태 변경에 실패했습니다.'); } });
-            }
-        });
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/ko.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // 달력 초기화
+            flatpickr(".datepicker", { "locale": "ko", dateFormat: "Y-m-d" });
 
-        // 이벤트 삭제 및 공유 버튼
-        eventsTable.addEventListener('click', (e) => {
-            if (e.target.matches('.delete-event-btn')) {
-                const button = e.target;
-                const eventId = button.dataset.eventId;
-                const eventName = button.dataset.eventName;
-                if (confirm(`정말로 '${eventName}' 이벤트를 삭제하시겠습니까?\n모든 슬롯과 예약 정보가 함께 삭제됩니다.`)) {
-                    fetch(`/api/admin/events/${eventId}/delete`, { method: 'POST' })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'success') { button.closest('tr').remove(); alert('이벤트가 삭제되었습니다.'); }
-                        else { alert('삭제 실패: ' + data.message); }
-                    })
-                    .catch(error => console.error('Error:', error));
-                }
-            }
-            else if (e.target.matches('.share-link-btn')) {
-                const button = e.target;
-                const eventId = button.dataset.eventId;
-                fetch(`/api/admin/events/${eventId}/generate_share_link`, { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        navigator.clipboard.writeText(data.link).then(() => {
-                            alert('공유 링크가 클립보드에 복사되었습니다.\n' + data.link);
-                        });
-                    } else { alert('링크 생성 실패: ' + data.message); }
-                })
-                .catch(error => console.error('Error:', error));
-            }
-        });
-    }
+            // 이벤트 테이블 액션
+            const eventsTable = document.getElementById('events-table');
+            if (eventsTable) {
+                // 이벤트 활성화 토글
+                eventsTable.addEventListener('change', (e) => {
+                    if (e.target.matches('.event-toggle')) {
+                        const checkbox = e.target;
+                        const eventId = checkbox.dataset.eventId;
+                        const newActiveState = checkbox.checked;
+                        fetch(`/api/admin/events/${eventId}/toggle_active`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: newActiveState }) })
+                            .then(response => { if (!response.ok) { checkbox.checked = !newActiveState; alert('상태 변경에 실패했습니다.'); } });
+                    }
+                });
 
-    // 멤버 상태 관리
-    const memberList = document.getElementById('member-status-list');
-    if(memberList) {
-        memberList.addEventListener('click', async (e) => {
-            // 활성/비활성 토글
-            if (e.target.matches('.member-toggle')) {
-                const checkbox = e.target;
-                const memberId = checkbox.dataset.memberId;
-                const newActiveState = checkbox.checked;
+                // 이벤트 삭제 및 공유 버튼
+                eventsTable.addEventListener('click', (e) => {
+                    if (e.target.matches('.delete-event-btn')) {
+                        const button = e.target;
+                        const eventId = button.dataset.eventId;
+                        const eventName = button.dataset.eventName;
+                        if (confirm(`정말로 '${eventName}' 이벤트를 삭제하시겠습니까?\n모든 슬롯과 예약 정보가 함께 삭제됩니다.`)) {
+                            fetch(`/api/admin/events/${eventId}/delete`, { method: 'POST' })
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.status === 'success') { button.closest('tr').remove(); alert('이벤트가 삭제되었습니다.'); }
+                                    else { alert('삭제 실패: ' + data.message); }
+                                })
+                                .catch(error => console.error('Error:', error));
+                        }
+                    }
+                    else if (e.target.matches('.share-link-btn')) {
+                        const button = e.target;
+                        const eventId = button.dataset.eventId;
+                        fetch(`/api/admin/events/${eventId}/generate_share_link`, { method: 'POST' })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.status === 'success') {
+                                    navigator.clipboard.writeText(data.link).then(() => {
+                                        alert('공유 링크가 클립보드에 복사되었습니다.\n' + data.link);
+                                    });
+                                } else { alert('링크 생성 실패: ' + data.message); }
+                            })
+                            .catch(error => console.error('Error:', error));
+                    }
+                });
+            }
+
+            // 멤버 상태 관리 함수들은 전역으로 선언
+
+            // [복구됨] --- 발제문 이벤트 생성 폼 제출 로직 ---
+            document.getElementById('createTopicEventForm')?.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const date = document.getElementById('topicDate').value;
+                const title = document.getElementById('topicBookTitle').value;
+                const author = document.getElementById('topicBookAuthor').value;
 
                 try {
-                    const response = await fetch(`/api/admin/members/${memberId}/toggle_active`, {
+                    const response = await fetch('/api/admin/topic_events/create', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ is_active: newActiveState })
+                        body: JSON.stringify({ meeting_date: date, book_title: title, book_author: author })
                     });
                     const result = await response.json();
-                    if (!response.ok) {
-                        checkbox.checked = !newActiveState;
-                        throw new Error(result.message || '상태 변경에 실패했습니다.');
-                    }
-                    const bg = checkbox.nextElementSibling;
-                    const dot = bg.nextElementSibling;
-                    bg.classList.toggle('bg-eva-green', newActiveState);
-                    bg.classList.toggle('bg-gray-600', !newActiveState);
-                    dot.classList.toggle('translate-x-6', newActiveState);
+
+                    if (!response.ok) throw new Error(result.error);
+
+                    alert(result.message);
+                    window.location.reload();
                 } catch (error) {
-                    alert('오류: ' + error.message);
+                    alert(`오류 발생: ${error.message}`);
                 }
-            }
-            // 벌점 부과 버튼
-            if (e.target.matches('.add-demerit-btn')) {
-                const btn = e.target;
-                const memberId = btn.dataset.memberId;
-                const memberName = btn.dataset.memberName;
+            });
 
-                const pointsStr = prompt(`${memberName}님에게 부과할 벌점을 숫자로 입력하세요:`);
-                if (pointsStr) {
-                    const points = parseInt(pointsStr, 10);
-                    if (isNaN(points) || points === 0) {
-                        alert('벌점은 0이 아닌 숫자만 입력해야 합니다.');
-                        return;
-                    }
-                    const reason = prompt(`벌점(${points}점) 부과 사유를 입력하세요:`);
-                    if (reason && reason.trim() !== '') {
-                        try {
-                            const response = await fetch(`/api/admin/members/${memberId}/add_demerit`, {
-                                method: 'POST',
-                                headers: {'Content-Type': 'application/json'},
-                                body: JSON.stringify({ points, reason })
-                            });
-                            const result = await response.json();
-                            if (!response.ok) throw new Error(result.error || '알 수 없는 오류');
-                            alert(result.message);
-                            window.location.reload();
-                        } catch (error) {
-                            alert('오류: ' + error.message);
-                        }
-                    } else if (reason !== null) {
-                        alert('벌점 부과 사유를 반드시 입력해야 합니다.');
-                    }
-                }
-            }
-            // 벌점 차감 버튼
-            if (e.target.matches('.remove-demerit-btn')) {
-                const btn = e.target;
-                const memberId = btn.dataset.memberId;
-                const memberName = btn.dataset.memberName;
+        }); // DOMContentLoaded 닫기
 
-                const pointsStr = prompt(`${memberName}님에게 차감할 벌점을 숫자로 입력하세요:`);
-                if (pointsStr) {
-                    const points = parseInt(pointsStr, 10);
-                    if (isNaN(points) || points <= 0) {
-                        alert('차감할 벌점은 0보다 큰 숫자여야 합니다.');
-                        return;
-                    }
-                    const reason = prompt(`벌점(${points}점) 차감 사유를 입력하세요: (예: 우수 활동 보상)`);
-                    if (reason && reason.trim() !== '') {
-                        try {
-                            const response = await fetch(`/api/admin/members/${memberId}/remove_demerit`, {
-                                method: 'POST',
-                                headers: {'Content-Type': 'application/json'},
-                                body: JSON.stringify({ points, reason })
-                            });
-                            const result = await response.json();
-                            if (!response.ok) throw new Error(result.error || '알 수 없는 오류');
-                            alert(result.message);
-                            window.location.reload();
-                        } catch (error) {
-                            alert('오류: ' + error.message);
-                        }
-                    } else if (reason !== null) {
-                        alert('벌점 차감 사유를 반드시 입력해야 합니다.');
-                    }
+        // --- 공유 링크 복사 로직 (버튼에서 호출할 수 있도록 바깥으로 빼냅니다) ---
+        async function setMemberStatus(selectEl) {
+            const memberId = selectEl.dataset.memberId;
+            const status = selectEl.value;
+            const rowEl = selectEl.closest('.member-row');
+            try {
+                const response = await fetch(`/api/admin/members/${memberId}/set_status`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ member_status: status })
+                });
+                const result = await response.json();
+                if (result.status !== 'success') throw new Error(result.message);
+
+                // [신규] 성공 시 해당 row의 data-status 업데이트 및 즉시 필터링 반영
+                if (rowEl) {
+                    rowEl.dataset.status = status;
+                    filterMembers(); // 상태 변경 시 즉시 화면에 반영 (현재 활성화된 탭 기준)
                 }
+
+                // 시각적 피드백
+                selectEl.style.borderColor = status === 'active' ? '#00FF7F' : status === 'dormant' ? '#FBBF24' : '#6B7280';
+                setTimeout(() => selectEl.style.borderColor = '', 2000);
+            } catch (error) {
+                alert('오류: ' + error.message);
+                location.reload();
+            }
+        }
+
+        // Member Action Buttons (Edit and Delete) Listener
+        document.getElementById('member-status-list')?.addEventListener('click', (e) => {
+            if (e.target.matches('.edit-member-btn')) {
+                const btn = e.target;
+                openEditMemberModal(
+                    btn.dataset.id, btn.dataset.name, btn.dataset.email,
+                    btn.dataset.department, btn.dataset.gender,
+                    btn.dataset.student_id, btn.dataset.recruiting_class, btn.dataset.role
+                );
+            } else if (e.target.matches('.delete-member-btn')) {
+                const btn = e.target;
+                deleteMember(btn.dataset.id, btn.dataset.name);
             }
         });
-    }
 
-    // [복구됨] --- 발제문 이벤트 생성 폼 제출 로직 ---
-    document.getElementById('createTopicEventForm')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const date = document.getElementById('topicDate').value;
-        const title = document.getElementById('topicBookTitle').value;
-
-        try {
-            const response = await fetch('/api/admin/topic_events/create', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ meeting_date: date, book_title: title })
-            });
-            const result = await response.json();
-
-            if (!response.ok) throw new Error(result.error);
-
-            alert(result.message);
-            window.location.reload(); // 성공 시 새로고침하여 목록 업데이트
-        } catch (error) {
-            alert(`오류 발생: ${error.message}`);
+        async function deleteMember(memberId, name) {
+            if (!confirm(`정말로 '${name}' 멤버를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+            try {
+                const response = await fetch(`/api/admin/members/${memberId}/delete`, { method: 'POST' });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    document.getElementById(`member-row-${memberId}`)?.remove();
+                    filterMembers(); // 삭제 후 멤버 목록 다시 필터링 및 카운트 업데이트
+                } else {
+                    alert('삭제 실패: ' + result.message);
+                }
+            } catch (err) { alert('오류: ' + err.message); }
         }
-    });
 
-}); // DOMContentLoaded 닫기
+        // --- Add Member Modal ---
+        let editingMemberId = null;
 
-// --- 공유 링크 복사 로직 (버튼에서 호출할 수 있도록 바깥으로 빼냅니다) ---
-function copyTopicLink(token) {
-    // 현재 도메인을 기반으로 공유 링크 생성
-    const link = `${window.location.origin}/shared_topics?token=${token}`;
+        function openAddMemberModal() {
+            editingMemberId = null;
+            document.getElementById('memberModalTitle').textContent = '멤버 추가';
+            document.getElementById('memberForm').reset();
+            document.getElementById('memberModal').classList.remove('hidden');
+        }
 
-    navigator.clipboard.writeText(link).then(() => {
-        alert('발제문 제출 링크가 클립보드에 복사되었습니다!\n단톡방에 공유해주세요.');
-    }).catch(err => {
-        alert('링크 복사에 실패했습니다. 수동으로 복사해주세요: \n' + link);
-    });
-}
-</script>
+        function openEditMemberModal(id, name, email, department, gender, studentId, recruitingClass, role) {
+            editingMemberId = id;
+            document.getElementById('memberModalTitle').textContent = '멤버 편집';
+            document.getElementById('mName').value = name;
+            document.getElementById('mEmail').value = email;
+            document.getElementById('mDepartment').value = department;
+            document.getElementById('mGender').value = gender;
+            document.getElementById('mStudentId').value = studentId || '';
+            document.getElementById('mRecruitingClass').value = recruitingClass || '';
+            document.getElementById('mRole').value = role;
+            document.getElementById('memberModal').classList.remove('hidden');
+        }
+
+        function closeMemberModal() {
+            document.getElementById('memberModal').classList.add('hidden');
+        }
+
+        document.getElementById('memberForm')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const payload = {
+                name: document.getElementById('mName').value.trim(),
+                email: document.getElementById('mEmail').value.trim(),
+                department: document.getElementById('mDepartment').value.trim(),
+                gender: document.getElementById('mGender').value,
+                student_id: document.getElementById('mStudentId').value.trim() || null,
+                recruiting_class: document.getElementById('mRecruitingClass').value ? parseInt(document.getElementById('mRecruitingClass').value) : null,
+                role: document.getElementById('mRole').value
+            };
+            const url = editingMemberId
+                ? `/api/admin/members/${editingMemberId}/edit`
+                : '/api/admin/members/create';
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    alert(result.message);
+                    closeMemberModal();
+                    location.reload();
+                } else {
+                    alert('오류: ' + result.message);
+                }
+            } catch (err) { alert('오류: ' + err.message); }
+        });
+
+        function copyTopicLink(token) {
+            const link = `${window.location.origin}/shared_topics?token=${token}`;
+            navigator.clipboard.writeText(link).then(() => {
+                alert('발제문 제출 링크가 클립보드에 복사되었습니다!\n단톡방에 공유해주세요.');
+            }).catch(err => {
+                alert('링크 복사에 실패했습니다. 수동으로 복사해주세요: \n' + link);
+            });
+        }
+
+        async function deleteTopicEvent(eventId, bookTitle) {
+            if (!confirm(`'${bookTitle}' 발제문 이벤트를 삭제하시겠습니까?\n제출된 모든 발제문도 함께 삭제됩니다.`)) return;
+            try {
+                const response = await fetch(`/api/admin/topic_events/${eventId}/delete`, { method: 'POST' });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    alert('이벤트가 삭제되었습니다.');
+                    window.location.reload();
+                } else {
+                    alert('삭제 실패: ' + (result.error || '알 수 없는 오류'));
+                }
+            } catch (err) {
+                alert('오류 발생: ' + err.message);
+            }
+        }
+
+        // --- [신규] 멤버 상태 탭 필터링 로직 ---
+        function filterMembers(targetStatus = null) {
+            // 현재 활성화된 탭을 찾음
+            if (!targetStatus) {
+                const activeTab = document.querySelector('.member-tab.active');
+                targetStatus = activeTab ? activeTab.dataset.target : 'active';
+            }
+
+            const rows = document.querySelectorAll('.member-row');
+
+            // [추가] 각 탭별 인원수 계산을 위한 객체
+            const statusCounts = {
+                'active': 0,
+                'dormant': 0,
+                'inactive': 0
+            };
+
+            let visibleCount = 0;
+            rows.forEach(row => {
+                const rowStatus = row.dataset.status;
+                // [추가] 탭별 카운트 증가
+                if (statusCounts[rowStatus] !== undefined) {
+                    statusCounts[rowStatus]++;
+                } else if (rowStatus === '' || !rowStatus) {
+                    // status가 없는 경우 기본값 active로 간주
+                    statusCounts['active']++;
+                }
+
+                if (rowStatus === targetStatus || (targetStatus === 'active' && (!rowStatus || rowStatus === ''))) {
+                    row.style.display = 'flex'; // tailwind의 flex 클래스 유지
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            // [추가] 각 탭의 span에 카운트 업데이트
+            document.querySelectorAll('.member-tab').forEach(tab => {
+                const tStatus = tab.dataset.target;
+                const countSpan = tab.querySelector('.tab-count');
+                if (countSpan) {
+                    countSpan.textContent = `(${statusCounts[tStatus]})`;
+                }
+            });
+
+            // "등록된 멤버가 없습니다" 메시지 처리 (필요시 개선)
+            let noDataMsg = document.getElementById('no-members-msg');
+            if (!noDataMsg) {
+                noDataMsg = document.createElement('p');
+                noDataMsg.id = 'no-members-msg';
+                noDataMsg.className = 'text-center text-sm text-gray-500 py-4';
+                noDataMsg.textContent = '해당 상태의 멤버가 없습니다.';
+                document.getElementById('member-status-list').appendChild(noDataMsg);
+            }
+            noDataMsg.style.display = visibleCount === 0 ? 'block' : 'none';
+        }
+
+        document.querySelectorAll('.member-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                // 1. 모든 탭에서 활성화 스타일 제거
+                document.querySelectorAll('.member-tab').forEach(t => {
+                    t.classList.remove('active', 'border-eva-green', 'text-eva-green', 'font-bold');
+                    t.classList.add('border-transparent', 'text-gray-400');
+                });
+                // 2. 클릭된 탭에 활성화 스타일 적용
+                const clickedTab = e.currentTarget;
+                clickedTab.classList.add('active', 'border-eva-green', 'text-eva-green', 'font-bold');
+                clickedTab.classList.remove('border-transparent', 'text-gray-400');
+
+                // 3. 목록 필터링
+                filterMembers(clickedTab.dataset.target);
+            });
+        });
+
+        // 페이지 로드 시 '활성' 멤버 목록만 보이도록 초기화
+        window.addEventListener('DOMContentLoaded', () => {
+            filterMembers('active');
+        });
+    </script>
 </body>
+
 </html>

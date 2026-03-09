@@ -1,31 +1,69 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>계정 연결</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap"
+        rel="stylesheet">
     <style>
-        :root { --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A; --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444; }
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
-        h1 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; }
-        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
-        .eva-input { background-color: var(--bg-dark); border-color: var(--border-dark); color: var(--text-light); }
-        .eva-button { background-color: var(--eva-green); color: black; font-weight: bold; }
-        .eva-button-secondary { background-color: #4A4A4A; color: var(--text-light); }
+        :root {
+            --eva-purple: #6A0DAD;
+            --eva-green: #00FF7F;
+            --bg-dark: #1A1A1A;
+            --card-dark: #2D2D2D;
+            --text-light: #E5E5E5;
+            --border-dark: #444444;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            text-transform: uppercase;
+        }
+
+        .eva-card {
+            background-color: var(--card-dark);
+            border: 1px solid var(--border-dark);
+        }
+
+        .eva-input {
+            background-color: var(--bg-dark);
+            border-color: var(--border-dark);
+            color: var(--text-light);
+        }
+
+        .eva-button {
+            background-color: var(--eva-green);
+            color: black;
+            font-weight: bold;
+        }
+
+        .eva-button-secondary {
+            background-color: #4A4A4A;
+            color: var(--text-light);
+        }
     </style>
 </head>
+
 <body class="flex items-center justify-center h-screen p-4">
     <div class="w-full max-w-md">
         {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                <div class="p-4 mb-4 text-sm rounded-lg border bg-red-900/50 text-red-300 border-red-500/50" role="alert">
-                    {{ message }}
-                </div>
-                {% endfor %}
-            {% endif %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="p-4 mb-4 text-sm rounded-lg border bg-red-900/50 text-red-300 border-red-500/50" role="alert">
+            {{ message }}
+        </div>
+        {% endfor %}
+        {% endif %}
         {% endwith %}
 
         <div class="eva-card shadow-lg rounded-xl px-8 pt-6 pb-8 mb-4">
@@ -42,21 +80,29 @@
                 <input type="hidden" name="profile_pic" value="{{ profile_pic }}">
 
                 <div>
-                    <label for="existing_name" class="block text-sm font-bold mb-2">기존 활동명</label>
-                    <input type="text" id="existing_name" name="existing_name" class="eva-input shadow rounded w-full py-2 px-3" placeholder="기존에 사용하시던 이름을 입력하세요">
+                    <label for="existing_name" class="block text-sm font-bold mb-2">기존 부원이실 경우 이름과 학번을 입력해주세요.</label>
+                    <p class="text-xs text-gray-400 mb-3">두 정보관 정확히 일치하면 원스톱 즈시 승인됩니다. 학번 없이 이름만 입력하면 관리자 승인 대기 상태가 됩니다.
+                    </p>
+                    <input type="text" id="existing_name" name="existing_name"
+                        class="eva-input shadow rounded w-full py-2 px-3 mb-3" placeholder="시스템에 등록된 이름">
+                    <input type="text" id="student_id" name="student_id"
+                        class="eva-input shadow rounded w-full py-2 px-3" placeholder="학번 (선택 입력 시 즉시 승인)">
                 </div>
 
-                <button type="submit" name="action" value="link" class="eva-button w-full font-bold py-3 px-4 rounded text-base">
+                <button type="submit" name="action" value="link"
+                    class="eva-button w-full font-bold py-3 px-4 rounded text-base">
                     기존 계정과 연결하기
                 </button>
 
                 <div class="text-center text-gray-400 text-sm">또는</div>
 
-                <button type="submit" name="action" value="create" class="eva-button-secondary w-full font-bold py-3 px-4 rounded text-base">
+                <button type="submit" name="action" value="create"
+                    class="eva-button-secondary w-full font-bold py-3 px-4 rounded text-base">
                     신규 회원으로 가입하기
                 </button>
             </form>
         </div>
     </div>
 </body>
+
 </html>
