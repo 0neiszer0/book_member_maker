@@ -1,0 +1,120 @@
+{% from '_records_base.html' import records_nav %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <title>{{ group.name }} - 소모임</title>
+    {% include '_records_base.html' %}
+</head>
+<body class="min-h-screen">
+    {% include '_header.html' %}
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        {{ records_nav('study') }}
+        <a href="{{ url_for('records_study_groups') }}" class="text-sm text-gray-400 hover:text-eva-green mb-4 inline-block">← 소모임 목록</a>
+
+        <div class="eva-card p-6 rounded-lg mb-6">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h1 class="text-2xl font-bold text-blue-300">🤝 {{ group.name }}</h1>
+                    {% if group.notes %}<p class="text-gray-400 text-sm mt-1">{{ group.notes }}</p>{% endif %}
+                </div>
+                <button onclick="deleteGroup()"
+                    class="text-xs bg-red-700 hover:bg-red-600 text-white px-3 py-1.5 rounded">삭제</button>
+            </div>
+        </div>
+
+        <!-- 세션 추가 폼 -->
+        <div class="eva-card p-5 rounded-lg mb-6">
+            <h2 class="text-lg font-bold text-eva-green mb-4">+ 새 세션 추가</h2>
+            <div class="flex flex-col md:flex-row gap-3">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">날짜 *</label>
+                    <input type="date" id="sessionDate"
+                        class="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm">
+                </div>
+                <div class="flex-1">
+                    <label class="block text-xs text-gray-400 mb-1">메모</label>
+                    <input type="text" id="sessionNotes" placeholder="(선택)"
+                        class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm">
+                </div>
+            </div>
+            <div class="mt-3">
+                <label class="block text-xs text-gray-400 mb-2">참여자 선택 (복수 가능)</label>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+                    {% for m in all_members %}
+                    <label class="flex items-center gap-2 text-sm cursor-pointer hover:text-eva-green">
+                        <input type="checkbox" class="member-check" value="{{ m.id }}">
+                        {{ m.name }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            <button onclick="addSession()"
+                class="mt-4 bg-eva-green text-black font-bold py-2 px-4 rounded text-sm hover:opacity-80">세션 등록</button>
+        </div>
+
+        <!-- 세션 목록 -->
+        <div class="space-y-4">
+            <h2 class="text-lg font-bold text-eva-green">세션 기록 ({{ sessions|length }}회)</h2>
+            {% for s in sessions %}
+            <div class="eva-card p-5 rounded-lg">
+                <div class="flex justify-between items-start mb-3">
+                    <div>
+                        <span class="font-mono font-bold text-gray-200">{{ s.meeting_date }}</span>
+                        {% if s.notes %}<span class="text-gray-400 text-sm ml-3">{{ s.notes }}</span>{% endif %}
+                    </div>
+                    <button onclick="deleteSession('{{ s.id }}', '{{ s.meeting_date }}')"
+                        class="text-xs bg-red-700 hover:bg-red-600 text-white px-2 py-1 rounded">삭제</button>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    {% for m in s.members %}
+                    <a href="{{ url_for('records_member_profile', member_id=m.id) }}"
+                        class="bg-gray-700 hover:bg-gray-600 text-gray-200 px-3 py-1 rounded-full text-sm transition">
+                        {{ m.name }}
+                    </a>
+                    {% else %}
+                    <span class="text-gray-500 text-sm">참여자 없음</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="eva-card p-8 rounded-lg text-center text-gray-500">아직 기록된 세션이 없습니다.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script>
+        const GROUP_ID = '{{ group.id }}';
+
+        async function addSession() {
+            const date = document.getElementById('sessionDate').value;
+            if (!date) { alert('날짜를 선택하세요.'); return; }
+            const notes = document.getElementById('sessionNotes').value.trim();
+            const memberIds = Array.from(document.querySelectorAll('.member-check:checked')).map(c => parseInt(c.value, 10));
+            const res = await fetch(`/api/admin/study_groups/${GROUP_ID}/sessions/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ meeting_date: date, notes, member_ids: memberIds }),
+            });
+            const data = await res.json();
+            if (data.status === 'success') window.location.reload();
+            else alert('실패: ' + (data.message || '오류'));
+        }
+
+        async function deleteSession(sessionId, date) {
+            if (!confirm(`${date} 세션을 삭제하시겠습니까?`)) return;
+            const res = await fetch(`/api/admin/study_sessions/${sessionId}/delete`, { method: 'POST' });
+            const data = await res.json();
+            if (data.status === 'success') window.location.reload();
+            else alert('실패: ' + (data.message || '오류'));
+        }
+
+        async function deleteGroup() {
+            if (!confirm('이 소모임과 모든 세션 기록을 삭제하시겠습니까?')) return;
+            const res = await fetch(`/api/admin/study_groups/${GROUP_ID}/delete`, { method: 'POST' });
+            const data = await res.json();
+            if (data.status === 'success') window.location.href = '{{ url_for("records_study_groups") }}';
+            else alert('실패: ' + (data.message || '오류'));
+        }
+    </script>
+</body>
+</html>
