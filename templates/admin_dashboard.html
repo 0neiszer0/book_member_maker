@@ -267,6 +267,92 @@
                     </div>
                 </div>
 
+                <!-- 세미나 출석 투표 관리 -->
+                <div class="eva-card p-6 rounded-lg">
+                    <h2 class="text-xl font-bold text-eva-green mb-4">세미나 출석 투표 관리</h2>
+
+                    <form id="seminarTermForm" class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end mb-6">
+                        <div class="md:col-span-2">
+                            <label class="block text-xs text-gray-400 mb-1">학기명</label>
+                            <input type="text" name="name" required placeholder="2025-2학기"
+                                class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">시작일</label>
+                            <input type="date" name="start_date" required
+                                class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">종료일</label>
+                            <input type="date" name="end_date" required
+                                class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">한도</label>
+                            <input type="number" name="max_capacity" value="32" min="1"
+                                class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm">
+                        </div>
+                        <div class="md:col-span-5">
+                            <button type="submit"
+                                class="bg-eva-green text-black font-bold py-1.5 px-4 rounded text-sm hover:opacity-80">
+                                + 새 학기 만들기 (월/목 회차 자동 생성)
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-border-dark text-left text-gray-400">
+                                    <th class="p-3">학기명</th>
+                                    <th class="p-3">기간</th>
+                                    <th class="p-3 text-center">회차 수</th>
+                                    <th class="p-3 text-center">한도</th>
+                                    <th class="p-3 text-center">상태</th>
+                                    <th class="p-3 text-center">관리</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for term in seminar_terms %}
+                                <tr class="border-b border-border-dark/50 hover:bg-gray-700/30">
+                                    <td class="p-3 font-semibold">{{ term.name }}</td>
+                                    <td class="p-3 text-gray-300">{{ term.start_date }} ~ {{ term.end_date }}</td>
+                                    <td class="p-3 text-center">{{ term.session_count }}</td>
+                                    <td class="p-3 text-center">{{ term.max_capacity }}</td>
+                                    <td class="p-3 text-center">
+                                        {% if term.is_active %}
+                                        <span class="bg-green-700 text-white px-2 py-1 rounded text-xs">활성</span>
+                                        {% else %}
+                                        <span class="bg-gray-700 text-gray-400 px-2 py-1 rounded text-xs">비활성</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="p-3 text-center space-x-2 whitespace-nowrap">
+                                        <button onclick="copySeminarLink('{{ term.share_url }}')"
+                                            class="bg-gray-700 hover:bg-gray-600 text-white py-1.5 px-3 rounded shadow">
+                                            링크 복사
+                                        </button>
+                                        <a href="/admin/seminar_terms/{{ term.id }}"
+                                            class="bg-blue-700 hover:bg-blue-600 text-white py-1.5 px-3 rounded shadow inline-block">
+                                            회차 관리
+                                        </a>
+                                        <button onclick="deleteSeminarTerm('{{ term.id }}', '{{ term.name }}')"
+                                            class="bg-red-700 hover:bg-red-600 text-white py-1.5 px-3 rounded shadow">
+                                            삭제
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="p-6 text-center text-gray-500 bg-gray-900/20 rounded-lg">
+                                        아직 생성된 학기가 없습니다.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <div class="eva-card p-6 rounded-lg">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-xl font-bold text-eva-green">Member Management</h2>
@@ -641,6 +727,58 @@
                 alert('오류 발생: ' + err.message);
             }
         }
+
+        // --- 세미나 출석 투표 학기 관리 ---
+        function copySeminarLink(url) {
+            navigator.clipboard.writeText(url).then(() => {
+                alert('세미나 투표 링크가 복사되었습니다!\n단톡방에 공유해주세요.\n' + url);
+            }).catch(() => {
+                prompt('아래 링크를 복사하세요:', url);
+            });
+        }
+
+        async function deleteSeminarTerm(termId, name) {
+            if (!confirm(`'${name}' 학기를 삭제하시겠습니까?\n모든 회차와 투표 기록도 함께 삭제됩니다.`)) return;
+            try {
+                const res = await fetch(`/api/admin/seminar_terms/${termId}/delete`, { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    alert('삭제되었습니다.');
+                    window.location.reload();
+                } else {
+                    alert('삭제 실패: ' + (data.message || '알 수 없는 오류'));
+                }
+            } catch (err) {
+                alert('오류 발생: ' + err.message);
+            }
+        }
+
+        document.getElementById('seminarTermForm')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fd = new FormData(e.target);
+            const payload = {
+                name: fd.get('name'),
+                start_date: fd.get('start_date'),
+                end_date: fd.get('end_date'),
+                max_capacity: parseInt(fd.get('max_capacity') || '32', 10),
+            };
+            try {
+                const res = await fetch('/api/admin/seminar_terms/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    alert(`학기가 생성되었습니다 (회차 ${data.session_count}개).\n공유 링크:\n${data.share_url}`);
+                    window.location.reload();
+                } else {
+                    alert('생성 실패: ' + (data.message || '오류'));
+                }
+            } catch (err) {
+                alert('오류 발생: ' + err.message);
+            }
+        });
 
         // --- [신규] 멤버 상태 탭 필터링 로직 ---
         function filterMembers(targetStatus = null) {

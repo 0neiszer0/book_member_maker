@@ -1,0 +1,89 @@
+{% from '_records_base.html' import records_nav %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <title>회원명부 - 기록 시스템</title>
+    {% include '_records_base.html' %}
+</head>
+<body class="min-h-screen">
+    {% include '_header.html' %}
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        {{ records_nav('members') }}
+
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-3">
+            <h1 class="text-2xl font-bold text-eva-green">회원명부 ({{ members|length }}명)</h1>
+            <input type="text" id="memberSearch" placeholder="이름·학번·학과로 검색"
+                class="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm w-full md:w-72">
+        </div>
+
+        <div class="eva-card rounded-lg overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="bg-gray-700/50 text-left text-gray-300">
+                            <th class="p-3">이름</th>
+                            <th class="p-3">학번</th>
+                            <th class="p-3">학과</th>
+                            <th class="p-3 text-center">기수</th>
+                            <th class="p-3 text-center">성별</th>
+                            <th class="p-3 text-center">상태</th>
+                            <th class="p-3 text-center">권한</th>
+                            <th class="p-3 text-center">프로필</th>
+                        </tr>
+                    </thead>
+                    <tbody id="memberTableBody">
+                        {% for m in members %}
+                        <tr class="member-row border-t border-border-dark/50 hover:bg-gray-700/20"
+                            data-search="{{ (m.name or '') ~ ' ' ~ (m.student_id or '') ~ ' ' ~ (m.department or '') }}">
+                            <td class="p-3 font-semibold">{{ m.name }}</td>
+                            <td class="p-3 font-mono text-gray-300">{{ m.student_id or '-' }}</td>
+                            <td class="p-3 text-gray-300">{{ m.department or '-' }}</td>
+                            <td class="p-3 text-center text-gray-300">{{ m.recruiting_class or '-' }}</td>
+                            <td class="p-3 text-center">
+                                {% if m.gender in ('M','남','남성','남자','male') %}
+                                <span class="text-blue-300">남</span>
+                                {% elif m.gender in ('W','F','여','여성','여자','female') %}
+                                <span class="text-pink-300">여</span>
+                                {% else %}-{% endif %}
+                            </td>
+                            <td class="p-3 text-center">
+                                {% set st = m.member_status or 'active' %}
+                                {% if st == 'active' %}<span class="status-pill status-active">활성</span>
+                                {% elif st == 'dormant' %}<span class="status-pill status-paused">휴면</span>
+                                {% else %}<span class="status-pill status-done">비활성</span>{% endif %}
+                            </td>
+                            <td class="p-3 text-center text-xs">
+                                {% if m.role == 'admin' %}<span class="bg-red-700 text-white px-2 py-0.5 rounded">관리자</span>
+                                {% elif m.role == 'officer' %}<span class="bg-yellow-700 text-white px-2 py-0.5 rounded">임원</span>
+                                {% else %}<span class="text-gray-500">일반</span>{% endif %}
+                            </td>
+                            <td class="p-3 text-center">
+                                <a href="{{ url_for('records_member_profile', member_id=m.id) }}"
+                                    class="bg-blue-700 hover:bg-blue-600 text-white text-xs py-1 px-3 rounded">
+                                    보기 →
+                                </a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="8" class="p-6 text-center text-gray-500">멤버가 없습니다.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('memberSearch');
+        const rows = document.querySelectorAll('.member-row');
+        searchInput?.addEventListener('input', () => {
+            const q = searchInput.value.trim().toLowerCase();
+            rows.forEach(r => {
+                const txt = (r.dataset.search || '').toLowerCase();
+                r.style.display = (!q || txt.includes(q)) ? '' : 'none';
+            });
+        });
+    </script>
+</body>
+</html>
