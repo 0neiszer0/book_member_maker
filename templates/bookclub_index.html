@@ -396,37 +396,44 @@
 
                 // 타이머 초기화
                 const startTime = Date.now();
-                // 추정 소요 시간: 인원 수에 따라 다름 (60명 = 12초, 20명 = 5초)
-                const estTotal = Math.max(5, Math.min(20, 1 + presentCount * 0.2));
 
                 timeElapsedEl.textContent = '00:00';
-                timeRemainingEl.textContent = formatTime(estTotal);
+                timeRemainingEl.textContent = '계산 중...';
 
-                progressBar.style.transition = 'none';
+                progressBar.style.transition = 'width 0.3s ease';
                 progressBar.style.width = '0%';
                 progressText.textContent = '0%';
                 loadingOverlay.style.display = 'flex';
 
-                // RAF 기반 스무스 애니메이션 (SSE에 의존하지 않음)
+                // 서버에서 받은 실제 진행률(0~100). 매끄러운 표시를 위해 보간 사용.
+                let serverProgress = 0;
+                let displayProgress = 0;
                 let animDone = false;
-                function animateProgress() {
+
+                function tick() {
                     if (animDone) return;
                     const elapsed = (Date.now() - startTime) / 1000;
-                    // easeOut 커브: 85%에 점셍 접근하두고 마지막 5%는 쿠파에 끝에 도달
-                    const t = Math.min(1, elapsed / estTotal);
-                    const eased = 1 - Math.pow(1 - t, 2.5); // easeOut
-                    const displayPct = Math.floor(eased * 85);
-
-                    progressBar.style.width = displayPct + '%';
-                    progressText.textContent = displayPct + '%';
-
-                    const remaining = Math.max(0, estTotal - elapsed);
                     timeElapsedEl.textContent = formatTime(elapsed);
-                    timeRemainingEl.textContent = formatTime(remaining);
 
-                    if (!animDone) requestAnimationFrame(animateProgress);
+                    // 표시 진행률은 서버 진행률을 향해 부드럽게 따라감
+                    if (displayProgress < serverProgress) {
+                        displayProgress = Math.min(serverProgress, displayProgress + 0.6);
+                    }
+                    const shown = Math.floor(displayProgress);
+                    progressBar.style.width = shown + '%';
+                    progressText.textContent = shown + '%';
+
+                    // 남은 시간: 실제 진행 속도로부터 추정
+                    if (displayProgress >= 1 && displayProgress < 100) {
+                        const eta = (elapsed / displayProgress) * (100 - displayProgress);
+                        timeRemainingEl.textContent = formatTime(eta);
+                    } else if (displayProgress >= 100) {
+                        timeRemainingEl.textContent = '00:00';
+                    }
+
+                    requestAnimationFrame(tick);
                 }
-                requestAnimationFrame(animateProgress);
+                requestAnimationFrame(tick);
 
                 const eventSource = new EventSource(`/start_group_generation?${params}`);
 
@@ -436,12 +443,29 @@
                     eventSource.close();
                 };
 
+                eventSource.addEventListener('progress', (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (typeof data.progress === 'number') {
+                            // 서버 진행률은 단조 증가만 허용
+                            serverProgress = Math.max(serverProgress, Math.min(99, data.progress));
+                        }
+                    } catch (e) { /* ignore */ }
+                });
+
                 eventSource.addEventListener('complete', (event) => {
-                    stopAll();
-                    progressBar.style.transition = 'width 0.4s ease';
+                    serverProgress = 100;
+                    displayProgress = 100;
+                    animDone = true;
+                    clearInterval(timerInterval);
+                    eventSource.close();
+
                     progressBar.style.width = '100%';
                     progressText.textContent = '100%';
                     timeRemainingEl.textContent = '00:00';
+                    const totalElapsed = (Date.now() - startTime) / 1000;
+                    timeElapsedEl.textContent = formatTime(totalElapsed);
+
                     const data = JSON.parse(event.data);
                     setTimeout(() => {
                         document.open();
