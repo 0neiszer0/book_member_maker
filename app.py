@@ -95,6 +95,20 @@ def wiki_parser(wiki_text):
     return safe_html
 
 
+# 성별 표기 정규화 (DB 표준은 'M'/'W'이지만 과거 데이터에 'F', '남'/'여' 등이 섞일 수 있음)
+def normalize_gender(g):
+    if g is None:
+        return None
+    s = str(g).strip().lower()
+    if not s or s in ('nan', 'none', 'null'):
+        return None
+    if s in ('m', 'male', '남', '남성', '남자'):
+        return 'M'
+    if s in ('w', 'f', 'female', '여', '여성', '여자'):
+        return 'W'
+    return None
+
+
 # Jinja2 템플릿에서 날짜 형식을 예쁘게 보여주기 위한 필터
 def format_datetime_filter(value, format_str="%Y년 %m월 %d일 %p %I:%M"):
     """
@@ -207,6 +221,26 @@ def get_next_seminar_dates():
 # ==============================================================================
 
 # [신규] 가장 기본이 되는 메인 페이지 라우트를 추가합니다.
+@app.route('/keep-alive')
+def keep_alive_endpoint():
+    """
+    Render 인스턴스와 Supabase를 동시에 깨우는 헬스체크 엔드포인트.
+    외부 cron(GitHub Actions, cron-job.org 등)이 주기적으로 호출하면
+    - Render: HTTP 요청을 받음 → 잠들지 않음
+    - Supabase: 가장 가벼운 SELECT를 실행 → 비활성으로 인한 일시 정지 방지
+    """
+    try:
+        supabase.table('members').select('id').limit(1).execute()
+        return jsonify({
+            "status": "ok",
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "supabase": "alive"
+        }), 200
+    except Exception as e:
+        app.logger.error(f"keep-alive failed: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @app.route('/')
 def main_index():
     # --- [수정] D-데이 계산 로직 추가 ---
@@ -1524,7 +1558,11 @@ def start_group_generation():
 
             yield f"event: progress\ndata: {json.dumps({'progress': 90})}\n\n"
 
-            member_genders = dict(zip(members_df['name'], members_df['gender']))
+            # 결과 페이지에서 'M'/'W'로 비교하므로 정규화된 값으로 전달
+            member_genders = {
+                row['name']: normalize_gender(row.get('gender'))
+                for row in members_df.to_dict(orient='records')
+            }
 
             meeting_history = {}
             # co_matrix에서 last_met도 함께 가져와서 {count, last_met} 형태로 저장
@@ -1599,15 +1637,16 @@ def run_cp_grouping(members_df, co_matrix, attendee_names, presenter_names,
 
     app.logger.info(f"[CP-SAT] 그룹={num_groups}, 크기={min_size}~{max_size}")
 
-    # 성별 배열 (0=여성, 1=남성) — DB가 'M'(남)/'W'(여) 문자열로 저장함
-    def is_male(info):
-        g = info.get('gender')
-        return g == 'M'
-
-    genders = []
+    # 성별 정규화: 미상은 별도 카테고리로 두어 자동으로 여성에 합산되지 않도록 함.
+    is_male_arr = []   # 1 if 남성 else 0
+    is_female_arr = [] # 1 if 여성 else 0
     for name in names:
         info = name_to_info.get(name, {})
-        genders.append(1 if is_male(info) else 0)
+        norm = normalize_gender(info.get('gender'))
+        is_male_arr.append(1 if norm == 'M' else 0)
+        is_female_arr.append(1 if norm == 'W' else 0)
+    # 하위호환을 위해 genders도 유지 (기존 변수 참조 자리)
+    genders = is_male_arr
 
     # 발제자 인덱스
     presenter_set = set(presenter_names)
@@ -1678,12 +1717,13 @@ def run_cp_grouping(members_df, co_matrix, attendee_names, presenter_names,
         # --- 목적함수 ---
         obj = []
 
-        # 성비 점수: 각 그룹 내 성별 불균형을 최소화
+        # 성비 점수: 각 그룹 내 성별 불균형(|남-여|)을 최소화.
+        # 성별 미상자는 어느 쪽으로도 카운트하지 않아 결과 왜곡을 막음.
         for g in range(num_groups):
             males = model.NewIntVar(0, n, f'm_{g}')
-            model.Add(males == sum(genders[i] * x[i][g] for i in range(n)))
+            model.Add(males == sum(is_male_arr[i] * x[i][g] for i in range(n)))
             females = model.NewIntVar(0, n, f'f_{g}')
-            model.Add(females == sum((1 - genders[i]) * x[i][g] for i in range(n)))
+            model.Add(females == sum(is_female_arr[i] * x[i][g] for i in range(n)))
             diff = model.NewIntVar(-n, n, f'd_{g}')
             model.Add(diff == males - females)
             abs_diff = model.NewIntVar(0, n, f'ad_{g}')
@@ -1739,11 +1779,12 @@ def run_cp_grouping(members_df, co_matrix, attendee_names, presenter_names,
             app.logger.info(f"[CP-SAT] attempt {attempt}: 중복, 스킵")
             continue
 
-        # 점수 계산 (표시용 — combined 가중치 40:10 적용)
+        # 점수 계산 (표시용 — combined 가중치 40:10 적용).
+        # 성별 미상자는 분모/분자에서 모두 제외해 점수 왜곡 방지.
         gender_score = 0.0
         for grp in formatted_groups:
-            m = sum(1 for nm in grp if is_male(name_to_info.get(nm, {})))
-            f = len(grp) - m
+            m = sum(1 for nm in grp if normalize_gender(name_to_info.get(nm, {}).get('gender')) == 'M')
+            f = sum(1 for nm in grp if normalize_gender(name_to_info.get(nm, {}).get('gender')) == 'W')
             if m > 0 and f > 0:
                 gender_score += min(m, f) / max(m, f)
 
@@ -2456,7 +2497,7 @@ def preview_manual_groups():
 
         # 1. DB에서 전체 회원 정보와 만남 기록을 가져옵니다.
         all_members_res = supabase.table("members").select("name, gender").execute()
-        name_to_gender = {m['name']: m.get('gender') for m in all_members_res.data}
+        name_to_gender = {m['name']: normalize_gender(m.get('gender')) for m in all_members_res.data}
 
         # [수정] last_met 컬럼도 함께 가져옵니다.
         co_matrix_res = supabase.table("bookclub_co_matrix").select("pair_key, count, last_met").execute()
