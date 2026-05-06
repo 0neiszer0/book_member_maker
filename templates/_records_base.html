@@ -1,0 +1,161 @@
+{# 기록 시스템 공통 head — 다른 records_*.html 에서 {% include %} 로 사용 #}
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Orbitron:wght@400;700&display=swap"
+    rel="stylesheet">
+<style>
+    :root {
+        --eva-purple: #6A0DAD;
+        --eva-green: #00FF7F;
+        --eva-orange: #FF8C00;
+        --bg-dark: #1A1A1A;
+        --card-dark: #2D2D2D;
+        --text-light: #E5E5E5;
+        --border-dark: #444444;
+    }
+
+    body {
+        font-family: 'Noto Sans KR', sans-serif;
+        background-color: var(--bg-dark);
+        color: var(--text-light);
+    }
+
+    h1, h2, h3 {
+        font-family: 'Orbitron', sans-serif;
+        letter-spacing: 0.04em;
+    }
+
+    .eva-card {
+        background-color: var(--card-dark);
+        border: 1px solid var(--border-dark);
+    }
+
+    .eva-card:hover {
+        border-color: var(--eva-green);
+    }
+
+    .text-eva-green { color: var(--eva-green); }
+    .text-eva-purple { color: var(--eva-purple); }
+    .text-eva-orange { color: var(--eva-orange); }
+    .bg-eva-green { background-color: var(--eva-green); }
+    .border-eva-green { border-color: var(--eva-green); }
+    .border-border-dark { border-color: var(--border-dark); }
+
+    .records-tab {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem 0.5rem 0 0;
+        background-color: var(--card-dark);
+        color: #aaa;
+        font-weight: bold;
+        font-size: 0.9rem;
+        text-decoration: none;
+        border: 1px solid var(--border-dark);
+        border-bottom: none;
+    }
+
+    .records-tab.active {
+        background-color: var(--bg-dark);
+        color: var(--eva-green);
+        border-bottom: 2px solid var(--bg-dark);
+        position: relative;
+        top: 1px;
+    }
+
+    .records-tab:hover {
+        color: var(--eva-green);
+    }
+
+    .genre-pill {
+        display: inline-block;
+        padding: 0.15rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        background-color: rgba(106, 13, 173, 0.3);
+        color: #c8a2ff;
+        border: 1px solid rgba(106, 13, 173, 0.6);
+    }
+
+    .status-pill {
+        display: inline-block;
+        padding: 0.15rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: bold;
+    }
+
+    .status-active { background-color: rgba(0, 255, 127, 0.2); color: var(--eva-green); }
+    .status-done { background-color: rgba(100, 100, 100, 0.3); color: #aaa; }
+    .status-paused { background-color: rgba(255, 140, 0, 0.2); color: var(--eva-orange); }
+</style>
+
+{# 노션식 장르 셀렉터 — 표시 영역 한 곳에서 끌어다 사용 #}
+{% macro genre_selector(name, current, genres, with_label=true) %}
+<div class="genre-selector-wrap" data-name="{{ name }}">
+    {% if with_label %}<label class="block text-xs text-gray-400 mb-1">장르</label>{% endif %}
+    <div class="flex gap-2 items-center">
+        <select name="{{ name }}" class="genre-select bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm flex-1">
+            <option value="">선택 안 함</option>
+            {% for g in genres %}
+            <option value="{{ g.name }}" {% if g.name == current %}selected{% endif %}>{{ g.name }}</option>
+            {% endfor %}
+        </select>
+        <button type="button" onclick="addNewGenre(this)"
+            class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1.5 rounded">+ 장르 추가</button>
+    </div>
+</div>
+{% endmacro %}
+
+{# 페이지 어디서나 호출 가능한 장르 추가 스크립트 (한 번만 include) #}
+{% macro genre_script() %}
+<script>
+async function addNewGenre(btn) {
+    const name = prompt('새 장르명을 입력하세요:');
+    if (!name || !name.trim()) return;
+    try {
+        const res = await fetch('/api/admin/genres/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name.trim() }),
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            const select = btn.parentElement.querySelector('select');
+            const opt = document.createElement('option');
+            opt.value = data.genre.name;
+            opt.textContent = data.genre.name;
+            opt.selected = true;
+            select.appendChild(opt);
+            // 다른 셀렉터들에도 추가
+            document.querySelectorAll('.genre-select').forEach(s => {
+                if (s !== select && !Array.from(s.options).some(o => o.value === data.genre.name)) {
+                    const o = document.createElement('option');
+                    o.value = data.genre.name;
+                    o.textContent = data.genre.name;
+                    s.appendChild(o);
+                }
+            });
+        } else {
+            alert('실패: ' + (data.message || '오류'));
+        }
+    } catch (err) {
+        alert('오류: ' + err.message);
+    }
+}
+</script>
+{% endmacro %}
+
+{% macro records_nav(active) %}
+<div class="border-b border-border-dark mb-6">
+    <a href="{{ url_for('records_hub') }}" class="records-tab {% if active == 'hub' %}active{% endif %}">홈</a>
+    <a href="{{ url_for('records_members') }}" class="records-tab {% if active == 'members' %}active{% endif %}">회원명부</a>
+    <a href="{{ url_for('records_seminars') }}" class="records-tab {% if active == 'seminars' %}active{% endif %}">세미나</a>
+    <a href="{{ url_for('records_brick_books') }}" class="records-tab {% if active == 'brick' %}active{% endif %}">벽돌책</a>
+    <a href="{{ url_for('records_study_groups') }}" class="records-tab {% if active == 'study' %}active{% endif %}">소모임</a>
+    <a href="{{ url_for('records_analytics') }}" class="records-tab {% if active == 'analytics' %}active{% endif %}">통계</a>
+</div>
+{% endmacro %}

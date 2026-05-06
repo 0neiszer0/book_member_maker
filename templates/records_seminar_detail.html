@@ -1,0 +1,124 @@
+{% from '_records_base.html' import records_nav, genre_script %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <title>{{ row.date }} 세미나 - 기록 시스템</title>
+    {% include '_records_base.html' %}
+</head>
+<body class="min-h-screen">
+    {% include '_header.html' %}
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        {{ records_nav('seminars') }}
+
+        <a href="{{ url_for('records_seminars') }}" class="text-sm text-gray-400 hover:text-eva-green mb-4 inline-block">← 세미나 목록</a>
+
+        <div class="eva-card p-6 rounded-lg mb-6">
+            <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+                <div class="flex-1">
+                    <div class="text-sm text-gray-400 mb-1">{{ row.date }}</div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">도서명</label>
+                            <input type="text" id="bookTitle" value="{{ row.book_title or '' }}" placeholder="도서명을 입력하세요"
+                                onblur="updateMeta('book_title', this.value)"
+                                class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-lg font-bold text-eva-green">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">장르</label>
+                            <div class="flex gap-2">
+                                <select id="genreSelect" onchange="updateMeta('genre', this.value)"
+                                    class="genre-select flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2">
+                                    <option value="">미분류</option>
+                                    {% for g in genres %}
+                                    <option value="{{ g.name }}" {% if g.name == row.genre %}selected{% endif %}>{{ g.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="button" onclick="addNewGenre(this)"
+                                    class="text-xs bg-gray-700 hover:bg-gray-600 px-2 rounded">+</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                        <div class="text-xs text-gray-400">총 참여</div>
+                        <div class="text-2xl font-bold text-eva-green">{{ total_present }}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400">조 수</div>
+                        <div class="text-2xl font-bold">{{ groups|length }}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400">발제자</div>
+                        <div class="text-2xl font-bold text-eva-purple">{{ (row.facilitators or [])|length }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 발제자 -->
+        {% if row.facilitators %}
+        <div class="eva-card p-5 rounded-lg mb-6">
+            <h2 class="text-lg font-bold text-eva-purple mb-3">📣 발제자</h2>
+            <div class="flex flex-wrap gap-2">
+                {% for name in row.facilitators %}
+                {% set mid = member_map.get(name) %}
+                {% if mid %}
+                <a href="{{ url_for('records_member_profile', member_id=mid) }}"
+                    class="bg-eva-purple text-white px-3 py-1.5 rounded-full text-sm hover:opacity-80">{{ name }}</a>
+                {% else %}
+                <span class="bg-gray-700 text-gray-300 px-3 py-1.5 rounded-full text-sm">{{ name }}</span>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 조 편성 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for group in groups %}
+            <div class="eva-card p-5 rounded-lg">
+                <h3 class="text-base font-bold text-eva-green mb-3">조 {{ loop.index }} ({{ group|length }}명)</h3>
+                <div class="flex flex-wrap gap-2">
+                    {% for name in group %}
+                    {% set mid = member_map.get(name) %}
+                    {% set is_facilitator = name in (row.facilitators or []) %}
+                    {% if mid %}
+                    <a href="{{ url_for('records_member_profile', member_id=mid) }}"
+                        class="bg-gray-700 hover:bg-gray-600 text-gray-200 px-3 py-1 rounded-full text-sm
+                        {% if is_facilitator %}border border-eva-purple{% endif %}">
+                        {{ name }}{% if is_facilitator %} ★{% endif %}
+                    </a>
+                    {% else %}
+                    <span class="bg-gray-700 text-gray-400 px-3 py-1 rounded-full text-sm
+                        {% if is_facilitator %}border border-eva-purple{% endif %}">
+                        {{ name }}{% if is_facilitator %} ★{% endif %}
+                    </span>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <p class="text-gray-500">조 편성 정보가 없습니다.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    {{ genre_script() }}
+    <script>
+        const HISTORY_ID = {{ row.id }};
+        async function updateMeta(field, value) {
+            try {
+                const res = await fetch(`/api/admin/history/${HISTORY_ID}/update_meta`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ [field]: value }),
+                });
+                const data = await res.json();
+                if (data.status !== 'success') alert('저장 실패: ' + (data.message || '오류'));
+            } catch (err) { alert('오류: ' + err.message); }
+        }
+    </script>
+</body>
+</html>

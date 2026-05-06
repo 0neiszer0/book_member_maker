@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ term.name }} 세미나 참석 투표</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --eva-green: #00FF7F;
+            --bg-dark: #1A1A1A;
+            --card-dark: #2D2D2D;
+            --text-light: #E5E5E5;
+            --border-dark: #444444;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+        }
+
+        h1, h2 {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .eva-card {
+            background-color: var(--card-dark);
+            border: 1px solid var(--border-dark);
+        }
+
+        .text-eva-green { color: var(--eva-green); }
+
+        .session-card.full {
+            opacity: 0.6;
+        }
+
+        input[type="radio"]:checked + label {
+            background-color: var(--eva-green);
+            color: black;
+            font-weight: bold;
+        }
+
+        .radio-label {
+            cursor: pointer;
+            user-select: none;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen">
+    <div class="container mx-auto p-4 sm:p-6 max-w-2xl">
+        <div class="text-center mb-8 mt-4">
+            <h1 class="text-2xl sm:text-3xl font-bold text-eva-green mb-2">{{ term.name }}</h1>
+            <p class="text-gray-300">세미나 참석 투표</p>
+            <p class="text-xs text-gray-500 mt-2">학번과 이름으로 본인 확인 후, 회차별로 참석 여부를 선택하세요.</p>
+        </div>
+
+        <form id="voteForm" class="space-y-6">
+            <!-- 본인 확인 -->
+            <div class="eva-card p-5 rounded-lg">
+                <h2 class="text-lg font-bold mb-3 text-eva-green">본인 확인</h2>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">학번</label>
+                        <input type="text" name="student_id" required placeholder="20231234"
+                            class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">이름</label>
+                        <input type="text" name="name" required placeholder="홍길동"
+                            class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 회차 목록 -->
+            <div class="space-y-3">
+                {% for s in sessions %}
+                <div class="session-card eva-card p-4 rounded-lg {% if s.is_full %}full{% endif %}" data-session-id="{{ s.id }}">
+                    <div class="flex justify-between items-center mb-3">
+                        <div>
+                            <span class="font-bold text-lg">{{ s.meeting_date }}</span>
+                            <span class="ml-2 text-sm {% if s.day_type == 'mon' %}text-blue-300{% else %}text-purple-300{% endif %}">
+                                ({% if s.day_type == 'mon' %}월{% else %}목{% endif %})
+                            </span>
+                        </div>
+                        <div class="text-sm">
+                            <span class="text-eva-green font-bold">{{ s.attending_count }}</span>
+                            <span class="text-gray-400">/ {{ term.max_capacity }}</span>
+                            {% if s.is_full %}<span class="ml-2 text-red-400 text-xs">마감</span>{% endif %}
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 text-center text-sm">
+                        <input type="radio" name="vote_{{ s.id }}" id="yes_{{ s.id }}" value="yes" class="hidden peer/yes">
+                        <label for="yes_{{ s.id }}" class="radio-label py-2 rounded bg-gray-700 hover:bg-gray-600 peer-checked/yes:bg-eva-green peer-checked/yes:text-black peer-checked/yes:font-bold">
+                            참석
+                        </label>
+                        <input type="radio" name="vote_{{ s.id }}" id="no_{{ s.id }}" value="no" class="hidden peer/no">
+                        <label for="no_{{ s.id }}" class="radio-label py-2 rounded bg-gray-700 hover:bg-gray-600 peer-checked/no:bg-red-700 peer-checked/no:text-white peer-checked/no:font-bold">
+                            불참
+                        </label>
+                        <input type="radio" name="vote_{{ s.id }}" id="skip_{{ s.id }}" value="skip" class="hidden peer/skip" checked>
+                        <label for="skip_{{ s.id }}" class="radio-label py-2 rounded bg-gray-700 hover:bg-gray-600 peer-checked/skip:bg-gray-500 peer-checked/skip:text-white peer-checked/skip:font-bold">
+                            미정
+                        </label>
+                    </div>
+                </div>
+                {% else %}
+                <div class="eva-card p-6 rounded-lg text-center text-gray-500">
+                    아직 활성화된 회차가 없습니다.
+                </div>
+                {% endfor %}
+            </div>
+
+            <button type="submit"
+                class="w-full bg-eva-green text-black font-bold py-3 rounded-lg text-lg hover:opacity-80">
+                투표 제출
+            </button>
+        </form>
+
+        <div id="result" class="hidden mt-6 eva-card p-5 rounded-lg"></div>
+
+        <p class="text-center text-xs text-gray-500 mt-8">
+            책 먹는 호반우 · 학기 단위 세미나 출석 투표
+        </p>
+    </div>
+
+    <script>
+        const TOKEN = '{{ term.share_token }}';
+        const SESSION_IDS = [{% for s in sessions %}'{{ s.id }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+
+        document.getElementById('voteForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fd = new FormData(e.target);
+            const student_id = (fd.get('student_id') || '').trim();
+            const name = (fd.get('name') || '').trim();
+            if (!student_id || !name) {
+                alert('학번과 이름을 입력해주세요.');
+                return;
+            }
+            const votes = SESSION_IDS.map(sid => ({
+                session_id: sid,
+                attending: fd.get('vote_' + sid) || 'skip',
+            }));
+            try {
+                const res = await fetch('/api/seminar_vote/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: TOKEN, student_id, name, votes }),
+                });
+                const data = await res.json();
+                const box = document.getElementById('result');
+                box.classList.remove('hidden');
+                if (data.status === 'success') {
+                    let html = `<h3 class="text-lg font-bold text-eva-green mb-3">${data.member_name}님, 투표가 제출되었습니다!</h3>`;
+                    if (data.success && data.success.length) {
+                        html += `<p class="mb-2"><span class="text-eva-green font-bold">✓ 등록됨:</span> ${data.success.join(', ')}</p>`;
+                    }
+                    if (data.full && data.full.length) {
+                        html += `<p class="mb-2 text-red-400"><span class="font-bold">✗ 마감됨 (참석 거절):</span> ${data.full.join(', ')}</p>`;
+                    }
+                    if (data.skipped && data.skipped.length) {
+                        html += `<p class="mb-2 text-gray-400"><span class="font-bold">— 미정:</span> ${data.skipped.join(', ')}</p>`;
+                    }
+                    html += `<p class="text-xs text-gray-500 mt-3">동일 학번으로 다시 제출하면 기존 투표가 갱신됩니다.</p>`;
+                    box.innerHTML = html;
+                    box.scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    box.innerHTML = `<p class="text-red-400 font-bold">제출 실패</p><p class="text-sm mt-2">${data.message || '오류가 발생했습니다.'}</p>`;
+                }
+            } catch (err) {
+                alert('오류: ' + err.message);
+            }
+        });
+    </script>
+</body>
+</html>
