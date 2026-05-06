@@ -1471,25 +1471,55 @@ def start_group_generation():
             yield f"event: progress\ndata: {json.dumps({'progress': 10})}\n\n"
 
             app.logger.info("[7] '종합 최적화(단일)' CP-SAT 알고리즘 실행 시작")
-            # 성비와 새로운 만남 우선순위를 합친 단일 최적화
+
+            # 솔버를 별도 스레드에서 돌리고, 진행률을 큐를 통해 실시간 스트리밍
+            import threading, queue
+            progress_queue = queue.Queue()
+
             def progress_callback(pct):
-                """SSE 진행률 콜백 함수. 솔버 반복 중 중간 통보를 제공."""
                 try:
-                    event_str = f"event: progress\ndata: {json.dumps({'progress': pct})}\n\n"
-                    # 제너레이터에서 yield는 비선형이므로 리스트에 담아 나중에 yield
-                    progress_events.append(event_str)
+                    progress_queue.put(('progress', pct))
                 except Exception:
                     pass
 
-            progress_events = []
-            combined_solutions = run_cp_grouping(
-                members_df, co_matrix, present_names, facilitator_names,
-                optimize_for='combined', top_n=12, group_count_override=group_count_override,
-                progress_callback=progress_callback
-            )
-            # 진도 이벤트들 전달
-            for evt in progress_events:
-                yield evt
+            solver_result = {'solutions': None, 'error': None}
+
+            def run_solver():
+                try:
+                    solver_result['solutions'] = run_cp_grouping(
+                        members_df, co_matrix, present_names, facilitator_names,
+                        optimize_for='combined', top_n=12,
+                        group_count_override=group_count_override,
+                        progress_callback=progress_callback
+                    )
+                except Exception as ex:
+                    solver_result['error'] = ex
+                finally:
+                    progress_queue.put(('done', None))
+
+            t = threading.Thread(target=run_solver, daemon=True)
+            t.start()
+
+            # 큐를 폴링하면서 진행률을 실시간 yield
+            last_sent_pct = 10
+            while True:
+                try:
+                    kind, payload = progress_queue.get(timeout=30)
+                except queue.Empty:
+                    # heartbeat (SSE 연결 유지)
+                    yield ": keep-alive\n\n"
+                    continue
+                if kind == 'progress':
+                    if payload > last_sent_pct:
+                        last_sent_pct = payload
+                        yield f"event: progress\ndata: {json.dumps({'progress': payload})}\n\n"
+                elif kind == 'done':
+                    break
+
+            t.join()
+            if solver_result['error']:
+                raise solver_result['error']
+            combined_solutions = solver_result['solutions'] or []
             app.logger.info(f"[8] '종합 최적화' 완료, {len(combined_solutions)}개")
 
             yield f"event: progress\ndata: {json.dumps({'progress': 90})}\n\n"
@@ -2432,6 +2462,12 @@ def preview_manual_groups():
         co_matrix_res = supabase.table("bookclub_co_matrix").select("pair_key, count, last_met").execute()
         co_matrix = {item['pair_key']: {'count': item['count'], 'last_met': item.get('last_met')} for item in
                      co_matrix_res.data}
+
+        # 발제자 표시용 '*' 접미사를 제거하여 실제 회원 이름으로 정규화
+        def strip_facilitator_mark(nm):
+            return nm[:-1].strip() if isinstance(nm, str) and nm.endswith('*') else nm
+
+        groups = [[strip_facilitator_mark(n) for n in g if n] for g in groups]
 
         # 2. 그룹별 분석 시작
         group_analysis = []
