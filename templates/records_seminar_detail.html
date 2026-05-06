@@ -4,6 +4,17 @@
 <head>
     <title>{{ row.date }} 세미나 - 기록 시스템</title>
     {% include '_records_base.html' %}
+    <style>
+        .pill-x { cursor: pointer; padding: 0 0.4rem; opacity: 0.6; }
+        .pill-x:hover { opacity: 1; color: #ff5050; }
+        .member-pill { display: inline-flex; align-items: center; gap: 0.25rem; }
+        .member-add-btn {
+            background: #4a4a4a; color: #ccc; border: 1px dashed #888;
+            border-radius: 999px; padding: 0.2rem 0.7rem; font-size: 0.75rem;
+        }
+        .member-add-btn:hover { background: #5a5a5a; color: #fff; }
+        .fac-marker { color: var(--eva-purple); margin-left: 2px; }
+    </style>
 </head>
 <body class="min-h-screen">
     {% include '_header.html' %}
@@ -11,114 +22,266 @@
     <div class="container mx-auto p-4 sm:p-6 lg:p-8">
         {{ records_nav('seminars') }}
 
-        <a href="{{ url_for('records_seminars') }}" class="text-sm text-gray-400 hover:text-eva-green mb-4 inline-block">← 세미나 목록</a>
+        <div class="flex justify-between items-center mb-4">
+            <a href="{{ url_for('records_seminars') }}" class="text-sm text-gray-400 hover:text-eva-green">← 세미나 목록</a>
+            <button onclick="deleteHistory()"
+                class="text-xs bg-red-700 hover:bg-red-600 text-white px-3 py-1.5 rounded">이 세미나 기록 삭제</button>
+        </div>
 
+        <!-- 메타 정보 -->
         <div class="eva-card p-6 rounded-lg mb-6">
-            <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-                <div class="flex-1">
-                    <div class="text-sm text-gray-400 mb-1">{{ row.date }}</div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs text-gray-400 mb-1">도서명</label>
-                            <input type="text" id="bookTitle" value="{{ row.book_title or '' }}" placeholder="도서명을 입력하세요"
-                                onblur="updateMeta('book_title', this.value)"
-                                class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-lg font-bold text-eva-green">
-                        </div>
-                        <div>
-                            <label class="block text-xs text-gray-400 mb-1">장르</label>
-                            <div class="flex gap-2">
-                                <select id="genreSelect" onchange="updateMeta('genre', this.value)"
-                                    class="genre-select flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2">
-                                    <option value="">미분류</option>
-                                    {% for g in genres %}
-                                    <option value="{{ g.name }}" {% if g.name == row.genre %}selected{% endif %}>{{ g.name }}</option>
-                                    {% endfor %}
-                                </select>
-                                <button type="button" onclick="addNewGenre(this)"
-                                    class="text-xs bg-gray-700 hover:bg-gray-600 px-2 rounded">+</button>
-                            </div>
-                        </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">날짜</label>
+                    <input type="date" id="dateInput" value="{{ row.date }}"
+                        onchange="updateMeta('date', this.value)"
+                        class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm font-mono">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">도서명</label>
+                    <input type="text" id="bookTitle" value="{{ row.book_title or '' }}" placeholder="도서명을 입력하세요"
+                        onblur="updateMeta('book_title', this.value)"
+                        class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm font-bold text-eva-green">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">장르</label>
+                    <div class="flex gap-2">
+                        <select id="genreSelect" onchange="updateMeta('genre', this.value)"
+                            class="genre-select flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm">
+                            <option value="">미분류</option>
+                            {% for g in genres %}
+                            <option value="{{ g.name }}" {% if g.name == row.genre %}selected{% endif %}>{{ g.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="button" onclick="addNewGenre(this)"
+                            class="text-xs bg-gray-700 hover:bg-gray-600 px-2 rounded">+</button>
                     </div>
                 </div>
-                <div class="grid grid-cols-3 gap-4 text-center">
-                    <div>
-                        <div class="text-xs text-gray-400">총 참여</div>
-                        <div class="text-2xl font-bold text-eva-green">{{ total_present }}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-gray-400">조 수</div>
-                        <div class="text-2xl font-bold">{{ groups|length }}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-gray-400">발제자</div>
-                        <div class="text-2xl font-bold text-eva-purple">{{ (row.facilitators or [])|length }}</div>
-                    </div>
+            </div>
+            <div class="grid grid-cols-3 gap-4 text-center pt-3 border-t border-border-dark">
+                <div>
+                    <div class="text-xs text-gray-400">총 참여</div>
+                    <div class="text-2xl font-bold text-eva-green" id="statTotal">{{ total_present }}</div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-400">조 수</div>
+                    <div class="text-2xl font-bold" id="statGroups">{{ groups|length }}</div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-400">발제자</div>
+                    <div class="text-2xl font-bold text-eva-purple" id="statFacs">{{ (row.facilitators or [])|length }}</div>
                 </div>
             </div>
         </div>
 
-        <!-- 발제자 -->
-        {% if row.facilitators %}
+        <!-- 발제자 편집 -->
         <div class="eva-card p-5 rounded-lg mb-6">
-            <h2 class="text-lg font-bold text-eva-purple mb-3">📣 발제자</h2>
-            <div class="flex flex-wrap gap-2">
-                {% for name in row.facilitators %}
-                {% set mid = member_map.get(name) %}
-                {% if mid %}
-                <a href="{{ url_for('records_member_profile', member_id=mid) }}"
-                    class="bg-eva-purple text-white px-3 py-1.5 rounded-full text-sm hover:opacity-80">{{ name }}</a>
-                {% else %}
-                <span class="bg-gray-700 text-gray-300 px-3 py-1.5 rounded-full text-sm">{{ name }}</span>
-                {% endif %}
-                {% endfor %}
+            <div class="flex justify-between items-center mb-3">
+                <h2 class="text-lg font-bold text-eva-purple">📣 발제자</h2>
+                <button onclick="saveFacilitators()"
+                    class="text-xs bg-eva-purple text-white px-3 py-1.5 rounded hover:opacity-80">저장</button>
+            </div>
+            <p class="text-xs text-gray-500 mb-2">참여자 클릭으로 발제자 토글. 또는 아래에서 직접 추가/제거.</p>
+            <div id="facList" class="flex flex-wrap gap-2 mb-3"></div>
+            <div class="flex gap-2 items-center">
+                <select id="facAdd" class="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm flex-1">
+                    <option value="">+ 발제자 추가 (참여자 또는 멤버 선택)</option>
+                </select>
+                <button onclick="addFac()" class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-3 py-1.5 rounded">추가</button>
             </div>
         </div>
-        {% endif %}
 
-        <!-- 조 편성 -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {% for group in groups %}
-            <div class="eva-card p-5 rounded-lg">
-                <h3 class="text-base font-bold text-eva-green mb-3">조 {{ loop.index }} ({{ group|length }}명)</h3>
-                <div class="flex flex-wrap gap-2">
-                    {% for name in group %}
-                    {% set mid = member_map.get(name) %}
-                    {% set is_facilitator = name in (row.facilitators or []) %}
-                    {% if mid %}
-                    <a href="{{ url_for('records_member_profile', member_id=mid) }}"
-                        class="bg-gray-700 hover:bg-gray-600 text-gray-200 px-3 py-1 rounded-full text-sm
-                        {% if is_facilitator %}border border-eva-purple{% endif %}">
-                        {{ name }}{% if is_facilitator %} ★{% endif %}
-                    </a>
-                    {% else %}
-                    <span class="bg-gray-700 text-gray-400 px-3 py-1 rounded-full text-sm
-                        {% if is_facilitator %}border border-eva-purple{% endif %}">
-                        {{ name }}{% if is_facilitator %} ★{% endif %}
-                    </span>
-                    {% endif %}
-                    {% endfor %}
+        <!-- 조 편성 편집 -->
+        <div class="eva-card p-5 rounded-lg mb-6">
+            <div class="flex justify-between items-center mb-3">
+                <h2 class="text-lg font-bold text-eva-green">🧩 조 편성</h2>
+                <div class="flex gap-2">
+                    <button onclick="addGroup()"
+                        class="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded">+ 조 추가</button>
+                    <button onclick="saveGroups()"
+                        class="text-xs bg-eva-green text-black font-bold px-3 py-1.5 rounded hover:opacity-80">저장</button>
                 </div>
             </div>
-            {% else %}
-            <p class="text-gray-500">조 편성 정보가 없습니다.</p>
-            {% endfor %}
+            <p class="text-xs text-gray-500 mb-3">멤버 클릭으로 발제자 토글(★). 발제자 변경은 위에서 별도 저장.</p>
+            <div id="groupsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
         </div>
     </div>
 
     {{ genre_script() }}
     <script>
         const HISTORY_ID = {{ row.id }};
+        const ALL_MEMBERS = {{ all_members | tojson }};
+        let groups = {{ groups | tojson }};
+        let facilitators = {{ (row.facilitators or []) | tojson }};
+        const memberMap = {{ member_map | tojson }};
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
+        function profileUrl(name) {
+            const id = memberMap[name];
+            return id ? `/records/members/${id}` : null;
+        }
+
+        // ---- 발제자 ----
+        function renderFacs() {
+            const list = document.getElementById('facList');
+            if (facilitators.length === 0) {
+                list.innerHTML = '<span class="text-gray-500 text-sm">발제자가 없습니다.</span>';
+            } else {
+                list.innerHTML = facilitators.map(name => `
+                    <span class="member-pill bg-eva-purple text-white px-3 py-1 rounded-full text-sm">
+                        ${escapeHtml(name)}
+                        <span class="pill-x" onclick="removeFac('${escapeHtml(name)}')" title="제거">✕</span>
+                    </span>
+                `).join('');
+            }
+            // 후보 셀렉터 업데이트: 현재 참여자 + 전체 멤버 union, 이미 발제자인 사람 제외
+            const present = new Set();
+            groups.forEach(g => g.forEach(n => present.add(n)));
+            const candidates = new Set([...present, ...ALL_MEMBERS.map(m => m.name)]);
+            facilitators.forEach(f => candidates.delete(f));
+            const sel = document.getElementById('facAdd');
+            sel.innerHTML = '<option value="">+ 발제자 추가</option>' +
+                Array.from(candidates).sort().map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+            document.getElementById('statFacs').textContent = facilitators.length;
+        }
+        function removeFac(name) {
+            facilitators = facilitators.filter(f => f !== name);
+            renderFacs();
+            renderGroups();
+        }
+        function addFac() {
+            const v = document.getElementById('facAdd').value;
+            if (!v) return;
+            if (!facilitators.includes(v)) facilitators.push(v);
+            renderFacs();
+            renderGroups();
+        }
+        async function saveFacilitators() {
+            const ok = await postMeta({ facilitators });
+            if (ok) toast('발제자 저장 완료');
+        }
+
+        // ---- 조 편성 ----
+        function renderGroups() {
+            const cont = document.getElementById('groupsContainer');
+            if (groups.length === 0) {
+                cont.innerHTML = '<p class="text-gray-500 text-sm col-span-full">조가 없습니다. + 조 추가를 누르세요.</p>';
+            } else {
+                cont.innerHTML = groups.map((g, gi) => {
+                    const memberOptions = ALL_MEMBERS
+                        .filter(m => !g.includes(m.name))
+                        .map(m => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`)
+                        .join('');
+                    const pills = g.map(name => {
+                        const url = profileUrl(name);
+                        const isFac = facilitators.includes(name);
+                        const facMark = isFac ? '<span class="fac-marker">★</span>' : '';
+                        const tag = url
+                            ? `<a href="${url}" class="text-gray-200 hover:text-eva-green">${escapeHtml(name)}${facMark}</a>`
+                            : `<span class="text-gray-200">${escapeHtml(name)}${facMark}</span>`;
+                        return `<span class="member-pill bg-gray-700 px-3 py-1 rounded-full text-sm ${isFac ? 'border border-eva-purple' : ''}">
+                            ${tag}
+                            <span class="pill-x" onclick="toggleFac('${escapeHtml(name)}')" title="발제자 토글">★</span>
+                            <span class="pill-x" onclick="removeMember(${gi}, '${escapeHtml(name)}')" title="조에서 제거">✕</span>
+                        </span>`;
+                    }).join('');
+                    return `
+                    <div class="bg-gray-800/40 border border-border-dark p-4 rounded-lg">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-bold text-eva-green">조 ${gi + 1} (${g.length}명)</h3>
+                            <button onclick="removeGroup(${gi})" class="text-xs text-red-400 hover:text-red-300">조 삭제</button>
+                        </div>
+                        <div class="flex flex-wrap gap-2 mb-3">${pills || '<span class="text-gray-500 text-xs">멤버 없음</span>'}</div>
+                        <div class="flex gap-2">
+                            <select class="add-mem-sel flex-1 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs" data-gi="${gi}">
+                                <option value="">+ 멤버 추가</option>
+                                ${memberOptions}
+                            </select>
+                            <button onclick="addMember(${gi})" class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-2 py-1 rounded">추가</button>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+            // 통계 업데이트
+            const total = groups.reduce((acc, g) => acc + g.length, 0);
+            document.getElementById('statTotal').textContent = total;
+            document.getElementById('statGroups').textContent = groups.length;
+        }
+        function addGroup() { groups.push([]); renderGroups(); }
+        function removeGroup(gi) {
+            if (!confirm(`조 ${gi + 1}을 삭제하시겠습니까?`)) return;
+            groups.splice(gi, 1); renderGroups();
+        }
+        function addMember(gi) {
+            const sel = document.querySelector(`.add-mem-sel[data-gi="${gi}"]`);
+            const name = sel?.value;
+            if (!name) return;
+            if (groups[gi].includes(name)) return;
+            groups[gi].push(name);
+            renderGroups();
+        }
+        function removeMember(gi, name) {
+            groups[gi] = groups[gi].filter(n => n !== name);
+            renderGroups();
+        }
+        function toggleFac(name) {
+            if (facilitators.includes(name)) facilitators = facilitators.filter(f => f !== name);
+            else facilitators.push(name);
+            renderFacs();
+            renderGroups();
+        }
+        async function saveGroups() {
+            const ok = await postMeta({ groups });
+            if (ok) toast('조 편성 저장 완료');
+        }
+
+        // ---- 메타 공통 ----
         async function updateMeta(field, value) {
+            await postMeta({ [field]: value });
+        }
+        async function postMeta(payload) {
             try {
                 const res = await fetch(`/api/admin/history/${HISTORY_ID}/update_meta`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ [field]: value }),
+                    body: JSON.stringify(payload),
                 });
                 const data = await res.json();
-                if (data.status !== 'success') alert('저장 실패: ' + (data.message || '오류'));
+                if (data.status !== 'success') {
+                    alert('저장 실패: ' + (data.message || '오류'));
+                    return false;
+                }
+                return true;
+            } catch (err) {
+                alert('오류: ' + err.message);
+                return false;
+            }
+        }
+
+        async function deleteHistory() {
+            if (!confirm('이 세미나 기록을 영구 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
+            try {
+                const res = await fetch(`/api/admin/history/${HISTORY_ID}/delete`, { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'success') window.location.href = '{{ url_for("records_seminars") }}';
+                else alert('삭제 실패: ' + (data.message || '오류'));
             } catch (err) { alert('오류: ' + err.message); }
         }
+
+        function toast(msg) {
+            const el = document.createElement('div');
+            el.textContent = msg;
+            el.className = 'fixed bottom-6 right-6 bg-eva-green text-black font-bold px-4 py-2 rounded shadow-lg z-50';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 2000);
+        }
+
+        // 초기 렌더
+        renderFacs();
+        renderGroups();
     </script>
 </body>
 </html>
