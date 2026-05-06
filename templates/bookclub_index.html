@@ -207,6 +207,15 @@
                         <button type="button" id="select-all-present">전체</button>
                         <button type="button" class="secondary" id="deselect-all-present">해제</button>
                     </div>
+                    <div style="grid-column: 1 / -1;" class="bulk-paste-wrap">
+                        <div class="flex gap-2 items-stretch">
+                            <textarea id="bulk-present-input" rows="2"
+                                placeholder="이름을 쉼표/공백/줄바꿈으로 붙여넣기 (예: 홍길동, 김철수 이영희)"
+                                class="flex-grow eva-input p-2 rounded-md text-sm" style="background:#1A1A1A;border:1px solid #444;color:#E5E5E5;"></textarea>
+                            <button type="button" id="bulk-present-apply" class="px-3 rounded-md text-sm font-bold" style="background: var(--eva-green); color:#000;">적용</button>
+                        </div>
+                        <p id="bulk-present-msg" class="text-xs text-gray-400 mt-1"></p>
+                    </div>
                     {% for m in all_members %}
                     <label class="form-check">
                         <input type="checkbox" name="present" value="{{ m.name }}" {% if m.id in
@@ -223,6 +232,15 @@
                     <div class="controls">
                         <button type="button" id="select-all-facilitators">전체</button>
                         <button type="button" class="secondary" id="deselect-all-facilitators">해제</button>
+                    </div>
+                    <div style="grid-column: 1 / -1;" class="bulk-paste-wrap">
+                        <div class="flex gap-2 items-stretch">
+                            <textarea id="bulk-facilitators-input" rows="2"
+                                placeholder="발제자 이름을 쉼표/공백/줄바꿈으로 붙여넣기"
+                                class="flex-grow eva-input p-2 rounded-md text-sm" style="background:#1A1A1A;border:1px solid #444;color:#E5E5E5;"></textarea>
+                            <button type="button" id="bulk-facilitators-apply" class="px-3 rounded-md text-sm font-bold" style="background: var(--eva-green); color:#000;">적용</button>
+                        </div>
+                        <p id="bulk-facilitators-msg" class="text-xs text-gray-400 mt-1"></p>
                     </div>
                     {% for m in all_members %}
                     <label class="form-check">
@@ -287,6 +305,83 @@
             document.getElementById('deselect-all-present').onclick = () => document.querySelectorAll('input[name="present"]').forEach(cb => cb.checked = false);
             document.getElementById('select-all-facilitators').onclick = () => document.querySelectorAll('input[name="facilitators"]').forEach(cb => cb.checked = true);
             document.getElementById('deselect-all-facilitators').onclick = () => document.querySelectorAll('input[name="facilitators"]').forEach(cb => cb.checked = false);
+
+            // --- 벌크 붙여넣기 적용 ---
+            // 쉼표, 세미콜론, 공백, 줄바꿈, 가운뎃점 등으로 구분된 이름들을 파싱하여 매칭되는 체크박스를 켭니다.
+            // '*' 접미사는 발제자 표시용이므로 제거하고 비교합니다.
+            function applyBulkSelection(textareaId, checkboxName, msgId, { append = false } = {}) {
+                const ta = document.getElementById(textareaId);
+                const msgEl = document.getElementById(msgId);
+                if (!ta) return;
+                const raw = ta.value || '';
+                const tokens = raw
+                    .split(/[\s,;·,、|/\\]+/)
+                    .map(s => s.trim())
+                    .map(s => s.endsWith('*') ? s.slice(0, -1).trim() : s)
+                    .filter(Boolean);
+
+                if (tokens.length === 0) {
+                    msgEl.textContent = '입력된 이름이 없습니다.';
+                    msgEl.className = 'text-xs text-yellow-300 mt-1';
+                    return;
+                }
+
+                const checkboxes = Array.from(document.querySelectorAll(`input[name="${checkboxName}"]`));
+                const valueMap = new Map(checkboxes.map(cb => [cb.value, cb]));
+
+                if (!append) {
+                    checkboxes.forEach(cb => { cb.checked = false; });
+                }
+
+                const matched = [];
+                const unmatched = [];
+                const seen = new Set();
+                tokens.forEach(name => {
+                    if (seen.has(name)) return;
+                    seen.add(name);
+                    const cb = valueMap.get(name);
+                    if (cb) {
+                        cb.checked = true;
+                        matched.push(name);
+                    } else {
+                        unmatched.push(name);
+                    }
+                });
+
+                let msg = `✅ ${matched.length}명 선택됨`;
+                if (unmatched.length) msg += ` · ⚠ 미일치 ${unmatched.length}명: ${unmatched.join(', ')}`;
+                msgEl.textContent = msg;
+                msgEl.className = unmatched.length
+                    ? 'text-xs text-yellow-300 mt-1'
+                    : 'text-xs text-eva-green mt-1';
+            }
+
+            const presentBtn = document.getElementById('bulk-present-apply');
+            const presentTa = document.getElementById('bulk-present-input');
+            if (presentBtn && presentTa) {
+                presentBtn.addEventListener('click', () => {
+                    applyBulkSelection('bulk-present-input', 'present', 'bulk-present-msg');
+                });
+                presentTa.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        presentBtn.click();
+                    }
+                });
+            }
+            const facBtn = document.getElementById('bulk-facilitators-apply');
+            const facTa = document.getElementById('bulk-facilitators-input');
+            if (facBtn && facTa) {
+                facBtn.addEventListener('click', () => {
+                    applyBulkSelection('bulk-facilitators-input', 'facilitators', 'bulk-facilitators-msg');
+                });
+                facTa.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        facBtn.click();
+                    }
+                });
+            }
 
             // --- 이전 모임 기록(History) 다이얼로그 관련 로직 ---
             const btnOpen = document.getElementById('manage-history-btn');
