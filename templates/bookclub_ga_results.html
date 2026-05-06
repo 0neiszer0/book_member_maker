@@ -460,15 +460,31 @@
                 }
             });
 
-            setupLoadMore('load-more-combined', 'result-card-combined');
-
+            // 모달 닫기 바인딩을 먼저 수행 (이후 코드에서 에러가 나도 닫기는 동작)
             const modal = document.getElementById('image-modal');
             const modalClose = document.getElementById('modal-close');
             if (modal && modalClose) {
-                // Direct binds (not inside delegation) so X button always works
-                modalClose.onclick = (e) => { e.stopPropagation(); modal.style.display = "none"; }
-                modal.onclick = (e) => { if (e.target === modal) { modal.style.display = "none"; } }
+                modalClose.onclick = (e) => { e.stopPropagation(); modal.style.display = "none"; };
+                modal.onclick = (e) => { if (e.target === modal) { modal.style.display = "none"; } };
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && modal.style.display === 'flex') {
+                        modal.style.display = 'none';
+                    }
+                });
             }
+
+            // 추천안 더 보기: 숨겨진 카드를 모두 노출
+            function setupLoadMore(btnId, cardClass) {
+                const btn = document.getElementById(btnId);
+                if (!btn) return;
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.' + cardClass).forEach(card => {
+                        card.style.display = '';
+                    });
+                    btn.style.display = 'none';
+                });
+            }
+            setupLoadMore('load-more-combined', 'result-card-combined');
         });
     </script>
 </body>
