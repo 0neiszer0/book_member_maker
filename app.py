@@ -3349,8 +3349,37 @@ def records_members():
     try:
         members = supabase.table('members').select(
             'id, name, gender, department, student_id, recruiting_class, member_status, role, email'
-        ).order('name').execute().data or []
+        ).eq('is_active', True).order('name').execute().data or []
+        # 회원명부 클릭 시 미리 활동 요약을 보여주기 위해 각 멤버의 활동 카운트 집계
+        if members:
+            # 1) 세미나/발제 카운트 (history.groups 이름 매칭)
+            history_rows = supabase.table('history').select('groups, facilitators').execute().data or []
+            seminar_cnt, fac_cnt = {}, {}
+            for r in history_rows:
+                names = set()
+                for g in (r.get('groups') or []):
+                    if isinstance(g, list): names.update(g)
+                    elif isinstance(g, str): names.add(g)
+                facs = set(r.get('facilitators') or [])
+                for n in names: seminar_cnt[n] = seminar_cnt.get(n, 0) + 1
+                for n in facs: fac_cnt[n] = fac_cnt.get(n, 0) + 1
+            # 2) 벽돌책 + 소모임 세션 카운트 (member_id 기반)
+            try:
+                bb_rows = supabase.table('brick_session_members').select('member_id').execute().data or []
+            except Exception: bb_rows = []
+            try:
+                sg_rows = supabase.table('study_session_members').select('member_id').execute().data or []
+            except Exception: sg_rows = []
+            bb_cnt, sg_cnt = {}, {}
+            for r in bb_rows: bb_cnt[r['member_id']] = bb_cnt.get(r['member_id'], 0) + 1
+            for r in sg_rows: sg_cnt[r['member_id']] = sg_cnt.get(r['member_id'], 0) + 1
+            for m in members:
+                m['seminar_count'] = seminar_cnt.get(m['name'], 0)
+                m['facilitator_count'] = fac_cnt.get(m['name'], 0)
+                m['brick_count'] = bb_cnt.get(m['id'], 0)
+                m['study_count'] = sg_cnt.get(m['id'], 0)
     except Exception as e:
+        app.logger.error(f"records_members error: {e}", exc_info=True)
         flash(f"멤버 로딩 오류: {e}", 'danger')
         members = []
     return render_template('records_members.html', members=members)
@@ -3400,7 +3429,7 @@ def records_seminars():
     return render_template('records_seminars.html', history=history, genres=genres)
 
 
-@app.route('/records/seminars/<int:history_id>')
+@app.route('/records/seminars/<history_id>')
 @login_required(role="admin")
 def records_seminar_detail(history_id):
     try:
@@ -3417,18 +3446,23 @@ def records_seminar_detail(history_id):
             mres = supabase.table('members').select('id, name').in_('name', list(set(all_present))).execute().data or []
             member_map = {m['name']: m['id'] for m in mres}
         genres = _load_genres()
+        all_members = supabase.table('members').select('id, name').eq('is_active', True).order('name').execute().data or []
         return render_template('records_seminar_detail.html',
                                row=row, groups=groups, member_map=member_map,
-                               genres=genres, total_present=len(all_present))
+                               genres=genres, total_present=len(all_present),
+                               all_members=all_members)
     except Exception as e:
         app.logger.error(f"records_seminar_detail error: {e}", exc_info=True)
         flash(f"오류: {e}", 'danger')
         return redirect(url_for('records_seminars'))
 
 
-@app.route('/api/admin/history/<int:history_id>/update_meta', methods=['POST'])
+@app.route('/api/admin/history/<history_id>/update_meta', methods=['POST'])
 @login_required(role="admin")
 def update_history_meta(history_id):
+    """세미나 기록 메타 + 본문(날짜/발제자/조) 수정.
+    허용 필드: book_title, genre, date, facilitators(list[str]), groups(list[list[str]])
+    """
     try:
         data = request.json or {}
         update = {}
@@ -3436,11 +3470,40 @@ def update_history_meta(history_id):
             update['book_title'] = (data.get('book_title') or '').strip() or None
         if 'genre' in data:
             update['genre'] = (data.get('genre') or '').strip() or None
+        if 'date' in data:
+            d = (data.get('date') or '').strip()
+            if not d:
+                return jsonify({'status': 'error', 'message': '날짜는 비울 수 없습니다.'}), 400
+            update['date'] = d
+        if 'facilitators' in data:
+            facs = data.get('facilitators') or []
+            if not isinstance(facs, list):
+                return jsonify({'status': 'error', 'message': 'facilitators는 배열이어야 합니다.'}), 400
+            update['facilitators'] = [str(x).strip() for x in facs if str(x).strip()]
+        if 'groups' in data:
+            groups = data.get('groups') or []
+            if not isinstance(groups, list) or not all(isinstance(g, list) for g in groups):
+                return jsonify({'status': 'error', 'message': 'groups는 배열의 배열이어야 합니다.'}), 400
+            cleaned = [[str(n).strip() for n in g if str(n).strip()] for g in groups]
+            update['groups'] = [g for g in cleaned if g]  # 빈 조 제거
         if not update:
             return jsonify({'status': 'error', 'message': '변경할 필드가 없습니다.'}), 400
         supabase.table('history').update(update).eq('id', history_id).execute()
         return jsonify({'status': 'success'})
     except Exception as e:
+        app.logger.error(f"update_history_meta error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/history/<history_id>/delete', methods=['POST'])
+@login_required(role="admin")
+def records_history_delete(history_id):
+    """세미나 기록 삭제 (records 페이지용 단순 래퍼)."""
+    try:
+        supabase.table('history').delete().eq('id', history_id).execute()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        app.logger.error(f"records_history_delete error: {e}", exc_info=True)
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
