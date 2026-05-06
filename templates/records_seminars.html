@@ -1,0 +1,119 @@
+{% from '_records_base.html' import records_nav, genre_selector, genre_script %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <title>세미나 진행 현황 - 기록 시스템</title>
+    {% include '_records_base.html' %}
+</head>
+<body class="min-h-screen">
+    {% include '_header.html' %}
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        {{ records_nav('seminars') }}
+
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-3">
+            <h1 class="text-2xl font-bold text-eva-green">세미나 진행 현황 ({{ history|length }}회)</h1>
+            <div class="flex gap-2">
+                <input type="text" id="seminarSearch" placeholder="도서명·날짜 검색"
+                    class="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm w-full md:w-64">
+                <select id="genreFilter" class="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm">
+                    <option value="">전체 장르</option>
+                    {% for g in genres %}<option value="{{ g.name }}">{{ g.name }}</option>{% endfor %}
+                    <option value="__none">미분류</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="eva-card rounded-lg overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="bg-gray-700/50 text-left text-gray-300">
+                            <th class="p-3">날짜</th>
+                            <th class="p-3">도서명</th>
+                            <th class="p-3">장르</th>
+                            <th class="p-3 text-center">참여</th>
+                            <th class="p-3 text-center">조</th>
+                            <th class="p-3 text-center">발제자</th>
+                            <th class="p-3 text-center">상세</th>
+                        </tr>
+                    </thead>
+                    <tbody id="seminarTableBody">
+                        {% for h in history %}
+                        <tr class="seminar-row border-t border-border-dark/50 hover:bg-gray-700/20"
+                            data-date="{{ h.date }}" data-title="{{ h.book_title or '' }}"
+                            data-genre="{{ h.genre or '__none' }}">
+                            <td class="p-3 font-mono text-gray-300">{{ h.date }}</td>
+                            <td class="p-3">
+                                <input type="text" value="{{ h.book_title or '' }}" placeholder="(미입력)"
+                                    onblur="updateMeta({{ h.id }}, 'book_title', this.value)"
+                                    class="bg-transparent border-b border-transparent hover:border-gray-600 focus:border-eva-green focus:bg-gray-800 px-2 py-1 text-sm w-full focus:outline-none">
+                            </td>
+                            <td class="p-3">
+                                <select onchange="updateMeta({{ h.id }}, 'genre', this.value)"
+                                    class="genre-select bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs">
+                                    <option value="">미분류</option>
+                                    {% for g in genres %}
+                                    <option value="{{ g.name }}" {% if g.name == h.genre %}selected{% endif %}>{{ g.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td class="p-3 text-center text-eva-green font-bold">{{ h.present_count }}</td>
+                            <td class="p-3 text-center text-gray-300">{{ h.group_count }}</td>
+                            <td class="p-3 text-center text-eva-purple">{{ h.facilitator_count }}</td>
+                            <td class="p-3 text-center">
+                                <a href="{{ url_for('records_seminar_detail', history_id=h.id) }}"
+                                    class="bg-blue-700 hover:bg-blue-600 text-white text-xs py-1 px-3 rounded">
+                                    보기 →
+                                </a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="7" class="p-6 text-center text-gray-500">기록이 없습니다.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="mt-4 text-xs text-gray-500">
+            도서명 · 장르는 인라인으로 수정됩니다 (관리자 전용). 새 장르가 필요하면 다른 페이지의 "+ 장르 추가" 버튼을 사용하세요.
+        </div>
+    </div>
+
+    {{ genre_script() }}
+    <script>
+        async function updateMeta(historyId, field, value) {
+            try {
+                const res = await fetch(`/api/admin/history/${historyId}/update_meta`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ [field]: value }),
+                });
+                const data = await res.json();
+                if (data.status !== 'success') {
+                    alert('저장 실패: ' + (data.message || '오류'));
+                }
+            } catch (err) {
+                alert('오류: ' + err.message);
+            }
+        }
+
+        const search = document.getElementById('seminarSearch');
+        const genreFilter = document.getElementById('genreFilter');
+        const rows = document.querySelectorAll('.seminar-row');
+        function applyFilter() {
+            const q = (search.value || '').trim().toLowerCase();
+            const gf = genreFilter.value;
+            rows.forEach(r => {
+                const text = (r.dataset.date + ' ' + r.dataset.title).toLowerCase();
+                const matchSearch = !q || text.includes(q);
+                const matchGenre = !gf || r.dataset.genre === gf;
+                r.style.display = (matchSearch && matchGenre) ? '' : 'none';
+            });
+        }
+        search.addEventListener('input', applyFilter);
+        genreFilter.addEventListener('change', applyFilter);
+    </script>
+</body>
+</html>
