@@ -102,48 +102,72 @@
         <!-- 회차 목록 -->
         <div class="eva-card p-6 rounded-lg">
             <h2 class="text-lg font-bold mb-4 text-eva-green">회차 목록 ({{ sessions|length }}개)</h2>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="border-b border-border-dark text-left text-gray-400">
-                            <th class="p-3">날짜</th>
-                            <th class="p-3 text-center">요일</th>
-                            <th class="p-3 text-center">활성</th>
-                            <th class="p-3 text-center">참석</th>
-                            <th class="p-3 text-center">불참</th>
-                            <th class="p-3">참석자 명단</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for s in sessions %}
-                        <tr class="border-b border-border-dark/50 hover:bg-gray-700/30">
-                            <td class="p-3 font-mono">{{ s.meeting_date }}</td>
-                            <td class="p-3 text-center">
-                                {% if s.day_type == 'mon' %}<span class="text-blue-300">월</span>{% else %}<span class="text-purple-300">목</span>{% endif %}
-                            </td>
-                            <td class="p-3 text-center">
-                                <button onclick="toggleSession('{{ s.id }}', this)"
-                                    class="text-xs px-2 py-1 rounded {% if s.is_active %}bg-green-700 hover:bg-green-600{% else %}bg-gray-700 hover:bg-gray-600{% endif %}">
-                                    {% if s.is_active %}활성{% else %}비활성{% endif %}
-                                </button>
-                            </td>
-                            <td class="p-3 text-center text-eva-green font-bold">{{ s.yes_count }} / {{ term.max_capacity }}</td>
-                            <td class="p-3 text-center text-gray-400">{{ s.no_count }}</td>
-                            <td class="p-3 text-xs text-gray-300">
-                                {% if s.attendee_names %}
-                                {{ s.attendee_names | join(', ') }}
+            <p class="text-xs text-gray-500 mb-3">
+                💡 책 제목은 인라인으로 즉시 저장됩니다. 회차 카드의 <strong>참석자 관리</strong>에서 명단을 직접 추가/제거할 수 있습니다 (투표 마감 후에도 가능).
+            </p>
+            <div class="space-y-3">
+                {% for s in sessions %}
+                <div class="border border-border-dark rounded-lg p-4 bg-gray-800/30" data-session-id="{{ s.id }}">
+                    <div class="flex flex-wrap items-center gap-3 mb-3">
+                        <span class="font-mono font-bold">{{ s.meeting_date }}</span>
+                        <span class="text-sm {% if s.day_type == 'mon' %}text-blue-300{% else %}text-purple-300{% endif %}">
+                            ({% if s.day_type == 'mon' %}월{% else %}목{% endif %})
+                        </span>
+                        <span class="text-xs px-2 py-0.5 rounded
+                            {% if s.vote_status == 'open' %}bg-green-800 text-green-200
+                            {% elif s.vote_status == 'upcoming' %}bg-yellow-800 text-yellow-200
+                            {% else %}bg-gray-700 text-gray-300{% endif %}">
+                            {% if s.vote_status == 'open' %}투표 중
+                            {% elif s.vote_status == 'upcoming' %}투표 대기 ({{ s.voting_open_at }} 오픈)
+                            {% else %}투표 마감{% endif %}
+                        </span>
+                        <button onclick="toggleSession('{{ s.id }}', this)"
+                            class="text-xs px-2 py-1 rounded {% if s.is_active %}bg-green-700 hover:bg-green-600{% else %}bg-gray-700 hover:bg-gray-600{% endif %}">
+                            {% if s.is_active %}활성{% else %}비활성{% endif %}
+                        </button>
+                        <span class="ml-auto text-eva-green font-bold">참석 {{ s.yes_count }} / {{ term.max_capacity }}</span>
+                        <span class="text-gray-400 text-sm">불참 {{ s.no_count }}</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                        <div class="md:col-span-3">
+                            <label class="block text-xs text-gray-400 mb-1">📚 이번 회차 도서</label>
+                            <input type="text" value="{{ s.book_title or '' }}"
+                                onblur="updateBook('{{ s.id }}', this.value)"
+                                placeholder="예: 데미안 — 헤르만 헤세"
+                                class="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-sm focus:border-eva-green focus:outline-none">
+                        </div>
+                    </div>
+
+                    <details class="text-sm">
+                        <summary class="cursor-pointer text-gray-300 hover:text-white">참석자 관리 ({{ s.attendees|length }}명)</summary>
+                        <div class="mt-3 space-y-2">
+                            <div class="flex flex-wrap gap-2" id="attendees-{{ s.id }}">
+                                {% for a in s.attendees %}
+                                <span class="inline-flex items-center gap-1 bg-green-900/50 border border-green-700 text-green-200 px-2 py-1 rounded text-xs"
+                                    data-member-id="{{ a.id }}">
+                                    {{ a.name }}
+                                    <button onclick="removeAttendee('{{ s.id }}', {{ a.id }}, this)" class="text-red-400 hover:text-red-300 ml-1">×</button>
+                                </span>
                                 {% else %}
-                                <span class="text-gray-500">없음</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="6" class="p-6 text-center text-gray-500">회차가 없습니다.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                                <span class="text-gray-500 text-xs">참석자 없음</span>
+                                {% endfor %}
+                            </div>
+                            <div class="flex gap-2">
+                                <select class="add-attendee-select bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs flex-1">
+                                    <option value="">+ 멤버 선택해서 추가...</option>
+                                    {% for m in all_members %}
+                                    <option value="{{ m.id }}">{{ m.name }} ({{ m.student_id or '학번 없음' }}{% if m.department %} · {{ m.department }}{% endif %})</option>
+                                    {% endfor %}
+                                </select>
+                                <button onclick="addAttendee('{{ s.id }}', this)" class="bg-eva-green text-black font-bold py-1 px-3 rounded text-xs hover:opacity-80">추가</button>
+                            </div>
+                        </div>
+                    </details>
+                </div>
+                {% else %}
+                <p class="text-center text-gray-500 py-6">회차가 없습니다.</p>
+                {% endfor %}
             </div>
         </div>
     </div>
@@ -184,6 +208,71 @@
                 alert('오류: ' + err.message);
             }
         });
+
+        async function updateBook(sessionId, value) {
+            try {
+                const res = await fetch(`/api/admin/seminar_sessions/${sessionId}/update_book`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ book_title: value }),
+                });
+                const data = await res.json();
+                if (data.status !== 'success') alert('저장 실패: ' + (data.message || '오류'));
+            } catch (err) { alert('오류: ' + err.message); }
+        }
+
+        async function addAttendee(sessionId, btn) {
+            const wrap = btn.parentElement;
+            const sel = wrap.querySelector('.add-attendee-select');
+            const memberId = sel.value;
+            if (!memberId) { alert('멤버를 선택해주세요.'); return; }
+            const memberName = sel.options[sel.selectedIndex].text.split(' (')[0];
+            btn.disabled = true;
+            try {
+                const res = await fetch(`/api/admin/seminar_sessions/${sessionId}/add_attendee`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ member_id: parseInt(memberId, 10) }),
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    const list = document.getElementById('attendees-' + sessionId);
+                    // 빈 상태 메시지 제거
+                    if (list.querySelector('.text-gray-500')) list.innerHTML = '';
+                    if (list.querySelector(`[data-member-id="${memberId}"]`)) {
+                        // 이미 있음
+                    } else {
+                        const span = document.createElement('span');
+                        span.className = 'inline-flex items-center gap-1 bg-green-900/50 border border-green-700 text-green-200 px-2 py-1 rounded text-xs';
+                        span.dataset.memberId = memberId;
+                        span.innerHTML = `${memberName} <button class="text-red-400 hover:text-red-300 ml-1">×</button>`;
+                        span.querySelector('button').onclick = () => removeAttendee(sessionId, parseInt(memberId, 10), span.querySelector('button'));
+                        list.appendChild(span);
+                    }
+                    sel.value = '';
+                } else {
+                    alert('추가 실패: ' + (data.message || '오류'));
+                }
+            } catch (err) { alert('오류: ' + err.message); }
+            finally { btn.disabled = false; }
+        }
+
+        async function removeAttendee(sessionId, memberId, btn) {
+            if (!confirm('이 멤버를 명단에서 제거할까요?')) return;
+            try {
+                const res = await fetch(`/api/admin/seminar_sessions/${sessionId}/remove_attendee`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ member_id: memberId }),
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    btn.closest('[data-member-id]').remove();
+                } else {
+                    alert('제거 실패: ' + (data.message || '오류'));
+                }
+            } catch (err) { alert('오류: ' + err.message); }
+        }
 
         async function toggleSession(sessionId, btn) {
             try {

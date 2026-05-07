@@ -61,25 +61,31 @@
         <form id="topicForm" class="space-y-6">
             <input type="hidden" id="eventId" value="{{ event.id }}">
 
-            <div class="eva-card p-6 rounded-lg grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="eva-card p-6 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label for="existing_name" class="block text-sm font-bold mb-2">이름</label>
+                    <label class="block text-sm font-bold mb-2">이름</label>
                     <input type="text" id="authorName" class="eva-input w-full rounded py-2 px-3" required {% if
                         user_name %}value="{{ user_name }}" readonly style="opacity:0.6;cursor:not-allowed" {% endif %}>
                 </div>
                 <div>
-                    <label for="department" class="block text-sm font-bold mb-2">소속 (학과/직장 등)</label>
+                    <label class="block text-sm font-bold mb-2">소속 (학과/직장 등)</label>
                     <input type="text" id="department" class="eva-input w-full rounded py-2 px-3" required
                         placeholder="예: 경영학과" {% if user_department %}value="{{ user_department }}" {% endif %}>
                 </div>
                 {% if not user_name %}
                 <div>
-                    <label class="block text-sm font-bold mb-2">4자리 PIN (수정용)</label>
-                    <input type="password" id="pinCode" class="eva-input w-full rounded py-2 px-3" required
+                    <label class="block text-sm font-bold mb-2">학번 <span class="text-xs text-gray-400">(회원이면 입력 시 PIN 불필요)</span></label>
+                    <input type="text" id="studentId" class="eva-input w-full rounded py-2 px-3"
+                        placeholder="예: 20231234">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold mb-2">4자리 PIN <span class="text-xs text-gray-400">(비회원/학번 미입력 시)</span></label>
+                    <input type="password" id="pinCode" class="eva-input w-full rounded py-2 px-3"
                         pattern="[0-9]{4}" placeholder="숫자 4자리">
                 </div>
                 {% else %}
                 <div class="hidden">
+                    <input type="hidden" id="studentId" value="">
                     <input type="hidden" id="pinCode" value="">
                 </div>
                 {% endif %}
@@ -201,6 +207,7 @@
                 event_id: document.getElementById('eventId').value,
                 author_name: document.getElementById('authorName').value,
                 department: document.getElementById('department').value,
+                student_id: (document.getElementById('studentId') || {}).value || '',
                 pin_code: document.getElementById('pinCode').value,
                 topics: topics
             };
@@ -232,9 +239,10 @@
             const author = document.getElementById('authorName').value;
             const dept = document.getElementById('department').value;
             const pin = document.getElementById('pinCode').value;
+            const sid = (document.getElementById('studentId') || {}).value || '';
 
             if (!author || !dept) { alert("이름과 소속을 먼저 입력해주세요."); return; }
-            if (!'{{ user_name }}' && !pin) { alert("PIN 번호를 입력해주세요."); return; }
+            if (!'{{ user_name }}' && !pin && !sid) { alert("학번 또는 PIN 번호를 입력해주세요."); return; }
 
             const loadBtn = document.getElementById('loadTopicBtn');
             loadBtn.textContent = '불러오는 중...';
@@ -248,6 +256,7 @@
                         event_id: document.getElementById('eventId').value,
                         author_name: author,
                         department: dept,
+                        student_id: sid,
                         pin_code: pin
                     })
                 });

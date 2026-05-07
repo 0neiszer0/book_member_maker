@@ -109,7 +109,7 @@
 
     {{ genre_script() }}
     <script>
-        const HISTORY_ID = {{ row.id }};
+        const HISTORY_ID = {{ row.id | tojson }};
         const ALL_MEMBERS = {{ all_members | tojson }};
         let groups = {{ groups | tojson }};
         let facilitators = {{ (row.facilitators or []) | tojson }};
