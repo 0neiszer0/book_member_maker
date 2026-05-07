@@ -41,12 +41,12 @@
                 <canvas id="monthlyChart" height="200"></canvas>
             </div>
             <div class="eva-card p-5 rounded-lg">
-                <h2 class="text-lg font-bold text-eva-orange mb-3">벽돌책 - 장르별 분포</h2>
-                <canvas id="bbGenreChart" height="200"></canvas>
+                <h2 class="text-lg font-bold text-eva-orange mb-3">벽돌책 - 월별 세션</h2>
+                <canvas id="bbMonthlyChart" height="200"></canvas>
             </div>
             <div class="eva-card p-5 rounded-lg">
-                <h2 class="text-lg font-bold text-blue-400 mb-3">소모임 - 장르별 분포</h2>
-                <canvas id="sgGenreChart" height="200"></canvas>
+                <h2 class="text-lg font-bold text-blue-400 mb-3">소모임 - 월별 세션</h2>
+                <canvas id="sgMonthlyChart" height="200"></canvas>
             </div>
         </div>
 
@@ -116,8 +116,8 @@
 
         const genreData = {{ genre_counts | tojson }};
         const monthlyData = {{ monthly_counts | tojson }};
-        const bbGenreData = {{ bb_genre | tojson }};
-        const sgGenreData = {{ sg_genre | tojson }};
+        const bbMonthly = {{ bb_monthly | tojson }};
+        const sgMonthly = {{ sg_monthly | tojson }};
 
         if (Object.keys(genreData).length) {
             makePie('genreChart', Object.keys(genreData), Object.values(genreData));
@@ -125,11 +125,11 @@
         if (Object.keys(monthlyData).length) {
             makeBar('monthlyChart', Object.keys(monthlyData), Object.values(monthlyData), '#6A0DAD');
         }
-        if (Object.keys(bbGenreData).length) {
-            makePie('bbGenreChart', Object.keys(bbGenreData), Object.values(bbGenreData));
+        if (Object.keys(bbMonthly).length) {
+            makeBar('bbMonthlyChart', Object.keys(bbMonthly), Object.values(bbMonthly), '#FF8C00');
         }
-        if (Object.keys(sgGenreData).length) {
-            makePie('sgGenreChart', Object.keys(sgGenreData), Object.values(sgGenreData));
+        if (Object.keys(sgMonthly).length) {
+            makeBar('sgMonthlyChart', Object.keys(sgMonthly), Object.values(sgMonthly), '#3b82f6');
         }
     </script>
 </body>
