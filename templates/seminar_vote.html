@@ -104,7 +104,7 @@
                 <div>
                     <h2 class="text-lg font-bold text-eva-green mb-2">② 회차별 참석 선택</h2>
                     {% if not is_admin %}
-                    <p class="text-xs text-gray-500 mb-3">투표는 세미나 <strong>전주 금요일 오후 6시</strong>에 열려 회차 당일까지 가능합니다.</p>
+                    <p class="text-xs text-gray-500 mb-3">투표는 세미나 <strong>전주 금요일 오후 6시</strong>에 열려 <strong>전주 일요일 자정</strong>까지 가능합니다.</p>
                     {% endif %}
                     <div class="space-y-3">
                         {% for s in open_sessions %}
@@ -121,9 +121,13 @@
                                     {% endif %}
                                 </div>
                                 <div class="text-sm">
+                                    {% if is_admin or s.status == 'open' %}
                                     <span class="text-eva-green font-bold count-yes">{{ s.attending_count }}</span>
                                     <span class="text-gray-400">/ {{ term.max_capacity }}</span>
                                     {% if s.is_full %}<span class="ml-2 text-red-400 text-xs">마감</span>{% endif %}
+                                    {% else %}
+                                    <span class="text-gray-500 text-xs">오픈 후 공개</span>
+                                    {% endif %}
                                 </div>
                             </div>
                             {% if s.book_title %}
@@ -165,18 +169,16 @@
         <!-- 비관리자: 곧 열릴 회차 미리보기 (인증 전에도 노출) -->
         {% if upcoming_sessions and not is_admin %}
         <div class="mt-8">
-            <h2 class="text-sm font-bold text-gray-400 mb-2">⏳ 곧 열릴 회차 (현재 신청 인원)</h2>
+            <h2 class="text-sm font-bold text-gray-400 mb-2">⏳ 곧 열릴 회차</h2>
             <div class="space-y-1.5">
                 {% for s in upcoming_sessions %}
                 <div class="flex justify-between items-center text-xs bg-gray-800/50 px-3 py-2 rounded">
                     <span>{{ s.meeting_date }} ({% if s.day_type == 'mon' %}월{% else %}목{% endif %})</span>
-                    <span class="text-gray-400">
-                        <span class="text-eva-green font-bold">{{ s.attending_count }}</span>/{{ term.max_capacity }}
-                        · {{ s.voting_open_at }} 오픈
-                    </span>
+                    <span class="text-gray-400">{{ s.voting_open_at }} 오픈</span>
                 </div>
                 {% endfor %}
             </div>
+            <p class="text-xs text-gray-500 mt-2">신청 인원은 투표 오픈 후 공개됩니다.</p>
         </div>
         {% endif %}
 
