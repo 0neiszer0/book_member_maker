@@ -159,3 +159,30 @@ async function addNewGenre(btn) {
     <a href="{{ url_for('records_analytics') }}" class="records-tab {% if active == 'analytics' %}active{% endif %}">통계</a>
 </div>
 {% endmacro %}
+
+{# 학기 필터 — 페이지 상단에 배치. id="termFilter" 의 change 이벤트로 navigate. #}
+{% macro term_filter(terms, selected_term_id, route_name) %}
+<div class="flex items-center gap-2 mb-4 flex-wrap">
+    <label class="text-xs text-gray-400 font-bold">📅 학기 필터:</label>
+    <select id="termFilter" onchange="navTerm(this.value, '{{ route_name }}')"
+        class="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm">
+        <option value="">전체 (모든 기간)</option>
+        {% for t in terms %}
+        <option value="{{ t.id }}" {% if t.id == selected_term_id %}selected{% endif %}>
+            {{ t.name }} ({{ t.start_date }} ~ {{ t.end_date }})
+        </option>
+        {% endfor %}
+    </select>
+    {% if selected_term_id %}
+    <a href="{{ url_for(route_name) }}" class="text-xs text-eva-green hover:underline">× 필터 해제</a>
+    {% endif %}
+</div>
+<script>
+function navTerm(termId, routeName) {
+    const url = new URL(window.location.href);
+    if (termId) url.searchParams.set('term_id', termId);
+    else url.searchParams.delete('term_id');
+    window.location.href = url.pathname + (url.search || '');
+}
+</script>
+{% endmacro %}
