@@ -190,13 +190,80 @@
                 transform: rotate(360deg);
             }
         }
+
+        .summary-bar {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: rgba(26, 26, 26, 0.95);
+            backdrop-filter: blur(6px);
+            border-bottom: 1px solid var(--border-dark);
+            padding: 0.6rem 0.8rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            font-size: 0.85rem;
+        }
+
+        .summary-bar .stat {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.25rem 0.6rem;
+            background: #1f1f1f;
+            border: 1px solid var(--border-dark);
+            border-radius: 999px;
+        }
+
+        .summary-bar .stat .num {
+            color: var(--eva-green);
+            font-weight: 700;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .filter-input {
+            grid-column: 1 / -1;
+            padding: 0.45rem 0.7rem;
+            background: #1A1A1A;
+            border: 1px solid var(--border-dark);
+            border-radius: 4px;
+            color: var(--text-light);
+            font-size: 0.9rem;
+            width: 100%;
+        }
+
+        .voted-badge {
+            font-size: 0.65rem;
+            margin-left: 0.3rem;
+            background: var(--eva-green);
+            color: #000;
+            padding: 0.05rem 0.35rem;
+            border-radius: 999px;
+            font-weight: 700;
+        }
+
+        .form-check.hidden-by-filter { display: none; }
+        .form-check.is-prechecked { border-left: 3px solid var(--eva-green); }
     </style>
 </head>
 
 <body class="w-full">
     {% include '_header.html' %}
 
-    <div class="container mx-auto max-w-2xl px-4 mt-8">
+    <div class="summary-bar">
+        <div class="flex items-center gap-2 flex-wrap">
+            <span class="stat">참석 <span id="cnt-present" class="num">0</span></span>
+            <span class="stat">발제 <span id="cnt-facilitators" class="num">0</span></span>
+            <span class="stat" title="이번 주 출석투표를 한 사람 수">투표자 <span id="cnt-voted" class="num">{{ pre_checked_attendee_ids|length }}</span></span>
+        </div>
+        <div class="flex items-center gap-2">
+            <button type="button" id="quick-voted" class="text-xs px-2 py-1 rounded font-bold" style="background: var(--eva-green); color: #000;">🗳 투표자만</button>
+        </div>
+    </div>
+
+    <div class="container mx-auto max-w-2xl px-4 mt-6">
         <h1 class="text-3xl text-eva-green mb-6 text-center">Bookclub Grouping</h1>
 
         <form id="group-form">
@@ -216,11 +283,12 @@
                         </div>
                         <p id="bulk-present-msg" class="text-xs text-gray-400 mt-1"></p>
                     </div>
+                    <input type="text" class="filter-input" data-filter-target="present" placeholder="🔍 이름으로 검색…">
                     {% for m in all_members %}
-                    <label class="form-check">
+                    <label class="form-check {% if m.id in pre_checked_attendee_ids %}is-prechecked{% endif %}" data-name="{{ m.name }}">
                         <input type="checkbox" name="present" value="{{ m.name }}" {% if m.id in
                             pre_checked_attendee_ids %}checked{% endif %}>
-                        {{ m.name }}
+                        <span>{{ m.name }}{% if m.id in pre_checked_attendee_ids %}<span class="voted-badge">투표</span>{% endif %}</span>
                     </label>
                     {% endfor %}
                 </div>
@@ -242,10 +310,11 @@
                         </div>
                         <p id="bulk-facilitators-msg" class="text-xs text-gray-400 mt-1"></p>
                     </div>
+                    <input type="text" class="filter-input" data-filter-target="facilitators" placeholder="🔍 이름으로 검색…">
                     {% for m in all_members %}
-                    <label class="form-check">
+                    <label class="form-check" data-name="{{ m.name }}">
                         <input type="checkbox" name="facilitators" value="{{ m.name }}">
-                        {{ m.name }}
+                        <span>{{ m.name }}</span>
                     </label>
                     {% endfor %}
                 </div>
@@ -302,11 +371,58 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            // --- 라이브 카운터 ---
+            const cntPresent = document.getElementById('cnt-present');
+            const cntFacilitators = document.getElementById('cnt-facilitators');
+            function updateCounts() {
+                cntPresent.textContent = document.querySelectorAll('input[name="present"]:checked').length;
+                cntFacilitators.textContent = document.querySelectorAll('input[name="facilitators"]:checked').length;
+            }
+            document.querySelectorAll('input[name="present"], input[name="facilitators"]').forEach(cb => {
+                cb.addEventListener('change', () => {
+                    // 발제자로 체크되면 자동으로 참석에도 체크
+                    if (cb.name === 'facilitators' && cb.checked) {
+                        const presentCb = document.querySelector(`input[name="present"][value="${CSS.escape(cb.value)}"]`);
+                        if (presentCb && !presentCb.checked) presentCb.checked = true;
+                    }
+                    // 참석에서 빠지면 발제자에서도 제거
+                    if (cb.name === 'present' && !cb.checked) {
+                        const facCb = document.querySelector(`input[name="facilitators"][value="${CSS.escape(cb.value)}"]`);
+                        if (facCb && facCb.checked) facCb.checked = false;
+                    }
+                    updateCounts();
+                });
+            });
+            updateCounts();
+
+            // --- 검색 필터 ---
+            document.querySelectorAll('.filter-input').forEach(input => {
+                input.addEventListener('input', () => {
+                    const q = input.value.trim().toLowerCase();
+                    const target = input.dataset.filterTarget;
+                    const scope = input.closest('.content');
+                    scope.querySelectorAll('label.form-check').forEach(lbl => {
+                        const name = (lbl.dataset.name || '').toLowerCase();
+                        const matches = !q || name.includes(q);
+                        lbl.classList.toggle('hidden-by-filter', !matches);
+                    });
+                });
+            });
+
+            // --- 투표자만 빠른 선택 ---
+            document.getElementById('quick-voted').addEventListener('click', () => {
+                document.querySelectorAll('input[name="present"]').forEach(cb => {
+                    const lbl = cb.closest('label.form-check');
+                    cb.checked = !!(lbl && lbl.classList.contains('is-prechecked'));
+                });
+                updateCounts();
+            });
+
             // --- 전체 선택/해제 버튼 ---
-            document.getElementById('select-all-present').onclick = () => document.querySelectorAll('input[name="present"]').forEach(cb => cb.checked = true);
-            document.getElementById('deselect-all-present').onclick = () => document.querySelectorAll('input[name="present"]').forEach(cb => cb.checked = false);
-            document.getElementById('select-all-facilitators').onclick = () => document.querySelectorAll('input[name="facilitators"]').forEach(cb => cb.checked = true);
-            document.getElementById('deselect-all-facilitators').onclick = () => document.querySelectorAll('input[name="facilitators"]').forEach(cb => cb.checked = false);
+            document.getElementById('select-all-present').onclick = () => { document.querySelectorAll('input[name="present"]').forEach(cb => cb.checked = true); updateCounts(); };
+            document.getElementById('deselect-all-present').onclick = () => { document.querySelectorAll('input[name="present"]').forEach(cb => cb.checked = false); document.querySelectorAll('input[name="facilitators"]').forEach(cb => cb.checked = false); updateCounts(); };
+            document.getElementById('select-all-facilitators').onclick = () => { document.querySelectorAll('input[name="facilitators"]').forEach(cb => cb.checked = true); document.querySelectorAll('input[name="facilitators"]:checked').forEach(cb => { const p = document.querySelector(`input[name="present"][value="${CSS.escape(cb.value)}"]`); if (p) p.checked = true; }); updateCounts(); };
+            document.getElementById('deselect-all-facilitators').onclick = () => { document.querySelectorAll('input[name="facilitators"]').forEach(cb => cb.checked = false); updateCounts(); };
 
             // --- 벌크 붙여넣기 적용 ---
             // 쉼표, 세미콜론, 공백, 줄바꿈, 가운뎃점 등으로 구분된 이름들을 파싱하여 매칭되는 체크박스를 켭니다.
@@ -356,6 +472,7 @@
                 msgEl.className = unmatched.length
                     ? 'text-xs text-yellow-300 mt-1'
                     : 'text-xs text-eva-green mt-1';
+                updateCounts();
             }
 
             const presentBtn = document.getElementById('bulk-present-apply');
