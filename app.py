@@ -2803,10 +2803,25 @@ def submit_topics():
     author_name = data.get('author_name')
     department = data.get('department')
     pin_code = data.get('pin_code')
+    student_id = (data.get('student_id') or '').strip()
     topics = data.get('topics')  # JSON Array
 
     # 로그인한 회원은 PIN 검증 패스 (세션 확인)
     is_logged_in_member = session.get('user_name') == author_name
+
+    # 학번+이름 매칭으로도 회원 인증 가능
+    if not is_logged_in_member and student_id and author_name:
+        try:
+            mres = supabase.table('members').select('id, name, department, is_active') \
+                .eq('student_id', student_id).execute().data or []
+            for m in mres:
+                if (m.get('name') or '').strip() == author_name.strip() and m.get('is_active'):
+                    is_logged_in_member = True
+                    if not department:
+                        department = m.get('department') or ''
+                    break
+        except Exception as e:
+            app.logger.warning(f"student_id member lookup 실패: {e}")
 
     if not all([event_id, author_name, department, topics]):
         return jsonify({"error": "필수 정보를 모두 입력해주세요."}), 400
@@ -2855,9 +2870,24 @@ def load_topics():
     author_name = data.get('author_name')
     department = data.get('department')
     pin_code = data.get('pin_code')
+    student_id = (data.get('student_id') or '').strip()
 
     # 로그인한 회원은 PIN 검증 패스
     is_logged_in_member = session.get('user_name') == author_name
+
+    # 학번+이름 매칭으로도 회원 인증 가능
+    if not is_logged_in_member and student_id and author_name:
+        try:
+            mres = supabase.table('members').select('id, name, department, is_active') \
+                .eq('student_id', student_id).execute().data or []
+            for m in mres:
+                if (m.get('name') or '').strip() == author_name.strip() and m.get('is_active'):
+                    is_logged_in_member = True
+                    if not department:
+                        department = m.get('department') or ''
+                    break
+        except Exception as e:
+            app.logger.warning(f"student_id member lookup 실패: {e}")
 
     if not all([event_id, author_name, department]):
         return jsonify({"error": "이름과 소속을 모두 입력해주세요."}), 400
@@ -2972,7 +3002,8 @@ KST = timezone(timedelta(hours=9))
 def _voting_window_for(meeting_date):
     """세미나 회차의 투표 오픈/마감 시각 계산.
     - 오픈: 회차가 속한 주의 전 주 금요일 18:00 KST
-    - 마감: 회차 당일 23:59:59 KST
+    - 마감: 회차가 속한 주의 전 주 일요일 23:59:59 KST
+      (즉, 세미나 주의 월요일 직전 일요일 자정까지. 그 후엔 관리자가 수동 추가/제거)
     """
     if isinstance(meeting_date, str):
         d = date.fromisoformat(meeting_date)
@@ -2980,8 +3011,9 @@ def _voting_window_for(meeting_date):
         d = meeting_date
     monday = d - timedelta(days=d.weekday())
     friday_before = monday - timedelta(days=3)
+    sunday_before = monday - timedelta(days=1)
     open_at = datetime.combine(friday_before, time(18, 0), tzinfo=KST)
-    close_at = datetime.combine(d, time(23, 59, 59), tzinfo=KST)
+    close_at = datetime.combine(sunday_before, time(23, 59, 59), tzinfo=KST)
     return open_at, close_at
 
 
@@ -3141,14 +3173,79 @@ def admin_seminar_term(term_id):
             a = agg.get(s['id'], {'yes': 0, 'no': 0, 'attendee_ids': []})
             s['yes_count'] = a['yes']
             s['no_count'] = a['no']
-            s['attendee_names'] = [member_map.get(mid, f"id={mid}") for mid in a['attendee_ids']]
+            s['attendees'] = [{'id': mid, 'name': member_map.get(mid, f"id={mid}")} for mid in a['attendee_ids']]
+            open_at, close_at = _voting_window_for(s['meeting_date'])
+            s['voting_open_at'] = open_at.strftime('%Y-%m-%d %H:%M')
+            s['voting_close_at'] = close_at.strftime('%Y-%m-%d %H:%M')
+            now_kst = datetime.now(KST)
+            if now_kst < open_at:
+                s['vote_status'] = 'upcoming'
+            elif now_kst <= close_at:
+                s['vote_status'] = 'open'
+            else:
+                s['vote_status'] = 'closed'
+
+        # 전체 활성 멤버 (관리자 수동 추가용)
+        all_members = supabase.table('members').select('id, name, student_id, department') \
+            .eq('is_active', True).order('name').execute().data or []
 
         share_url = f"{request.host_url}seminar_vote?token={term['share_token']}"
-        return render_template('admin_seminar_term.html', term=term, sessions=sessions, share_url=share_url)
+        return render_template('admin_seminar_term.html', term=term, sessions=sessions,
+                               share_url=share_url, all_members=all_members)
     except Exception as e:
         app.logger.error(f"admin_seminar_term error: {e}", exc_info=True)
         flash(f"학기 정보를 불러오는 중 오류: {e}", "danger")
         return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/api/admin/seminar_sessions/<session_id>/update_book', methods=['POST'])
+@login_required(role="admin")
+def seminar_session_update_book(session_id):
+    try:
+        data = request.json or {}
+        book_title = (data.get('book_title') or '').strip()
+        supabase.table('seminar_sessions').update({'book_title': book_title or None}) \
+            .eq('id', session_id).execute()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        app.logger.error(f"seminar_session_update_book error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/seminar_sessions/<session_id>/add_attendee', methods=['POST'])
+@login_required(role="admin")
+def seminar_session_add_attendee(session_id):
+    try:
+        data = request.json or {}
+        member_id = data.get('member_id')
+        if not member_id:
+            return jsonify({'status': 'error', 'message': 'member_id 필요'}), 400
+        supabase.table('seminar_votes').upsert({
+            'session_id': session_id,
+            'member_id': member_id,
+            'attending': True,
+            'added_by_admin': True,
+        }, on_conflict='session_id,member_id').execute()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        app.logger.error(f"seminar_session_add_attendee error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/seminar_sessions/<session_id>/remove_attendee', methods=['POST'])
+@login_required(role="admin")
+def seminar_session_remove_attendee(session_id):
+    try:
+        data = request.json or {}
+        member_id = data.get('member_id')
+        if not member_id:
+            return jsonify({'status': 'error', 'message': 'member_id 필요'}), 400
+        supabase.table('seminar_votes').delete() \
+            .eq('session_id', session_id).eq('member_id', member_id).execute()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        app.logger.error(f"seminar_session_remove_attendee error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @app.route('/seminar_vote')
@@ -3184,7 +3281,7 @@ def seminar_vote_page():
             elif now_kst < open_at:
                 s['status'] = 'upcoming'
                 upcoming_sessions.append(s)
-            # 지나간 회차는 표시하지 않음
+            # 지나간 회차는 표시하지 않음 (관리자가 수동으로 처리)
         return render_template('seminar_vote.html', term=term,
                                open_sessions=open_sessions,
                                upcoming_sessions=upcoming_sessions[:6])
