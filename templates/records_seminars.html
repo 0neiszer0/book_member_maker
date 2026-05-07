@@ -1,4 +1,4 @@
-{% from '_records_base.html' import records_nav, genre_selector, genre_script %}
+{% from '_records_base.html' import records_nav, genre_selector, genre_script, term_filter %}
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -10,6 +10,7 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8">
         {{ records_nav('seminars') }}
+        {{ term_filter(terms, selected_term_id, 'records_seminars') }}
 
         <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-3">
             <h1 class="text-2xl font-bold text-eva-green">세미나 진행 현황 ({{ history|length }}회)</h1>

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 가이드 - 책 먹는 호반우</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Orbitron:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --eva-purple: #6A0DAD;
+            --eva-green: #00FF7F;
+            --bg-dark: #1A1A1A;
+            --card-dark: #2D2D2D;
+            --text-light: #E5E5E5;
+            --border-dark: #444444;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            line-height: 1.7;
+        }
+
+        h1, h2, h3 {
+            font-family: 'Orbitron', sans-serif;
+            letter-spacing: 0.04em;
+        }
+
+        .eva-card {
+            background-color: var(--card-dark);
+            border: 1px solid var(--border-dark);
+            border-radius: 0.75rem;
+        }
+
+        .step {
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+            padding: 0.75rem 0;
+        }
+
+        .step-num {
+            background-color: var(--eva-green);
+            color: black;
+            font-weight: bold;
+            width: 1.75rem;
+            height: 1.75rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .anchor-nav a {
+            display: inline-block;
+            padding: 0.4rem 0.8rem;
+            background-color: #374151;
+            border-radius: 0.4rem;
+            font-size: 0.85rem;
+            margin: 0.2rem;
+            transition: all 0.15s;
+        }
+
+        .anchor-nav a:hover {
+            background-color: var(--eva-purple);
+            color: white;
+        }
+
+        section {
+            scroll-margin-top: 5rem;
+        }
+
+        .tip {
+            background-color: rgba(0, 255, 127, 0.08);
+            border-left: 3px solid var(--eva-green);
+            padding: 0.75rem 1rem;
+            margin: 1rem 0;
+            border-radius: 0.4rem;
+        }
+
+        .warn {
+            background-color: rgba(255, 140, 0, 0.08);
+            border-left: 3px solid #FF8C00;
+            padding: 0.75rem 1rem;
+            margin: 1rem 0;
+            border-radius: 0.4rem;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen">
+    {% include '_header.html' %}
+
+    <div class="container mx-auto max-w-4xl p-4 sm:p-6 lg:p-8">
+
+        <div class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-eva-green mb-2">관리자 운영 가이드</h1>
+            <p class="text-sm text-gray-400">책 먹는 호반우 시스템을 효율적으로 운영하기 위한 안내서</p>
+        </div>
+
+        <!-- 빠른 이동 -->
+        <div class="eva-card p-4 mb-6 anchor-nav text-center">
+            <a href="#term">① 학기 만들기</a>
+            <a href="#vote">② 출석 투표</a>
+            <a href="#topic">③ 발제문 수집</a>
+            <a href="#group">④ 조 편성</a>
+            <a href="#records">⑤ 기록 관리</a>
+            <a href="#member">⑥ 회원 관리</a>
+        </div>
+
+        <!-- 1. 학기 만들기 -->
+        <section id="term" class="eva-card p-6 mb-6">
+            <h2 class="text-xl font-bold text-eva-green mb-3">① 학기 만들기 (한 학기 시작 전)</h2>
+            <p class="text-sm text-gray-400 mb-3">학기 단위로 세미나를 운영합니다. 시작 전에 한 번만 만들면 끝.</p>
+            <div class="step"><div class="step-num">1</div><div>관리자 대시보드 → <strong>세미나 출석 투표 관리</strong> 섹션</div></div>
+            <div class="step"><div class="step-num">2</div><div>학기명(예: <em>"2025-2학기"</em>), 시작일/종료일, 한도(기본 32명) 입력 → <strong>+ 새 학기 만들기</strong></div></div>
+            <div class="step"><div class="step-num">3</div><div>해당 기간 내 모든 월/목 회차가 자동 생성됨</div></div>
+            <div class="step"><div class="step-num">4</div><div><strong>링크 복사</strong> → 카톡방에 한 번만 공유 (학기 끝까지 같은 링크 사용)</div></div>
+            <div class="tip">💡 학기가 늘어나면 <strong>회차 관리</strong>에서 기간 수정 시 누락된 월/목이 자동 추가됨 (기존 데이터 보존).</div>
+        </section>
+
+        <!-- 2. 출석 투표 -->
+        <section id="vote" class="eva-card p-6 mb-6">
+            <h2 class="text-xl font-bold text-eva-green mb-3">② 매주 출석 투표 운영</h2>
+            <p class="text-sm text-gray-400 mb-3">투표는 자동으로 열리고 닫힙니다. 회장이 매주 카톡방에서 묻지 않아도 됨.</p>
+            <ul class="list-disc list-inside text-sm space-y-2 text-gray-300 mb-3">
+                <li><strong>투표 기간</strong>: 세미나 <span class="text-eva-green">전주 금요일 18:00 ~ 일요일 23:59 KST</span></li>
+                <li>회원이 학번+이름으로 본인 인증 후 회차별로 참석/불참 선택</li>
+                <li>투표 마감 후엔 <strong>관리자만</strong> 명단을 추가/제거 가능</li>
+            </ul>
+            <div class="step"><div class="step-num">1</div><div>대시보드 → 학기 줄에서 <strong>회차 관리</strong> 클릭</div></div>
+            <div class="step"><div class="step-num">2</div><div>회차별로 <strong>📚 이번 회차 도서</strong> 입력 (회원에게 표시됨)</div></div>
+            <div class="step"><div class="step-num">3</div><div><strong>참석자 관리</strong> 펼쳐서 직접 추가/제거 (지각자, 카톡으로 받은 신청 등)</div></div>
+            <div class="warn">⚠️ 투표 마감 시점은 시스템이 자동 판단. 관리자는 마감 후에도 자유롭게 수정 가능.</div>
+        </section>
+
+        <!-- 3. 발제문 -->
+        <section id="topic" class="eva-card p-6 mb-6">
+            <h2 class="text-xl font-bold text-eva-green mb-3">③ 발제문 수집</h2>
+            <p class="text-sm text-gray-400 mb-3">매주 세미나 도서에 대한 발제(논의 주제)를 모읍니다.</p>
+            <div class="step"><div class="step-num">1</div><div>대시보드 → <strong>주간 발제문 관리</strong> → 모임 날짜·책 제목 입력 → <strong>+ 취합 링크 생성</strong></div></div>
+            <div class="step"><div class="step-num">2</div><div>생성된 <strong>링크 복사</strong> → 카톡 공유</div></div>
+            <div class="step"><div class="step-num">3</div><div>회원이 학번+이름만 입력하면 발제문 작성 가능 (PIN 불필요)</div></div>
+            <div class="step"><div class="step-num">4</div><div>세미나 당일: <strong>발제문 확인</strong> 버튼 → DOCX 다운로드 가능</div></div>
+        </section>
+
+        <!-- 4. 조 편성 -->
+        <section id="group" class="eva-card p-6 mb-6">
+            <h2 class="text-xl font-bold text-eva-green mb-3">④ 세미나 당일 조 편성</h2>
+            <p class="text-sm text-gray-400 mb-3">출석자를 자동으로 조에 분배합니다.</p>
+            <div class="step"><div class="step-num">1</div><div>상단 메뉴 → <strong>🧩 조 편성</strong> 진입</div></div>
+            <div class="step"><div class="step-num">2</div><div>오늘 회차에 투표한 회원이 <strong>자동으로 사전 체크</strong>됨</div></div>
+            <div class="step"><div class="step-num">3</div><div>현장에서 조정 (불참자 체크 해제, 신규 게스트 추가)</div></div>
+            <div class="step"><div class="step-num">4</div><div>조 수, 발제자 지정 → <strong>조 편성 시작</strong></div></div>
+            <div class="step"><div class="step-num">5</div><div>결과 확인 후 <strong>저장</strong> → 자동으로 기록 시스템에 누적</div></div>
+        </section>
+
+        <!-- 5. 기록 관리 -->
+        <section id="records" class="eva-card p-6 mb-6">
+            <h2 class="text-xl font-bold text-eva-green mb-3">⑤ 기록 관리</h2>
+            <p class="text-sm text-gray-400 mb-3">과거 활동을 학기별/전체로 조회·수정합니다.</p>
+            <ul class="list-disc list-inside text-sm space-y-2 text-gray-300 mb-3">
+                <li><strong>📅 학기 필터</strong>: 모든 기록 페이지 상단에서 선택. "전체"로 하면 전 기간 데이터.</li>
+                <li><strong>세미나 탭</strong>: 도서명/장르 인라인 수정. 상세 페이지에서 조 편성도 직접 편집.</li>
+                <li><strong>저장 안 한 과거 세미나</strong>: <strong>+ 과거 세미나 수동 추가</strong> 버튼으로 추가</li>
+                <li><strong>벽돌책/소모임</strong>: 별도 카드로 관리, 회차 추가 시 멤버 함께 입력</li>
+                <li><strong>통계</strong>: 학기 필터 적용 시 해당 학기만의 수치 표시</li>
+            </ul>
+        </section>
+
+        <!-- 6. 회원 관리 -->
+        <section id="member" class="eva-card p-6 mb-6">
+            <h2 class="text-xl font-bold text-eva-green mb-3">⑥ 회원 관리</h2>
+            <p class="text-sm text-gray-400 mb-3">멤버 상태를 명확하게 구분합니다.</p>
+            <ul class="list-disc list-inside text-sm space-y-2 text-gray-300 mb-3">
+                <li><strong>활성</strong>: 현재 활동 중. 조 편성·통계에 포함.</li>
+                <li><strong>휴면</strong>: 일시 정지. 조 편성에서 자동 제외하지만 기록은 보존.</li>
+                <li><strong>비활성</strong>: 졸업·탈퇴 등. 기본 노출에서 빠짐.</li>
+            </ul>
+            <div class="tip">💡 회원이 직접 회원가입하면 자동으로 <strong>활성</strong> 상태가 되며, 학번/이름이 일치해야 발제문·투표에 참여 가능.</div>
+        </section>
+
+        <!-- 푸터 -->
+        <div class="text-center mt-8 mb-12">
+            <a href="{{ url_for('admin_dashboard') }}"
+                class="bg-eva-green text-black font-bold py-2 px-6 rounded text-sm hover:opacity-80">
+                ← 관리자 대시보드로 돌아가기
+            </a>
+        </div>
+    </div>
+</body>
+
+</html>

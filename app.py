@@ -3501,6 +3501,50 @@ def delete_genre(genre_id):
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+# --- 학기 필터 헬퍼 ---
+def _get_terms_for_filter():
+    """기록 페이지의 학기 필터 드롭다운에 사용할 학기 목록 (최신순)."""
+    try:
+        return supabase.table('seminar_terms').select('id, name, start_date, end_date') \
+            .order('start_date', desc=True).execute().data or []
+    except Exception:
+        return []
+
+
+def _get_term_range(term_id):
+    """선택된 term_id의 (start_date, end_date, term_dict) 반환. 없으면 (None, None, None)."""
+    if not term_id:
+        return None, None, None
+    try:
+        term = supabase.table('seminar_terms').select('*').eq('id', term_id).single().execute().data
+        if not term:
+            return None, None, None
+        return term['start_date'], term['end_date'], term
+    except Exception:
+        return None, None, None
+
+
+def _date_in_range(d, start, end):
+    """문자열 또는 date를 받아 [start, end] 범위에 있는지 확인."""
+    if not d or not start or not end:
+        return False
+    s = str(d)[:10]
+    return str(start)[:10] <= s <= str(end)[:10]
+
+
+# --- 도움말 페이지 ---
+@app.route('/help/admin')
+@login_required(role="admin")
+def help_admin():
+    return render_template('help_admin.html')
+
+
+@app.route('/help/member')
+@login_required(role="ANY")
+def help_member():
+    return render_template('help_member.html')
+
+
 # --- 기록 허브 ---
 @app.route('/records')
 @login_required(role="admin")
@@ -3584,8 +3628,13 @@ def records_member_profile(member_id):
 @app.route('/records/seminars')
 @login_required(role="admin")
 def records_seminars():
+    term_id = request.args.get('term_id') or ''
     try:
-        history = supabase.table('history').select('*').order('date', desc=True).execute().data or []
+        q = supabase.table('history').select('*').order('date', desc=True)
+        start, end, _ = _get_term_range(term_id)
+        if start and end:
+            q = q.gte('date', start).lte('date', end)
+        history = q.execute().data or []
         for row in history:
             groups = row.get('groups') or []
             present = []
@@ -3598,11 +3647,13 @@ def records_seminars():
             row['group_count'] = len(groups) if groups and isinstance(groups[0], list) else 0
             row['facilitator_count'] = len(row.get('facilitators') or [])
         genres = _load_genres()
+        terms = _get_terms_for_filter()
     except Exception as e:
         app.logger.error(f"records_seminars error: {e}", exc_info=True)
         flash(f"오류: {e}", 'danger')
-        history, genres = [], []
-    return render_template('records_seminars.html', history=history, genres=genres)
+        history, genres, terms = [], [], []
+    return render_template('records_seminars.html', history=history, genres=genres,
+                           terms=terms, selected_term_id=term_id)
 
 
 @app.route('/records/seminars/<history_id>')
@@ -3687,22 +3738,31 @@ def records_history_delete(history_id):
 @app.route('/records/brick_books')
 @login_required(role="admin")
 def records_brick_books():
+    term_id = request.args.get('term_id') or ''
     try:
         books = supabase.table('brick_books').select('*').order('created_at', desc=True).execute().data or []
+        start, end, _ = _get_term_range(term_id)
         if books:
             ids = [b['id'] for b in books]
-            sess_res = supabase.table('brick_book_sessions').select('brick_book_id') \
-                .in_('brick_book_id', ids).execute().data or []
+            sq = supabase.table('brick_book_sessions').select('brick_book_id, meeting_date').in_('brick_book_id', ids)
+            if start and end:
+                sq = sq.gte('meeting_date', start).lte('meeting_date', end)
+            sess_res = sq.execute().data or []
             cnt = {}
             for s in sess_res:
                 cnt[s['brick_book_id']] = cnt.get(s['brick_book_id'], 0) + 1
             for b in books:
                 b['session_count'] = cnt.get(b['id'], 0)
+            # 학기 필터링 시: 해당 학기 내 세션이 있는 책만 표시
+            if start and end:
+                books = [b for b in books if b['session_count'] > 0]
+        terms = _get_terms_for_filter()
     except Exception as e:
         app.logger.error(f"records_brick_books error: {e}", exc_info=True)
         flash(f"오류: {e}", 'danger')
-        books = []
-    return render_template('records_brick_books.html', books=books)
+        books, terms = [], []
+    return render_template('records_brick_books.html', books=books,
+                           terms=terms, selected_term_id=term_id)
 
 
 @app.route('/records/brick_books/<book_id>')
@@ -3796,22 +3856,30 @@ def brick_session_delete(session_id):
 @app.route('/records/study_groups')
 @login_required(role="admin")
 def records_study_groups():
+    term_id = request.args.get('term_id') or ''
     try:
         groups = supabase.table('study_groups').select('*').order('created_at', desc=True).execute().data or []
+        start, end, _ = _get_term_range(term_id)
         if groups:
             ids = [g['id'] for g in groups]
-            sess_res = supabase.table('study_group_sessions').select('study_group_id') \
-                .in_('study_group_id', ids).execute().data or []
+            sq = supabase.table('study_group_sessions').select('study_group_id, meeting_date').in_('study_group_id', ids)
+            if start and end:
+                sq = sq.gte('meeting_date', start).lte('meeting_date', end)
+            sess_res = sq.execute().data or []
             cnt = {}
             for s in sess_res:
                 cnt[s['study_group_id']] = cnt.get(s['study_group_id'], 0) + 1
             for g in groups:
                 g['session_count'] = cnt.get(g['id'], 0)
+            if start and end:
+                groups = [g for g in groups if g['session_count'] > 0]
+        terms = _get_terms_for_filter()
     except Exception as e:
         app.logger.error(f"records_study_groups error: {e}", exc_info=True)
         flash(f"오류: {e}", 'danger')
-        groups = []
-    return render_template('records_study_groups.html', groups=groups)
+        groups, terms = [], []
+    return render_template('records_study_groups.html', groups=groups,
+                           terms=terms, selected_term_id=term_id)
 
 
 @app.route('/records/study_groups/<group_id>')
@@ -3905,8 +3973,13 @@ def study_session_delete(session_id):
 @app.route('/records/analytics')
 @login_required(role="admin")
 def records_analytics():
+    term_id = request.args.get('term_id') or ''
     try:
-        history = supabase.table('history').select('date, genre, groups').execute().data or []
+        start, end, _ = _get_term_range(term_id)
+        hq = supabase.table('history').select('date, genre, groups')
+        if start and end:
+            hq = hq.gte('date', start).lte('date', end)
+        history = hq.execute().data or []
         genre_counts, monthly_counts, member_attend = {}, {}, {}
         for row in history:
             g = row.get('genre') or '미분류'
@@ -3920,24 +3993,41 @@ def records_analytics():
                 for n in (grp if isinstance(grp, list) else [grp]):
                     member_attend[n] = member_attend.get(n, 0) + 1
         top_attendees = sorted(member_attend.items(), key=lambda x: x[1], reverse=True)[:15]
-        bb_count = supabase.table('brick_books').select('id', count='exact').execute().count or 0
-        sg_count = supabase.table('study_groups').select('id', count='exact').execute().count or 0
 
-        # 벽돌책/소모임 월별 세션 카운트
+        # 벽돌책/소모임 월별 세션 카운트 (학기 필터 적용)
         bb_monthly, sg_monthly = {}, {}
         try:
-            bb_sess = supabase.table('brick_book_sessions').select('meeting_date').execute().data or []
+            bbq = supabase.table('brick_book_sessions').select('meeting_date')
+            if start and end:
+                bbq = bbq.gte('meeting_date', start).lte('meeting_date', end)
+            bb_sess = bbq.execute().data or []
             for s in bb_sess:
                 ym = str(s.get('meeting_date') or '')[:7]
                 if ym: bb_monthly[ym] = bb_monthly.get(ym, 0) + 1
         except Exception: pass
         try:
-            sg_sess = supabase.table('study_group_sessions').select('meeting_date').execute().data or []
+            sgq = supabase.table('study_group_sessions').select('meeting_date')
+            if start and end:
+                sgq = sgq.gte('meeting_date', start).lte('meeting_date', end)
+            sg_sess = sgq.execute().data or []
             for s in sg_sess:
                 ym = str(s.get('meeting_date') or '')[:7]
                 if ym: sg_monthly[ym] = sg_monthly.get(ym, 0) + 1
         except Exception: pass
 
+        # 벽돌책/소모임 카운트: 학기 내 세션이 있는 것만
+        if start and end:
+            bb_count = len({s.get('brick_book_id') for s in (supabase.table('brick_book_sessions')
+                .select('brick_book_id, meeting_date').gte('meeting_date', start).lte('meeting_date', end)
+                .execute().data or [])})
+            sg_count = len({s.get('study_group_id') for s in (supabase.table('study_group_sessions')
+                .select('study_group_id, meeting_date').gte('meeting_date', start).lte('meeting_date', end)
+                .execute().data or [])})
+        else:
+            bb_count = supabase.table('brick_books').select('id', count='exact').execute().count or 0
+            sg_count = supabase.table('study_groups').select('id', count='exact').execute().count or 0
+
+        terms = _get_terms_for_filter()
         return render_template('records_analytics.html',
                                total_seminars=len(history),
                                total_brick_books=bb_count,
@@ -3946,7 +4036,8 @@ def records_analytics():
                                monthly_counts=dict(sorted(monthly_counts.items())),
                                bb_monthly=dict(sorted(bb_monthly.items())),
                                sg_monthly=dict(sorted(sg_monthly.items())),
-                               top_attendees=top_attendees)
+                               top_attendees=top_attendees,
+                               terms=terms, selected_term_id=term_id)
     except Exception as e:
         app.logger.error(f"records_analytics error: {e}", exc_info=True)
         flash(f"오류: {e}", 'danger')
