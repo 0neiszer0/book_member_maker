@@ -153,21 +153,26 @@
             <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">지금 할 수 있는 것</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 
-                <!-- 발제문 제출 -->
+                <!-- 발제문 제출 (다중) -->
                 <div class="action-card">
                     <div class="icon">📝</div>
                     <div>
-                        <div class="title">발제문 제출</div>
-                        {% if active_topic_event %}
-                        <div class="desc">{{ active_topic_event.book_title }} ({{ active_topic_event.meeting_date }}) —
-                            현재 접수 중</div>
+                        <div class="title">발제문 제출 / 보기</div>
+                        {% if active_topic_events %}
+                        <div class="desc">진행 중 {{ active_topic_events|length }}건. 클릭해 작성·수정하세요.</div>
                         {% else %}
                         <div class="desc">현재 진행 중인 발제문 수집이 없습니다.</div>
                         {% endif %}
                     </div>
-                    {% if active_topic_event %}
-                    <a href="/shared_topics?token={{ active_topic_event.share_token }}"
-                        class="action-btn action-btn-green">제출하기</a>
+                    {% if active_topic_events %}
+                    <div class="flex flex-col gap-1.5">
+                        {% for evt in active_topic_events[:3] %}
+                        <a href="/shared_topics?token={{ evt.share_token }}"
+                            class="action-btn action-btn-green text-sm">
+                            {{ evt.book_title }} ({{ evt.meeting_date }})
+                        </a>
+                        {% endfor %}
+                    </div>
                     {% else %}
                     <button class="action-btn action-btn-gray" disabled>접수 대기 중</button>
                     {% endif %}
@@ -205,6 +210,40 @@
                     </div>
                     <a href="{{ url_for('view_all_documents') }}" class="action-btn action-btn-purple">위키 보기</a>
                 </div>
+
+                <!-- 내 활동 기록 -->
+                <div class="action-card">
+                    <div class="icon">📊</div>
+                    <div>
+                        <div class="title">내 활동 기록</div>
+                        <div class="desc">
+                            세미나 {{ activity.seminar_count or 0 }}회 · 발제 {{ activity.facilitator_count or 0 }}회 ·
+                            벽돌책 {{ (activity.brick_sessions or [])|length }} · 소모임 {{ (activity.study_sessions or [])|length }}
+                        </div>
+                    </div>
+                    <a href="{{ url_for('records_member_profile', member_id=user.id) }}"
+                        class="action-btn action-btn-purple">전체 기록 보기</a>
+                </div>
+
+                <!-- 세미나 투표 (학기 단위) -->
+                {% if my_open_votes %}
+                <div class="action-card">
+                    <div class="icon">🗳️</div>
+                    <div>
+                        <div class="title">다음 세미나 참석 투표</div>
+                        <div class="desc">{{ my_open_votes|length }}개 회차 투표 가능 · 비로그인 링크로 빠른 투표 가능</div>
+                    </div>
+                    <div class="flex flex-col gap-1.5">
+                        {% for v in my_open_votes[:3] %}
+                        <a href="/seminar_vote?token={{ v.term_token }}"
+                            class="action-btn {% if v.my_vote == True %}action-btn-green{% elif v.my_vote == False %}action-btn-red{% else %}action-btn-yellow{% endif %} text-sm">
+                            {{ v.meeting_date }} ({% if v.day_type == 'mon' %}월{% else %}목{% endif %})
+                            {% if v.my_vote == True %}— 참석{% elif v.my_vote == False %}— 불참{% else %}— 미정{% endif %}
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
 
             </div>
         </section>

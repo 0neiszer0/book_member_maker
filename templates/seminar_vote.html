@@ -80,49 +80,70 @@
                 </div>
             </div>
 
-            <!-- 회차 목록 -->
-            <div class="space-y-3">
-                {% for s in sessions %}
-                <div class="session-card eva-card p-4 rounded-lg {% if s.is_full %}full{% endif %}" data-session-id="{{ s.id }}">
-                    <div class="flex justify-between items-center mb-3">
-                        <div>
-                            <span class="font-bold text-lg">{{ s.meeting_date }}</span>
-                            <span class="ml-2 text-sm {% if s.day_type == 'mon' %}text-blue-300{% else %}text-purple-300{% endif %}">
-                                ({% if s.day_type == 'mon' %}월{% else %}목{% endif %})
-                            </span>
+            <!-- 현재 투표 중인 회차 -->
+            <div>
+                <h2 class="text-lg font-bold text-eva-green mb-2">📌 지금 투표할 수 있는 회차</h2>
+                <p class="text-xs text-gray-500 mb-3">투표는 세미나 <strong>전주 금요일 오후 6시</strong>에 열려 회차 당일까지 가능합니다.</p>
+                <div class="space-y-3">
+                    {% for s in open_sessions %}
+                    <div class="session-card eva-card p-4 rounded-lg {% if s.is_full %}full{% endif %}" data-session-id="{{ s.id }}">
+                        <div class="flex justify-between items-center mb-3">
+                            <div>
+                                <span class="font-bold text-lg">{{ s.meeting_date }}</span>
+                                <span class="ml-2 text-sm {% if s.day_type == 'mon' %}text-blue-300{% else %}text-purple-300{% endif %}">
+                                    ({% if s.day_type == 'mon' %}월{% else %}목{% endif %})
+                                </span>
+                            </div>
+                            <div class="text-sm">
+                                <span class="text-eva-green font-bold">{{ s.attending_count }}</span>
+                                <span class="text-gray-400">/ {{ term.max_capacity }}</span>
+                                {% if s.is_full %}<span class="ml-2 text-red-400 text-xs">마감</span>{% endif %}
+                            </div>
                         </div>
-                        <div class="text-sm">
-                            <span class="text-eva-green font-bold">{{ s.attending_count }}</span>
-                            <span class="text-gray-400">/ {{ term.max_capacity }}</span>
-                            {% if s.is_full %}<span class="ml-2 text-red-400 text-xs">마감</span>{% endif %}
+                        <div class="grid grid-cols-3 gap-2 text-center text-sm">
+                            <input type="radio" name="vote_{{ s.id }}" id="yes_{{ s.id }}" value="yes" class="hidden peer/yes">
+                            <label for="yes_{{ s.id }}" class="radio-label py-2 rounded bg-gray-700 hover:bg-gray-600 peer-checked/yes:bg-eva-green peer-checked/yes:text-black peer-checked/yes:font-bold">
+                                참석
+                            </label>
+                            <input type="radio" name="vote_{{ s.id }}" id="no_{{ s.id }}" value="no" class="hidden peer/no">
+                            <label for="no_{{ s.id }}" class="radio-label py-2 rounded bg-gray-700 hover:bg-gray-600 peer-checked/no:bg-red-700 peer-checked/no:text-white peer-checked/no:font-bold">
+                                불참
+                            </label>
+                            <input type="radio" name="vote_{{ s.id }}" id="skip_{{ s.id }}" value="skip" class="hidden peer/skip" checked>
+                            <label for="skip_{{ s.id }}" class="radio-label py-2 rounded bg-gray-700 hover:bg-gray-600 peer-checked/skip:bg-gray-500 peer-checked/skip:text-white peer-checked/skip:font-bold">
+                                미정
+                            </label>
                         </div>
                     </div>
-                    <div class="grid grid-cols-3 gap-2 text-center text-sm">
-                        <input type="radio" name="vote_{{ s.id }}" id="yes_{{ s.id }}" value="yes" class="hidden peer/yes">
-                        <label for="yes_{{ s.id }}" class="radio-label py-2 rounded bg-gray-700 hover:bg-gray-600 peer-checked/yes:bg-eva-green peer-checked/yes:text-black peer-checked/yes:font-bold">
-                            참석
-                        </label>
-                        <input type="radio" name="vote_{{ s.id }}" id="no_{{ s.id }}" value="no" class="hidden peer/no">
-                        <label for="no_{{ s.id }}" class="radio-label py-2 rounded bg-gray-700 hover:bg-gray-600 peer-checked/no:bg-red-700 peer-checked/no:text-white peer-checked/no:font-bold">
-                            불참
-                        </label>
-                        <input type="radio" name="vote_{{ s.id }}" id="skip_{{ s.id }}" value="skip" class="hidden peer/skip" checked>
-                        <label for="skip_{{ s.id }}" class="radio-label py-2 rounded bg-gray-700 hover:bg-gray-600 peer-checked/skip:bg-gray-500 peer-checked/skip:text-white peer-checked/skip:font-bold">
-                            미정
-                        </label>
+                    {% else %}
+                    <div class="eva-card p-6 rounded-lg text-center text-gray-500 text-sm">
+                        지금은 투표 중인 회차가 없습니다. 다음 세미나 주의 전주 금요일 오후 6시에 다시 확인해주세요.
                     </div>
+                    {% endfor %}
                 </div>
-                {% else %}
-                <div class="eva-card p-6 rounded-lg text-center text-gray-500">
-                    아직 활성화된 회차가 없습니다.
-                </div>
-                {% endfor %}
             </div>
 
+            {% if open_sessions %}
             <button type="submit"
                 class="w-full bg-eva-green text-black font-bold py-3 rounded-lg text-lg hover:opacity-80">
                 투표 제출
             </button>
+            {% endif %}
+
+            <!-- 곧 열릴 회차 -->
+            {% if upcoming_sessions %}
+            <div class="mt-8">
+                <h2 class="text-sm font-bold text-gray-400 mb-2">⏳ 곧 열릴 회차</h2>
+                <div class="space-y-1.5">
+                    {% for s in upcoming_sessions %}
+                    <div class="flex justify-between items-center text-xs bg-gray-800/50 px-3 py-2 rounded">
+                        <span>{{ s.meeting_date }} ({% if s.day_type == 'mon' %}월{% else %}목{% endif %})</span>
+                        <span class="text-gray-500">{{ s.voting_open_at }} 오픈</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
         </form>
 
         <div id="result" class="hidden mt-6 eva-card p-5 rounded-lg"></div>
@@ -134,7 +155,7 @@
 
     <script>
         const TOKEN = '{{ term.share_token }}';
-        const SESSION_IDS = [{% for s in sessions %}'{{ s.id }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+        const SESSION_IDS = [{% for s in open_sessions %}'{{ s.id }}'{% if not loop.last %}, {% endif %}{% endfor %}];
 
         document.getElementById('voteForm').addEventListener('submit', async (e) => {
             e.preventDefault();

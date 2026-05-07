@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash, Response
 import json
 from supabase import create_client, Client
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date, time
 from functools import wraps
 import requests
 import re
@@ -2631,14 +2631,47 @@ def my_page():
             .eq('attending_seminar', True).execute()
         my_confirmed_dates = {r['meeting_date'] for r in (confirmed_res.data or [])}
 
-        # 현재 진행 중인 발제문 제출 이벤트 확인
-        active_topic_event = None
+        # 현재 진행 중인 발제문 제출 이벤트들 (다중 지원)
+        active_topic_events = []
         try:
-            topic_res = supabase.table('topic_events').select('*').eq('is_active', True).order('meeting_date', desc=True).limit(1).execute()
-            if topic_res.data:
-                active_topic_event = topic_res.data[0]
+            topic_res = supabase.table('topic_events').select('*').eq('is_active', True).order('meeting_date', desc=True).execute()
+            active_topic_events = topic_res.data or []
         except Exception:
             pass
+
+        # 내 활동 요약 (세미나/발제/벽돌책/소모임)
+        try:
+            activity = _aggregate_member_activity(user_id, user_data.get('name', ''))
+        except Exception as e:
+            app.logger.warning(f"my_page activity error: {e}")
+            activity = {'seminar_count': 0, 'facilitator_count': 0, 'brick_sessions': [], 'study_sessions': []}
+
+        # 현재 투표 가능한 세미나 회차 (학기별)
+        my_open_votes = []
+        try:
+            now_kst = datetime.now(KST)
+            terms = supabase.table('seminar_terms').select('id, name, share_token, max_capacity') \
+                .eq('is_active', True).execute().data or []
+            for term in terms:
+                t_sess = supabase.table('seminar_sessions').select('id, meeting_date, day_type') \
+                    .eq('term_id', term['id']).eq('is_active', True) \
+                    .order('meeting_date').execute().data or []
+                # 내 기존 투표
+                sids = [s['id'] for s in t_sess]
+                my_votes = {}
+                if sids:
+                    mv = supabase.table('seminar_votes').select('session_id, attending') \
+                        .in_('session_id', sids).eq('member_id', user_id).execute().data or []
+                    my_votes = {v['session_id']: v['attending'] for v in mv}
+                for s in t_sess:
+                    open_at, close_at = _voting_window_for(s['meeting_date'])
+                    if open_at <= now_kst <= close_at:
+                        s['my_vote'] = my_votes.get(s['id'])  # True/False/None
+                        s['term_token'] = term['share_token']
+                        s['term_name'] = term['name']
+                        my_open_votes.append(s)
+        except Exception as e:
+            app.logger.warning(f"my_page open votes error: {e}")
 
         return render_template(
             'my_page_member.html',
@@ -2646,7 +2679,9 @@ def my_page():
             attendance_records=attendance_records,
             seminar_dates=seminar_dates,
             my_confirmed_dates=my_confirmed_dates,
-            active_topic_event=active_topic_event
+            active_topic_events=active_topic_events,
+            activity=activity,
+            my_open_votes=my_open_votes,
         )
 
     except Exception as e:
@@ -2931,6 +2966,31 @@ def download_topics_word(event_id):
 # --- 6.5 세미나 출석 투표 (학기 단위) ---
 # ==============================================================================
 
+KST = timezone(timedelta(hours=9))
+
+
+def _voting_window_for(meeting_date):
+    """세미나 회차의 투표 오픈/마감 시각 계산.
+    - 오픈: 회차가 속한 주의 전 주 금요일 18:00 KST
+    - 마감: 회차 당일 23:59:59 KST
+    """
+    if isinstance(meeting_date, str):
+        d = date.fromisoformat(meeting_date)
+    else:
+        d = meeting_date
+    monday = d - timedelta(days=d.weekday())
+    friday_before = monday - timedelta(days=3)
+    open_at = datetime.combine(friday_before, time(18, 0), tzinfo=KST)
+    close_at = datetime.combine(d, time(23, 59, 59), tzinfo=KST)
+    return open_at, close_at
+
+
+def _is_voting_open(meeting_date):
+    open_at, close_at = _voting_window_for(meeting_date)
+    now = datetime.now(KST)
+    return open_at <= now <= close_at
+
+
 def _enumerate_mon_thu(start_date, end_date):
     """start_date~end_date(둘 다 포함) 사이 모든 월/목 날짜를 (date, day_type) 리스트로 반환."""
     if isinstance(start_date, str):
@@ -3110,10 +3170,24 @@ def seminar_vote_page():
                 .in_('session_id', session_ids).eq('attending', True).execute().data or []
             for v in votes:
                 counts[v['session_id']] = counts.get(v['session_id'], 0) + 1
+        now_kst = datetime.now(KST)
+        open_sessions, upcoming_sessions = [], []
         for s in sessions:
             s['attending_count'] = counts.get(s['id'], 0)
             s['is_full'] = s['attending_count'] >= term.get('max_capacity', 32)
-        return render_template('seminar_vote.html', term=term, sessions=sessions)
+            open_at, close_at = _voting_window_for(s['meeting_date'])
+            s['voting_open_at'] = open_at.strftime('%Y-%m-%d %H:%M')
+            s['voting_close_at'] = close_at.strftime('%Y-%m-%d %H:%M')
+            if open_at <= now_kst <= close_at:
+                s['status'] = 'open'
+                open_sessions.append(s)
+            elif now_kst < open_at:
+                s['status'] = 'upcoming'
+                upcoming_sessions.append(s)
+            # 지나간 회차는 표시하지 않음
+        return render_template('seminar_vote.html', term=term,
+                               open_sessions=open_sessions,
+                               upcoming_sessions=upcoming_sessions[:6])
     except Exception as e:
         app.logger.error(f"seminar_vote_page error: {e}", exc_info=True)
         return "유효하지 않은 링크입니다.", 404
@@ -3158,6 +3232,11 @@ def seminar_vote_submit():
             if sid not in valid_map or not valid_map[sid].get('is_active'):
                 continue
             label = f"{valid_map[sid]['meeting_date']} ({valid_map[sid]['day_type']})"
+
+            # 투표 윈도우 체크: 전주 금요일 18:00 ~ 회차 당일 23:59 KST 외에는 차단
+            if not _is_voting_open(valid_map[sid]['meeting_date']):
+                skipped.append(f"{label} - 투표 기간 외")
+                continue
 
             if choice == 'skip':
                 supabase.table('seminar_votes').delete() \
@@ -3746,12 +3825,30 @@ def records_analytics():
         top_attendees = sorted(member_attend.items(), key=lambda x: x[1], reverse=True)[:15]
         bb_count = supabase.table('brick_books').select('id', count='exact').execute().count or 0
         sg_count = supabase.table('study_groups').select('id', count='exact').execute().count or 0
+
+        # 벽돌책/소모임 월별 세션 카운트
+        bb_monthly, sg_monthly = {}, {}
+        try:
+            bb_sess = supabase.table('brick_book_sessions').select('meeting_date').execute().data or []
+            for s in bb_sess:
+                ym = str(s.get('meeting_date') or '')[:7]
+                if ym: bb_monthly[ym] = bb_monthly.get(ym, 0) + 1
+        except Exception: pass
+        try:
+            sg_sess = supabase.table('study_group_sessions').select('meeting_date').execute().data or []
+            for s in sg_sess:
+                ym = str(s.get('meeting_date') or '')[:7]
+                if ym: sg_monthly[ym] = sg_monthly.get(ym, 0) + 1
+        except Exception: pass
+
         return render_template('records_analytics.html',
                                total_seminars=len(history),
                                total_brick_books=bb_count,
                                total_study_groups=sg_count,
                                genre_counts=genre_counts,
                                monthly_counts=dict(sorted(monthly_counts.items())),
+                               bb_monthly=dict(sorted(bb_monthly.items())),
+                               sg_monthly=dict(sorted(sg_monthly.items())),
                                top_attendees=top_attendees)
     except Exception as e:
         app.logger.error(f"records_analytics error: {e}", exc_info=True)
