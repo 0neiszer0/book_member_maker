@@ -26,9 +26,11 @@
 </head>
 <body class="p-4 md:p-8">
     <div class="container mx-auto max-w-7xl">
-        <div class="flex justify-between items-center mb-6">
+        <div class="flex justify-between items-center mb-6 gap-2 flex-wrap">
             <h1 class="text-2xl md:text-3xl font-bold text-eva-green">Manual Group Entry</h1>
-            <a href="{{ url_for('admin_dashboard') }}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md">대시보드로</a>
+            <div class="flex gap-2">
+                <a href="{{ url_for('records_seminars') }}" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-md text-sm">← 진행 현황으로</a>
+            </div>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -42,9 +44,29 @@
         {% endwith %}
 
         <form id="manual-form" action="{{ url_for('save_manual_groups') }}" method="POST" class="eva-card p-6 rounded-lg space-y-6">
-            <div>
-                <label for="meeting_date" class="block text-lg font-bold text-eva-purple mb-2">모임 날짜</label>
-                <input type="date" id="meeting_date" name="meeting_date" required class="eva-input w-full md:w-1/2 p-2 rounded-md">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label for="meeting_date" class="block text-sm font-bold text-eva-purple mb-1">모임 날짜 *</label>
+                    <input type="date" id="meeting_date" name="meeting_date" required
+                        value="{{ prefill.date or '' }}"
+                        class="eva-input w-full p-2 rounded-md">
+                </div>
+                <div>
+                    <label for="book_title" class="block text-sm font-bold text-eva-purple mb-1">📚 도서명</label>
+                    <input type="text" id="book_title" name="book_title"
+                        value="{{ prefill.book_title or '' }}"
+                        placeholder="예: 데미안 — 헤르만 헤세"
+                        class="eva-input w-full p-2 rounded-md">
+                </div>
+                <div>
+                    <label for="genre" class="block text-sm font-bold text-eva-purple mb-1">🏷️ 장르</label>
+                    <select id="genre" name="genre" class="eva-input w-full p-2 rounded-md">
+                        <option value="">미분류</option>
+                        {% for g in genres %}
+                        <option value="{{ g.name }}">{{ g.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
 
             <div>
@@ -86,7 +108,9 @@
 
     <script>
     document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('meeting_date').valueAsDate = new Date();
+        // 날짜 prefill이 없으면 오늘로 설정
+        const dateInput = document.getElementById('meeting_date');
+        if (!dateInput.value) dateInput.valueAsDate = new Date();
 
         const previewBtn = document.getElementById('preview-btn');
         const previewDialog = document.getElementById('preview-dialog');
