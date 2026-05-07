@@ -1868,6 +1868,44 @@ def bookclub_save():
         return jsonify(result), 500
 
 
+def _adjust_co_matrix(groups, date_str, sign):
+    """groups의 모든 페어에 대해 bookclub_co_matrix count를 sign(+1/-1)만큼 조정.
+    sign=+1: 증가 (upsert), sign=-1: 감소 (0이 되면 row 삭제, 그렇지 않으면 upsert).
+    last_met은 sign=+1일 때 더 최근 날짜로 갱신, sign=-1일 때는 건드리지 않음.
+    """
+    deltas = {}
+    for g in groups or []:
+        for a, b in itertools.combinations(g, 2):
+            key = '-'.join(sorted([a, b]))
+            deltas[key] = deltas.get(key, 0) + sign
+    if not deltas:
+        return
+    keys = list(deltas.keys())
+    matrix_res = supabase.table('bookclub_co_matrix').select('pair_key, count, last_met').in_('pair_key', keys).execute()
+    current = {row['pair_key']: row for row in (matrix_res.data or [])}
+
+    upsert_rows = []
+    del_keys = []
+    for key, delta in deltas.items():
+        cur = current.get(key)
+        cur_count = (cur or {}).get('count', 0)
+        new_count = max(0, cur_count + delta)
+        if new_count == 0:
+            if cur:
+                del_keys.append(key)
+            continue
+        row = {"pair_key": key, "count": new_count}
+        if sign > 0:
+            cur_last = (cur or {}).get('last_met') or ''
+            row["last_met"] = date_str if (not cur_last or date_str >= cur_last) else cur_last
+        upsert_rows.append(row)
+
+    if del_keys:
+        supabase.table('bookclub_co_matrix').delete().in_('pair_key', del_keys).execute()
+    if upsert_rows:
+        supabase.table('bookclub_co_matrix').upsert(upsert_rows).execute()
+
+
 # [신규] 조 편성 기록을 DB에 저장하는 헬퍼 함수
 def save_group_record_to_db(date, present, facilitators, groups, book_title=None, genre=None):
     """주어진 데이터로 조 편성 기록과 만남 횟수 매트릭스를 DB에 저장/업데이트합니다."""
@@ -3855,7 +3893,26 @@ def update_history_meta(history_id):
             update['groups'] = [g for g in cleaned if g]  # 빈 조 제거
         if not update:
             return jsonify({'status': 'error', 'message': '변경할 필드가 없습니다.'}), 400
+
+        # groups/date 변경 시 co_matrix 재계산
+        groups_changed = 'groups' in update
+        date_changed = 'date' in update
+        old_row = None
+        if groups_changed or date_changed:
+            old_res = supabase.table('history').select('groups, date').eq('id', history_id).execute()
+            old_row = (old_res.data or [None])[0]
+
         supabase.table('history').update(update).eq('id', history_id).execute()
+
+        if old_row is not None and (groups_changed or date_changed):
+            old_groups = old_row.get('groups') or []
+            old_date = old_row.get('date') or ''
+            new_groups = update.get('groups', old_groups)
+            new_date = update.get('date', old_date)
+            # 기존 페어 카운트 차감 후 새 페어 카운트 가산
+            _adjust_co_matrix(old_groups, old_date, -1)
+            _adjust_co_matrix(new_groups, new_date, +1)
+
         return jsonify({'status': 'success'})
     except Exception as e:
         app.logger.error(f"update_history_meta error: {e}", exc_info=True)
@@ -3865,9 +3922,13 @@ def update_history_meta(history_id):
 @app.route('/api/admin/history/<history_id>/delete', methods=['POST'])
 @login_required(role="admin")
 def records_history_delete(history_id):
-    """세미나 기록 삭제 (records 페이지용 단순 래퍼)."""
+    """세미나 기록 삭제 + co_matrix 차감."""
     try:
+        old_res = supabase.table('history').select('groups, date').eq('id', history_id).execute()
+        old_row = (old_res.data or [None])[0]
         supabase.table('history').delete().eq('id', history_id).execute()
+        if old_row:
+            _adjust_co_matrix(old_row.get('groups') or [], old_row.get('date') or '', -1)
         return jsonify({'status': 'success'})
     except Exception as e:
         app.logger.error(f"records_history_delete error: {e}", exc_info=True)
