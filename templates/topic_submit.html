@@ -146,6 +146,41 @@
         addTopicField();
         addBtn.addEventListener('click', addTopicField);
 
+        // 로그인된 회원이고 학과까지 채워진 경우 자동 로드 시도
+        const IS_LOGGED_IN = {{ 'true' if user_name else 'false' }};
+        if (IS_LOGGED_IN && document.getElementById('department').value) {
+            (async () => {
+                try {
+                    const r = await fetch('/api/topics/load', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            event_id: document.getElementById('eventId').value,
+                            author_name: document.getElementById('authorName').value,
+                            department: document.getElementById('department').value,
+                            pin_code: '',
+                        }),
+                    });
+                    if (!r.ok) return;
+                    const data = await r.json();
+                    if (data.status !== 'success' || !data.topics?.length) return;
+                    container.innerHTML = '';
+                    topicCount = 0;
+                    data.topics.forEach(t => {
+                        addTopicField();
+                        const cur = container.lastElementChild;
+                        cur.querySelector('.topic-text').value = t.topic || '';
+                        cur.querySelector('.topic-page').value = t.page || '';
+                        cur.querySelector('.topic-ref').value = t.reference || '';
+                    });
+                    const note = document.createElement('p');
+                    note.className = 'text-xs text-eva-green text-center';
+                    note.textContent = '✓ 이전 작성한 발제문을 불러왔습니다. 수정 후 저장하세요.';
+                    container.parentElement.insertBefore(note, container);
+                } catch (e) { /* silent */ }
+            })();
+        }
+
         document.getElementById('topicForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 

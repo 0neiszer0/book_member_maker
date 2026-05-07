@@ -13,7 +13,11 @@
 
         <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-3">
             <h1 class="text-2xl font-bold text-eva-green">세미나 진행 현황 ({{ history|length }}회)</h1>
-            <div class="flex gap-2">
+            <div class="flex gap-2 flex-wrap">
+                <a href="{{ url_for('manual_entry') }}"
+                    class="bg-eva-purple text-white font-bold py-2 px-3 rounded text-sm hover:opacity-80">
+                    + 과거 세미나 수동 추가
+                </a>
                 <input type="text" id="seminarSearch" placeholder="도서명·날짜 검색"
                     class="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm w-full md:w-64">
                 <select id="genreFilter" class="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm">
@@ -23,6 +27,10 @@
                 </select>
             </div>
         </div>
+        <p class="text-xs text-gray-500 mb-3">
+            💡 진행했지만 그날 저장 못 한 세미나가 있다면 <strong>과거 세미나 수동 추가</strong>를 눌러 날짜·발제자·조 편성을 함께 입력하세요.
+            저장된 기록은 회원 프로필·통계에 즉시 반영됩니다.
+        </p>
 
         <div class="eva-card rounded-lg overflow-hidden">
             <div class="overflow-x-auto">
