@@ -1869,11 +1869,15 @@ def bookclub_save():
 
 
 # [신규] 조 편성 기록을 DB에 저장하는 헬퍼 함수
-def save_group_record_to_db(date, present, facilitators, groups):
+def save_group_record_to_db(date, present, facilitators, groups, book_title=None, genre=None):
     """주어진 데이터로 조 편성 기록과 만남 횟수 매트릭스를 DB에 저장/업데이트합니다."""
     try:
         # 1. history 테이블에 기록 저장
         record = {"date": date, "present": present, "facilitators": facilitators, "groups": groups}
+        if book_title:
+            record["book_title"] = book_title.strip()
+        if genre:
+            record["genre"] = genre.strip()
         supabase.table("history").insert(record).execute()
 
         # 2. bookclub_co_matrix 업데이트
@@ -1911,7 +1915,17 @@ def manual_entry():
     except Exception as e:
         flash(f"회원 정보를 불러오는 중 오류 발생: {e}", "danger")
         all_members = []
-    return render_template('manual_entry.html', all_members=all_members)
+    # 회차 관리 페이지에서 "+ 수동 추가" 클릭 시 prefill (?date=, ?book_title=)
+    prefill = {
+        'date': (request.args.get('date') or '').strip(),
+        'book_title': (request.args.get('book_title') or '').strip(),
+    }
+    try:
+        genres = _load_genres()
+    except Exception:
+        genres = []
+    return render_template('manual_entry.html', all_members=all_members,
+                           prefill=prefill, genres=genres)
 
 
 @app.route('/save_manual_groups', methods=['POST'])
@@ -1920,6 +1934,8 @@ def save_manual_groups():
     try:
         form_data = request.form
         meeting_date = form_data.get('meeting_date')
+        book_title = (form_data.get('book_title') or '').strip()
+        genre = (form_data.get('genre') or '').strip()
 
         groups = []
         present_members_set = set()
@@ -1955,12 +1971,13 @@ def save_manual_groups():
             flash("날짜와 최소 1명 이상의 그룹 멤버를 모두 입력해야 합니다.", "danger")
             return redirect(url_for('manual_entry'))
 
-        # [수정] 발제자 정보도 함께 DB에 저장
-        result = save_group_record_to_db(meeting_date, present_members, facilitator_members, groups)
+        # [수정] 발제자/도서/장르 정보도 함께 DB에 저장
+        result = save_group_record_to_db(meeting_date, present_members, facilitator_members, groups,
+                                         book_title=book_title, genre=genre)
 
         if result["status"] == "ok":
             flash("수동 조 편성 기록이 성공적으로 저장되었습니다.", "success")
-            return redirect(url_for('admin_dashboard'))
+            return redirect(url_for('records_seminars'))
         else:
             flash(f"저장 중 오류 발생: {result['message']}", "danger")
             return redirect(url_for('manual_entry'))
@@ -3169,6 +3186,17 @@ def admin_seminar_term(term_id):
             mres = supabase.table('members').select('id, name').in_('id', list(member_ids)).execute().data or []
             member_map = {m['id']: m['name'] for m in mres}
 
+        # 진행 기록(history)과 연동: 같은 날짜의 history row 존재 여부 + id
+        session_dates = [s['meeting_date'] for s in sessions]
+        history_map = {}
+        if session_dates:
+            hres = supabase.table('history').select('id, date, book_title, genre, groups, facilitators') \
+                .in_('date', session_dates).execute().data or []
+            for h in hres:
+                history_map[h['date']] = h
+
+        today_kst = datetime.now(KST).date()
+        upcoming_sessions, past_sessions = [], []
         for s in sessions:
             a = agg.get(s['id'], {'yes': 0, 'no': 0, 'attendee_ids': []})
             s['yes_count'] = a['yes']
@@ -3185,12 +3213,30 @@ def admin_seminar_term(term_id):
             else:
                 s['vote_status'] = 'closed'
 
+            # 기록 연동
+            h = history_map.get(s['meeting_date'])
+            s['history_id'] = h['id'] if h else None
+            if h and not s.get('book_title') and h.get('book_title'):
+                s['book_title'] = h['book_title']
+
+            # 과거 회차 분리
+            try:
+                m_date = date.fromisoformat(s['meeting_date'])
+            except Exception:
+                m_date = today_kst
+            s['is_past'] = m_date < today_kst
+            if s['is_past']:
+                past_sessions.append(s)
+            else:
+                upcoming_sessions.append(s)
+
         # 전체 활성 멤버 (관리자 수동 추가용)
         all_members = supabase.table('members').select('id, name, student_id, department') \
             .eq('is_active', True).order('name').execute().data or []
 
         share_url = f"{request.host_url}seminar_vote?token={term['share_token']}"
         return render_template('admin_seminar_term.html', term=term, sessions=sessions,
+                               upcoming_sessions=upcoming_sessions, past_sessions=past_sessions,
                                share_url=share_url, all_members=all_members)
     except Exception as e:
         app.logger.error(f"admin_seminar_term error: {e}", exc_info=True)
@@ -3723,14 +3769,31 @@ def records_seminars():
             row['present_count'] = len(present)
             row['group_count'] = len(groups) if groups and isinstance(groups[0], list) else 0
             row['facilitator_count'] = len(row.get('facilitators') or [])
+
+        # 6개월 단위 버킷 그룹화 (예: "2025년 상반기", "2025년 하반기")
+        buckets = []  # [{'key': str, 'label': str, 'rows': [..]}]
+        seen = {}
+        for row in history:
+            try:
+                d = date.fromisoformat(row['date'])
+                half = '상반기' if d.month <= 6 else '하반기'
+                key = f"{d.year}-{1 if d.month <= 6 else 2}"
+                label = f"{d.year}년 {half}"
+            except Exception:
+                key, label = 'unknown', '날짜 미상'
+            if key not in seen:
+                seen[key] = {'key': key, 'label': label, 'rows': []}
+                buckets.append(seen[key])
+            seen[key]['rows'].append(row)
+        # history는 이미 date desc 정렬이므로 buckets도 자연스럽게 최신순
         genres = _load_genres()
         terms = _get_terms_for_filter()
     except Exception as e:
         app.logger.error(f"records_seminars error: {e}", exc_info=True)
         flash(f"오류: {e}", 'danger')
-        history, genres, terms = [], [], []
+        history, genres, terms, buckets = [], [], [], []
     return render_template('records_seminars.html', history=history, genres=genres,
-                           terms=terms, selected_term_id=term_id)
+                           terms=terms, selected_term_id=term_id, buckets=buckets)
 
 
 @app.route('/records/seminars/<history_id>')

@@ -33,11 +33,20 @@
             저장된 기록은 회원 프로필·통계에 즉시 반영됩니다.
         </p>
 
-        <div class="eva-card rounded-lg overflow-hidden">
+        {% if not buckets %}
+        <div class="eva-card rounded-lg p-6 text-center text-gray-500">기록이 없습니다.</div>
+        {% endif %}
+
+        {% for bucket in buckets %}
+        <details class="eva-card rounded-lg overflow-hidden mb-3" {% if loop.index <= 1 %}open{% endif %}>
+            <summary class="cursor-pointer px-4 py-3 bg-gray-700/40 flex justify-between items-center">
+                <span class="font-bold text-eva-green">{{ bucket.label }}</span>
+                <span class="text-xs text-gray-400">{{ bucket.rows|length }}회</span>
+            </summary>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
-                        <tr class="bg-gray-700/50 text-left text-gray-300">
+                        <tr class="bg-gray-700/30 text-left text-gray-300">
                             <th class="p-3">날짜</th>
                             <th class="p-3">도서명</th>
                             <th class="p-3">장르</th>
@@ -47,8 +56,8 @@
                             <th class="p-3 text-center">상세</th>
                         </tr>
                     </thead>
-                    <tbody id="seminarTableBody">
-                        {% for h in history %}
+                    <tbody>
+                        {% for h in bucket.rows %}
                         <tr class="seminar-row border-t border-border-dark/50 hover:bg-gray-700/20"
                             data-date="{{ h.date }}" data-title="{{ h.book_title or '' }}"
                             data-genre="{{ h.genre or '__none' }}">
@@ -77,13 +86,12 @@
                                 </a>
                             </td>
                         </tr>
-                        {% else %}
-                        <tr><td colspan="7" class="p-6 text-center text-gray-500">기록이 없습니다.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-        </div>
+        </details>
+        {% endfor %}
 
         <div class="mt-4 text-xs text-gray-500">
             도서명 · 장르는 인라인으로 수정됩니다 (관리자 전용). 새 장르가 필요하면 다른 페이지의 "+ 장르 추가" 버튼을 사용하세요.
@@ -114,11 +122,17 @@
         function applyFilter() {
             const q = (search.value || '').trim().toLowerCase();
             const gf = genreFilter.value;
+            const filtering = q || gf;
             rows.forEach(r => {
                 const text = (r.dataset.date + ' ' + r.dataset.title).toLowerCase();
                 const matchSearch = !q || text.includes(q);
                 const matchGenre = !gf || r.dataset.genre === gf;
                 r.style.display = (matchSearch && matchGenre) ? '' : 'none';
+            });
+            // 필터 활성 시: 매칭된 row가 있는 bucket은 자동 펼침
+            document.querySelectorAll('details.eva-card').forEach(d => {
+                const visibleRows = d.querySelectorAll('.seminar-row:not([style*="display: none"])');
+                if (filtering) d.open = visibleRows.length > 0;
             });
         }
         search.addEventListener('input', applyFilter);
