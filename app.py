@@ -3268,7 +3268,8 @@ def seminar_vote_page():
             for v in votes:
                 counts[v['session_id']] = counts.get(v['session_id'], 0) + 1
         now_kst = datetime.now(KST)
-        open_sessions, upcoming_sessions = [], []
+        is_admin = session.get('user_role') in ('admin', 'officer')
+        open_sessions, upcoming_sessions, closed_sessions = [], [], []
         for s in sessions:
             s['attending_count'] = counts.get(s['id'], 0)
             s['is_full'] = s['attending_count'] >= term.get('max_capacity', 32)
@@ -3281,13 +3282,88 @@ def seminar_vote_page():
             elif now_kst < open_at:
                 s['status'] = 'upcoming'
                 upcoming_sessions.append(s)
-            # 지나간 회차는 표시하지 않음 (관리자가 수동으로 처리)
+            else:
+                s['status'] = 'closed'
+                closed_sessions.append(s)
+        # 관리자/임원은 열리기 전 회차도 바로 투표 가능 → open에 합쳐서 노출
+        if is_admin:
+            for s in upcoming_sessions:
+                s['admin_early'] = True
+            open_sessions = open_sessions + upcoming_sessions
+            upcoming_sessions_for_template = []
+        else:
+            upcoming_sessions_for_template = upcoming_sessions[:6]
         return render_template('seminar_vote.html', term=term,
                                open_sessions=open_sessions,
-                               upcoming_sessions=upcoming_sessions[:6])
+                               upcoming_sessions=upcoming_sessions_for_template,
+                               is_admin=is_admin)
     except Exception as e:
         app.logger.error(f"seminar_vote_page error: {e}", exc_info=True)
         return "유효하지 않은 링크입니다.", 404
+
+
+@app.route('/api/seminar_vote/verify', methods=['POST'])
+def seminar_vote_verify():
+    """학번+이름으로 본인 확인 + 기존 투표/세션 현황 반환."""
+    try:
+        data = request.json or {}
+        token = (data.get('token') or '').strip()
+        student_id = (data.get('student_id') or '').strip()
+        name = (data.get('name') or '').strip()
+        if not (token and student_id and name):
+            return jsonify({'status': 'error', 'message': '학번/이름을 입력해주세요.'}), 400
+        term_res = supabase.table('seminar_terms').select('*').eq('share_token', token).single().execute()
+        term = term_res.data
+        if not term or not term.get('is_active'):
+            return jsonify({'status': 'error', 'message': '유효하지 않은 링크입니다.'}), 404
+        member_res = supabase.table('members').select('id, name, student_id') \
+            .eq('student_id', student_id).execute()
+        candidates = [m for m in (member_res.data or []) if (m.get('name') or '').strip() == name]
+        if not candidates:
+            return jsonify({'status': 'error', 'message': '학번/이름이 일치하는 멤버를 찾을 수 없습니다.'}), 404
+        member = candidates[0]
+        # 기존 투표 (이 학기의 모든 세션)
+        sess_res = supabase.table('seminar_sessions').select('id') \
+            .eq('term_id', term['id']).execute().data or []
+        sess_ids = [s['id'] for s in sess_res]
+        existing = {}
+        if sess_ids:
+            ev = supabase.table('seminar_votes').select('session_id, attending') \
+                .in_('session_id', sess_ids).eq('member_id', member['id']).execute().data or []
+            existing = {x['session_id']: ('yes' if x['attending'] else 'no') for x in ev}
+        return jsonify({
+            'status': 'success',
+            'member_name': member['name'],
+            'existing_votes': existing,
+        })
+    except Exception as e:
+        app.logger.error(f"seminar_vote_verify error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/seminar_vote/counts')
+def seminar_vote_counts():
+    """현재 회차별 참석 인원 수 (실시간 새로고침용)."""
+    try:
+        token = (request.args.get('token') or '').strip()
+        if not token:
+            return jsonify({'status': 'error', 'message': 'token 필요'}), 400
+        term = supabase.table('seminar_terms').select('id, max_capacity') \
+            .eq('share_token', token).single().execute().data
+        if not term:
+            return jsonify({'status': 'error', 'message': '유효하지 않은 링크'}), 404
+        sess = supabase.table('seminar_sessions').select('id') \
+            .eq('term_id', term['id']).eq('is_active', True).execute().data or []
+        sess_ids = [s['id'] for s in sess]
+        counts = {sid: 0 for sid in sess_ids}
+        if sess_ids:
+            votes = supabase.table('seminar_votes').select('session_id') \
+                .in_('session_id', sess_ids).eq('attending', True).execute().data or []
+            for v in votes:
+                counts[v['session_id']] = counts.get(v['session_id'], 0) + 1
+        return jsonify({'status': 'success', 'counts': counts, 'max_capacity': term.get('max_capacity', 32)})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @app.route('/api/seminar_vote/submit', methods=['POST'])
@@ -3317,6 +3393,7 @@ def seminar_vote_submit():
 
         max_cap = int(term.get('max_capacity', 32))
         success, full, skipped = [], [], []
+        is_admin = session.get('user_role') in ('admin', 'officer')
 
         # 회차 ID 화이트리스트 (이 학기 소속만 허용)
         valid_sessions = supabase.table('seminar_sessions').select('id, meeting_date, day_type, is_active') \
@@ -3330,8 +3407,8 @@ def seminar_vote_submit():
                 continue
             label = f"{valid_map[sid]['meeting_date']} ({valid_map[sid]['day_type']})"
 
-            # 투표 윈도우 체크: 전주 금요일 18:00 ~ 회차 당일 23:59 KST 외에는 차단
-            if not _is_voting_open(valid_map[sid]['meeting_date']):
+            # 투표 윈도우 체크: 관리자/임원은 언제든 가능
+            if not is_admin and not _is_voting_open(valid_map[sid]['meeting_date']):
                 skipped.append(f"{label} - 투표 기간 외")
                 continue
 
