@@ -25,18 +25,39 @@
             {% endif %}
         {% endwith %}
 
-        <div class="eva-card shadow-lg rounded-xl px-8 pt-6 pb-8 mb-4">
-            <h1 class="text-3xl font-bold text-center text-eva-green mb-8">LOGIN</h1>
-            <div class="text-center space-y-4">
-                <a href="{{ url_for('kakao_login') }}"
-                   class="inline-flex items-center justify-center bg-[#FEE500] text-black font-bold py-3 px-6 rounded-lg w-full max-w-xs hover:opacity-90 transition-opacity">
+        <div class="eva-card shadow-lg rounded-xl px-8 pt-8 pb-8 mb-4">
+            <h1 class="text-3xl font-bold text-center text-eva-green mb-2">책 먹는 호반우</h1>
+            <p class="text-center text-sm text-gray-400 mb-8">로그인 또는 회원가입을 선택해주세요</p>
+
+            <!-- 기존 회원: 로그인 -->
+            <div class="mb-5">
+                <a href="{{ url_for('kakao_login', mode='login') }}"
+                   class="flex items-center justify-center bg-[#FEE500] text-black font-bold py-4 px-6 rounded-lg w-full hover:opacity-90 transition-opacity shadow-md">
                     <svg class="w-6 h-6 mr-3" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 4.44c-4.42 0-8 3.22-8 7.22 0 2.89 1.83 5.42 4.5 6.63l-1.03 3.42 3.42-2.14c.37.07.75.1 1.12.1 4.42 0 8-3.22 8-7.22S16.42 4.44 12 4.44z" fill-opacity="0.9"></path></svg>
-                    <span>카카오 계정으로 로그인</span>
+                    <span>카카오로 로그인</span>
                 </a>
-                </div>
+                <p class="text-xs text-gray-500 mt-2 text-center">이미 가입된 카카오 계정으로 들어가기</p>
+            </div>
+
+            <!-- 구분선 -->
+            <div class="flex items-center my-6">
+                <div class="flex-1 border-t border-gray-700"></div>
+                <span class="px-3 text-xs text-gray-500">처음이세요?</span>
+                <div class="flex-1 border-t border-gray-700"></div>
+            </div>
+
+            <!-- 신규/연결: 회원가입 -->
+            <div>
+                <a href="{{ url_for('kakao_login', mode='signup') }}"
+                   class="flex items-center justify-center bg-transparent border-2 border-eva-green text-eva-green font-bold py-4 px-6 rounded-lg w-full hover:bg-eva-green hover:text-black transition-colors">
+                    <span>✨ 회원가입 / 계정 연결</span>
+                </a>
+                <p class="text-xs text-gray-500 mt-2 text-center">카카오 인증 후 본인 확인을 진행합니다</p>
+            </div>
+
              <div class="text-center mt-8">
-                <a class="inline-block align-baseline font-bold text-sm text-gray-500 hover:text-eva-green" href="/">
-                    &lt;&lt; BACK TO MAIN
+                <a class="inline-block align-baseline text-xs text-gray-500 hover:text-eva-green" href="/">
+                    &lt;&lt; 메인으로 돌아가기
                 </a>
             </div>
         </div>
