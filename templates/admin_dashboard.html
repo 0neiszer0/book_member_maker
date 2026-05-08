@@ -286,6 +286,35 @@
                     </div>
                 </div>
 
+                <!-- 스페셜 이벤트 (MT/워크숍/강연/친목) -->
+                <div id="sec-special" class="eva-card p-6 rounded-lg scroll-mt-20 mb-6">
+                    <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+                        <h2 class="text-xl font-bold text-eva-green">🎉 스페셜 이벤트</h2>
+                        <a href="{{ url_for('admin_special_events') }}"
+                           class="text-sm bg-eva-green text-black font-bold px-3 py-1.5 rounded hover:opacity-80">
+                            관리 페이지로 →
+                        </a>
+                    </div>
+                    <p class="text-xs text-gray-400">
+                        세미나·벽돌책·소모임 외의 1회성 행사(MT, 워크숍, 강연, 친목 모임 등)를 등록·관리하고 참석자 명단을 기록합니다.
+                        회원 활동 매트릭스에도 자동 반영됩니다.
+                    </p>
+                </div>
+
+                <!-- 출석 매트릭스 (관리자 도구) -->
+                <div class="eva-card p-6 rounded-lg scroll-mt-20 mb-6">
+                    <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+                        <h2 class="text-xl font-bold text-eva-green">📊 출석 매트릭스</h2>
+                        <a href="{{ url_for('admin_attendance_matrix') }}"
+                           class="text-sm bg-eva-green text-black font-bold px-3 py-1.5 rounded hover:opacity-80">
+                            매트릭스 보기 →
+                        </a>
+                    </div>
+                    <p class="text-xs text-gray-400">
+                        가로축은 세미나 회차, 세로축은 회원으로 한 출석 표를 보고 엑셀(.xlsx)로 내보낼 수 있습니다.
+                    </p>
+                </div>
+
                 <!-- 세미나 출석 투표 관리 -->
                 <div id="sec-seminars" class="eva-card p-6 rounded-lg scroll-mt-20">
                     <h2 class="text-xl font-bold text-eva-green mb-4">세미나 출석 투표 관리</h2>

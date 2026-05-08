@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스페셜 이벤트 관리</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --eva-purple: #6A0DAD; --eva-green: #00FF7F; --eva-orange: #FF8C00;
+            --bg-dark: #1A1A1A; --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444;
+        }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
+        h1, h2 { font-family: 'Orbitron', sans-serif; }
+        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
+        .eva-input { background-color: var(--bg-dark); border: 1px solid var(--border-dark); color: var(--text-light); }
+        .eva-input:focus { border-color: var(--eva-green); outline: none; }
+        .text-eva-green { color: var(--eva-green); }
+        .bg-eva-green { background-color: var(--eva-green); }
+        .border-eva-green { border-color: var(--eva-green); }
+        .eva-button-secondary { background-color: var(--card-dark); border: 1px solid var(--eva-green); color: var(--eva-green); }
+        .bg-card-dark { background-color: var(--card-dark); }
+        .border-border-dark { border-color: var(--border-dark); }
+        .cat-pill { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; }
+        .cat-mt { background: rgba(0, 255, 127, 0.2); color: var(--eva-green); }
+        .cat-workshop { background: rgba(255, 140, 0, 0.2); color: var(--eva-orange); }
+        .cat-lecture { background: rgba(106, 13, 173, 0.3); color: #c8a2ff; }
+        .cat-social { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+        .cat-event { background: rgba(100, 100, 100, 0.3); color: #ddd; }
+    </style>
+</head>
+
+<body class="min-h-screen">
+    {% include '_header.html' %}
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-6xl">
+        <div class="flex items-center justify-between mb-6 flex-wrap gap-2">
+            <h1 class="text-2xl sm:text-3xl font-bold text-eva-green">🎉 스페셜 이벤트</h1>
+            <a href="{{ url_for('admin_dashboard') }}" class="text-sm text-gray-400 hover:text-eva-green">← 관리자 대시보드</a>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+        <div class="p-3 mb-4 text-sm rounded-lg border bg-red-900/50 text-red-300 border-red-500/50">{{ message }}</div>
+        {% endfor %}
+        {% endwith %}
+
+        <!-- 새 이벤트 만들기 -->
+        <div class="eva-card rounded-lg p-5 mb-6">
+            <h2 class="text-lg font-bold text-eva-green mb-3">➕ 새 이벤트 등록</h2>
+            <p class="text-xs text-gray-400 mb-4">MT, 워크숍, 강연, 친목 행사 등 정규 세미나 외의 활동을 기록합니다. 회원 활동 통계에도 반영됩니다.</p>
+            <form id="createForm" class="grid grid-cols-1 md:grid-cols-6 gap-3">
+                <input type="text" name="name" required placeholder="이벤트 이름 (예: 여름 MT)"
+                    class="eva-input rounded px-3 py-2 text-sm md:col-span-3">
+                <select name="category" class="eva-input rounded px-3 py-2 text-sm md:col-span-1">
+                    <option value="event">행사</option>
+                    <option value="mt">MT</option>
+                    <option value="workshop">워크숍</option>
+                    <option value="lecture">강연</option>
+                    <option value="social">친목</option>
+                </select>
+                <input type="date" name="event_date" required
+                    class="eva-input rounded px-3 py-2 text-sm md:col-span-1">
+                <input type="date" name="end_date" placeholder="종료일(선택)"
+                    class="eva-input rounded px-3 py-2 text-sm md:col-span-1">
+                <input type="text" name="description" placeholder="설명/장소 (선택)"
+                    class="eva-input rounded px-3 py-2 text-sm md:col-span-4">
+                <select name="term_id" class="eva-input rounded px-3 py-2 text-sm md:col-span-2">
+                    <option value="">학기 미연결</option>
+                    {% for t in terms %}
+                    <option value="{{ t.id }}">{{ t.name }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit"
+                    class="bg-eva-green text-black font-bold py-2 px-4 rounded hover:opacity-80 md:col-span-6">
+                    등록
+                </button>
+            </form>
+        </div>
+
+        <!-- 이벤트 목록 -->
+        <div class="eva-card rounded-lg p-5">
+            <h2 class="text-lg font-bold text-eva-green mb-4">📅 등록된 이벤트 ({{ events|length }}건)</h2>
+            {% if events %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-700 text-gray-400 text-xs">
+                            <th class="text-left py-2 px-2">날짜</th>
+                            <th class="text-left py-2 px-2">이벤트</th>
+                            <th class="text-left py-2 px-2 hidden md:table-cell">분류</th>
+                            <th class="text-center py-2 px-2">참석자</th>
+                            <th class="text-center py-2 px-2">상태</th>
+                            <th class="text-right py-2 px-2">작업</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for evt in events %}
+                        <tr class="border-b border-gray-800 hover:bg-gray-800/50">
+                            <td class="py-2 px-2 text-gray-300 whitespace-nowrap">
+                                {{ evt.event_date }}
+                                {% if evt.end_date and evt.end_date != evt.event_date %}<br><span class="text-xs text-gray-500">~ {{ evt.end_date }}</span>{% endif %}
+                            </td>
+                            <td class="py-2 px-2">
+                                <a href="{{ url_for('admin_special_event_detail', event_id=evt.id) }}"
+                                    class="font-bold text-eva-green hover:underline">{{ evt.name }}</a>
+                                {% if evt.description %}<div class="text-xs text-gray-500 truncate max-w-xs">{{ evt.description }}</div>{% endif %}
+                            </td>
+                            <td class="py-2 px-2 hidden md:table-cell">
+                                <span class="cat-pill cat-{{ evt.category or 'event' }}">{{ evt.category or 'event' }}</span>
+                            </td>
+                            <td class="py-2 px-2 text-center font-bold text-eva-green">{{ evt.attendee_count }}</td>
+                            <td class="py-2 px-2 text-center">
+                                {% if evt.is_active %}
+                                <span class="text-xs text-eva-green">공개</span>
+                                {% else %}
+                                <span class="text-xs text-gray-500">숨김</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2 px-2 text-right whitespace-nowrap">
+                                <a href="{{ url_for('admin_special_event_detail', event_id=evt.id) }}"
+                                    class="text-xs text-eva-green hover:underline mr-2">관리</a>
+                                <button onclick="toggleActive('{{ evt.id }}', this)"
+                                    class="text-xs text-yellow-400 hover:underline mr-2">
+                                    {{ '숨기기' if evt.is_active else '공개' }}
+                                </button>
+                                <button onclick="deleteEvent('{{ evt.id }}', '{{ evt.name|e }}')"
+                                    class="text-xs text-red-400 hover:underline">삭제</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-center py-8 text-gray-500 text-sm">아직 등록된 이벤트가 없습니다. 위에서 첫 이벤트를 등록해보세요.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('createForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fd = new FormData(e.target);
+            const payload = Object.fromEntries(fd.entries());
+            try {
+                const res = await fetch('/api/admin/special_events/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error || '등록 실패');
+                location.reload();
+            } catch (err) { alert(err.message); }
+        });
+
+        async function toggleActive(id, btn) {
+            try {
+                const res = await fetch(`/api/admin/special_events/${id}/toggle_active`, { method: 'POST' });
+                if (!res.ok) throw new Error('실패');
+                location.reload();
+            } catch (e) { alert(e.message); }
+        }
+
+        async function deleteEvent(id, name) {
+            if (!confirm(`이벤트 "${name}" 을 영구 삭제합니다.\n참석자 명단까지 함께 삭제됩니다.\n계속할까요?`)) return;
+            try {
+                const res = await fetch(`/api/admin/special_events/${id}/delete`, { method: 'POST' });
+                if (!res.ok) throw new Error('삭제 실패');
+                location.reload();
+            } catch (e) { alert(e.message); }
+        }
+    </script>
+</body>
+</html>
