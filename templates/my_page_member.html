@@ -231,7 +231,7 @@
         <!-- 내 활동 기록 -->
         <section class="mb-6">
             <h2 class="section-title">📚 내 최근 활동</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 
                 <!-- 최근 세미나 -->
                 <div class="eva-card rounded-xl p-4">
@@ -269,6 +269,21 @@
                         </a>
                         {% else %}
                         <p class="text-xs text-gray-500 text-center py-4">참여 중인 책이 없습니다.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- 스페셜 이벤트 -->
+                <div class="eva-card rounded-xl p-4">
+                    <h3 class="text-sm font-bold text-eva-green mb-3">✨ 스페셜 이벤트</h3>
+                    <div class="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                        {% for ev in (my_special_events or []) %}
+                        <div class="block px-3 py-2 rounded bg-gray-800/50 text-xs">
+                            <div class="font-bold text-gray-200 truncate">{{ ev.name }}</div>
+                            <div class="text-gray-400">{{ ev.event_date }} · {{ ev.category }}</div>
+                        </div>
+                        {% else %}
+                        <p class="text-xs text-gray-500 text-center py-4">참여한 이벤트가 없습니다.</p>
                         {% endfor %}
                     </div>
                 </div>

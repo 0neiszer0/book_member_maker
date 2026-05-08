@@ -5,6 +5,7 @@ python-dotenv
 requests
 pandas
 numpy
+openpyxl
 deap
 mwparserfromhell
 bleach
