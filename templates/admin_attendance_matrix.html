@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>출석 매트릭스</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --eva-purple:#6A0DAD; --eva-green:#00FF7F; --bg-dark:#1A1A1A; --card-dark:#2D2D2D; --text-light:#E5E5E5; --border-dark:#444444; }
+        body { font-family:'Noto Sans KR', sans-serif; background:var(--bg-dark); color:var(--text-light); }
+        h1, h2 { font-family:'Orbitron', sans-serif; }
+        .eva-card { background:var(--card-dark); border:1px solid var(--border-dark); }
+        .eva-input { background:var(--bg-dark); border:1px solid var(--border-dark); color:var(--text-light); }
+        .eva-input:focus { border-color:var(--eva-green); outline:none; }
+        .text-eva-green { color:var(--eva-green); }
+        .bg-eva-green { background:var(--eva-green); }
+
+        .matrix-table { border-collapse: collapse; font-size: 0.78rem; }
+        .matrix-table th, .matrix-table td {
+            border: 1px solid #3a3a3a;
+            padding: 0.35rem 0.45rem;
+            text-align: center;
+            white-space: nowrap;
+        }
+        .matrix-table th {
+            background: #1f1f1f;
+            color: #ddd;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+        .matrix-table th.row-header,
+        .matrix-table td.row-header {
+            position: sticky;
+            left: 0;
+            z-index: 6;
+            background: var(--card-dark);
+            text-align: left;
+        }
+        .matrix-table th.row-header { z-index: 7; background:#1f1f1f; }
+        .cell-O { color: var(--eva-green); font-weight: 700; }
+        .cell-X { color: #5a5a5a; }
+    </style>
+</head>
+
+<body class="min-h-screen">
+    {% include '_header.html' %}
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-full">
+        <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+            <h1 class="text-2xl sm:text-3xl font-bold text-eva-green">📊 출석 매트릭스</h1>
+            <a href="{{ url_for('admin_dashboard') }}" class="text-sm text-gray-400 hover:text-eva-green">← 관리자 대시보드</a>
+        </div>
+
+        <!-- 필터 -->
+        <form method="get" class="eva-card rounded-lg p-4 mb-4">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+                <div class="md:col-span-2">
+                    <label class="block text-xs text-gray-400 mb-1">학기 선택 (자동으로 기간 채움)</label>
+                    <select name="term_id" class="eva-input w-full rounded px-3 py-2 text-sm">
+                        <option value="">직접 기간 지정</option>
+                        {% for t in terms %}
+                        <option value="{{ t.id }}" {% if t.id == term_id %}selected{% endif %}>{{ t.name }} ({{ t.start_date }}~{{ t.end_date }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">시작일</label>
+                    <input type="date" name="start_date" value="{{ start_date }}"
+                        class="eva-input w-full rounded px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">종료일</label>
+                    <input type="date" name="end_date" value="{{ end_date }}"
+                        class="eva-input w-full rounded px-3 py-2 text-sm">
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit"
+                        class="bg-eva-green text-black font-bold py-2 px-3 rounded text-sm hover:opacity-80 flex-1">조회</button>
+                    <a href="{{ url_for('admin_attendance_matrix_export', term_id=term_id, start_date=start_date, end_date=end_date) }}"
+                        class="bg-blue-600 text-white font-bold py-2 px-3 rounded text-sm hover:bg-blue-700 text-center">📥 엑셀</a>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">
+                💡 같은 주의 월/목 회차는 한 칸으로 묶입니다 (둘 중 하나라도 출석하면 O). 데이터 출처: 확정된 세미나 기록(history).
+            </p>
+        </form>
+
+        <!-- 매트릭스 -->
+        <div class="eva-card rounded-lg p-3 overflow-auto" style="max-height:75vh;">
+            {% if weeks %}
+            <table class="matrix-table">
+                <thead>
+                    <tr>
+                        <th class="row-header">이름</th>
+                        <th>학번</th>
+                        {% for w in weeks %}
+                        <th title="{{ w.title }}">
+                            <div>{{ w.label }}</div>
+                            <div class="text-[9px] text-gray-500 max-w-[80px] truncate">{{ w.title }}</div>
+                        </th>
+                        {% endfor %}
+                        <th class="text-eva-green">합계</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in members %}
+                    {% set cnt = member_counts[m.id] %}
+                    {% if cnt > 0 or m.is_active %}
+                    <tr>
+                        <td class="row-header">
+                            <div class="font-bold">{{ m.name }}</div>
+                            {% if not m.is_active %}<span class="text-[9px] text-gray-500">(비활성)</span>{% endif %}
+                        </td>
+                        <td class="text-gray-400">{{ m.student_id or '-' }}</td>
+                        {% for w in weeks %}
+                        {% set attended = matrix.get(m.id, {}).get(w.key) %}
+                        <td class="{% if attended %}cell-O{% else %}cell-X{% endif %}">
+                            {{ 'O' if attended else 'X' }}
+                        </td>
+                        {% endfor %}
+                        <td class="font-bold text-eva-green">{{ cnt }}</td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="text-center py-8 text-gray-500">선택한 기간에 세미나 기록이 없습니다.</p>
+            {% endif %}
+        </div>
+
+        <p class="text-xs text-gray-500 mt-3">
+            전체 회원 {{ members|length }}명 · 회차 {{ weeks|length }}주 표시
+        </p>
+    </div>
+
+    <script>
+        // 학기 select 변경 시 자동 제출
+        document.querySelector('select[name=term_id]').addEventListener('change', function() {
+            // 학기 선택 시 기존 시작/종료일 비우고 학기 기간으로 자동 채워지게
+            if (this.value) {
+                document.querySelector('input[name=start_date]').value = '';
+                document.querySelector('input[name=end_date]').value = '';
+            }
+        });
+    </script>
+</body>
+</html>
