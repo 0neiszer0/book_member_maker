@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ event.name }} - 스페셜 이벤트</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --eva-purple:#6A0DAD; --eva-green:#00FF7F; --bg-dark:#1A1A1A; --card-dark:#2D2D2D; --text-light:#E5E5E5; --border-dark:#444444; }
+        body { font-family:'Noto Sans KR', sans-serif; background:var(--bg-dark); color:var(--text-light); }
+        h1, h2 { font-family:'Orbitron', sans-serif; }
+        .eva-card { background:var(--card-dark); border:1px solid var(--border-dark); }
+        .eva-input { background:var(--bg-dark); border:1px solid var(--border-dark); color:var(--text-light); }
+        .eva-input:focus { border-color:var(--eva-green); outline:none; }
+        .text-eva-green { color:var(--eva-green); }
+        .bg-eva-green { background:var(--eva-green); }
+        .member-chip { display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,255,127,0.1); border:1px solid rgba(0,255,127,0.3); padding:0.25rem 0.6rem; border-radius:999px; font-size:0.78rem; }
+        .member-chip button { color:#ef4444; font-weight:bold; cursor:pointer; }
+    </style>
+</head>
+
+<body class="min-h-screen">
+    {% include '_header.html' %}
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-5xl">
+        <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+            <h1 class="text-2xl sm:text-3xl font-bold text-eva-green">✨ {{ event.name }}</h1>
+            <a href="{{ url_for('admin_special_events') }}" class="text-sm text-gray-400 hover:text-eva-green">← 스페셜 이벤트 목록</a>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+        <div class="p-3 mb-4 text-sm rounded-lg border {{ 'bg-green-900/40 text-green-200 border-green-500/40' if category=='success' else 'bg-red-900/40 text-red-200 border-red-500/40' }}">{{ message }}</div>
+        {% endfor %}
+        {% endwith %}
+
+        <!-- 이벤트 정보 -->
+        <div class="eva-card rounded-lg p-5 mb-6">
+            <h2 class="text-lg font-bold text-eva-green mb-3">이벤트 정보</h2>
+            <form id="infoForm" class="grid grid-cols-1 md:grid-cols-6 gap-3">
+                <div class="md:col-span-3">
+                    <label class="block text-xs text-gray-400 mb-1">이름</label>
+                    <input name="name" value="{{ event.name }}" class="eva-input w-full rounded px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">분류</label>
+                    <select name="category" class="eva-input w-full rounded px-3 py-2 text-sm">
+                        {% for c in ['event','mt','workshop','lecture'] %}
+                        <option value="{{ c }}" {% if event.category==c %}selected{% endif %}>{{ c }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">시작일</label>
+                    <input name="event_date" type="date" value="{{ event.event_date }}" class="eva-input w-full rounded px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">종료일</label>
+                    <input name="end_date" type="date" value="{{ event.end_date or '' }}" class="eva-input w-full rounded px-3 py-2 text-sm">
+                </div>
+                <div class="md:col-span-3">
+                    <label class="block text-xs text-gray-400 mb-1">장소</label>
+                    <input name="location" value="{{ event.location or '' }}" class="eva-input w-full rounded px-3 py-2 text-sm">
+                </div>
+                <div class="md:col-span-3">
+                    <label class="block text-xs text-gray-400 mb-1">학기 연결</label>
+                    <select name="term_id" class="eva-input w-full rounded px-3 py-2 text-sm">
+                        <option value="">없음</option>
+                        {% for t in terms %}
+                        <option value="{{ t.id }}" {% if t.id==event.term_id %}selected{% endif %}>{{ t.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="md:col-span-6">
+                    <label class="block text-xs text-gray-400 mb-1">설명</label>
+                    <textarea name="description" rows="3" class="eva-input w-full rounded px-3 py-2 text-sm">{{ event.description or '' }}</textarea>
+                </div>
+                <div class="md:col-span-6 text-right">
+                    <button type="submit" class="bg-eva-green text-black font-bold py-2 px-5 rounded text-sm hover:opacity-80">저장</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- 참여자 -->
+        <div class="eva-card rounded-lg p-5">
+            <h2 class="text-lg font-bold text-eva-green mb-3">참여자 ({{ attendees|length }}명)</h2>
+
+            <div class="mb-4">
+                <label class="block text-xs text-gray-400 mb-1">회원 추가 (이름 검색 후 체크)</label>
+                <input id="memberSearch" placeholder="이름으로 검색…" class="eva-input w-full rounded px-3 py-2 text-sm mb-2">
+                <div id="memberPicker" class="max-h-48 overflow-y-auto border border-border-dark rounded p-2 mb-2 text-sm">
+                    {% for m in all_members %}
+                    <label class="block px-2 py-1 hover:bg-gray-800 cursor-pointer">
+                        <input type="checkbox" class="mr-2 member-cb" value="{{ m.id }}" data-name="{{ m.name }}">
+                        {{ m.name }} <span class="text-xs text-gray-500">{{ m.student_id or '-' }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                <div class="flex gap-2 items-end">
+                    <select id="newRole" class="eva-input rounded px-3 py-2 text-sm">
+                        <option value="attendee">참석자</option>
+                        <option value="organizer">주최</option>
+                        <option value="speaker">발표</option>
+                    </select>
+                    <input id="newNote" placeholder="메모 (선택)" class="eva-input flex-1 rounded px-3 py-2 text-sm">
+                    <button id="addBtn" class="bg-eva-green text-black font-bold py-2 px-4 rounded text-sm hover:opacity-80">+ 추가</button>
+                </div>
+            </div>
+
+            {% if attendees %}
+            <div class="flex flex-wrap gap-2">
+                {% for a in attendees %}
+                {% set m = a.members or {} %}
+                <span class="member-chip" data-attendee-id="{{ a.id }}">
+                    <strong>{{ m.name }}</strong>
+                    <span class="text-xs text-gray-400">({{ a.role }}{% if a.note %}·{{ a.note }}{% endif %})</span>
+                    <button type="button" class="remove-att">×</button>
+                </span>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-center text-gray-500 py-4">아직 참여자가 없습니다.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+    const eventId = "{{ event.id }}";
+
+    document.getElementById('infoForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const payload = Object.fromEntries(fd.entries());
+        const res = await fetch(`/api/admin/special_events/${eventId}/update`, {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const r = await res.json();
+        if (r.status === 'success') alert('저장되었습니다.');
+        else alert('실패: ' + (r.message || '오류'));
+    });
+
+    document.getElementById('memberSearch')?.addEventListener('input', (e) => {
+        const q = e.target.value.toLowerCase();
+        document.querySelectorAll('#memberPicker label').forEach(l => {
+            l.style.display = l.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+    });
+
+    document.getElementById('addBtn')?.addEventListener('click', async () => {
+        const ids = Array.from(document.querySelectorAll('.member-cb:checked')).map(cb => cb.value);
+        if (ids.length === 0) return alert('회원을 선택하세요.');
+        const role = document.getElementById('newRole').value;
+        const note = document.getElementById('newNote').value;
+        const res = await fetch(`/api/admin/special_events/${eventId}/attendees/add`, {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ member_ids: ids, role, note })
+        });
+        const r = await res.json();
+        if (r.status === 'success') location.reload();
+        else alert('실패: ' + (r.message || '오류'));
+    });
+
+    document.querySelectorAll('.remove-att').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const chip = btn.closest('.member-chip');
+            const aid = chip.dataset.attendeeId;
+            if (!confirm('참여자를 삭제할까요?')) return;
+            const res = await fetch(`/api/admin/special_events/${eventId}/attendees/${aid}/delete`, { method:'POST' });
+            const r = await res.json();
+            if (r.status === 'success') chip.remove();
+            else alert('실패: ' + (r.message || '오류'));
+        });
+    });
+    </script>
+</body>
+</html>
