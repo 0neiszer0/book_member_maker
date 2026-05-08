@@ -245,29 +245,32 @@
                             </thead>
                             <tbody class="text-sm">
                                 {% for event in topic_events %}
-                                <tr class="border-b border-gray-800 hover:bg-gray-800/50 transition-colors">
+                                <tr class="border-b border-gray-800 hover:bg-gray-800/50 transition-colors {% if not event.is_active %}opacity-60{% endif %}"
+                                    data-event-id="{{ event.id }}">
                                     <td class="p-3">{{ event.meeting_date }}</td>
                                     <td class="p-3 font-bold text-text-light">{{ event.book_title }}</td>
                                     <td class="p-3">
-                                        {% if event.is_active %}
-                                        <span
-                                            class="bg-green-900/50 text-green-400 px-2 py-1 rounded text-xs font-bold">진행중</span>
-                                        {% else %}
-                                        <span class="bg-gray-700 text-gray-400 px-2 py-1 rounded text-xs">마감됨</span>
-                                        {% endif %}
+                                        <span class="status-badge px-2 py-1 rounded text-xs font-bold
+                                            {% if event.is_active %}bg-green-900/50 text-green-400{% else %}bg-gray-700 text-gray-400{% endif %}">
+                                            {% if event.is_active %}공개중{% else %}숨김{% endif %}
+                                        </span>
                                     </td>
-                                    <td class="p-3 text-center space-x-2">
+                                    <td class="p-3 text-center space-x-1">
                                         <button onclick="copyTopicLink('{{ event.share_token }}')"
-                                            class="bg-gray-700 hover:bg-gray-600 text-white py-1.5 px-3 rounded shadow">
+                                            class="bg-gray-700 hover:bg-gray-600 text-white py-1.5 px-3 rounded shadow text-xs">
                                             링크 복사
                                         </button>
                                         <a href="/admin/topics/{{ event.id }}/view"
-                                            class="bg-blue-700 hover:bg-blue-600 text-white py-1.5 px-3 rounded shadow inline-block">
+                                            class="bg-blue-700 hover:bg-blue-600 text-white py-1.5 px-3 rounded shadow inline-block text-xs">
                                             발제문 확인
                                         </a>
+                                        <button onclick="toggleTopicEvent('{{ event.id }}', this)"
+                                            class="toggle-btn {% if event.is_active %}bg-yellow-700 hover:bg-yellow-600{% else %}bg-emerald-700 hover:bg-emerald-600{% endif %} text-white py-1.5 px-3 rounded shadow text-xs">
+                                            {% if event.is_active %}숨기기{% else %}공개{% endif %}
+                                        </button>
                                         <button onclick="deleteTopicEvent('{{ event.id }}', '{{ event.book_title }}')"
-                                            class="bg-red-700 hover:bg-red-600 text-white py-1.5 px-3 rounded shadow">
-                                            삭제
+                                            class="bg-red-800 hover:bg-red-700 text-white py-1.5 px-3 rounded shadow text-xs">
+                                            영구 삭제
                                         </button>
                                     </td>
                                 </tr>
@@ -732,8 +735,41 @@
             });
         }
 
+        async function toggleTopicEvent(eventId, btn) {
+            try {
+                const response = await fetch(`/api/admin/topic_events/${eventId}/toggle_active`, { method: 'POST' });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    const row = btn.closest('tr');
+                    const badge = row.querySelector('.status-badge');
+                    if (result.is_active) {
+                        btn.textContent = '숨기기';
+                        btn.className = 'toggle-btn bg-yellow-700 hover:bg-yellow-600 text-white py-1.5 px-3 rounded shadow text-xs';
+                        badge.textContent = '공개중';
+                        badge.className = 'status-badge px-2 py-1 rounded text-xs font-bold bg-green-900/50 text-green-400';
+                        row.classList.remove('opacity-60');
+                    } else {
+                        btn.textContent = '공개';
+                        btn.className = 'toggle-btn bg-emerald-700 hover:bg-emerald-600 text-white py-1.5 px-3 rounded shadow text-xs';
+                        badge.textContent = '숨김';
+                        badge.className = 'status-badge px-2 py-1 rounded text-xs font-bold bg-gray-700 text-gray-400';
+                        row.classList.add('opacity-60');
+                    }
+                } else {
+                    alert(`상태 변경 실패: ${result.error || result.message}`);
+                }
+            } catch (err) {
+                alert('상태 변경 중 오류가 발생했습니다.');
+            }
+        }
+
         async function deleteTopicEvent(eventId, bookTitle) {
-            if (!confirm(`'${bookTitle}' 발제문 이벤트를 삭제하시겠습니까?\n제출된 모든 발제문도 함께 삭제됩니다.`)) return;
+            if (!confirm(`⚠️ '${bookTitle}' 이벤트를 영구 삭제합니다.\n\n제출된 모든 발제문도 함께 삭제되며 복구할 수 없습니다.\n\n사용자에게만 숨기려면 '숨기기' 버튼을 사용하세요.\n\n계속하시겠습니까?`)) return;
+            const confirmText = prompt(`정말 삭제하려면 책 제목을 그대로 입력하세요:\n${bookTitle}`);
+            if (confirmText !== bookTitle) {
+                if (confirmText !== null) alert('책 제목이 일치하지 않아 삭제를 취소했습니다.');
+                return;
+            }
             try {
                 const response = await fetch(`/api/admin/topic_events/${eventId}/delete`, { method: 'POST' });
                 const result = await response.json();

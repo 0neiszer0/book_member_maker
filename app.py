@@ -1903,7 +1903,7 @@ def _adjust_co_matrix(groups, date_str, sign):
     if del_keys:
         supabase.table('bookclub_co_matrix').delete().in_('pair_key', del_keys).execute()
     if upsert_rows:
-        supabase.table('bookclub_co_matrix').upsert(upsert_rows).execute()
+        supabase.table('bookclub_co_matrix').upsert(upsert_rows, on_conflict='pair_key').execute()
 
 
 # [신규] 조 편성 기록을 DB에 저장하는 헬퍼 함수
@@ -1936,7 +1936,7 @@ def save_group_record_to_db(date, present, facilitators, groups, book_title=None
                 new_count = current_counts.get(key, 0) + increment
                 final_upsert_data.append({"pair_key": key, "count": new_count, "last_met": date})
 
-            supabase.table("bookclub_co_matrix").upsert(final_upsert_data).execute()
+            supabase.table("bookclub_co_matrix").upsert(final_upsert_data, on_conflict='pair_key').execute()
 
         return {"status": "ok"}
     except Exception as e:
@@ -2073,7 +2073,7 @@ def bookclub_api_delete_history():
             if del_keys:
                 supabase.table('bookclub_co_matrix').delete().in_('pair_key', del_keys).execute()
             if upsert_rows:
-                supabase.table('bookclub_co_matrix').upsert(upsert_rows).execute()
+                supabase.table('bookclub_co_matrix').upsert(upsert_rows, on_conflict='pair_key').execute()
 
         return jsonify({"status": "ok"})
     except Exception as e:
@@ -2805,20 +2805,33 @@ def create_topic_event():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# 1.5. 관리자: 발제문 이벤트 삭제 API
+# 1.5. 관리자: 발제문 이벤트 영구 삭제 API (제출 내역까지 포함)
 @app.route('/api/admin/topic_events/<event_id>/delete', methods=['POST'])
 @login_required(role="admin")
 def delete_topic_event(event_id):
     try:
-        # 먼저 연관된 발제문 제출 내역들을 모두 삭제
         supabase.table('topic_submissions').delete().eq('event_id', event_id).execute()
-        # 이벤트 본체 삭제
         supabase.table('topic_events').delete().eq('id', event_id).execute()
-        
-        return jsonify({"status": "success", "message": "발제문 수집 이벤트가 삭제되었습니다."})
+        return jsonify({"status": "success", "message": "발제문 이벤트가 영구 삭제되었습니다."})
     except Exception as e:
         app.logger.error(f"Error deleting topic event: {e}")
         return jsonify({"error": "이벤트 삭제 중 서버 오류가 발생했습니다."}), 500
+
+
+# 1.6. 관리자: 발제문 이벤트 활성/숨김 토글 (soft delete)
+@app.route('/api/admin/topic_events/<event_id>/toggle_active', methods=['POST'])
+@login_required(role="admin")
+def toggle_topic_event(event_id):
+    try:
+        cur = supabase.table('topic_events').select('is_active').eq('id', event_id).single().execute().data
+        if not cur:
+            return jsonify({"error": "이벤트를 찾을 수 없습니다."}), 404
+        new_state = not bool(cur.get('is_active'))
+        supabase.table('topic_events').update({'is_active': new_state}).eq('id', event_id).execute()
+        return jsonify({"status": "success", "is_active": new_state})
+    except Exception as e:
+        app.logger.error(f"Error toggling topic event: {e}")
+        return jsonify({"error": "상태 변경 중 오류가 발생했습니다."}), 500
 
 
 # 2. 사용자: 공유 링크를 통한 발제문 작성 페이지
