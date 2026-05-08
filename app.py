@@ -2729,6 +2729,9 @@ def my_page():
             app.logger.warning(f"my_page activity error: {e}")
             activity = {'seminar_count': 0, 'facilitator_count': 0, 'brick_sessions': [], 'study_sessions': []}
 
+        # 내가 참여한 스페셜 이벤트 (최근 5개)
+        my_special_events = _member_special_events(user_id)[:5]
+
         # 현재 투표 가능한 세미나 회차 (학기별)
         my_open_votes = []
         try:
@@ -2765,6 +2768,7 @@ def my_page():
             active_topic_events=active_topic_events,
             activity=activity,
             my_open_votes=my_open_votes,
+            my_special_events=my_special_events,
         )
 
     except Exception as e:
@@ -3819,7 +3823,9 @@ def records_member_profile(member_id):
             flash("멤버를 찾을 수 없습니다.", "danger")
             return redirect(url_for('records_members') if session.get('user_role') == 'admin' else url_for('my_page'))
         activity = _aggregate_member_activity(member_id, member.get('name', ''))
-        return render_template('records_member_profile.html', member=member, **activity)
+        special_events = _member_special_events(member_id)
+        return render_template('records_member_profile.html', member=member,
+                               special_events=special_events, **activity)
     except Exception as e:
         app.logger.error(f"records_member_profile error: {e}", exc_info=True)
         flash(f"프로필 로딩 오류: {e}", 'danger')
@@ -4284,6 +4290,309 @@ def records_analytics():
         app.logger.error(f"records_analytics error: {e}", exc_info=True)
         flash(f"오류: {e}", 'danger')
         return redirect(url_for('records_hub'))
+
+
+# ==============================================================================
+# --- 6.9 스페셜 이벤트 (MT, 워크숍, 강연 등) ---
+# ==============================================================================
+
+@app.route('/admin/special_events')
+@login_required(role="admin")
+def admin_special_events():
+    try:
+        events = supabase.table('special_events') \
+            .select('id, name, category, event_date, end_date, is_active, location, term_id, description') \
+            .order('event_date', desc=True).execute().data or []
+        # 참여자 수 카운트
+        if events:
+            ev_ids = [e['id'] for e in events]
+            att_rows = supabase.table('special_event_attendees') \
+                .select('event_id').in_('event_id', ev_ids).execute().data or []
+            counts = {}
+            for r in att_rows:
+                counts[r['event_id']] = counts.get(r['event_id'], 0) + 1
+            for e in events:
+                e['attendee_count'] = counts.get(e['id'], 0)
+        terms = _get_terms_for_filter()
+    except Exception as e:
+        app.logger.error(f"admin_special_events error: {e}", exc_info=True)
+        flash(f"스페셜 이벤트 로딩 오류: {e}", 'danger')
+        events, terms = [], []
+    return render_template('admin_special_events.html', events=events, terms=terms)
+
+
+@app.route('/admin/special_events/<event_id>')
+@login_required(role="admin")
+def admin_special_event_detail(event_id):
+    try:
+        ev = supabase.table('special_events').select('*').eq('id', event_id).single().execute().data
+        if not ev:
+            flash("이벤트를 찾을 수 없습니다.", 'danger')
+            return redirect(url_for('admin_special_events'))
+        atts = supabase.table('special_event_attendees') \
+            .select('id, role, note, member_id, members(id, name, student_id, department)') \
+            .eq('event_id', event_id).execute().data or []
+        atts.sort(key=lambda r: ((r.get('members') or {}).get('name') or ''))
+        all_members = supabase.table('members') \
+            .select('id, name, student_id, department').eq('is_active', True) \
+            .order('name').execute().data or []
+        terms = _get_terms_for_filter()
+    except Exception as e:
+        app.logger.error(f"admin_special_event_detail error: {e}", exc_info=True)
+        flash(f"이벤트 로딩 오류: {e}", 'danger')
+        return redirect(url_for('admin_special_events'))
+    return render_template('admin_special_event_detail.html',
+                           event=ev, attendees=atts, all_members=all_members, terms=terms)
+
+
+@app.route('/api/admin/special_events/create', methods=['POST'])
+@login_required(role="admin")
+def api_special_event_create():
+    try:
+        d = request.json or {}
+        name = (d.get('name') or '').strip()
+        if not name:
+            return jsonify({'status': 'error', 'message': '이름을 입력하세요.'}), 400
+        if not d.get('event_date'):
+            return jsonify({'status': 'error', 'message': '날짜를 입력하세요.'}), 400
+        payload = {
+            'name': name,
+            'description': (d.get('description') or '').strip() or None,
+            'event_date': d['event_date'],
+            'end_date': d.get('end_date') or None,
+            'category': (d.get('category') or 'event').strip(),
+            'location': (d.get('location') or '').strip() or None,
+            'term_id': d.get('term_id') or None,
+            'created_by': session.get('user_id'),
+        }
+        res = supabase.table('special_events').insert(payload).execute()
+        return jsonify({'status': 'success', 'event': (res.data or [None])[0]})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/special_events/<event_id>/update', methods=['POST'])
+@login_required(role="admin")
+def api_special_event_update(event_id):
+    try:
+        d = request.json or {}
+        update = {}
+        for k in ('name', 'description', 'event_date', 'end_date', 'category', 'location', 'term_id', 'is_active'):
+            if k in d:
+                v = d[k]
+                if isinstance(v, str): v = v.strip() or None
+                update[k] = v
+        if not update:
+            return jsonify({'status': 'error', 'message': '변경할 항목이 없습니다.'}), 400
+        supabase.table('special_events').update(update).eq('id', event_id).execute()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/special_events/<event_id>/delete', methods=['POST'])
+@login_required(role="admin")
+def api_special_event_delete(event_id):
+    try:
+        supabase.table('special_events').delete().eq('id', event_id).execute()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/special_events/<event_id>/attendees/add', methods=['POST'])
+@login_required(role="admin")
+def api_special_event_add_attendees(event_id):
+    try:
+        d = request.json or {}
+        member_ids = d.get('member_ids') or []
+        role = (d.get('role') or 'attendee').strip()
+        note = (d.get('note') or '').strip() or None
+        if not isinstance(member_ids, list) or not member_ids:
+            return jsonify({'status': 'error', 'message': '추가할 회원을 선택하세요.'}), 400
+        rows = [{'event_id': event_id, 'member_id': int(mid), 'role': role, 'note': note}
+                for mid in member_ids]
+        supabase.table('special_event_attendees').upsert(rows, on_conflict='event_id,member_id').execute()
+        return jsonify({'status': 'success', 'added': len(rows)})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/special_events/<event_id>/attendees/<attendee_id>/delete', methods=['POST'])
+@login_required(role="admin")
+def api_special_event_remove_attendee(event_id, attendee_id):
+    try:
+        supabase.table('special_event_attendees').delete() \
+            .eq('id', attendee_id).eq('event_id', event_id).execute()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+def _member_special_events(member_id):
+    """한 회원이 참여한 스페셜 이벤트 목록 (최신순)."""
+    try:
+        rows = supabase.table('special_event_attendees') \
+            .select('role, note, special_events(id, name, category, event_date, end_date, location)') \
+            .eq('member_id', member_id).execute().data or []
+        events = []
+        for r in rows:
+            ev = r.get('special_events') or {}
+            if not ev: continue
+            events.append({
+                'id': ev.get('id'), 'name': ev.get('name'), 'category': ev.get('category'),
+                'event_date': ev.get('event_date'), 'end_date': ev.get('end_date'),
+                'location': ev.get('location'),
+                'role': r.get('role'), 'note': r.get('note'),
+            })
+        events.sort(key=lambda x: x.get('event_date') or '', reverse=True)
+        return events
+    except Exception as e:
+        app.logger.warning(f"_member_special_events error: {e}")
+        return []
+
+
+# ==============================================================================
+# --- 6.95 출석 매트릭스 (가로=회차, 세로=회원, O/X) ---
+# ==============================================================================
+
+def _build_attendance_matrix(start_date=None, end_date=None):
+    """history 기반 매트릭스. 같은 ISO 주차의 월/목 회차는 한 칼럼으로 OR.
+    반환: (members, weeks, matrix, member_counts)
+      members: [{id, name, student_id, is_active}]
+      weeks: [{key, label, title, dates: [...]}]  최신주가 오른쪽? — 시간 정순(오래→최근)
+      matrix: {member_id: {week_key: bool}}
+      member_counts: {member_id: int}
+    """
+    members = supabase.table('members') \
+        .select('id, name, student_id, is_active') \
+        .order('name').execute().data or []
+    name_to_id = {m['name']: m['id'] for m in members}
+
+    q = supabase.table('history').select('id, date, groups, book_title')
+    if start_date: q = q.gte('date', start_date)
+    if end_date: q = q.lte('date', end_date)
+    histories = q.order('date').execute().data or []
+
+    week_buckets = {}  # week_key -> {label, title, dates:[...], present_member_ids:set}
+    for h in histories:
+        try:
+            d = datetime.strptime(h['date'], '%Y-%m-%d').date()
+        except Exception:
+            continue
+        iso_year, iso_week, _ = d.isocalendar()
+        week_key = f"{iso_year}-W{iso_week:02d}"
+        if week_key not in week_buckets:
+            week_buckets[week_key] = {
+                'key': week_key,
+                'label': d.strftime('%m/%d'),
+                'title': h.get('book_title') or '',
+                'dates': [],
+                'present': set(),
+            }
+        bucket = week_buckets[week_key]
+        bucket['dates'].append(h['date'])
+        if not bucket['title'] and h.get('book_title'):
+            bucket['title'] = h['book_title']
+        # 참석 명단 집계
+        for g in (h.get('groups') or []):
+            names = g if isinstance(g, list) else [g]
+            for nm in names:
+                mid = name_to_id.get(nm)
+                if mid is not None:
+                    bucket['present'].add(mid)
+
+    weeks = sorted(week_buckets.values(), key=lambda w: w['key'])
+    # label은 첫 날짜 기준 m/d
+    for w in weeks:
+        try:
+            first = sorted(w['dates'])[0]
+            w['label'] = datetime.strptime(first, '%Y-%m-%d').date().strftime('%m/%d')
+        except Exception:
+            pass
+
+    matrix = {}
+    member_counts = {}
+    for m in members:
+        row = {}
+        cnt = 0
+        for w in weeks:
+            ok = m['id'] in w['present']
+            row[w['key']] = ok
+            if ok: cnt += 1
+        matrix[m['id']] = row
+        member_counts[m['id']] = cnt
+
+    return members, weeks, matrix, member_counts
+
+
+@app.route('/admin/attendance_matrix')
+@login_required(role="admin")
+def admin_attendance_matrix():
+    term_id = request.args.get('term_id') or ''
+    start_date = request.args.get('start_date') or ''
+    end_date = request.args.get('end_date') or ''
+    if term_id and not (start_date or end_date):
+        s, e, _ = _get_term_range(term_id)
+        start_date, end_date = s or '', e or ''
+    try:
+        members, weeks, matrix, member_counts = _build_attendance_matrix(
+            start_date or None, end_date or None
+        )
+    except Exception as e:
+        app.logger.error(f"admin_attendance_matrix error: {e}", exc_info=True)
+        flash(f"매트릭스 로딩 오류: {e}", 'danger')
+        members, weeks, matrix, member_counts = [], [], {}, {}
+    return render_template(
+        'admin_attendance_matrix.html',
+        members=members, weeks=weeks, matrix=matrix, member_counts=member_counts,
+        terms=_get_terms_for_filter(), term_id=term_id,
+        start_date=start_date, end_date=end_date,
+    )
+
+
+@app.route('/admin/attendance_matrix/export')
+@login_required(role="admin")
+def admin_attendance_matrix_export():
+    term_id = request.args.get('term_id') or ''
+    start_date = request.args.get('start_date') or ''
+    end_date = request.args.get('end_date') or ''
+    if term_id and not (start_date or end_date):
+        s, e, _ = _get_term_range(term_id)
+        start_date, end_date = s or '', e or ''
+    try:
+        members, weeks, matrix, member_counts = _build_attendance_matrix(
+            start_date or None, end_date or None
+        )
+    except Exception as e:
+        flash(f"엑셀 내보내기 실패: {e}", 'danger')
+        return redirect(url_for('admin_attendance_matrix'))
+
+    columns = ['이름', '학번'] + [w['label'] for w in weeks] + ['합계']
+    rows = []
+    for m in members:
+        cnt = member_counts.get(m['id'], 0)
+        if cnt == 0 and not m.get('is_active'):
+            continue
+        row = [m['name'], m.get('student_id') or '']
+        for w in weeks:
+            row.append('O' if matrix.get(m['id'], {}).get(w['key']) else 'X')
+        row.append(cnt)
+        rows.append(row)
+
+    df = pd.DataFrame(rows, columns=columns)
+    buf = BytesIO()
+    with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='출석매트릭스', index=False)
+    buf.seek(0)
+
+    label = f"{start_date or 'all'}_{end_date or 'all'}"
+    fname = f"attendance_matrix_{label}.xlsx"
+    return Response(
+        buf.getvalue(),
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={"Content-disposition": f"attachment; filename={fname}"}
+    )
 
 
 # ==============================================================================
