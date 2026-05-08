@@ -25,120 +25,108 @@
             color: var(--text-light);
         }
 
-        h1,
-        h2 {
-            font-family: 'Orbitron', sans-serif;
-            text-transform: uppercase;
-        }
+        h1, h2, h3 { font-family: 'Orbitron', sans-serif; }
 
         .eva-card {
             background-color: var(--card-dark);
             border: 1px solid var(--border-dark);
         }
 
+        .stat-card {
+            background-color: var(--card-dark);
+            border: 1px solid var(--border-dark);
+            border-radius: 0.75rem;
+            padding: 1rem 0.75rem;
+            text-align: center;
+        }
+        .stat-card .num {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--eva-green);
+            line-height: 1;
+        }
+        .stat-card .label {
+            font-size: 0.7rem;
+            color: #9ca3af;
+            margin-top: 0.4rem;
+        }
+
+        .section-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.75rem;
+        }
+
         .action-card {
             background-color: var(--card-dark);
             border: 1px solid var(--border-dark);
             border-radius: 0.75rem;
-            padding: 1.5rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-            transition: border-color 0.2s, transform 0.2s;
+            padding: 1.25rem;
+            transition: border-color 0.2s;
         }
-
-        .action-card:hover {
-            border-color: var(--eva-green);
-            transform: translateY(-2px);
-        }
-
-        .action-card .icon {
-            font-size: 2rem;
-            line-height: 1;
-        }
+        .action-card:hover { border-color: var(--eva-green); }
 
         .action-card .title {
             font-weight: 700;
-            font-size: 1.05rem;
+            font-size: 1rem;
+            margin-bottom: 0.25rem;
         }
-
         .action-card .desc {
-            font-size: 0.82rem;
+            font-size: 0.78rem;
             color: #9ca3af;
+            margin-bottom: 0.75rem;
         }
 
-        .action-btn {
-            display: inline-block;
-            text-align: center;
-            font-weight: 700;
-            padding: 0.5rem 1rem;
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            padding: 0.55rem 0.85rem;
             border-radius: 0.5rem;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
+            font-weight: 600;
             transition: all 0.15s;
-            cursor: pointer;
-            border: none;
         }
+        .pill-green { background: var(--eva-green); color: #000; }
+        .pill-green:hover { box-shadow: 0 0 12px rgba(0, 255, 127, 0.5); }
+        .pill-red { background: #b91c1c; color: #fff; }
+        .pill-yellow { background: #d97706; color: #fff; }
+        .pill-purple { background: var(--eva-purple); color: #fff; }
+        .pill-purple:hover { box-shadow: 0 0 12px rgba(106, 13, 173, 0.5); }
+        .pill-gray { background: #4A4A4A; color: #E5E5E5; }
+        .pill-gray:hover { background: #5a5a5a; }
 
-        .action-btn-green {
-            background-color: var(--eva-green);
-            color: #000;
-        }
-
-        .action-btn-green:hover {
-            box-shadow: 0 0 12px var(--eva-green);
-        }
-
-        .action-btn-purple {
-            background-color: var(--eva-purple);
-            color: #fff;
-        }
-
-        .action-btn-purple:hover {
-            box-shadow: 0 0 12px var(--eva-purple);
-        }
-
-        .action-btn-gray {
-            background-color: #4A4A4A;
-            color: #E5E5E5;
-        }
-
-        .action-btn-gray:hover {
-            background-color: #5a5a5a;
-        }
-
-        .action-btn-red {
-            background-color: #dc2626;
-            color: #fff;
-        }
-
-        .action-btn-red:hover {
-            background-color: #b91c1c;
-        }
-
-        .action-btn-yellow {
-            background-color: #d97706;
-            color: #fff;
-        }
-
-        .stat-number {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 2.5rem;
+        .chip {
+            display: inline-block;
+            font-size: 0.65rem;
+            padding: 0.1rem 0.45rem;
+            border-radius: 999px;
             font-weight: 700;
-            color: var(--eva-green);
+            margin-left: 0.4rem;
+            vertical-align: middle;
         }
+        .chip-fac { background: var(--eva-purple); color: #fff; }
     </style>
 </head>
 
 <body class="min-h-screen">
     {% include '_header.html' %}
 
-    <div class="container mx-auto max-w-4xl px-4 py-8">
+    <div class="container mx-auto max-w-5xl px-4 py-6">
 
-        <!-- 환영 헤더 -->
-        <div class="mb-8 flex items-start justify-between gap-4 flex-wrap">
+        <!-- 헤더 -->
+        <div class="mb-6 flex items-start justify-between gap-4 flex-wrap">
             <div>
-                <h1 class="text-2xl md:text-3xl font-bold text-eva-green">{{ user.name }}님, 안녕하세요</h1>
-                <p class="text-gray-400 text-sm mt-1">{{ user.department or '' }} {{ user.email or '' }}</p>
+                <h1 class="text-2xl md:text-3xl font-bold text-eva-green">{{ user.name }}님</h1>
+                <p class="text-gray-400 text-sm mt-1">
+                    {{ user.department or '소속 미입력' }}
+                    {% if user.student_id %}· 학번 {{ user.student_id }}{% endif %}
+                </p>
             </div>
             <a href="{{ url_for('help_member') }}"
                 class="text-xs bg-gray-700 hover:bg-eva-green hover:text-black border border-gray-600 px-3 py-1.5 rounded transition">
@@ -148,131 +136,185 @@
 
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% for category, message in messages %}
-        <div class="p-4 mb-4 text-sm rounded-lg border bg-red-900/50 text-red-300 border-red-500/50" role="alert">
-            {{ message }}
-        </div>
+        <div class="p-3 mb-4 text-sm rounded-lg border bg-red-900/50 text-red-300 border-red-500/50">{{ message }}</div>
         {% endfor %}
         {% endwith %}
 
-        <!-- 빠른 실행 카드 -->
-        <section class="mb-8">
-            <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">지금 할 수 있는 것</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- 활동 요약 통계 -->
+        <section class="mb-6">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="stat-card">
+                    <div class="num">{{ activity.seminar_count or 0 }}</div>
+                    <div class="label">세미나 참여</div>
+                </div>
+                <div class="stat-card">
+                    <div class="num">{{ activity.facilitator_count or 0 }}</div>
+                    <div class="label">발제 횟수</div>
+                </div>
+                <div class="stat-card">
+                    <div class="num">{{ (activity.brick_sessions or [])|length }}</div>
+                    <div class="label">벽돌책 세션</div>
+                </div>
+                <div class="stat-card">
+                    <div class="num">{{ (activity.study_sessions or [])|length }}</div>
+                    <div class="label">소모임 세션</div>
+                </div>
+            </div>
+            <div class="text-right mt-2">
+                <a href="{{ url_for('records_member_profile', member_id=user.id) }}"
+                    class="text-xs text-gray-400 hover:text-eva-green underline">전체 활동 기록 →</a>
+            </div>
+        </section>
 
-                <!-- 발제문 제출 (다중) -->
+        <!-- 지금 할 일 -->
+        <section class="mb-6">
+            <h2 class="section-title">⚡ 지금 할 일</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                <!-- 다음 세미나 참석 투표 -->
+                <div class="action-card md:col-span-2">
+                    <div class="flex items-start justify-between flex-wrap gap-2 mb-1">
+                        <div>
+                            <div class="title">🗳️ 다음 세미나 참석 투표</div>
+                            <div class="desc">
+                                {% if my_open_votes %}
+                                현재 {{ my_open_votes|length }}개 회차에 투표할 수 있습니다.
+                                {% elif seminar_dates %}
+                                활성 학기가 없습니다. 다음 세미나에 참석할 의향을 표시하세요.
+                                {% else %}
+                                예정된 세미나가 없습니다.
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if my_open_votes %}
+                    {# 학기 투표 모드 — 신규 시스템 #}
+                    <div class="flex flex-wrap gap-2">
+                        {% for v in my_open_votes %}
+                        <a href="/seminar_vote?token={{ v.term_token }}"
+                            class="pill {% if v.my_vote == True %}pill-green{% elif v.my_vote == False %}pill-red{% else %}pill-yellow{% endif %}">
+                            <span>{{ v.meeting_date }} ({% if v.day_type == 'mon' %}월{% else %}목{% endif %})</span>
+                            <span class="text-xs">
+                                {% if v.my_vote == True %}✓ 참석
+                                {% elif v.my_vote == False %}✗ 불참
+                                {% else %}? 미정{% endif %}
+                            </span>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">버튼을 누르면 학기별 투표 페이지로 이동합니다.</p>
+                    {% elif seminar_dates %}
+                    {# 폴백 — 구 attendance 시스템 #}
+                    <div class="flex flex-wrap gap-2" id="seminar-date-btns">
+                        {% for seminar in seminar_dates %}
+                        {% set is_confirmed = seminar.date in my_confirmed_dates %}
+                        <button class="attendance-toggle-btn pill {% if is_confirmed %}pill-green{% else %}pill-gray{% endif %}"
+                            data-date="{{ seminar.date }}" data-confirmed="{{ 'true' if is_confirmed else 'false' }}">
+                            <span>{{ seminar.label }}</span>
+                            <span class="text-lg">{% if is_confirmed %}✅{% else %}☐{% endif %}</span>
+                        </button>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-xs text-gray-500">예정된 일정이 없습니다.</p>
+                    {% endif %}
+                </div>
+
+                <!-- 발제문 제출 -->
                 <div class="action-card">
-                    <div class="icon">📝</div>
-                    <div>
-                        <div class="title">발제문 제출 / 보기</div>
-                        {% if active_topic_events %}
-                        <div class="desc">진행 중 {{ active_topic_events|length }}건. 클릭해 작성·수정하세요.</div>
-                        {% else %}
-                        <div class="desc">현재 진행 중인 발제문 수집이 없습니다.</div>
-                        {% endif %}
+                    <div class="title">📝 발제문 제출</div>
+                    <div class="desc">
+                        {% if active_topic_events %}진행 중 {{ active_topic_events|length }}건. 클릭해 작성·수정하세요.
+                        {% else %}현재 진행 중인 발제문 수집이 없습니다.{% endif %}
                     </div>
                     {% if active_topic_events %}
                     <div class="flex flex-col gap-1.5">
                         {% for evt in active_topic_events[:3] %}
-                        <a href="/shared_topics?token={{ evt.share_token }}"
-                            class="action-btn action-btn-green text-sm">
-                            {{ evt.book_title }} ({{ evt.meeting_date }})
+                        <a href="/shared_topics?token={{ evt.share_token }}" class="pill pill-green">
+                            <span>{{ evt.book_title }}</span>
+                            <span class="text-xs">{{ evt.meeting_date }}</span>
                         </a>
                         {% endfor %}
                     </div>
                     {% else %}
-                    <button class="action-btn action-btn-gray" disabled>접수 대기 중</button>
+                    <button class="pill pill-gray w-full" disabled>접수 대기 중</button>
                     {% endif %}
-                </div>
-
-                <!-- 참석 확인 카드 -->
-                <div class="action-card" id="attendance-card">
-                    <div class="icon">📅</div>
-                    <div>
-                        <div class="title">세미나 참석 확인</div>
-                        <div class="desc">다음 세미나 날짜 중 참석 가능한 날짜를 눌러주세요.</div>
-                    </div>
-                    <div class="flex flex-col gap-2" id="seminar-date-btns">
-                        {% for seminar in seminar_dates %}
-                        {% set is_confirmed = seminar.date in my_confirmed_dates %}
-                        <button
-                            class="attendance-toggle-btn action-btn {% if is_confirmed %}action-btn-green{% else %}action-btn-gray{% endif %}"
-                            data-date="{{ seminar.date }}" data-confirmed="{{ 'true' if is_confirmed else 'false' }}"
-                            style="justify-content: space-between; display: flex; align-items: center; gap: 8px;">
-                            <span>{{ seminar.label }} ({{ seminar.date }})</span>
-                            <span class="text-lg">{% if is_confirmed %}✅{% else %}☐{% endif %}</span>
-                        </button>
-                        {% else %}
-                        <p class="text-xs text-gray-500">예정된 세미나가 없습니다.</p>
-                        {% endfor %}
-                    </div>
                 </div>
 
                 <!-- 위키 -->
                 <div class="action-card">
-                    <div class="icon">📖</div>
-                    <div>
-                        <div class="title">독서모임 위키</div>
-                        <div class="desc">지식 위키를 열람하고 새 문서를 작성해보세요.</div>
-                    </div>
-                    <a href="{{ url_for('view_all_documents') }}" class="action-btn action-btn-purple">위키 보기</a>
+                    <div class="title">📖 독서모임 위키</div>
+                    <div class="desc">지식 위키를 열람하고 새 문서를 작성해보세요.</div>
+                    <a href="{{ url_for('view_all_documents') }}" class="pill pill-purple w-full">위키 열기</a>
                 </div>
-
-                <!-- 내 활동 기록 -->
-                <div class="action-card">
-                    <div class="icon">📊</div>
-                    <div>
-                        <div class="title">내 활동 기록</div>
-                        <div class="desc">
-                            세미나 {{ activity.seminar_count or 0 }}회 · 발제 {{ activity.facilitator_count or 0 }}회 ·
-                            벽돌책 {{ (activity.brick_sessions or [])|length }} · 소모임 {{ (activity.study_sessions or [])|length }}
-                        </div>
-                    </div>
-                    <a href="{{ url_for('records_member_profile', member_id=user.id) }}"
-                        class="action-btn action-btn-purple">전체 기록 보기</a>
-                </div>
-
-                <!-- 세미나 투표 (학기 단위) -->
-                {% if my_open_votes %}
-                <div class="action-card">
-                    <div class="icon">🗳️</div>
-                    <div>
-                        <div class="title">다음 세미나 참석 투표</div>
-                        <div class="desc">{{ my_open_votes|length }}개 회차 투표 가능 · 비로그인 링크로 빠른 투표 가능</div>
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                        {% for v in my_open_votes[:3] %}
-                        <a href="/seminar_vote?token={{ v.term_token }}"
-                            class="action-btn {% if v.my_vote == True %}action-btn-green{% elif v.my_vote == False %}action-btn-red{% else %}action-btn-yellow{% endif %} text-sm">
-                            {{ v.meeting_date }} ({% if v.day_type == 'mon' %}월{% else %}목{% endif %})
-                            {% if v.my_vote == True %}— 참석{% elif v.my_vote == False %}— 불참{% else %}— 미정{% endif %}
-                        </a>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
 
             </div>
         </section>
 
-        <!-- 출석 현황 + 기록 -->
-        <section>
-            <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">내 활동</h2>
+        <!-- 내 활동 기록 -->
+        <section class="mb-6">
+            <h2 class="section-title">📚 내 최근 활동</h2>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 
-                <!-- 출석 수 -->
-                <div class="eva-card rounded-xl p-6 text-center flex flex-col justify-center items-center">
-                    <div class="stat-number">{{ attendance_records|length }}</div>
-                    <div class="text-sm text-gray-400 mt-1">총 참석 횟수</div>
+                <!-- 최근 세미나 -->
+                <div class="eva-card rounded-xl p-4">
+                    <h3 class="text-sm font-bold text-eva-green mb-3">최근 세미나</h3>
+                    <div class="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                        {% for r in (activity.seminar_records or [])[:8] %}
+                        <a href="{{ url_for('records_seminar_detail', history_id=r.history_id) }}"
+                            class="block px-3 py-2 rounded bg-gray-800/50 hover:bg-gray-700 text-xs">
+                            <div class="font-bold text-gray-200">{{ r.date }}
+                                {% if r.is_facilitator %}<span class="chip chip-fac">발제</span>{% endif %}
+                            </div>
+                            <div class="text-gray-400 truncate">{{ r.book_title or '(제목 없음)' }}</div>
+                        </a>
+                        {% else %}
+                        <p class="text-xs text-gray-500 text-center py-4">참여 기록이 없습니다.</p>
+                        {% endfor %}
+                    </div>
                 </div>
 
-                <!-- 참석 기록 목록 -->
-                <div class="eva-card rounded-xl p-6 md:col-span-2">
-                    <h3 class="text-sm font-bold text-gray-400 mb-3">참석 기록</h3>
-                    <div class="max-h-52 overflow-y-auto space-y-1 text-sm pr-1">
-                        {% for record in attendance_records %}
-                        <div class="px-3 py-2 rounded bg-gray-800/50 text-gray-300">{{ record.meeting_date }}</div>
+                <!-- 벽돌책 -->
+                <div class="eva-card rounded-xl p-4">
+                    <h3 class="text-sm font-bold text-eva-green mb-3">참여 중 벽돌책</h3>
+                    <div class="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                        {% set bb_books = {} %}
+                        {% for s in (activity.brick_sessions or []) %}
+                            {% if s.book_id and s.book_id not in bb_books %}
+                                {% set _ = bb_books.update({s.book_id: s}) %}
+                            {% endif %}
+                        {% endfor %}
+                        {% for bid, s in bb_books.items() %}
+                        <a href="{{ url_for('records_brick_book_detail', book_id=s.book_id) }}"
+                            class="block px-3 py-2 rounded bg-gray-800/50 hover:bg-gray-700 text-xs">
+                            <div class="font-bold text-gray-200 truncate">{{ s.book_title or '(제목 없음)' }}</div>
+                            <div class="text-gray-400">최근 {{ s.meeting_date or '-' }}</div>
+                        </a>
                         {% else %}
-                        <p class="text-gray-500 py-4 text-center">아직 참석 기록이 없습니다.</p>
+                        <p class="text-xs text-gray-500 text-center py-4">참여 중인 책이 없습니다.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- 소모임 -->
+                <div class="eva-card rounded-xl p-4">
+                    <h3 class="text-sm font-bold text-eva-green mb-3">참여 중 소모임</h3>
+                    <div class="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                        {% set sg_groups = {} %}
+                        {% for s in (activity.study_sessions or []) %}
+                            {% if s.group_id and s.group_id not in sg_groups %}
+                                {% set _ = sg_groups.update({s.group_id: s}) %}
+                            {% endif %}
+                        {% endfor %}
+                        {% for gid, s in sg_groups.items() %}
+                        <a href="{{ url_for('records_study_group_detail', group_id=s.group_id) }}"
+                            class="block px-3 py-2 rounded bg-gray-800/50 hover:bg-gray-700 text-xs">
+                            <div class="font-bold text-gray-200 truncate">{{ s.group_name or '(이름 없음)' }}</div>
+                            <div class="text-gray-400">최근 {{ s.meeting_date or '-' }}</div>
+                        </a>
+                        {% else %}
+                        <p class="text-xs text-gray-500 text-center py-4">참여 중인 소모임이 없습니다.</p>
                         {% endfor %}
                     </div>
                 </div>
@@ -284,38 +326,29 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // 참석 토글 버튼들
             document.querySelectorAll('.attendance-toggle-btn').forEach(btn => {
                 btn.addEventListener('click', async () => {
                     const date = btn.dataset.date;
                     const isConfirmed = btn.dataset.confirmed === 'true';
-                    const newState = !isConfirmed;  // 토글
-
+                    const newState = !isConfirmed;
                     btn.disabled = true;
-
                     try {
-                        const response = await fetch('/api/attendance', {
+                        const res = await fetch('/api/attendance', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                meeting_date: date,
-                                attending_seminar: newState
-                            })
+                            body: JSON.stringify({ meeting_date: date, attending_seminar: newState }),
                         });
-                        const result = await response.json();
+                        const result = await res.json();
                         if (result.status !== 'success') throw new Error(result.message || '오류');
-
-                        // 버튼 UI 업데이트
                         btn.dataset.confirmed = newState ? 'true' : 'false';
-                        const label = btn.querySelector('span:first-child');
                         const icon = btn.querySelector('span:last-child');
                         if (newState) {
-                            btn.classList.remove('action-btn-gray');
-                            btn.classList.add('action-btn-green');
+                            btn.classList.remove('pill-gray');
+                            btn.classList.add('pill-green');
                             icon.textContent = '✅';
                         } else {
-                            btn.classList.remove('action-btn-green');
-                            btn.classList.add('action-btn-gray');
+                            btn.classList.remove('pill-green');
+                            btn.classList.add('pill-gray');
                             icon.textContent = '☐';
                         }
                     } catch (err) {

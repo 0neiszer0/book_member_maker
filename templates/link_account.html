@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>계정 연결</title>
+    <title>회원가입 / 계정 연결</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link
         href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap"
@@ -25,10 +25,7 @@
             color: var(--text-light);
         }
 
-        h1 {
-            font-family: 'Orbitron', sans-serif;
-            text-transform: uppercase;
-        }
+        h1, h2 { font-family: 'Orbitron', sans-serif; }
 
         .eva-card {
             background-color: var(--card-dark);
@@ -37,72 +34,165 @@
 
         .eva-input {
             background-color: var(--bg-dark);
-            border-color: var(--border-dark);
+            border: 1px solid var(--border-dark);
             color: var(--text-light);
         }
-
-        .eva-button {
-            background-color: var(--eva-green);
-            color: black;
-            font-weight: bold;
+        .eva-input:focus {
+            border-color: var(--eva-green);
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0, 255, 127, 0.2);
         }
 
-        .eva-button-secondary {
-            background-color: #4A4A4A;
-            color: var(--text-light);
+        .path-card {
+            background-color: var(--card-dark);
+            border: 1px solid var(--border-dark);
+            transition: all 0.2s;
+        }
+        .path-card.selected {
+            border-color: var(--eva-green);
+            box-shadow: 0 0 0 2px rgba(0, 255, 127, 0.3);
+        }
+        .path-card.dimmed {
+            opacity: 0.5;
         }
     </style>
 </head>
 
-<body class="flex items-center justify-center h-screen p-4">
-    <div class="w-full max-w-md">
+<body class="min-h-screen p-4 py-8">
+    <div class="max-w-xl mx-auto">
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
         {% for category, message in messages %}
-        <div class="p-4 mb-4 text-sm rounded-lg border bg-red-900/50 text-red-300 border-red-500/50" role="alert">
+        <div class="p-3 mb-4 text-sm rounded-lg border bg-red-900/50 text-red-300 border-red-500/50">
             {{ message }}
         </div>
         {% endfor %}
         {% endif %}
         {% endwith %}
 
-        <div class="eva-card shadow-lg rounded-xl px-8 pt-6 pb-8 mb-4">
-            <div class="text-center mb-6">
-                <h1 class="text-2xl font-bold text-eva-green">Link Account</h1>
-                <p class="mt-2 text-gray-300">{{ social_name }}님, 반갑습니다! 첫 방문이신가요?</p>
+        <!-- 카카오 정보 미리보기 -->
+        <div class="text-center mb-6">
+            {% if profile_pic %}
+            <img src="{{ profile_pic }}" alt="profile" class="w-20 h-20 rounded-full mx-auto mb-3 border-2 border-eva-green">
+            {% endif %}
+            <h1 class="text-2xl font-bold text-eva-green">{{ social_name }}님, 환영합니다!</h1>
+            {% if email %}<p class="text-xs text-gray-400 mt-1">📧 {{ email }}</p>{% endif %}
+            <p class="text-sm text-gray-300 mt-3">
+                책 먹는 호반우와 처음 만나셨네요.<br>
+                <strong class="text-eva-green">아래 두 가지 중 본인에게 맞는 경우</strong>를 선택해주세요.
+            </p>
+        </div>
+
+        <!-- 경로 선택 -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+            <button type="button" onclick="selectPath('link')" id="pathLink"
+                class="path-card rounded-lg p-4 text-left hover:border-eva-green">
+                <div class="text-2xl mb-2">🔗</div>
+                <h2 class="text-base font-bold text-eva-green mb-1">기존 부원이에요</h2>
+                <p class="text-xs text-gray-400">이미 동아리에 등록되어 있어요. 이름·학번으로 본인 확인해주세요.</p>
+            </button>
+            <button type="button" onclick="selectPath('create')" id="pathCreate"
+                class="path-card rounded-lg p-4 text-left hover:border-eva-green">
+                <div class="text-2xl mb-2">✨</div>
+                <h2 class="text-base font-bold text-eva-green mb-1">신규 가입이에요</h2>
+                <p class="text-xs text-gray-400">처음 가입합니다. 카카오 정보로 신청 후 관리자 승인을 기다려요.</p>
+            </button>
+        </div>
+
+        <!-- 입력 카드 (경로 선택 후 노출) -->
+        <form id="linkForm" action="{{ url_for('link_account_submit') }}" method="POST" class="hidden">
+            <input type="hidden" name="provider" value="{{ provider }}">
+            <input type="hidden" name="social_id" value="{{ social_id }}">
+            <input type="hidden" name="email" value="{{ email }}">
+            <input type="hidden" name="social_name" value="{{ social_name }}">
+            <input type="hidden" name="profile_pic" value="{{ profile_pic }}">
+            <input type="hidden" name="action" id="actionInput" value="">
+
+            <!-- 기존 부원 입력 -->
+            <div id="linkFields" class="eva-card rounded-lg p-5 hidden">
+                <h2 class="text-lg font-bold text-eva-green mb-2">🔗 기존 계정 연결</h2>
+                <p class="text-xs text-gray-400 mb-4">
+                    이름과 학번이 모두 일치하면 <strong class="text-eva-green">즉시 자동 승인</strong>됩니다.<br>
+                    학번 없이 이름만 입력하면 관리자 승인 대기 상태가 됩니다.
+                </p>
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-xs text-gray-400 block mb-1">시스템에 등록된 이름 <span class="text-red-400">*</span></label>
+                        <input type="text" name="existing_name" class="eva-input w-full rounded py-2 px-3 text-sm"
+                            placeholder="예: 홍길동" value="{{ social_name }}" required>
+                        <p class="text-xs text-gray-500 mt-1">카카오 닉네임을 미리 채웠습니다. 동아리에 등록된 이름이 다르면 수정해주세요.</p>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-400 block mb-1">학번 <span class="text-eva-green">(입력 시 즉시 승인)</span></label>
+                        <input type="text" name="student_id" class="eva-input w-full rounded py-2 px-3 text-sm"
+                            placeholder="예: 20231234" inputmode="numeric">
+                    </div>
+                </div>
+                <button type="submit" class="mt-4 w-full bg-eva-green text-black font-bold py-3 rounded-lg hover:opacity-80 transition">
+                    ✓ 본인 확인 후 연결
+                </button>
             </div>
 
-            <form action="{{ url_for('link_account_submit') }}" method="POST" class="space-y-4">
-                <input type="hidden" name="provider" value="{{ provider }}">
-                <input type="hidden" name="social_id" value="{{ social_id }}">
-                <input type="hidden" name="email" value="{{ email }}">
-                <input type="hidden" name="social_name" value="{{ social_name }}">
-                <input type="hidden" name="profile_pic" value="{{ profile_pic }}">
-
-                <div>
-                    <label for="existing_name" class="block text-sm font-bold mb-2">기존 부원이실 경우 이름과 학번을 입력해주세요.</label>
-                    <p class="text-xs text-gray-400 mb-3">두 정보관 정확히 일치하면 원스톱 즈시 승인됩니다. 학번 없이 이름만 입력하면 관리자 승인 대기 상태가 됩니다.
-                    </p>
-                    <input type="text" id="existing_name" name="existing_name"
-                        class="eva-input shadow rounded w-full py-2 px-3 mb-3" placeholder="시스템에 등록된 이름">
-                    <input type="text" id="student_id" name="student_id"
-                        class="eva-input shadow rounded w-full py-2 px-3" placeholder="학번 (선택 입력 시 즉시 승인)">
+            <!-- 신규 가입 입력 -->
+            <div id="createFields" class="eva-card rounded-lg p-5 hidden">
+                <h2 class="text-lg font-bold text-eva-green mb-2">✨ 신규 회원 가입</h2>
+                <p class="text-xs text-gray-400 mb-4">
+                    아래 카카오 정보로 가입 신청을 보냅니다.<br>
+                    <strong class="text-yellow-400">관리자 승인 후</strong> 정상 활동이 가능합니다.
+                </p>
+                <div class="bg-gray-900/50 rounded p-3 text-sm space-y-1 mb-4">
+                    <div><span class="text-gray-400">이름:</span> <span class="font-bold">{{ social_name }}</span></div>
+                    {% if email %}<div><span class="text-gray-400">이메일:</span> <span class="font-mono text-xs">{{ email }}</span></div>{% endif %}
                 </div>
-
-                <button type="submit" name="action" value="link"
-                    class="eva-button w-full font-bold py-3 px-4 rounded text-base">
-                    기존 계정과 연결하기
+                <button type="submit" class="w-full bg-eva-green text-black font-bold py-3 rounded-lg hover:opacity-80 transition">
+                    가입 신청 보내기
                 </button>
+                <p class="text-xs text-gray-500 mt-2 text-center">신청 후 관리자에게 알림이 발송됩니다.</p>
+            </div>
+        </form>
 
-                <div class="text-center text-gray-400 text-sm">또는</div>
+        <!-- 도움말 -->
+        <details class="mt-6">
+            <summary class="cursor-pointer text-xs text-gray-400 hover:text-eva-green text-center">❓ 어느 쪽인지 잘 모르겠어요</summary>
+            <div class="eva-card rounded-lg p-4 mt-3 text-xs text-gray-300 space-y-2">
+                <p><strong class="text-eva-green">기존 부원</strong>: 동아리 활동을 한 번이라도 한 적이 있다면 이쪽입니다. 운영진이 회원명부에 등록한 이름·학번으로 확인합니다.</p>
+                <p><strong class="text-eva-green">신규 가입</strong>: 처음 동아리에 들어왔다면 이쪽입니다. 관리자 승인 후 활동할 수 있습니다.</p>
+                <p class="text-gray-500">잘못 선택해도 다시 시도할 수 있으니 부담 없이 골라주세요.</p>
+            </div>
+        </details>
 
-                <button type="submit" name="action" value="create"
-                    class="eva-button-secondary w-full font-bold py-3 px-4 rounded text-base">
-                    신규 회원으로 가입하기
-                </button>
-            </form>
-        </div>
+        <p class="text-center mt-6">
+            <a href="{{ url_for('login') }}" class="text-xs text-gray-500 hover:text-eva-green underline">← 로그인 화면으로 돌아가기</a>
+        </p>
     </div>
+
+    <script>
+        function selectPath(path) {
+            document.getElementById('actionInput').value = path;
+            const cardLink = document.getElementById('pathLink');
+            const cardCreate = document.getElementById('pathCreate');
+            const fieldsLink = document.getElementById('linkFields');
+            const fieldsCreate = document.getElementById('createFields');
+            const form = document.getElementById('linkForm');
+
+            form.classList.remove('hidden');
+            if (path === 'link') {
+                cardLink.classList.add('selected');
+                cardLink.classList.remove('dimmed');
+                cardCreate.classList.remove('selected');
+                cardCreate.classList.add('dimmed');
+                fieldsLink.classList.remove('hidden');
+                fieldsCreate.classList.add('hidden');
+            } else {
+                cardCreate.classList.add('selected');
+                cardCreate.classList.remove('dimmed');
+                cardLink.classList.remove('selected');
+                cardLink.classList.add('dimmed');
+                fieldsCreate.classList.remove('hidden');
+                fieldsLink.classList.add('hidden');
+            }
+        }
+    </script>
 </body>
 
 </html>

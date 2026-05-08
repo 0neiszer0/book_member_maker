@@ -25,11 +25,7 @@
             color: var(--text-light);
         }
 
-        h1,
-        h2 {
-            font-family: 'Orbitron', sans-serif;
-            text-transform: uppercase;
-        }
+        h1, h2 { font-family: 'Orbitron', sans-serif; }
 
         .eva-card {
             background-color: var(--card-dark);
@@ -38,7 +34,7 @@
 
         .eva-input {
             background-color: #1A1A1A;
-            border-color: var(--border-dark);
+            border: 1px solid var(--border-dark);
             color: var(--text-light);
         }
 
@@ -47,240 +43,314 @@
             outline: none;
             box-shadow: 0 0 0 2px rgba(0, 255, 127, 0.2);
         }
+
+        .step-num {
+            display: inline-flex;
+            width: 1.5rem; height: 1.5rem;
+            border-radius: 9999px;
+            background: var(--eva-green);
+            color: #000;
+            align-items: center; justify-content: center;
+            font-weight: 700; font-size: 0.85rem;
+            margin-right: 0.5rem;
+        }
+
+        .badge {
+            display: inline-block;
+            font-size: 0.65rem;
+            padding: 0.1rem 0.45rem;
+            border-radius: 999px;
+            font-weight: 700;
+            margin-left: 0.4rem;
+        }
+        .badge-member { background: var(--eva-green); color: #000; }
+        .badge-guest { background: #d97706; color: #fff; }
     </style>
 </head>
 
 <body class="p-4 md:p-8">
     <div class="max-w-3xl mx-auto">
-        <div class="text-center mb-8">
-            <h1 class="text-3xl font-bold text-eva-green">{{ event.book_title }}</h1>
-            <p class="text-gray-400 mt-2">모임 날짜: {{ event.meeting_date }}</p>
-            <p class="text-sm text-yellow-500 mt-2">동일한 이름과 학과, PIN 번호를 입력하면 작성한 발제문을 수정할 수 있습니다.</p>
+        <!-- 헤더 -->
+        <div class="text-center mb-6">
+            <p class="text-xs text-gray-400 mb-1">📚 발제문 제출</p>
+            <h1 class="text-2xl md:text-3xl font-bold text-eva-green">{{ event.book_title }}</h1>
+            {% if event.book_author %}
+            <p class="text-sm text-gray-300 mt-1">{{ event.book_author }}</p>
+            {% endif %}
+            <p class="text-gray-400 mt-2 text-sm">📅 모임 날짜: {{ event.meeting_date }}</p>
         </div>
 
-        <form id="topicForm" class="space-y-6">
-            <input type="hidden" id="eventId" value="{{ event.id }}">
+        <!-- 가이드 카드 -->
+        <details class="eva-card rounded-lg mb-6 overflow-hidden">
+            <summary class="cursor-pointer px-4 py-3 bg-gray-800/50 text-eva-green font-bold text-sm">
+                💡 처음이신가요? 작성 방법 보기
+            </summary>
+            <div class="p-4 text-sm text-gray-300 space-y-2">
+                <p><strong class="text-eva-green">1단계.</strong> 아래 <strong>본인 확인</strong> 폼에 이름·소속·학번(또는 PIN 4자리)을 입력하고 <strong>확인하기</strong>를 누르세요.</p>
+                <p><strong class="text-eva-green">2단계.</strong> 인증되면 <strong>발제문 작성 폼</strong>이 나타납니다. 토론하고 싶은 주제·해당 페이지·참조 사항을 입력하세요. 최대 10개까지 추가할 수 있습니다.</p>
+                <p><strong class="text-eva-green">3단계.</strong> <strong>제출</strong> 버튼을 누르면 끝! 같은 정보로 다시 들어오면 작성한 내용을 수정할 수 있습니다.</p>
+                <div class="mt-3 p-3 bg-gray-900/50 rounded text-xs">
+                    <p class="text-eva-green font-bold mb-1">예시</p>
+                    <p>• 발제 내용: "주인공이 X를 선택한 동기는 무엇인가? 작가는 이를 통해 무엇을 말하고자 했는가?"</p>
+                    <p>• 페이지: p.123~125</p>
+                    <p>• 참조: 3장 마지막 단락의 비유</p>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">※ 회원은 학번만 입력하면 PIN 없이 인증됩니다. 비회원은 4자리 PIN을 정해 입력하면 다음에 같은 PIN으로 수정할 수 있습니다.</p>
+            </div>
+        </details>
 
-            <div class="eva-card p-6 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- 1단계: 본인 확인 -->
+        <div id="verifyCard" class="eva-card rounded-lg p-5 mb-6">
+            <h2 class="text-lg font-bold text-eva-green mb-1"><span class="step-num">1</span>본인 확인</h2>
+            <p class="text-xs text-gray-400 mb-4 ml-8">동명이인 구분 및 수정 권한을 위해 필요합니다.</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-sm font-bold mb-2">이름</label>
-                    <input type="text" id="authorName" class="eva-input w-full rounded py-2 px-3" required {% if
-                        user_name %}value="{{ user_name }}" readonly style="opacity:0.6;cursor:not-allowed" {% endif %}>
+                    <label class="text-xs text-gray-400 block mb-1">이름</label>
+                    <input type="text" id="authorName" class="eva-input w-full rounded py-2 px-3 text-sm" required
+                        placeholder="홍길동"
+                        {% if user_name %}value="{{ user_name }}" readonly style="opacity:0.7;cursor:not-allowed"{% endif %}>
                 </div>
                 <div>
-                    <label class="block text-sm font-bold mb-2">소속 (학과/직장 등)</label>
-                    <input type="text" id="department" class="eva-input w-full rounded py-2 px-3" required
-                        placeholder="예: 경영학과" {% if user_department %}value="{{ user_department }}" {% endif %}>
+                    <label class="text-xs text-gray-400 block mb-1">소속 (학과 등)</label>
+                    <input type="text" id="department" class="eva-input w-full rounded py-2 px-3 text-sm" required
+                        placeholder="예: 경영학과"
+                        {% if user_department %}value="{{ user_department }}"{% endif %}>
                 </div>
                 {% if not user_name %}
                 <div>
-                    <label class="block text-sm font-bold mb-2">학번 <span class="text-xs text-gray-400">(회원이면 입력 시 PIN 불필요)</span></label>
-                    <input type="text" id="studentId" class="eva-input w-full rounded py-2 px-3"
-                        placeholder="예: 20231234">
+                    <label class="text-xs text-gray-400 block mb-1">
+                        학번 <span class="text-eva-green">(회원이면 학번만 입력 → PIN 불필요)</span>
+                    </label>
+                    <input type="text" id="studentId" class="eva-input w-full rounded py-2 px-3 text-sm"
+                        placeholder="예: 20231234" inputmode="numeric">
                 </div>
                 <div>
-                    <label class="block text-sm font-bold mb-2">4자리 PIN <span class="text-xs text-gray-400">(비회원/학번 미입력 시)</span></label>
-                    <input type="password" id="pinCode" class="eva-input w-full rounded py-2 px-3"
-                        pattern="[0-9]{4}" placeholder="숫자 4자리">
+                    <label class="text-xs text-gray-400 block mb-1">
+                        PIN 4자리 <span class="text-yellow-400">(비회원만 입력)</span>
+                    </label>
+                    <input type="password" id="pinCode" class="eva-input w-full rounded py-2 px-3 text-sm"
+                        pattern="[0-9]{4}" maxlength="4" placeholder="숫자 4자리" inputmode="numeric">
                 </div>
                 {% else %}
-                <div class="hidden">
-                    <input type="hidden" id="studentId" value="">
-                    <input type="hidden" id="pinCode" value="">
-                </div>
+                <input type="hidden" id="studentId" value="">
+                <input type="hidden" id="pinCode" value="">
                 {% endif %}
             </div>
-            <div class="flex justify-end mt-2">
-                <button type="button" id="loadTopicBtn"
-                    class="bg-gray-700 hover:bg-gray-600 text-sm font-bold py-2 px-4 rounded border border-gray-500 transition-colors">
-                    🔄 이전에 작성한 내 발제문 불러오기
+
+            <button type="button" id="verifyBtn"
+                class="mt-4 w-full bg-eva-green text-black font-bold py-2.5 rounded-lg hover:opacity-80 transition">
+                ✓ 확인하기
+            </button>
+            <p id="verifyMsg" class="text-xs mt-2 text-red-400 hidden"></p>
+        </div>
+
+        <!-- 2단계: 발제문 작성 (인증 후 노출) -->
+        <div id="writeCard" class="hidden">
+            <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <div class="text-sm">
+                    <span class="text-gray-400">인증:</span>
+                    <span id="verifiedName" class="text-eva-green font-bold"></span>
+                    <span id="verifiedBadge"></span>
+                    <button type="button" id="resetBtn" class="text-xs text-gray-400 hover:text-eva-green ml-2 underline">변경</button>
+                </div>
+                <p id="loadedNote" class="text-xs text-eva-green hidden">✓ 이전에 작성한 발제문을 불러왔습니다.</p>
+            </div>
+
+            <form id="topicForm" class="space-y-4">
+                <input type="hidden" id="eventId" value="{{ event.id }}">
+
+                <h2 class="text-lg font-bold text-eva-green"><span class="step-num">2</span>발제문 작성</h2>
+
+                <div id="topicsContainer" class="space-y-4"></div>
+
+                <button type="button" id="addTopicBtn"
+                    class="w-full bg-gray-700 hover:bg-gray-600 font-bold py-3 rounded-lg border border-dashed border-gray-500 text-sm">
+                    + 발제문 추가하기 (최대 10개)
                 </button>
-            </div>
 
-            <div id="topicsContainer" class="space-y-4">
-            </div>
-
-            <button type="button" id="addTopicBtn"
-                class="w-full bg-gray-700 hover:bg-gray-600 font-bold py-3 rounded-lg border border-dashed border-gray-500">
-                + 발제문 추가하기 (최대 10개)
-            </button>
-
-            <button type="submit" id="submitBtn"
-                class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-lg text-lg transition-colors shadow-lg shadow-green-900/50">
-                발제문 제출 / 수정 완료
-            </button>
-        </form>
+                <button type="submit" id="submitBtn"
+                    class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-lg text-lg transition shadow-lg shadow-green-900/50">
+                    제출 / 수정 완료
+                </button>
+            </form>
+        </div>
     </div>
 
     <script>
+        const IS_LOGGED_IN = {{ 'true' if user_name else 'false' }};
         let topicCount = 0;
-        const container = document.getElementById('topicsContainer');
-        const addBtn = document.getElementById('addTopicBtn');
+        let verified = null; // {author, dept, sid, pin, isMember}
+        const container = document.createElement('div'); // placeholder until verified
 
-        function addTopicField() {
-            if (topicCount >= 10) { alert("발제문은 최대 10개까지만 추가할 수 있습니다."); return; }
+        function getContainer() { return document.getElementById('topicsContainer'); }
+
+        function addTopicField(prefill) {
+            const c = getContainer();
+            if (!c) return;
+            if (topicCount >= 10) { alert('발제문은 최대 10개까지만 추가할 수 있습니다.'); return; }
             topicCount++;
-
             const div = document.createElement('div');
             div.className = 'eva-card p-4 rounded-lg relative';
             div.innerHTML = `
-                <div class="absolute top-2 right-2">
-                    <button type="button" onclick="this.parentElement.parentElement.remove(); topicCount--;" class="text-red-500 hover:text-red-400 font-bold text-xl px-2">&times;</button>
-                </div>
+                <button type="button" class="remove-btn absolute top-2 right-2 text-red-500 hover:text-red-400 font-bold text-xl px-2">&times;</button>
                 <h3 class="text-eva-green font-bold mb-3">#${topicCount} 발제</h3>
                 <div class="space-y-3">
                     <div>
-                        <label class="text-xs text-gray-400 block mb-1">발제 내용</label>
-                        <textarea class="topic-text eva-input w-full rounded py-2 px-3 h-24 resize-none" required placeholder="논의하고 싶은 주제를 상세히 적어주세요"></textarea>
+                        <label class="text-xs text-gray-400 block mb-1">발제 내용 *</label>
+                        <textarea class="topic-text eva-input w-full rounded py-2 px-3 h-24 resize-none" required
+                            placeholder="논의하고 싶은 주제를 상세히 적어주세요"></textarea>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="text-xs text-gray-400 block mb-1">해당 페이지</label>
-                            <input type="text" class="topic-page eva-input w-full rounded py-1 px-3 text-sm" placeholder="예: p.123~125">
+                            <input type="text" class="topic-page eva-input w-full rounded py-1.5 px-3 text-sm" placeholder="예: p.123~125">
                         </div>
                         <div>
                             <label class="text-xs text-gray-400 block mb-1">참조 사항</label>
-                            <input type="text" class="topic-ref eva-input w-full rounded py-1 px-3 text-sm" placeholder="특정 문단, 키워드 등">
+                            <input type="text" class="topic-ref eva-input w-full rounded py-1.5 px-3 text-sm" placeholder="특정 문단·키워드 등">
                         </div>
                     </div>
                 </div>
             `;
-            container.appendChild(div);
-        }
-
-        // 초기 1개 생성
-        addTopicField();
-        addBtn.addEventListener('click', addTopicField);
-
-        // 로그인된 회원이고 학과까지 채워진 경우 자동 로드 시도
-        const IS_LOGGED_IN = {{ 'true' if user_name else 'false' }};
-        if (IS_LOGGED_IN && document.getElementById('department').value) {
-            (async () => {
-                try {
-                    const r = await fetch('/api/topics/load', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            event_id: document.getElementById('eventId').value,
-                            author_name: document.getElementById('authorName').value,
-                            department: document.getElementById('department').value,
-                            pin_code: '',
-                        }),
-                    });
-                    if (!r.ok) return;
-                    const data = await r.json();
-                    if (data.status !== 'success' || !data.topics?.length) return;
-                    container.innerHTML = '';
-                    topicCount = 0;
-                    data.topics.forEach(t => {
-                        addTopicField();
-                        const cur = container.lastElementChild;
-                        cur.querySelector('.topic-text').value = t.topic || '';
-                        cur.querySelector('.topic-page').value = t.page || '';
-                        cur.querySelector('.topic-ref').value = t.reference || '';
-                    });
-                    const note = document.createElement('p');
-                    note.className = 'text-xs text-eva-green text-center';
-                    note.textContent = '✓ 이전 작성한 발제문을 불러왔습니다. 수정 후 저장하세요.';
-                    container.parentElement.insertBefore(note, container);
-                } catch (e) { /* silent */ }
-            })();
-        }
-
-        document.getElementById('topicForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const submitBtn = document.getElementById('submitBtn');
-            submitBtn.disabled = true; submitBtn.textContent = '처리 중...';
-
-            // 데이터 수집
-            const topics = [];
-            document.querySelectorAll('#topicsContainer > div').forEach(el => {
-                topics.push({
-                    topic: el.querySelector('.topic-text').value,
-                    page: el.querySelector('.topic-page').value,
-                    reference: el.querySelector('.topic-ref').value
-                });
+            div.querySelector('.remove-btn').addEventListener('click', () => {
+                div.remove();
+                // re-number
+                topicCount = 0;
+                c.querySelectorAll('h3').forEach(h => { topicCount++; h.textContent = `#${topicCount} 발제`; });
             });
-
-            const payload = {
-                event_id: document.getElementById('eventId').value,
-                author_name: document.getElementById('authorName').value,
-                department: document.getElementById('department').value,
-                student_id: (document.getElementById('studentId') || {}).value || '',
-                pin_code: document.getElementById('pinCode').value,
-                topics: topics
-            };
-
-            try {
-                const response = await fetch('/api/topics/submit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const result = await response.json();
-
-                if (!response.ok) throw new Error(result.error);
-
-                alert(result.message);
-                if (!'{{ user_name }}') {
-                    // 비회원이면 작성 폼 초기화 후 이동
-                    window.location.href = '/';
-                }
-            } catch (error) {
-                alert(`오류: ${error.message}`);
-            } finally {
-                submitBtn.disabled = false; submitBtn.textContent = '발제문 제출 / 수정 완료';
+            if (prefill) {
+                div.querySelector('.topic-text').value = prefill.topic || '';
+                div.querySelector('.topic-page').value = prefill.page || '';
+                div.querySelector('.topic-ref').value = prefill.reference || '';
             }
-        });
+            c.appendChild(div);
+        }
 
-        // 작성된 발제문 불러오기 로직
-        document.getElementById('loadTopicBtn').addEventListener('click', async () => {
-            const author = document.getElementById('authorName').value;
-            const dept = document.getElementById('department').value;
-            const pin = document.getElementById('pinCode').value;
-            const sid = (document.getElementById('studentId') || {}).value || '';
+        function showVerifyError(msg) {
+            const el = document.getElementById('verifyMsg');
+            el.textContent = msg; el.classList.remove('hidden');
+        }
 
-            if (!author || !dept) { alert("이름과 소속을 먼저 입력해주세요."); return; }
-            if (!'{{ user_name }}' && !pin && !sid) { alert("학번 또는 PIN 번호를 입력해주세요."); return; }
+        async function tryVerify() {
+            document.getElementById('verifyMsg').classList.add('hidden');
+            const author = document.getElementById('authorName').value.trim();
+            const dept = document.getElementById('department').value.trim();
+            const sid = (document.getElementById('studentId') || {}).value?.trim() || '';
+            const pin = (document.getElementById('pinCode') || {}).value?.trim() || '';
 
-            const loadBtn = document.getElementById('loadTopicBtn');
-            loadBtn.textContent = '불러오는 중...';
-            loadBtn.disabled = true;
+            if (!author || !dept) { showVerifyError('이름과 소속을 입력해주세요.'); return; }
+            if (!IS_LOGGED_IN && !sid && !pin) { showVerifyError('학번 또는 PIN 4자리를 입력해주세요.'); return; }
+            if (!IS_LOGGED_IN && !sid && pin && !/^[0-9]{4}$/.test(pin)) { showVerifyError('PIN은 숫자 4자리여야 합니다.'); return; }
 
+            // 시도: 기존 발제문 로드
+            let isMember = IS_LOGGED_IN || !!sid;
+            let topics = [];
             try {
-                const response = await fetch('/api/topics/load', {
+                const res = await fetch('/api/topics/load', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         event_id: document.getElementById('eventId').value,
-                        author_name: author,
-                        department: dept,
-                        student_id: sid,
-                        pin_code: pin
-                    })
+                        author_name: author, department: dept,
+                        student_id: sid, pin_code: pin,
+                    }),
                 });
-                const result = await response.json();
-
-                if (!response.ok) throw new Error(result.error);
-
-                // 성공 시 기존 토픽 삭제 후 다시 생성
-                container.innerHTML = '';
-                topicCount = 0;
-                result.topics.forEach(t => {
-                    addTopicField();
-                    const currentDiv = container.lastElementChild;
-                    currentDiv.querySelector('.topic-text').value = t.topic;
-                    currentDiv.querySelector('.topic-page').value = t.page;
-                    currentDiv.querySelector('.topic-ref').value = t.reference;
-                });
-                alert("이전에 작성한 발제문을 성공적으로 불러왔습니다!");
-            } catch (error) {
-                alert(`오류: ${error.message}`);
-            } finally {
-                loadBtn.textContent = '🔄 이전에 작성한 내 발제문 불러오기';
-                loadBtn.disabled = false;
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    topics = data.topics || [];
+                } else if (res.status === 404) {
+                    // 신규 작성: PIN/학번이 맞는지 더 검증할 방법은 없으나, submit 시 검증됨
+                } else if (res.status === 403) {
+                    showVerifyError(data.error || 'PIN이 일치하지 않습니다.');
+                    return;
+                } else {
+                    showVerifyError(data.error || '확인 중 오류가 발생했습니다.');
+                    return;
+                }
+            } catch (e) {
+                showVerifyError('네트워크 오류: ' + e.message);
+                return;
             }
+
+            verified = { author, dept, sid, pin, isMember };
+            document.getElementById('verifyCard').classList.add('hidden');
+            const wc = document.getElementById('writeCard');
+            wc.classList.remove('hidden');
+            document.getElementById('verifiedName').textContent = author + ' (' + dept + ')';
+            const badge = document.getElementById('verifiedBadge');
+            badge.innerHTML = isMember
+                ? '<span class="badge badge-member">회원</span>'
+                : '<span class="badge badge-guest">비회원</span>';
+
+            // topics 채우기
+            getContainer().innerHTML = '';
+            topicCount = 0;
+            if (topics.length) {
+                topics.forEach(t => addTopicField(t));
+                document.getElementById('loadedNote').classList.remove('hidden');
+            } else {
+                addTopicField();
+            }
+        }
+
+        document.getElementById('verifyBtn').addEventListener('click', tryVerify);
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            verified = null;
+            document.getElementById('writeCard').classList.add('hidden');
+            document.getElementById('verifyCard').classList.remove('hidden');
+            document.getElementById('loadedNote').classList.add('hidden');
+        });
+
+        // 회원 자동 인증
+        if (IS_LOGGED_IN && document.getElementById('department').value) {
+            tryVerify();
+        }
+
+        document.getElementById('topicForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!verified) { alert('먼저 본인 확인을 해주세요.'); return; }
+
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true; submitBtn.textContent = '처리 중...';
+
+            const topics = [];
+            getContainer().querySelectorAll(':scope > div').forEach(el => {
+                topics.push({
+                    topic: el.querySelector('.topic-text').value,
+                    page: el.querySelector('.topic-page').value,
+                    reference: el.querySelector('.topic-ref').value,
+                });
+            });
+            if (!topics.length) { alert('최소 1개의 발제문을 작성해주세요.'); submitBtn.disabled = false; submitBtn.textContent = '제출 / 수정 완료'; return; }
+
+            try {
+                const res = await fetch('/api/topics/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        event_id: document.getElementById('eventId').value,
+                        author_name: verified.author, department: verified.dept,
+                        student_id: verified.sid, pin_code: verified.pin,
+                        topics,
+                    }),
+                });
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error || '제출 실패');
+                alert(result.message || '제출되었습니다.');
+                if (!IS_LOGGED_IN) window.location.href = '/';
+            } catch (err) {
+                alert('오류: ' + err.message);
+            } finally {
+                submitBtn.disabled = false; submitBtn.textContent = '제출 / 수정 완료';
+            }
+        });
+
+        // Enter 키로 인증
+        ['authorName', 'department', 'studentId', 'pinCode'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); tryVerify(); }});
         });
     </script>
 </body>
