@@ -130,19 +130,15 @@
         {% endfor %}{% endif %}
         {% endwith %}
 
-        <!-- 관리자 빠른 이동 -->
-        <nav class="eva-card rounded-lg p-3 mb-6 sticky top-2 z-30 backdrop-blur-sm bg-opacity-95">
+        <!-- 페이지 내 섹션 빠른 이동 (전역 메뉴는 상단 헤더 사용) -->
+        <nav class="eva-card rounded-lg p-3 mb-6">
             <div class="flex flex-wrap gap-2 items-center text-sm">
-                <span class="font-bold text-eva-green mr-2">⚡ 관리자</span>
-                <a href="#sec-events" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 transition">이벤트</a>
+                <span class="text-xs text-gray-400 mr-1">이 페이지:</span>
+                <a href="#sec-events" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 transition">이벤트(면접)</a>
                 <a href="#sec-topics" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 transition">발제문</a>
                 <a href="#sec-seminars" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 transition">세미나 투표</a>
                 <a href="#sec-members" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 transition">회원</a>
-                <a href="#sec-new-event" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 transition">새 이벤트</a>
-                <span class="mx-2 text-gray-600">|</span>
-                <a href="{{ url_for('records_hub') }}" class="px-3 py-1 rounded bg-eva-purple text-white hover:opacity-80 transition">📊 기록 시스템</a>
-                <a href="{{ url_for('bookclub_index') }}" class="px-3 py-1 rounded bg-eva-purple text-white hover:opacity-80 transition">🧩 조 편성</a>
-                <a href="{{ url_for('help_admin') }}" class="px-3 py-1 rounded bg-eva-green text-black font-bold hover:opacity-80 transition">📖 운영 가이드</a>
+                <a href="#sec-new-event" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 transition">새 면접 이벤트</a>
             </div>
         </nav>
 
