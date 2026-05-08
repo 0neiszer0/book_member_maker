@@ -922,9 +922,26 @@ def merge_members():
             return jsonify({"status": "error", "message": "자기 자신을 source 로 지정할 수 없습니다."}), 403
 
         # 두 멤버 모두 존재해야 함
-        both = supabase.table('members').select('id, name').in_('id', [source_id, target_id]).execute().data or []
+        both = supabase.table('members').select('id, name, social_id, email').in_('id', [source_id, target_id]).execute().data or []
         if len(both) != 2:
             return jsonify({"status": "error", "message": "멤버를 찾을 수 없습니다."}), 404
+        source_row = next(m for m in both if m['id'] == source_id)
+        target_row = next(m for m in both if m['id'] == target_id)
+
+        # 카카오 로그인 정보(social_id/email)를 target 으로 이전.
+        # target 에 이미 값이 있으면 덮어쓰지 않음. source 의 값은 unique 충돌 방지를 위해 먼저 NULL 처리.
+        login_transfer = {}
+        if (source_row.get('social_id') or '').strip() and not (target_row.get('social_id') or '').strip():
+            login_transfer['social_id'] = source_row['social_id']
+        if (source_row.get('email') or '').strip() and not (target_row.get('email') or '').strip():
+            login_transfer['email'] = source_row['email']
+        if login_transfer:
+            # source 에서 먼저 비워서 unique 충돌 방지
+            supabase.table('members').update({
+                k: None for k in login_transfer.keys()
+            }).eq('id', source_id).execute()
+            # target 으로 이전
+            supabase.table('members').update(login_transfer).eq('id', target_id).execute()
 
         # (table, column, conflict_columns) — conflict_columns 가 있으면 unique 충돌 시 source 행 삭제
         moves = [
@@ -975,6 +992,7 @@ def merge_members():
             "status": "success",
             "message": "멤버가 합쳐졌습니다.",
             "moved": moved_summary,
+            "login_transferred": login_transfer,
         })
     except Exception as e:
         app.logger.error(f"merge_members error: {e}", exc_info=True)
