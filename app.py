@@ -5,7 +5,7 @@ import itertools
 import random
 import math
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash, Response
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash, Response, send_file
 import json
 from supabase import create_client, Client
 from datetime import datetime, timedelta, timezone, date, time
@@ -3701,6 +3701,312 @@ def delete_genre(genre_id):
         return jsonify({'status': 'success'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# ============================================================================
+# 스페셜 이벤트 (MT, 워크숍, 강연 등 1회성 행사)
+# ============================================================================
+
+@app.route('/admin/special_events')
+@login_required(role="admin")
+def admin_special_events():
+    """관리자: 스페셜 이벤트 목록 + 생성/관리 페이지"""
+    try:
+        events = supabase.table('special_events').select('*') \
+            .order('event_date', desc=True).execute().data or []
+        # 각 이벤트별 참석자 수
+        for evt in events:
+            cnt_res = supabase.table('special_event_attendees') \
+                .select('id', count='exact').eq('event_id', evt['id']).execute()
+            evt['attendee_count'] = cnt_res.count or 0
+        terms = supabase.table('seminar_terms').select('id, name, start_date, end_date') \
+            .order('start_date', desc=True).execute().data or []
+        return render_template('admin_special_events.html', events=events, terms=terms)
+    except Exception as e:
+        app.logger.error(f"admin_special_events error: {e}")
+        flash("스페셜 이벤트 페이지 로드 중 오류.", "danger")
+        return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/admin/special_events/<event_id>')
+@login_required(role="admin")
+def admin_special_event_detail(event_id):
+    """관리자: 단일 이벤트 상세 + 참석자 관리"""
+    try:
+        evt = supabase.table('special_events').select('*').eq('id', event_id).single().execute().data
+        if not evt:
+            flash("이벤트를 찾을 수 없습니다.", "danger")
+            return redirect(url_for('admin_special_events'))
+        attendees = supabase.table('special_event_attendees') \
+            .select('id, member_id, role, note, members(id, name, student_id, department)') \
+            .eq('event_id', event_id).order('created_at').execute().data or []
+        all_members = supabase.table('members').select('id, name, student_id, department') \
+            .eq('is_active', True).order('name').execute().data or []
+        attendee_ids = {a['member_id'] for a in attendees}
+        candidates = [m for m in all_members if m['id'] not in attendee_ids]
+        return render_template('admin_special_event_detail.html',
+                               event=evt, attendees=attendees, candidates=candidates)
+    except Exception as e:
+        app.logger.error(f"admin_special_event_detail error: {e}")
+        flash("이벤트 상세 로드 중 오류.", "danger")
+        return redirect(url_for('admin_special_events'))
+
+
+@app.route('/api/admin/special_events/create', methods=['POST'])
+@login_required(role="admin")
+def create_special_event():
+    try:
+        data = request.json or {}
+        name = (data.get('name') or '').strip()
+        event_date = data.get('event_date')
+        if not name or not event_date:
+            return jsonify({'error': '이름과 날짜는 필수입니다.'}), 400
+        payload = {
+            'name': name,
+            'description': (data.get('description') or '').strip() or None,
+            'event_date': event_date,
+            'end_date': data.get('end_date') or None,
+            'category': (data.get('category') or 'event'),
+            'term_id': data.get('term_id') or None,
+            'created_by': session.get('user_id'),
+        }
+        res = supabase.table('special_events').insert(payload).execute()
+        return jsonify({'status': 'success', 'event': res.data[0]})
+    except Exception as e:
+        app.logger.error(f"create_special_event error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/special_events/<event_id>/update', methods=['POST'])
+@login_required(role="admin")
+def update_special_event(event_id):
+    try:
+        data = request.json or {}
+        update = {}
+        for k in ('name', 'description', 'event_date', 'end_date', 'category', 'term_id'):
+            if k in data:
+                update[k] = data[k] if data[k] != '' else None
+        if 'is_active' in data:
+            update['is_active'] = bool(data['is_active'])
+        if not update:
+            return jsonify({'error': '수정할 내용이 없습니다.'}), 400
+        supabase.table('special_events').update(update).eq('id', event_id).execute()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/special_events/<event_id>/toggle_active', methods=['POST'])
+@login_required(role="admin")
+def toggle_special_event(event_id):
+    try:
+        cur = supabase.table('special_events').select('is_active').eq('id', event_id).single().execute().data
+        if not cur:
+            return jsonify({'error': '이벤트를 찾을 수 없습니다.'}), 404
+        new_state = not bool(cur.get('is_active'))
+        supabase.table('special_events').update({'is_active': new_state}).eq('id', event_id).execute()
+        return jsonify({'status': 'success', 'is_active': new_state})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/special_events/<event_id>/delete', methods=['POST'])
+@login_required(role="admin")
+def delete_special_event(event_id):
+    try:
+        # cascade로 참석자도 함께 삭제됨
+        supabase.table('special_events').delete().eq('id', event_id).execute()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/special_events/<event_id>/attendees/add', methods=['POST'])
+@login_required(role="admin")
+def add_special_event_attendee(event_id):
+    try:
+        data = request.json or {}
+        member_ids = data.get('member_ids') or []
+        if isinstance(member_ids, (int, str)):
+            member_ids = [member_ids]
+        if not member_ids:
+            return jsonify({'error': '추가할 회원을 선택하세요.'}), 400
+        rows = [{'event_id': event_id, 'member_id': int(mid),
+                 'role': data.get('role', 'attendee'),
+                 'note': (data.get('note') or '').strip() or None}
+                for mid in member_ids]
+        # ON CONFLICT DO NOTHING 동작 — 이미 등록된 멤버는 스킵
+        supabase.table('special_event_attendees').upsert(rows, on_conflict='event_id,member_id').execute()
+        return jsonify({'status': 'success', 'added': len(rows)})
+    except Exception as e:
+        app.logger.error(f"add_special_event_attendee error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/special_events/<event_id>/attendees/<int:member_id>/remove', methods=['POST'])
+@login_required(role="admin")
+def remove_special_event_attendee(event_id, member_id):
+    try:
+        supabase.table('special_event_attendees').delete() \
+            .eq('event_id', event_id).eq('member_id', member_id).execute()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# 출석 매트릭스 (관리자 도구)
+# 가로축: 세미나 주차(월/목 묶어서 1주차로 표시), 세로축: 회원, 셀: O/X
+# 데이터 소스: history (확정된 세미나 진행 기록의 present 명단)
+# ============================================================================
+
+def _build_attendance_matrix(start_date=None, end_date=None):
+    """history의 present 명단 + members 명부로 출석 매트릭스를 생성.
+    Returns: (members_list, weeks_list, matrix_dict[member_id][week_key]=bool)
+    """
+    # 1) 회원 명부 (활성 + 비활성 모두 — 과거 회원 기록 보존)
+    members = supabase.table('members').select('id, name, student_id, department, is_active') \
+        .order('name').execute().data or []
+
+    # 2) 세미나 history 조회 (날짜 범위 필터)
+    q = supabase.table('history').select('id, date, present, book_title, book_genre')
+    if start_date:
+        q = q.gte('date', start_date)
+    if end_date:
+        q = q.lte('date', end_date)
+    histories = q.order('date').execute().data or []
+
+    # 3) 주차 단위로 묶기 — 같은 주의 월/목 출석을 합쳐 OR 연산
+    from datetime import datetime as _dt
+    name_to_id = {m['name']: m['id'] for m in members}
+    week_meta = {}        # week_key -> {label, dates:[date_str], titles:set}
+    matrix = {}           # member_id -> {week_key: True}
+
+    for h in histories:
+        try:
+            d = _dt.strptime(h['date'], '%Y-%m-%d').date()
+        except Exception:
+            continue
+        # ISO 주차로 묶기 (월요일 기준)
+        iso_year, iso_week, _ = d.isocalendar()
+        week_key = f"{iso_year}-W{iso_week:02d}"
+        meta = week_meta.setdefault(week_key, {'label': '', 'dates': [], 'titles': set(), 'sort': d})
+        meta['dates'].append(h['date'])
+        if h.get('book_title'):
+            meta['titles'].add(h['book_title'])
+        if d < meta['sort']:
+            meta['sort'] = d
+
+        # 출석자 처리 — present 는 이름 배열
+        present_names = h.get('present') or []
+        for nm in present_names:
+            if not nm:
+                continue
+            mid = name_to_id.get(nm)
+            if mid is None:
+                continue
+            matrix.setdefault(mid, {})[week_key] = True
+
+    # 4) 주차 정렬 + 라벨 만들기
+    weeks = []
+    for wk, meta in week_meta.items():
+        first_date = min(meta['dates'])
+        try:
+            d = _dt.strptime(first_date, '%Y-%m-%d').date()
+            label = f"{d.month}/{d.day}~"
+        except Exception:
+            label = first_date
+        title = ' / '.join(sorted(meta['titles'])) if meta['titles'] else '(미정)'
+        weeks.append({'key': wk, 'label': label, 'title': title, 'sort': meta['sort']})
+    weeks.sort(key=lambda w: w['sort'])
+
+    return members, weeks, matrix
+
+
+@app.route('/admin/attendance_matrix')
+@login_required(role="admin")
+def admin_attendance_matrix():
+    start_date = request.args.get('start_date') or None
+    end_date = request.args.get('end_date') or None
+    term_id = request.args.get('term_id') or None
+
+    # 학기 선택 시 학기 기간으로 자동 채움
+    if term_id and not (start_date and end_date):
+        try:
+            t = supabase.table('seminar_terms').select('start_date, end_date') \
+                .eq('id', term_id).single().execute().data
+            if t:
+                start_date = start_date or t['start_date']
+                end_date = end_date or t['end_date']
+        except Exception:
+            pass
+
+    try:
+        members, weeks, matrix = _build_attendance_matrix(start_date, end_date)
+        terms = supabase.table('seminar_terms').select('id, name, start_date, end_date') \
+            .order('start_date', desc=True).execute().data or []
+
+        # 회원별 출석 횟수 집계
+        member_counts = {m['id']: sum(1 for w in weeks if matrix.get(m['id'], {}).get(w['key'])) for m in members}
+
+        return render_template('admin_attendance_matrix.html',
+                               members=members, weeks=weeks, matrix=matrix,
+                               member_counts=member_counts,
+                               terms=terms, term_id=term_id,
+                               start_date=start_date or '', end_date=end_date or '')
+    except Exception as e:
+        app.logger.error(f"admin_attendance_matrix error: {e}")
+        flash("매트릭스 로드 중 오류.", "danger")
+        return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/admin/attendance_matrix/export')
+@login_required(role="admin")
+def admin_attendance_matrix_export():
+    """엑셀(.xlsx)로 출석 매트릭스 내보내기"""
+    start_date = request.args.get('start_date') or None
+    end_date = request.args.get('end_date') or None
+    term_id = request.args.get('term_id') or None
+    if term_id and not (start_date and end_date):
+        try:
+            t = supabase.table('seminar_terms').select('start_date, end_date, name') \
+                .eq('id', term_id).single().execute().data
+            if t:
+                start_date = start_date or t['start_date']
+                end_date = end_date or t['end_date']
+        except Exception:
+            pass
+
+    members, weeks, matrix = _build_attendance_matrix(start_date, end_date)
+
+    # DataFrame 구성: 행=회원, 열=주차
+    columns = ['이름', '학번', '소속'] + [f"{w['label']} {w['title']}" for w in weeks] + ['출석횟수']
+    rows = []
+    for m in members:
+        row = [m.get('name', ''), m.get('student_id', '') or '', m.get('department', '') or '']
+        cnt = 0
+        for w in weeks:
+            attended = bool(matrix.get(m['id'], {}).get(w['key']))
+            row.append('O' if attended else 'X')
+            if attended:
+                cnt += 1
+        row.append(cnt)
+        rows.append(row)
+
+    df = pd.DataFrame(rows, columns=columns)
+    buf = BytesIO()
+    with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='출석매트릭스', index=False)
+    buf.seek(0)
+
+    fname_parts = ['attendance_matrix']
+    if start_date: fname_parts.append(start_date)
+    if end_date: fname_parts.append(end_date)
+    fname = '_'.join(fname_parts) + '.xlsx'
+
+    return send_file(buf,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True, download_name=fname)
 
 
 # --- 학기 필터 헬퍼 ---
