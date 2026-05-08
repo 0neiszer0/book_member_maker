@@ -171,25 +171,15 @@
             <h2 class="section-title">⚡ 지금 할 일</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-                <!-- 다음 세미나 참석 투표 -->
+                {% if my_open_votes %}
+                <!-- 다음 세미나 참석 투표 (투표 창이 열린 동안에만 노출) -->
                 <div class="action-card md:col-span-2">
                     <div class="flex items-start justify-between flex-wrap gap-2 mb-1">
                         <div>
                             <div class="title">🗳️ 다음 세미나 참석 투표</div>
-                            <div class="desc">
-                                {% if my_open_votes %}
-                                현재 {{ my_open_votes|length }}개 회차에 투표할 수 있습니다.
-                                {% elif seminar_dates %}
-                                활성 학기가 없습니다. 다음 세미나에 참석할 의향을 표시하세요.
-                                {% else %}
-                                예정된 세미나가 없습니다.
-                                {% endif %}
-                            </div>
+                            <div class="desc">현재 {{ my_open_votes|length }}개 회차에 투표할 수 있습니다.</div>
                         </div>
                     </div>
-
-                    {% if my_open_votes %}
-                    {# 학기 투표 모드 — 신규 시스템 #}
                     <div class="flex flex-wrap gap-2">
                         {% for v in my_open_votes %}
                         <a href="/seminar_vote?token={{ v.term_token }}"
@@ -204,22 +194,8 @@
                         {% endfor %}
                     </div>
                     <p class="text-xs text-gray-500 mt-2">버튼을 누르면 학기별 투표 페이지로 이동합니다.</p>
-                    {% elif seminar_dates %}
-                    {# 폴백 — 구 attendance 시스템 #}
-                    <div class="flex flex-wrap gap-2" id="seminar-date-btns">
-                        {% for seminar in seminar_dates %}
-                        {% set is_confirmed = seminar.date in my_confirmed_dates %}
-                        <button class="attendance-toggle-btn pill {% if is_confirmed %}pill-green{% else %}pill-gray{% endif %}"
-                            data-date="{{ seminar.date }}" data-confirmed="{{ 'true' if is_confirmed else 'false' }}">
-                            <span>{{ seminar.label }}</span>
-                            <span class="text-lg">{% if is_confirmed %}✅{% else %}☐{% endif %}</span>
-                        </button>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    <p class="text-xs text-gray-500">예정된 일정이 없습니다.</p>
-                    {% endif %}
                 </div>
+                {% endif %}
 
                 <!-- 발제문 제출 -->
                 <div class="action-card">
@@ -324,42 +300,6 @@
 
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            document.querySelectorAll('.attendance-toggle-btn').forEach(btn => {
-                btn.addEventListener('click', async () => {
-                    const date = btn.dataset.date;
-                    const isConfirmed = btn.dataset.confirmed === 'true';
-                    const newState = !isConfirmed;
-                    btn.disabled = true;
-                    try {
-                        const res = await fetch('/api/attendance', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ meeting_date: date, attending_seminar: newState }),
-                        });
-                        const result = await res.json();
-                        if (result.status !== 'success') throw new Error(result.message || '오류');
-                        btn.dataset.confirmed = newState ? 'true' : 'false';
-                        const icon = btn.querySelector('span:last-child');
-                        if (newState) {
-                            btn.classList.remove('pill-gray');
-                            btn.classList.add('pill-green');
-                            icon.textContent = '✅';
-                        } else {
-                            btn.classList.remove('pill-green');
-                            btn.classList.add('pill-gray');
-                            icon.textContent = '☐';
-                        }
-                    } catch (err) {
-                        alert('오류: ' + err.message);
-                    } finally {
-                        btn.disabled = false;
-                    }
-                });
-            });
-        });
-    </script>
 </body>
 
 </html>
