@@ -428,7 +428,8 @@ def link_account_page():
     if nickname:
         try:
             res = supabase.table("members").select("id,name,student_id,profile_pic")\
-                .eq("name", nickname).is_("social_id", None).execute()
+                .eq("name", nickname)\
+                .or_("social_id.is.null,social_id.eq.").execute()
             rows = res.data or []
             if len(rows) == 1:
                 matched_member = rows[0]
@@ -461,7 +462,8 @@ def link_account_submit():
             flash("기존 활동명을 입력해주세요.", "danger")
             return redirect(url_for('link_account_page'))
 
-        member_res = supabase.table("members").select("*").eq("name", existing_name).is_("social_id", None).execute()
+        member_res = supabase.table("members").select("*").eq("name", existing_name)\
+            .or_("social_id.is.null,social_id.eq.").execute()
         member_to_link = member_res.data[0] if member_res.data else None
 
         if member_to_link:
