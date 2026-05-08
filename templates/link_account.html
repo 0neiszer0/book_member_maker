@@ -18,43 +18,17 @@
             --text-light: #E5E5E5;
             --border-dark: #444444;
         }
-
-        body {
-            font-family: 'Noto Sans KR', sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-light);
-        }
-
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
         h1, h2 { font-family: 'Orbitron', sans-serif; }
-
-        .eva-card {
-            background-color: var(--card-dark);
-            border: 1px solid var(--border-dark);
-        }
-
-        .eva-input {
-            background-color: var(--bg-dark);
-            border: 1px solid var(--border-dark);
-            color: var(--text-light);
-        }
-        .eva-input:focus {
-            border-color: var(--eva-green);
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(0, 255, 127, 0.2);
-        }
-
-        .path-card {
-            background-color: var(--card-dark);
-            border: 1px solid var(--border-dark);
-            transition: all 0.2s;
-        }
-        .path-card.selected {
-            border-color: var(--eva-green);
-            box-shadow: 0 0 0 2px rgba(0, 255, 127, 0.3);
-        }
-        .path-card.dimmed {
-            opacity: 0.5;
-        }
+        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
+        .eva-input { background-color: var(--bg-dark); border: 1px solid var(--border-dark); color: var(--text-light); }
+        .eva-input:focus { border-color: var(--eva-green); outline: none; box-shadow: 0 0 0 2px rgba(0, 255, 127, 0.2); }
+        .path-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); transition: all 0.2s; cursor: pointer; }
+        .path-card.selected { border-color: var(--eva-green); box-shadow: 0 0 0 2px rgba(0, 255, 127, 0.3); }
+        .path-card.dimmed { opacity: 0.5; }
+        .text-eva-green { color: var(--eva-green); }
+        .border-eva-green { border-color: var(--eva-green); }
+        .bg-eva-green { background-color: var(--eva-green); }
     </style>
 </head>
 
@@ -77,25 +51,102 @@
             {% endif %}
             <h1 class="text-2xl font-bold text-eva-green">{{ social_name }}님, 환영합니다!</h1>
             {% if email %}<p class="text-xs text-gray-400 mt-1">📧 {{ email }}</p>{% endif %}
-            <p class="text-sm text-gray-300 mt-3">
-                책 먹는 호반우와 처음 만나셨네요.<br>
-                <strong class="text-eva-green">아래 두 가지 중 본인에게 맞는 경우</strong>를 선택해주세요.
-            </p>
         </div>
 
+        {# ============================================================ #}
+        {# CASE 1: 카카오 닉네임으로 동아리 회원이 자동 매칭됨 (1명)     #}
+        {# ============================================================ #}
+        {% if matched_member %}
+        <div class="eva-card rounded-lg p-6 mb-4">
+            <div class="text-center mb-5">
+                <div class="text-4xl mb-3">👋</div>
+                <h2 class="text-xl font-bold text-eva-green mb-2">혹시 이 분 맞으신가요?</h2>
+                <div class="bg-gray-900/50 rounded-lg p-4 my-4">
+                    <p class="text-2xl font-bold text-white">{{ matched_member.name }} 님</p>
+                    {% if matched_member.student_id %}
+                    <p class="text-xs text-gray-400 mt-1">학번 ****{{ matched_member.student_id|string|truncate(4, True, '') }}* (일부만 표시)</p>
+                    {% endif %}
+                </div>
+                <p class="text-sm text-gray-300">
+                    동아리 명부에 같은 이름이 있어 자동으로 찾았어요.<br>
+                    <strong class="text-eva-green">학번을 입력</strong>하시면 즉시 본인 인증 후 카카오 계정과 연결됩니다.
+                </p>
+            </div>
+
+            <form action="{{ url_for('link_account_submit') }}" method="POST">
+                <input type="hidden" name="provider" value="{{ provider }}">
+                <input type="hidden" name="social_id" value="{{ social_id }}">
+                <input type="hidden" name="email" value="{{ email }}">
+                <input type="hidden" name="social_name" value="{{ social_name }}">
+                <input type="hidden" name="profile_pic" value="{{ profile_pic }}">
+                <input type="hidden" name="action" value="link">
+                <input type="hidden" name="existing_name" value="{{ matched_member.name }}">
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-sm font-bold text-eva-green block mb-2">학번 입력</label>
+                        <input type="text" name="student_id" class="eva-input w-full rounded py-3 px-4 text-base"
+                            placeholder="예: 20231234" inputmode="numeric" required autofocus>
+                        <p class="text-xs text-gray-500 mt-2">학번이 명부와 일치하면 즉시 자동 승인됩니다.</p>
+                    </div>
+                </div>
+                <button type="submit" class="mt-5 w-full bg-eva-green text-black font-bold py-3 rounded-lg hover:opacity-80 transition">
+                    ✓ 네, 저 맞아요 — 인증하고 연결
+                </button>
+            </form>
+
+            <div class="mt-4 pt-4 border-t border-gray-700 text-center">
+                <button type="button" onclick="document.getElementById('manual_section').classList.remove('hidden'); this.style.display='none';"
+                    class="text-xs text-gray-400 hover:text-eva-green underline">
+                    🤔 저 아닌데요 / 다른 이름으로 등록되어 있어요
+                </button>
+            </div>
+        </div>
+
+        <!-- 수동 입력 (matched 거부 시 펼침) -->
+        <div id="manual_section" class="hidden">
+        {% endif %}
+
+        {# ============================================================ #}
+        {# CASE 2: 동명이인 (2명 이상)                                   #}
+        {# ============================================================ #}
+        {% if multiple_matches %}
+        <div class="eva-card rounded-lg p-5 mb-4 bg-yellow-900/20 border-yellow-700">
+            <h2 class="text-base font-bold text-yellow-400 mb-2">⚠️ 같은 이름이 {{ multiple_matches|length }}명 있어요</h2>
+            <p class="text-xs text-gray-300">
+                동명이인이 있어 자동 매칭이 어렵습니다.<br>
+                아래에서 <strong>학번까지 입력</strong>해서 정확한 본인을 식별해주세요.
+            </p>
+        </div>
+        {% endif %}
+
+        {# ============================================================ #}
+        {# CASE 3: 자동 매칭 실패 또는 manual 모드 — 경로 선택 + 입력      #}
+        {# ============================================================ #}
+        {% if not matched_member %}
+        <p class="text-sm text-gray-300 text-center mb-4">
+            {% if auth_mode == 'login' %}
+            <strong class="text-yellow-400">아직 가입되지 않은 카카오 계정</strong>이에요.<br>
+            아래 두 가지 중 본인에게 맞는 경우를 선택해주세요.
+            {% else %}
+            <strong class="text-eva-green">아래 두 가지 중 본인에게 맞는 경우</strong>를 선택해주세요.
+            {% endif %}
+        </p>
+        {% endif %}
+
         <!-- 경로 선택 -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <button type="button" onclick="selectPath('link')" id="pathLink"
                 class="path-card rounded-lg p-4 text-left hover:border-eva-green">
                 <div class="text-2xl mb-2">🔗</div>
                 <h2 class="text-base font-bold text-eva-green mb-1">기존 부원이에요</h2>
-                <p class="text-xs text-gray-400">이미 동아리에 등록되어 있어요. 이름·학번으로 본인 확인해주세요.</p>
+                <p class="text-xs text-gray-400">동아리 명부에 등록되어 있어요. 이름·학번으로 본인 확인.</p>
             </button>
             <button type="button" onclick="selectPath('create')" id="pathCreate"
                 class="path-card rounded-lg p-4 text-left hover:border-eva-green">
                 <div class="text-2xl mb-2">✨</div>
                 <h2 class="text-base font-bold text-eva-green mb-1">신규 가입이에요</h2>
-                <p class="text-xs text-gray-400">처음 가입합니다. 카카오 정보로 신청 후 관리자 승인을 기다려요.</p>
+                <p class="text-xs text-gray-400">처음입니다. 카카오 정보로 신청 후 관리자 승인.</p>
             </button>
         </div>
 
@@ -150,6 +201,10 @@
                 <p class="text-xs text-gray-500 mt-2 text-center">신청 후 관리자에게 알림이 발송됩니다.</p>
             </div>
         </form>
+
+        {% if matched_member %}
+        </div>
+        {% endif %}
 
         <!-- 도움말 -->
         <details class="mt-6">

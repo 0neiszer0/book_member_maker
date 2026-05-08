@@ -313,6 +313,9 @@ def kakao_login():
 
     # [수정] 로그인 후 돌아올 목적지를 세션에 저장합니다.
     session['next_url'] = request.args.get('next')
+    # [신규] 사용자가 누른 버튼이 '로그인'인지 '회원가입'인지 기억
+    mode = request.args.get('mode', 'login')
+    session['auth_mode'] = mode if mode in ('login', 'signup') else 'login'
 
     return redirect(login_url)
 
@@ -413,7 +416,32 @@ def link_account_page():
     # kakao_callback에서 임시 저장한 소셜 데이터가 없으면 로그인 페이지로
     if 'temp_social_data' not in session:
         return redirect(url_for('login'))
-    return render_template('link_account.html', **session['temp_social_data'])
+
+    social_data = session['temp_social_data']
+    auth_mode = session.get('auth_mode', 'login')
+
+    # [신규] 카카오 닉네임으로 미연결 멤버 자동 매칭
+    # 동명이인 가능성 고려해 결과 0건 / 1건 / 2건 이상으로 분기
+    matched_member = None
+    multiple_matches = []
+    nickname = (social_data.get('social_name') or '').strip()
+    if nickname:
+        try:
+            res = supabase.table("members").select("id,name,student_id,profile_pic")\
+                .eq("name", nickname).is_("social_id", None).execute()
+            rows = res.data or []
+            if len(rows) == 1:
+                matched_member = rows[0]
+            elif len(rows) > 1:
+                multiple_matches = rows
+        except Exception as e:
+            app.logger.warning(f"link_account auto-match failed: {e}")
+
+    return render_template('link_account.html',
+                           **social_data,
+                           auth_mode=auth_mode,
+                           matched_member=matched_member,
+                           multiple_matches=multiple_matches)
 
 
 @app.route('/link_account', methods=['POST'])
