@@ -45,29 +45,42 @@
     .border-eva-green { border-color: var(--eva-green); }
     .border-border-dark { border-color: var(--border-dark); }
 
+    /* 기록 시스템 서브탭 — _header.html 바로 아래에 자연스럽게 붙도록 */
+    .records-subbar {
+        background-color: var(--card-dark);
+        border-bottom: 1px solid var(--border-dark);
+        position: sticky;
+        top: 0; /* _header.html 이 sticky 일 때 그 아래로 자동 이동 */
+        z-index: 40;
+    }
+    .records-subbar-inner {
+        display: flex;
+        gap: 0.25rem;
+        overflow-x: auto;
+        padding: 0.4rem 0;
+    }
     .records-tab {
         display: inline-block;
-        padding: 0.5rem 1rem;
-        border-radius: 0.5rem 0.5rem 0 0;
-        background-color: var(--card-dark);
+        padding: 0.4rem 0.9rem;
+        border-radius: 0.4rem;
+        background-color: transparent;
         color: #aaa;
-        font-weight: bold;
-        font-size: 0.9rem;
+        font-weight: 600;
+        font-size: 0.85rem;
         text-decoration: none;
-        border: 1px solid var(--border-dark);
-        border-bottom: none;
+        border: 1px solid transparent;
+        white-space: nowrap;
     }
 
     .records-tab.active {
-        background-color: var(--bg-dark);
+        background-color: rgba(0, 255, 127, 0.12);
         color: var(--eva-green);
-        border-bottom: 2px solid var(--bg-dark);
-        position: relative;
-        top: 1px;
+        border-color: rgba(0, 255, 127, 0.5);
     }
 
     .records-tab:hover {
         color: var(--eva-green);
+        background-color: rgba(255, 255, 255, 0.04);
     }
 
     .genre-pill {
@@ -150,13 +163,16 @@ async function addNewGenre(btn) {
 {% endmacro %}
 
 {% macro records_nav(active) %}
-<div class="border-b border-border-dark mb-6">
-    <a href="{{ url_for('records_hub') }}" class="records-tab {% if active == 'hub' %}active{% endif %}">홈</a>
-    <a href="{{ url_for('records_members') }}" class="records-tab {% if active == 'members' %}active{% endif %}">회원명부</a>
-    <a href="{{ url_for('records_seminars') }}" class="records-tab {% if active == 'seminars' %}active{% endif %}">세미나</a>
-    <a href="{{ url_for('records_brick_books') }}" class="records-tab {% if active == 'brick' %}active{% endif %}">벽돌책</a>
-    <a href="{{ url_for('records_study_groups') }}" class="records-tab {% if active == 'study' %}active{% endif %}">소모임</a>
-    <a href="{{ url_for('records_analytics') }}" class="records-tab {% if active == 'analytics' %}active{% endif %}">통계</a>
+{# 페이지 container 안에 들어가도 자연스럽게 보이는 sticky 서브바 #}
+<div class="records-subbar -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 mb-6 -mt-4 sm:-mt-6 lg:-mt-8">
+    <div class="records-subbar-inner">
+        <a href="{{ url_for('records_hub') }}" class="records-tab {% if active == 'hub' %}active{% endif %}">📚 홈</a>
+        <a href="{{ url_for('records_members') }}" class="records-tab {% if active == 'members' %}active{% endif %}">👥 회원</a>
+        <a href="{{ url_for('records_seminars') }}" class="records-tab {% if active == 'seminars' %}active{% endif %}">📖 세미나</a>
+        <a href="{{ url_for('records_brick_books') }}" class="records-tab {% if active == 'brick' %}active{% endif %}">🧱 벽돌책</a>
+        <a href="{{ url_for('records_study_groups') }}" class="records-tab {% if active == 'study' %}active{% endif %}">🤝 소모임</a>
+        <a href="{{ url_for('records_analytics') }}" class="records-tab {% if active == 'analytics' %}active{% endif %}">📊 통계</a>
+    </div>
 </div>
 {% endmacro %}
 
