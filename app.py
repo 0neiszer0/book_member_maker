@@ -905,6 +905,82 @@ def delete_member(member_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@app.route('/api/admin/members/merge', methods=['POST'])
+@login_required(role="admin")
+def merge_members():
+    """두 멤버를 하나로 합칩니다.
+    예: '민수'(성 빠짐) → '김민수' 로 모든 활동 이력 이전 후 source 삭제.
+    body: {source_id: int, target_id: int}
+    """
+    try:
+        data = request.json or {}
+        source_id = int(data.get('source_id'))
+        target_id = int(data.get('target_id'))
+        if source_id == target_id:
+            return jsonify({"status": "error", "message": "같은 멤버입니다."}), 400
+        if source_id == session.get('user_id'):
+            return jsonify({"status": "error", "message": "자기 자신을 source 로 지정할 수 없습니다."}), 403
+
+        # 두 멤버 모두 존재해야 함
+        both = supabase.table('members').select('id, name').in_('id', [source_id, target_id]).execute().data or []
+        if len(both) != 2:
+            return jsonify({"status": "error", "message": "멤버를 찾을 수 없습니다."}), 404
+
+        # (table, column, conflict_columns) — conflict_columns 가 있으면 unique 충돌 시 source 행 삭제
+        moves = [
+            ('attendance', 'user_id', ['user_id', 'meeting_date']),
+            ('seminar_votes', 'member_id', ['session_id', 'member_id']),
+            ('brick_session_members', 'member_id', ['session_id', 'member_id']),
+            ('study_session_members', 'member_id', ['session_id', 'member_id']),
+            ('special_event_attendees', 'member_id', ['event_id', 'member_id']),
+        ]
+        moved_summary = {}
+        for table, col, conflict_cols in moves:
+            try:
+                source_rows = supabase.table(table).select(','.join(['id'] + conflict_cols)) \
+                    .eq(col, source_id).execute().data or []
+                if not source_rows:
+                    moved_summary[table] = 0
+                    continue
+                # target 이 이미 갖고 있는 conflict_cols 조합 조회
+                other_col = [c for c in conflict_cols if c != col][0]
+                other_vals = list({r[other_col] for r in source_rows})
+                target_existing_res = supabase.table(table).select(other_col) \
+                    .eq(col, target_id).in_(other_col, other_vals).execute().data or []
+                target_has = {r[other_col] for r in target_existing_res}
+
+                to_delete_ids = [r['id'] for r in source_rows if r[other_col] in target_has]
+                to_update_ids = [r['id'] for r in source_rows if r[other_col] not in target_has]
+
+                if to_delete_ids:
+                    supabase.table(table).delete().in_('id', to_delete_ids).execute()
+                if to_update_ids:
+                    supabase.table(table).update({col: target_id}).in_('id', to_update_ids).execute()
+                moved_summary[table] = {'updated': len(to_update_ids), 'deleted_dup': len(to_delete_ids)}
+            except Exception as e:
+                app.logger.warning(f"merge_members move {table} 실패: {e}")
+                moved_summary[table] = f"error: {e}"
+
+        # set null 계열: special_events.created_by — source 가 만든 이벤트는 target 으로 이전
+        try:
+            supabase.table('special_events').update({'created_by': target_id}) \
+                .eq('created_by', source_id).execute()
+        except Exception as e:
+            app.logger.warning(f"merge_members special_events.created_by 실패: {e}")
+
+        # 마지막으로 source 삭제
+        supabase.table('members').delete().eq('id', source_id).execute()
+
+        return jsonify({
+            "status": "success",
+            "message": "멤버가 합쳐졌습니다.",
+            "moved": moved_summary,
+        })
+    except Exception as e:
+        app.logger.error(f"merge_members error: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @app.route('/admin/events/create', methods=['POST'])
 @login_required(role="admin")
 def create_event():
@@ -2736,10 +2812,14 @@ def my_page():
 
         # 현재 투표 가능한 세미나 회차 (학기별)
         my_open_votes = []
+        active_seminar_terms = []
         try:
             now_kst = datetime.now(KST)
             terms = supabase.table('seminar_terms').select('id, name, share_token, max_capacity') \
                 .eq('is_active', True).execute().data or []
+            active_seminar_terms = [
+                {'name': t['name'], 'share_token': t['share_token']} for t in terms
+            ]
             for term in terms:
                 t_sess = supabase.table('seminar_sessions').select('id, meeting_date, day_type') \
                     .eq('term_id', term['id']).eq('is_active', True) \
@@ -2770,6 +2850,7 @@ def my_page():
             active_topic_events=active_topic_events,
             activity=activity,
             my_open_votes=my_open_votes,
+            active_seminar_terms=active_seminar_terms,
             my_special_events=my_special_events,
         )
 
@@ -3393,17 +3474,30 @@ def seminar_vote_page():
             .order('meeting_date').execute().data or []
         session_ids = [s['id'] for s in sessions]
         counts = {sid: 0 for sid in session_ids}
+        attendees_by_session = {sid: [] for sid in session_ids}
         if session_ids:
-            votes = supabase.table('seminar_votes').select('session_id') \
+            votes = supabase.table('seminar_votes').select('session_id, member_id') \
                 .in_('session_id', session_ids).eq('attending', True).execute().data or []
+            member_ids = list({v['member_id'] for v in votes})
+            name_by_id = {}
+            if member_ids:
+                mres = supabase.table('members').select('id, name') \
+                    .in_('id', member_ids).execute().data or []
+                name_by_id = {m['id']: m.get('name') or '' for m in mres}
             for v in votes:
                 counts[v['session_id']] = counts.get(v['session_id'], 0) + 1
+                nm = name_by_id.get(v['member_id'])
+                if nm:
+                    attendees_by_session.setdefault(v['session_id'], []).append(nm)
+            for sid in attendees_by_session:
+                attendees_by_session[sid].sort()
         now_kst = datetime.now(KST)
         is_admin = session.get('user_role') in ('admin', 'officer')
         open_sessions, upcoming_sessions, closed_sessions = [], [], []
         for s in sessions:
             s['attending_count'] = counts.get(s['id'], 0)
             s['is_full'] = s['attending_count'] >= term.get('max_capacity', 32)
+            s['attendee_names'] = attendees_by_session.get(s['id'], [])
             open_at, close_at = _voting_window_for(s['meeting_date'])
             s['voting_open_at'] = open_at.strftime('%Y-%m-%d %H:%M')
             s['voting_close_at'] = close_at.strftime('%Y-%m-%d %H:%M')
