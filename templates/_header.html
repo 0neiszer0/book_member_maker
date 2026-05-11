@@ -28,6 +28,8 @@
                 <a href="{{ url_for('records_hub') }}"
                     class="text-sm text-eva-green hover:opacity-80 font-bold">기록</a>
                 {% endif %}
+                <a href="{{ url_for('help_admin') }}"
+                    class="text-sm text-gray-300 hover:text-eva-green">📖 가이드</a>
                 {% endif %}
 
                 <a href="{{ url_for('logout') }}" class="text-sm text-gray-400 hover:text-eva-green">로그아웃</a>
@@ -65,6 +67,8 @@
             <a href="{{ url_for('records_hub') }}"
                 class="block px-3 py-2 rounded-md text-base font-medium text-eva-green hover:text-white hover:bg-gray-700">기록</a>
             {% endif %}
+            <a href="{{ url_for('help_admin') }}"
+                class="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700">📖 가이드</a>
             {% endif %}
             <a href="{{ url_for('my_page') }}"
                 class="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700">마이페이지</a>

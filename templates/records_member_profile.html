@@ -99,6 +99,29 @@
                 </div>
             </div>
         </div>
+
+        <!-- 스페셜 이벤트 -->
+        <div class="eva-card p-5 rounded-lg mt-6">
+            <h2 class="text-lg font-bold text-eva-green mb-4">✨ 스페셜 이벤트 ({{ (special_events or [])|length }}회)</h2>
+            {% if special_events %}
+            <div class="overflow-y-auto max-h-96 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {% for ev in special_events %}
+                <div class="p-3 bg-gray-800/50 rounded text-sm">
+                    <div class="font-bold">{{ ev.name }}
+                        <span class="text-xs text-gray-500 font-normal">[{{ ev.category }}]</span>
+                    </div>
+                    <div class="text-xs text-gray-400 mt-1">
+                        {{ ev.event_date }}{% if ev.end_date and ev.end_date != ev.event_date %} ~ {{ ev.end_date }}{% endif %}
+                        {% if ev.location %} · {{ ev.location }}{% endif %}
+                    </div>
+                    {% if ev.role and ev.role != 'attendee' %}<div class="text-xs text-eva-purple mt-1">역할: {{ ev.role }}</div>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-sm">참여한 스페셜 이벤트가 없습니다.</p>
+            {% endif %}
+        </div>
     </div>
 </body>
 </html>

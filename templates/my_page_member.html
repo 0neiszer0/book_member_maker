@@ -171,8 +171,8 @@
             <h2 class="section-title">⚡ 지금 할 일</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-                {# 학기별 투표가 열려있을 때만 노출 — 관리자가 학기를 만들고 투표창이 열려야 함 #}
                 {% if my_open_votes %}
+                <!-- 다음 세미나 참석 투표 (투표 창이 열린 동안에만 노출) -->
                 <div class="action-card md:col-span-2">
                     <div class="flex items-start justify-between flex-wrap gap-2 mb-1">
                         <div>
@@ -194,6 +194,21 @@
                         {% endfor %}
                     </div>
                     <p class="text-xs text-gray-500 mt-2">버튼을 누르면 학기별 투표 페이지로 이동합니다.</p>
+                </div>
+                {% elif active_seminar_terms %}
+                <!-- 투표 창이 닫혀 있어도 학기 페이지로 들어갈 수 있게 -->
+                <div class="action-card md:col-span-2">
+                    <div class="title">🗳️ 세미나 참석 투표 페이지</div>
+                    <div class="desc">학기 전체 회차와 다른 회원들의 신청 현황을 볼 수 있습니다.</div>
+                    <div class="flex flex-wrap gap-2 mt-1">
+                        {% for t in active_seminar_terms %}
+                        <a href="/seminar_vote?token={{ t.share_token }}" class="pill pill-yellow">
+                            <span>{{ t.name }}</span>
+                            <span class="text-xs">바로가기 →</span>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">투표 창은 매주 금~일 자정까지만 열립니다.</p>
                 </div>
                 {% endif %}
 
@@ -231,7 +246,7 @@
         <!-- 내 활동 기록 -->
         <section class="mb-6">
             <h2 class="section-title">📚 내 최근 활동</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 
                 <!-- 최근 세미나 -->
                 <div class="eva-card rounded-xl p-4">
@@ -269,6 +284,21 @@
                         </a>
                         {% else %}
                         <p class="text-xs text-gray-500 text-center py-4">참여 중인 책이 없습니다.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- 스페셜 이벤트 -->
+                <div class="eva-card rounded-xl p-4">
+                    <h3 class="text-sm font-bold text-eva-green mb-3">✨ 스페셜 이벤트</h3>
+                    <div class="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                        {% for ev in (my_special_events or []) %}
+                        <div class="block px-3 py-2 rounded bg-gray-800/50 text-xs">
+                            <div class="font-bold text-gray-200 truncate">{{ ev.name }}</div>
+                            <div class="text-gray-400">{{ ev.event_date }} · {{ ev.category }}</div>
+                        </div>
+                        {% else %}
+                        <p class="text-xs text-gray-500 text-center py-4">참여한 이벤트가 없습니다.</p>
                         {% endfor %}
                     </div>
                 </div>

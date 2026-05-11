@@ -138,9 +138,7 @@
     </div>
 
     <script>
-        // 학기 select 변경 시 자동 제출
-        document.querySelector('select[name=term_id]').addEventListener('change', function() {
-            // 학기 선택 시 기존 시작/종료일 비우고 학기 기간으로 자동 채워지게
+        document.querySelector('select[name=term_id]')?.addEventListener('change', function() {
             if (this.value) {
                 document.querySelector('input[name=start_date]').value = '';
                 document.querySelector('input[name=end_date]').value = '';
