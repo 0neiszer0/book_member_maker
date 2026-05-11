@@ -3114,6 +3114,39 @@ def load_topics():
         return jsonify({"error": "불러오기 중 서버 오류가 발생했습니다."}), 500
 
 
+# 3.7 관리자: 발제문 제출 내역 삭제/수정 API (다른 사람의 것도 관리 가능)
+@app.route('/api/admin/topic_submissions/<submission_id>/delete', methods=['POST'])
+@login_required(role="admin")
+def admin_delete_topic_submission(submission_id):
+    try:
+        supabase.table('topic_submissions').delete().eq('id', submission_id).execute()
+        return jsonify({"status": "success", "message": "발제문이 삭제되었습니다."})
+    except Exception as e:
+        app.logger.error(f"admin_delete_topic_submission error: {e}")
+        return jsonify({"error": "삭제 중 오류가 발생했습니다."}), 500
+
+
+@app.route('/api/admin/topic_submissions/<submission_id>/update', methods=['POST'])
+@login_required(role="admin")
+def admin_update_topic_submission(submission_id):
+    try:
+        data = request.json or {}
+        topics = data.get('topics')
+        if not topics or not isinstance(topics, list):
+            return jsonify({"error": "발제문 내용이 비어있습니다."}), 400
+        update_fields = {'topics': topics, 'updated_at': 'now()'}
+        # 작성자/소속도 함께 수정할 수 있게 허용
+        if data.get('author_name'):
+            update_fields['author_name'] = data['author_name']
+        if data.get('department'):
+            update_fields['department'] = data['department']
+        supabase.table('topic_submissions').update(update_fields).eq('id', submission_id).execute()
+        return jsonify({"status": "success", "message": "발제문이 수정되었습니다."})
+    except Exception as e:
+        app.logger.error(f"admin_update_topic_submission error: {e}")
+        return jsonify({"error": "수정 중 오류가 발생했습니다."}), 500
+
+
 # 3.8 관리자: 발제문 상세 보기 및 취합 페이지
 @app.route('/admin/topics/<event_id>/view')
 @login_required(role="admin")
