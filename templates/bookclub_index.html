@@ -256,11 +256,20 @@
         <div class="flex items-center gap-2 flex-wrap">
             <span class="stat">참석 <span id="cnt-present" class="num">0</span></span>
             <span class="stat">발제 <span id="cnt-facilitators" class="num">0</span></span>
-            <span class="stat" title="이번 주 출석투표를 한 사람 수">투표자 <span id="cnt-voted" class="num">{{ pre_checked_attendee_ids|length }}</span></span>
+            <span class="stat" title="선택한 요일에 참석 투표한 사람 수">투표자 <span id="cnt-voted" class="num">{{ pre_checked_attendee_ids|length }}</span></span>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+            <div class="flex items-center gap-1 text-xs">
+                <span class="text-gray-400">요일:</span>
+                <a href="?day=mon" class="px-2 py-1 rounded font-bold {% if day_choice == 'mon' %}bg-blue-500 text-white{% else %}bg-gray-700 text-blue-300 hover:bg-gray-600{% endif %}">월 {% if mon_date %}({{ mon_date[5:] }}){% endif %} · {{ mon_attendee_ids|length }}명</a>
+                <a href="?day=thu" class="px-2 py-1 rounded font-bold {% if day_choice == 'thu' %}bg-purple-500 text-white{% else %}bg-gray-700 text-purple-300 hover:bg-gray-600{% endif %}">목 {% if thu_date %}({{ thu_date[5:] }}){% endif %} · {{ thu_attendee_ids|length }}명</a>
+                <a href="?day=all" class="px-2 py-1 rounded font-bold {% if day_choice == 'all' %}bg-eva-green text-black{% else %}bg-gray-700 text-gray-200 hover:bg-gray-600{% endif %}">합산</a>
+            </div>
             <button type="button" id="quick-voted" class="text-xs px-2 py-1 rounded font-bold" style="background: var(--eva-green); color: #000;">🗳 투표자만</button>
         </div>
+    </div>
+    <div class="container mx-auto max-w-2xl px-4 mt-3 text-xs text-gray-400">
+        현재 <strong class="text-eva-green">{% if day_choice == 'mon' %}월요일{% elif day_choice == 'thu' %}목요일{% else %}월+목 합산{% endif %}</strong> 기준으로 조 편성 중입니다. 다른 요일은 위 탭에서 전환하세요.
     </div>
 
     <div class="container mx-auto max-w-2xl px-4 mt-6">
