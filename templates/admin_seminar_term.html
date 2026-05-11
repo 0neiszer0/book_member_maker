@@ -238,6 +238,46 @@
             } catch (err) { alert('오류: ' + err.message); }
         }
 
+        async function saveVoteWindow(sessionId, btn) {
+            const card = btn.closest('[data-session-id]');
+            const openVal = card.querySelector('.vote-open-input').value;
+            const closeVal = card.querySelector('.vote-close-input').value;
+            if (!openVal || !closeVal) { alert('오픈/마감 시각을 모두 입력해주세요.'); return; }
+            try {
+                const res = await fetch(`/api/admin/seminar_sessions/${sessionId}/update_voting_window`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ vote_open_at: openVal, vote_close_at: closeVal }),
+                });
+                const data = await res.json();
+                if (data.status !== 'success') throw new Error(data.message || '저장 실패');
+                card.querySelector('.vote-open-input').value = data.voting_open_at_input;
+                card.querySelector('.vote-close-input').value = data.voting_close_at_input;
+                alert('투표 시간이 저장되었습니다. (페이지를 새로고침하면 상태도 갱신됩니다)');
+            } catch (err) {
+                alert('오류: ' + err.message);
+            }
+        }
+
+        async function resetVoteWindow(sessionId, btn) {
+            if (!confirm('이 회차의 투표 시간을 기본 규칙(전주 금 18:00 ~ 전주 일 23:59)으로 되돌리시겠습니까?')) return;
+            const card = btn.closest('[data-session-id]');
+            try {
+                const res = await fetch(`/api/admin/seminar_sessions/${sessionId}/update_voting_window`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reset: true }),
+                });
+                const data = await res.json();
+                if (data.status !== 'success') throw new Error(data.message || '되돌리기 실패');
+                card.querySelector('.vote-open-input').value = data.voting_open_at_input;
+                card.querySelector('.vote-close-input').value = data.voting_close_at_input;
+                alert('기본 규칙으로 되돌렸습니다.');
+            } catch (err) {
+                alert('오류: ' + err.message);
+            }
+        }
+
         async function toggleSession(sessionId, btn) {
             try {
                 const res = await fetch(`/api/admin/seminar_sessions/${sessionId}/toggle_active`, { method: 'POST' });

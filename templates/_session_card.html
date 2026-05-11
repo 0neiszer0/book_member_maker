@@ -44,6 +44,34 @@
         </div>
     </div>
 
+    <details class="text-sm mb-3" {% if s.voting_custom %}open{% endif %}>
+        <summary class="cursor-pointer text-gray-300 hover:text-white">
+            🗳️ 투표 시간 편집
+            {% if s.voting_custom %}<span class="text-xs text-yellow-400 ml-1">(직접 지정됨)</span>{% else %}<span class="text-xs text-gray-500 ml-1">(기본 규칙)</span>{% endif %}
+        </summary>
+        <div class="mt-3 p-3 bg-gray-900/50 border border-gray-700 rounded">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">오픈 시각 (KST)</label>
+                    <input type="datetime-local" class="vote-open-input w-full bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-sm focus:border-eva-green focus:outline-none"
+                        value="{{ s.voting_open_at_input }}">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">마감 시각 (KST)</label>
+                    <input type="datetime-local" class="vote-close-input w-full bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-sm focus:border-eva-green focus:outline-none"
+                        value="{{ s.voting_close_at_input }}">
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">기본값은 <strong>전주 금 18:00 ~ 전주 일 23:59</strong>입니다. 값을 바꾸면 이 회차에만 적용돼요.</p>
+            <div class="flex gap-2 mt-3 justify-end">
+                <button type="button" onclick="resetVoteWindow('{{ s.id }}', this)"
+                    class="text-xs bg-gray-700 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded">기본값으로 되돌리기</button>
+                <button type="button" onclick="saveVoteWindow('{{ s.id }}', this)"
+                    class="text-xs bg-eva-green text-black font-bold py-1 px-3 rounded hover:opacity-80">💾 저장</button>
+            </div>
+        </div>
+    </details>
+
     <details class="text-sm">
         <summary class="cursor-pointer text-gray-300 hover:text-white">참석자 관리 ({{ s.attendees|length }}명)</summary>
         <div class="mt-3 space-y-2">
