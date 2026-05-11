@@ -1570,47 +1570,73 @@ def handle_notification(notif_id):
 @login_required(role="admin")
 def bookclub_index():
     app.logger.info("---/making_team 경로 함수 실행 시작---")
-    try:
-        seminar_dates = get_next_seminar_dates()
-        app.logger.info(f"[1] 다음 세미나 날짜: {[d.isoformat() for d in seminar_dates]}")
+    # 어느 요일 기준으로 조 편성할지 (월/목 분리). 기본은 '월'.
+    day_choice = (request.args.get('day') or 'mon').lower()
+    if day_choice not in ('mon', 'thu', 'all'):
+        day_choice = 'mon'
 
-        # 1. 모든 활성 멤버 목록을 가져옵니다.
+    mon_attendee_ids: set = set()
+    thu_attendee_ids: set = set()
+    mon_date_iso = ''
+    thu_date_iso = ''
+
+    try:
+        seminar_dates = get_next_seminar_dates()  # [월요일, 목요일] (혹은 비슷한 묶음)
+        app.logger.info(f"[1] 다음 세미나 날짜: {[d.isoformat() for d in seminar_dates]}")
+        for d in seminar_dates:
+            wd = d.weekday()  # 월=0, 목=3
+            if wd == 0:
+                mon_date_iso = d.isoformat()
+            elif wd == 3:
+                thu_date_iso = d.isoformat()
+
+        # 1. 모든 활성 멤버 목록.
         all_active_members_res = supabase.table("members").select("id, name") \
             .eq('is_active', True).order("name").execute()
         all_active_members = all_active_members_res.data
         app.logger.info(f"[2] DB에서 가져온 전체 활성 멤버 수: {len(all_active_members)}명")
 
-        # 2. 다음 세미나 날짜들에 '참석(attending_seminar=True)' 의사를 발힙한 기록을 가져옵니다.
+        # 2. attendance 테이블 - 날짜별로 분리해서 집계
         date_strs = [d.isoformat() for d in seminar_dates]
-        attendance_res = supabase.table('attendance').select('user_id, meeting_date') \
-            .in_('meeting_date', date_strs) \
-            .eq('attending_seminar', True) \
-            .execute()
-        app.logger.info(f"[3] DB에서 가져온 참석 응답 기록: {attendance_res.data}")
+        if date_strs:
+            attendance_res = supabase.table('attendance').select('user_id, meeting_date') \
+                .in_('meeting_date', date_strs) \
+                .eq('attending_seminar', True) \
+                .execute()
+            for row in (attendance_res.data or []):
+                md = row.get('meeting_date')
+                if md == mon_date_iso:
+                    mon_attendee_ids.add(row['user_id'])
+                elif md == thu_date_iso:
+                    thu_attendee_ids.add(row['user_id'])
 
-        # 3. 참석자들의 ID만 따로 저장합니다.
-        attendee_ids = {att['user_id'] for att in attendance_res.data}
-        app.logger.info(f"[4] attendance 테이블 참석자 ID: {attendee_ids}")
-
-        # 3.5 seminar_votes 에서 다음 월/목 회차의 참석 응답도 합칩니다.
+        # 3. seminar_votes도 day_type별로 분리
         try:
-            seminar_sess_res = supabase.table('seminar_sessions').select('id') \
+            sess_res = supabase.table('seminar_sessions') \
+                .select('id, meeting_date, day_type') \
                 .in_('meeting_date', date_strs).eq('is_active', True).execute()
-            sess_ids = [s['id'] for s in (seminar_sess_res.data or [])]
-            seminar_attendee_ids = set()
-            if sess_ids:
-                votes_res = supabase.table('seminar_votes').select('member_id') \
-                    .in_('session_id', sess_ids).eq('attending', True).execute()
-                seminar_attendee_ids = {v['member_id'] for v in (votes_res.data or [])}
-            app.logger.info(f"[4.5] seminar_votes 참석자 ID: {seminar_attendee_ids}")
-            attendee_ids = attendee_ids | seminar_attendee_ids
+            sess_rows = sess_res.data or []
+            mon_sess_ids = [s['id'] for s in sess_rows if s.get('day_type') == 'mon']
+            thu_sess_ids = [s['id'] for s in sess_rows if s.get('day_type') == 'thu']
+            if mon_sess_ids:
+                v = supabase.table('seminar_votes').select('member_id') \
+                    .in_('session_id', mon_sess_ids).eq('attending', True).execute()
+                mon_attendee_ids |= {x['member_id'] for x in (v.data or [])}
+            if thu_sess_ids:
+                v = supabase.table('seminar_votes').select('member_id') \
+                    .in_('session_id', thu_sess_ids).eq('attending', True).execute()
+                thu_attendee_ids |= {x['member_id'] for x in (v.data or [])}
         except Exception as e:
             app.logger.warning(f"seminar_votes 통합 실패 (무시 가능): {e}")
 
-        # 4. 참석 의사를 밝힌 사람만 pre-check
-        pre_checked_attendee_ids = attendee_ids
-        app.logger.info(f"[5] 최종적으로 미리 체크될 참석자 수: {len(pre_checked_attendee_ids)}명")
-        # app.logger.info(f"최종 참석자 ID 목록: {pre_checked_attendee_ids}") # 필요시 이 줄의 주석을 해제하여 전체 ID를 볼 수 있습니다.
+        # 4. day_choice 에 따라 pre_checked 결정
+        if day_choice == 'mon':
+            pre_checked_attendee_ids = mon_attendee_ids
+        elif day_choice == 'thu':
+            pre_checked_attendee_ids = thu_attendee_ids
+        else:  # 'all'
+            pre_checked_attendee_ids = mon_attendee_ids | thu_attendee_ids
+        app.logger.info(f"[5] day={day_choice}, 미리 체크될 참석자 수: {len(pre_checked_attendee_ids)}명 (월 {len(mon_attendee_ids)} / 목 {len(thu_attendee_ids)})")
 
     except Exception as e:
         app.logger.error(f"!!! /making_team 경로에서 오류 발생: {e}", exc_info=True)
@@ -1621,7 +1647,12 @@ def bookclub_index():
     return render_template(
         'bookclub_index.html',
         all_members=all_active_members,
-        pre_checked_attendee_ids=pre_checked_attendee_ids
+        pre_checked_attendee_ids=pre_checked_attendee_ids,
+        mon_attendee_ids=mon_attendee_ids,
+        thu_attendee_ids=thu_attendee_ids,
+        mon_date=mon_date_iso,
+        thu_date=thu_date_iso,
+        day_choice=day_choice,
     )
 
 
