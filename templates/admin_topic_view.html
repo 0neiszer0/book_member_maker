@@ -36,6 +36,27 @@
             background-color: var(--card-dark);
             border: 1px solid var(--border-dark);
         }
+
+        .eva-input {
+            background-color: #1A1A1A;
+            border: 1px solid var(--border-dark);
+            color: var(--text-light);
+        }
+
+        .eva-input:focus {
+            border-color: var(--eva-green);
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0, 255, 127, 0.2);
+        }
+
+        .btn-mini {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 0.25rem;
+            font-weight: 700;
+            transition: opacity 0.15s;
+        }
+        .btn-mini:hover { opacity: 0.8; }
     </style>
 </head>
 
@@ -63,14 +84,19 @@
 
         <div class="grid gap-6">
             {% for sub in submissions %}
-            <div class="eva-card p-6 rounded-lg shadow-lg">
-                <div class="border-b border-border-dark pb-3 mb-4 flex justify-between items-center">
-                    <h2 class="text-xl font-bold text-eva-purple">👤 {{ sub.author_name }} <span
-                            class="text-sm text-gray-400 font-normal">({{ sub.department }})</span></h2>
-                    <span class="text-xs text-gray-500">{{ sub.created_at | datetime('%Y-%m-%d %H:%M') }}</span>
+            <div class="eva-card p-6 rounded-lg shadow-lg" data-sub-id="{{ sub.id }}">
+                <div class="border-b border-border-dark pb-3 mb-4 flex justify-between items-center flex-wrap gap-2">
+                    <h2 class="text-xl font-bold text-eva-purple">👤 <span class="sub-author">{{ sub.author_name }}</span> <span
+                            class="text-sm text-gray-400 font-normal">(<span class="sub-dept">{{ sub.department }}</span>)</span></h2>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-gray-500">{{ sub.created_at | datetime('%Y-%m-%d %H:%M') }}</span>
+                        <button type="button" class="btn-mini bg-blue-600 hover:bg-blue-500 text-white edit-btn">✏️ 편집</button>
+                        <button type="button" class="btn-mini bg-red-700 hover:bg-red-600 text-white delete-btn">🗑️ 삭제</button>
+                    </div>
                 </div>
 
-                <div class="space-y-4">
+                <!-- 뷰 모드 -->
+                <div class="view-mode space-y-4">
                     {% for t in sub.topics %}
                     <div class="bg-bg-dark p-4 rounded border-l-4 border-eva-green">
                         <p class="font-bold text-text-light whitespace-pre-wrap">{{ t.topic }}</p>
@@ -83,6 +109,31 @@
                     </div>
                     {% endfor %}
                 </div>
+
+                <!-- 편집 모드 (숨김) -->
+                <div class="edit-mode hidden space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-xs text-gray-400 block mb-1">작성자 이름</label>
+                            <input type="text" class="edit-author eva-input w-full rounded py-2 px-3 text-sm" value="{{ sub.author_name }}">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400 block mb-1">소속</label>
+                            <input type="text" class="edit-dept eva-input w-full rounded py-2 px-3 text-sm" value="{{ sub.department }}">
+                        </div>
+                    </div>
+                    <div class="edit-topics space-y-3"></div>
+                    <div class="flex justify-between gap-2 flex-wrap">
+                        <button type="button" class="btn-mini bg-gray-700 hover:bg-gray-600 text-white add-topic-btn">+ 발제 추가</button>
+                        <div class="flex gap-2">
+                            <button type="button" class="btn-mini bg-gray-600 hover:bg-gray-500 text-white cancel-edit-btn">취소</button>
+                            <button type="button" class="btn-mini bg-green-600 hover:bg-green-500 text-white save-edit-btn">💾 저장</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 원본 데이터(JSON) - 편집 시 복원용 -->
+                <script type="application/json" class="sub-data">{{ sub.topics | tojson }}</script>
             </div>
             {% else %}
             <div class="eva-card p-12 text-center rounded-lg text-gray-500">
@@ -91,6 +142,114 @@
             {% endfor %}
         </div>
     </div>
+
+    <script>
+        function topicFieldHtml(t) {
+            t = t || {};
+            const esc = (s) => (s || '').toString().replace(/"/g, '&quot;');
+            return `
+                <div class="bg-bg-dark p-3 rounded border-l-4 border-eva-green topic-row">
+                    <div class="flex justify-between items-start mb-2 gap-2">
+                        <label class="text-xs text-gray-400">발제 내용 *</label>
+                        <button type="button" class="text-red-400 hover:text-red-300 font-bold text-sm remove-topic-btn">× 제거</button>
+                    </div>
+                    <textarea class="t-topic eva-input w-full rounded py-2 px-3 text-sm h-20 resize-none" required>${(t.topic || '').replace(/</g, '&lt;')}</textarea>
+                    <div class="grid grid-cols-2 gap-2 mt-2">
+                        <input type="text" class="t-page eva-input w-full rounded py-1.5 px-3 text-sm" placeholder="페이지 (예: p.123)" value="${esc(t.page)}">
+                        <input type="text" class="t-ref eva-input w-full rounded py-1.5 px-3 text-sm" placeholder="참조" value="${esc(t.reference)}">
+                    </div>
+                </div>
+            `;
+        }
+
+        function bindRemove(row) {
+            row.querySelector('.remove-topic-btn').addEventListener('click', () => row.remove());
+        }
+
+        document.querySelectorAll('[data-sub-id]').forEach(card => {
+            const subId = card.dataset.subId;
+            const viewMode = card.querySelector('.view-mode');
+            const editMode = card.querySelector('.edit-mode');
+            const topicsEditor = card.querySelector('.edit-topics');
+            const dataEl = card.querySelector('.sub-data');
+            const originalTopics = JSON.parse(dataEl.textContent || '[]');
+
+            function renderEditor(topics) {
+                topicsEditor.innerHTML = '';
+                (topics || []).forEach(t => {
+                    const wrap = document.createElement('div');
+                    wrap.innerHTML = topicFieldHtml(t);
+                    const row = wrap.firstElementChild;
+                    topicsEditor.appendChild(row);
+                    bindRemove(row);
+                });
+            }
+
+            card.querySelector('.edit-btn').addEventListener('click', () => {
+                renderEditor(originalTopics);
+                viewMode.classList.add('hidden');
+                editMode.classList.remove('hidden');
+            });
+
+            card.querySelector('.cancel-edit-btn').addEventListener('click', () => {
+                editMode.classList.add('hidden');
+                viewMode.classList.remove('hidden');
+            });
+
+            card.querySelector('.add-topic-btn').addEventListener('click', () => {
+                const wrap = document.createElement('div');
+                wrap.innerHTML = topicFieldHtml({});
+                const row = wrap.firstElementChild;
+                topicsEditor.appendChild(row);
+                bindRemove(row);
+            });
+
+            card.querySelector('.save-edit-btn').addEventListener('click', async () => {
+                const newTopics = [];
+                topicsEditor.querySelectorAll('.topic-row').forEach(r => {
+                    const topic = r.querySelector('.t-topic').value.trim();
+                    if (!topic) return;
+                    newTopics.push({
+                        topic,
+                        page: r.querySelector('.t-page').value.trim(),
+                        reference: r.querySelector('.t-ref').value.trim(),
+                    });
+                });
+                if (!newTopics.length) { alert('최소 1개의 발제문이 필요합니다.'); return; }
+                const author = card.querySelector('.edit-author').value.trim();
+                const dept = card.querySelector('.edit-dept').value.trim();
+                if (!author || !dept) { alert('작성자/소속을 입력해주세요.'); return; }
+
+                try {
+                    const res = await fetch(`/api/admin/topic_submissions/${subId}/update`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ topics: newTopics, author_name: author, department: dept }),
+                    });
+                    const result = await res.json();
+                    if (!res.ok) throw new Error(result.error || '수정 실패');
+                    alert(result.message);
+                    location.reload();
+                } catch (err) {
+                    alert('오류: ' + err.message);
+                }
+            });
+
+            card.querySelector('.delete-btn').addEventListener('click', async () => {
+                const author = card.querySelector('.sub-author').textContent.trim();
+                if (!confirm(`'${author}' 님의 발제문을 정말 삭제하시겠습니까? 되돌릴 수 없습니다.`)) return;
+                try {
+                    const res = await fetch(`/api/admin/topic_submissions/${subId}/delete`, { method: 'POST' });
+                    const result = await res.json();
+                    if (!res.ok) throw new Error(result.error || '삭제 실패');
+                    alert(result.message);
+                    card.remove();
+                } catch (err) {
+                    alert('오류: ' + err.message);
+                }
+            });
+        });
+    </script>
 </body>
 
 </html>
