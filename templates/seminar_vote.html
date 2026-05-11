@@ -104,7 +104,10 @@
                 <div>
                     <h2 class="text-lg font-bold text-eva-green mb-2">② 회차별 참석 선택</h2>
                     {% if not is_admin %}
-                    <p class="text-xs text-gray-500 mb-3">투표는 세미나 <strong>전주 금요일 오후 6시</strong>에 열려 <strong>전주 일요일 자정</strong>까지 가능합니다.</p>
+                    <div class="mb-3 p-3 bg-yellow-900/20 border border-yellow-700/50 rounded text-sm">
+                        <p class="text-yellow-300 font-bold">⏰ 투표는 <strong>일요일 자정(23:59)까지</strong> 가능합니다.</p>
+                        <p class="text-xs text-gray-400 mt-1">기본 일정은 세미나 <strong>전주 금요일 18:00</strong>에 열려 <strong>전주 일요일 23:59</strong>에 마감되며, 회차별로 관리자가 변경할 수 있습니다. 각 회차의 정확한 마감 시각을 카드에서 확인해주세요.</p>
+                    </div>
                     {% endif %}
                     <div class="space-y-3">
                         {% for s in open_sessions %}
@@ -137,8 +140,11 @@
                             </div>
                             {% endif %}
                             {% if s.status == 'upcoming' and not is_admin %}
-                            <p class="text-xs text-yellow-400">⏳ {{ s.voting_open_at }}부터 투표 가능</p>
+                            <p class="text-xs text-yellow-400">⏳ {{ s.voting_open_at }}부터 투표 가능 (마감 {{ s.voting_close_at }})</p>
                             {% else %}
+                            {% if s.status == 'open' and not is_admin %}
+                            <p class="text-xs text-yellow-300 mb-2">🕛 마감: <strong>{{ s.voting_close_at }}</strong></p>
+                            {% endif %}
                             <div class="grid grid-cols-3 gap-2 text-center text-sm">
                                 <input type="radio" name="vote_{{ s.id }}" id="yes_{{ s.id }}" value="yes" class="hidden peer/yes">
                                 <label for="yes_{{ s.id }}" class="radio-label py-2 rounded bg-gray-700 hover:bg-gray-600 peer-checked/yes:bg-eva-green peer-checked/yes:text-black peer-checked/yes:font-bold">참석</label>
