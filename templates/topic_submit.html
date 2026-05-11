@@ -93,9 +93,9 @@
                     <p class="text-eva-green font-bold mb-1">예시</p>
                     <p>• 발제 내용: "주인공이 X를 선택한 동기는 무엇인가? 작가는 이를 통해 무엇을 말하고자 했는가?"</p>
                     <p>• 페이지: p.123~125</p>
-                    <p>• 참조: 3장 마지막 단락의 비유</p>
+                    <p>• 인용: "그 순간 그는 모든 것을 내려놓기로 했다. 더 이상 잃을 것이 없었기 때문이다." — 책에서 발제와 관련된 원문을 그대로 적어주세요.</p>
                 </div>
-                <p class="text-xs text-gray-500 mt-2">※ 회원은 학번만 입력하면 PIN 없이 인증됩니다. 비회원은 4자리 PIN을 정해 입력하면 다음에 같은 PIN으로 수정할 수 있습니다.</p>
+                <p class="text-xs text-gray-500 mt-2">※ 학번(2022XXXXXX 형식)은 모든 사용자에게 필수입니다. 비회원은 추가로 4자리 PIN을 정해 입력하면 다음에 같은 PIN으로 수정할 수 있습니다.</p>
             </div>
         </details>
 
@@ -117,14 +117,16 @@
                         placeholder="예: 경영학과"
                         {% if user_department %}value="{{ user_department }}"{% endif %}>
                 </div>
-                {% if not user_name %}
                 <div>
                     <label class="text-xs text-gray-400 block mb-1">
-                        학번 <span class="text-eva-green">(회원이면 학번만 입력 → PIN 불필요)</span>
+                        학번 <span class="text-eva-green">*</span>
                     </label>
                     <input type="text" id="studentId" class="eva-input w-full rounded py-2 px-3 text-sm"
-                        placeholder="예: 20231234" inputmode="numeric">
+                        placeholder="2022XXXXXX" inputmode="numeric"
+                        {% if user_student_id %}value="{{ user_student_id }}"{% endif %} required>
+                    <p class="text-[10px] text-gray-500 mt-1">입학년도 + 학번 (예: 2022123456)</p>
                 </div>
+                {% if not user_name %}
                 <div>
                     <label class="text-xs text-gray-400 block mb-1">
                         PIN 4자리 <span class="text-yellow-400">(비회원만 입력)</span>
@@ -133,7 +135,6 @@
                         pattern="[0-9]{4}" maxlength="4" placeholder="숫자 4자리" inputmode="numeric">
                 </div>
                 {% else %}
-                <input type="hidden" id="studentId" value="">
                 <input type="hidden" id="pinCode" value="">
                 {% endif %}
             </div>
@@ -201,14 +202,15 @@
                         <textarea class="topic-text eva-input w-full rounded py-2 px-3 h-24 resize-none" required
                             placeholder="논의하고 싶은 주제를 상세히 적어주세요"></textarea>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-1 md:grid-cols-[100px_1fr] gap-3">
                         <div>
                             <label class="text-xs text-gray-400 block mb-1">해당 페이지</label>
                             <input type="text" class="topic-page eva-input w-full rounded py-1.5 px-3 text-sm" placeholder="예: p.123~125">
                         </div>
                         <div>
-                            <label class="text-xs text-gray-400 block mb-1">참조 사항</label>
-                            <input type="text" class="topic-ref eva-input w-full rounded py-1.5 px-3 text-sm" placeholder="특정 문단·키워드 등">
+                            <label class="text-xs text-gray-400 block mb-1">인용 <span class="text-eva-green">(원문)</span></label>
+                            <textarea class="topic-ref eva-input w-full rounded py-1.5 px-3 text-sm h-16 resize-none"
+                                placeholder="발제와 관련된 책 본문을 그대로 인용해주세요 (한 문단 정도)"></textarea>
                         </div>
                     </div>
                 </div>
@@ -240,8 +242,9 @@
             const pin = (document.getElementById('pinCode') || {}).value?.trim() || '';
 
             if (!author || !dept) { showVerifyError('이름과 소속을 입력해주세요.'); return; }
-            if (!IS_LOGGED_IN && !sid && !pin) { showVerifyError('학번 또는 PIN 4자리를 입력해주세요.'); return; }
-            if (!IS_LOGGED_IN && !sid && pin && !/^[0-9]{4}$/.test(pin)) { showVerifyError('PIN은 숫자 4자리여야 합니다.'); return; }
+            if (!sid) { showVerifyError('학번을 입력해주세요. (예: 2022XXXXXX)'); return; }
+            if (!/^[0-9]{8,10}$/.test(sid)) { showVerifyError('학번은 숫자 8~10자리여야 합니다. (예: 2022123456)'); return; }
+            if (!IS_LOGGED_IN && pin && !/^[0-9]{4}$/.test(pin)) { showVerifyError('PIN은 숫자 4자리여야 합니다.'); return; }
 
             // 시도: 기존 발제문 로드
             let isMember = IS_LOGGED_IN || !!sid;
