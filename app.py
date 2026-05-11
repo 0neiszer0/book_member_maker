@@ -3221,22 +3221,33 @@ def download_topics_word(event_id):
             return redirect(url_for('admin_dashboard'))
 
         # 1) docxtpl로 템플릿 렌더링 (원본 디자인 유지)
+        # ※ 발제문 내용에 '<책제목>' 같이 꺾쇠괄호가 들어가면 Word XML 구조를 깨뜨려서
+        #   해당 지점 이후 렌더링이 중단되고 파일이 손상됨.
+        #   docxtpl의 자동 escape이 production 환경에서 일관되지 않게 동작하므로,
+        #   사전에 풀-와이드 유니코드(〈, 〉)로 치환해서 시각적으로는 동일하지만 안전하게 처리.
+        def _safe(s):
+            if s is None:
+                return ''
+            return (str(s)
+                    .replace('<', '〈')
+                    .replace('>', '〉'))
+
         doc = DocxTemplate(template_path)
         date_str = (event.get('meeting_date') or '').replace('-', '.')
         context = {
-            'book_title': event.get('book_title', ''),
+            'book_title': _safe(event.get('book_title', '')),
             'meeting_date': date_str,
-            'book_author': event.get('book_author', ''),
+            'book_author': _safe(event.get('book_author', '')),
             'moderator_name': '',
             'submissions': [
                 {
-                    'department': sub.get('department', ''),
-                    'author_name': sub.get('author_name', ''),
+                    'department': _safe(sub.get('department', '')),
+                    'author_name': _safe(sub.get('author_name', '')),
                     'topics': [
                         {
-                            'topic': t.get('topic', ''),
-                            'page': t.get('page', ''),
-                            'reference': t.get('reference', ''),
+                            'topic': _safe(t.get('topic', '')),
+                            'page': _safe(t.get('page', '')),
+                            'reference': _safe(t.get('reference', '')),
                         }
                         for t in (sub.get('topics') or [])
                     ],
