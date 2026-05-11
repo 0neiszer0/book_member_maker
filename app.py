@@ -2839,7 +2839,8 @@ def my_page():
                 {'name': t['name'], 'share_token': t['share_token']} for t in terms
             ]
             for term in terms:
-                t_sess = supabase.table('seminar_sessions').select('id, meeting_date, day_type') \
+                t_sess = supabase.table('seminar_sessions') \
+                    .select('id, meeting_date, day_type, vote_open_at, vote_close_at') \
                     .eq('term_id', term['id']).eq('is_active', True) \
                     .order('meeting_date').execute().data or []
                 # 내 기존 투표
@@ -2850,11 +2851,12 @@ def my_page():
                         .in_('session_id', sids).eq('member_id', user_id).execute().data or []
                     my_votes = {v['session_id']: v['attending'] for v in mv}
                 for s in t_sess:
-                    open_at, close_at = _voting_window_for(s['meeting_date'])
+                    open_at, close_at = _voting_window_for(s)
                     if open_at <= now_kst <= close_at:
                         s['my_vote'] = my_votes.get(s['id'])  # True/False/None
                         s['term_token'] = term['share_token']
                         s['term_name'] = term['name']
+                        s['vote_close_label'] = close_at.strftime('%m/%d %H:%M')
                         my_open_votes.append(s)
         except Exception as e:
             app.logger.warning(f"my_page open votes error: {e}")
@@ -3233,12 +3235,27 @@ def download_topics_word(event_id):
 KST = timezone(timedelta(hours=9))
 
 
-def _voting_window_for(meeting_date):
-    """세미나 회차의 투표 오픈/마감 시각 계산.
-    - 오픈: 회차가 속한 주의 전 주 금요일 18:00 KST
-    - 마감: 회차가 속한 주의 전 주 일요일 23:59:59 KST
-      (즉, 세미나 주의 월요일 직전 일요일 자정까지. 그 후엔 관리자가 수동 추가/제거)
-    """
+def _parse_db_ts(val):
+    """Supabase timestamptz 문자열 → KST datetime."""
+    if not val:
+        return None
+    if isinstance(val, datetime):
+        return val.astimezone(KST) if val.tzinfo else val.replace(tzinfo=KST)
+    try:
+        s = str(val).replace('Z', '+00:00')
+        # Postgres가 "2026-05-10 23:59:59+00" 같은 형식을 줄 수도 있으므로 보정
+        if 'T' not in s and ' ' in s:
+            s = s.replace(' ', 'T', 1)
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=KST)
+        return dt.astimezone(KST)
+    except Exception:
+        return None
+
+
+def _default_voting_window(meeting_date):
+    """기본 규칙(전주 금 18:00 ~ 전주 일 23:59:59 KST)."""
     if isinstance(meeting_date, str):
         d = date.fromisoformat(meeting_date)
     else:
@@ -3251,8 +3268,25 @@ def _voting_window_for(meeting_date):
     return open_at, close_at
 
 
-def _is_voting_open(meeting_date):
-    open_at, close_at = _voting_window_for(meeting_date)
+def _voting_window_for(session_or_date):
+    """세미나 회차의 투표 오픈/마감 시각 반환.
+    - session dict가 들어오면 vote_open_at/vote_close_at(관리자 지정값)이 있으면 그걸 우선.
+    - 둘 다 없거나 date/str만 들어오면 기본 규칙(전주 금 18:00 ~ 전주 일 23:59:59 KST).
+    """
+    if isinstance(session_or_date, dict):
+        meeting_date = session_or_date.get('meeting_date')
+        custom_open = _parse_db_ts(session_or_date.get('vote_open_at'))
+        custom_close = _parse_db_ts(session_or_date.get('vote_close_at'))
+    else:
+        meeting_date = session_or_date
+        custom_open = None
+        custom_close = None
+    default_open, default_close = _default_voting_window(meeting_date)
+    return (custom_open or default_open), (custom_close or default_close)
+
+
+def _is_voting_open(session_or_date):
+    open_at, close_at = _voting_window_for(session_or_date)
     now = datetime.now(KST)
     return open_at <= now <= close_at
 
@@ -3419,9 +3453,12 @@ def admin_seminar_term(term_id):
             s['yes_count'] = a['yes']
             s['no_count'] = a['no']
             s['attendees'] = [{'id': mid, 'name': member_map.get(mid, f"id={mid}")} for mid in a['attendee_ids']]
-            open_at, close_at = _voting_window_for(s['meeting_date'])
+            open_at, close_at = _voting_window_for(s)
             s['voting_open_at'] = open_at.strftime('%Y-%m-%d %H:%M')
             s['voting_close_at'] = close_at.strftime('%Y-%m-%d %H:%M')
+            s['voting_open_at_input']  = open_at.strftime('%Y-%m-%dT%H:%M')
+            s['voting_close_at_input'] = close_at.strftime('%Y-%m-%dT%H:%M')
+            s['voting_custom'] = bool(s.get('vote_open_at') or s.get('vote_close_at'))
             now_kst = datetime.now(KST)
             if now_kst < open_at:
                 s['vote_status'] = 'upcoming'
@@ -3472,6 +3509,65 @@ def seminar_session_update_book(session_id):
         return jsonify({'status': 'success'})
     except Exception as e:
         app.logger.error(f"seminar_session_update_book error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/seminar_sessions/<session_id>/update_voting_window', methods=['POST'])
+@login_required(role="admin")
+def seminar_session_update_voting_window(session_id):
+    """관리자: 회차별 투표 오픈/마감 시각을 직접 지정하거나 기본 규칙으로 되돌림.
+    body: { vote_open_at: 'YYYY-MM-DDTHH:MM' | '', vote_close_at: 'YYYY-MM-DDTHH:MM' | '',
+            reset: bool }
+    빈 문자열이거나 reset=True면 NULL로 설정 → 기본 규칙으로 fallback.
+    """
+    try:
+        data = request.json or {}
+
+        def parse_local_kst(val):
+            if not val:
+                return None
+            s = str(val).strip()
+            if not s:
+                return None
+            # datetime-local input: 'YYYY-MM-DDTHH:MM' (초 없음일 수 있음)
+            try:
+                if len(s) == 16:
+                    s += ':00'
+                dt = datetime.fromisoformat(s)
+            except Exception:
+                return None
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=KST)
+            return dt.astimezone(timezone.utc).isoformat()
+
+        if data.get('reset'):
+            new_open, new_close = None, None
+        else:
+            new_open = parse_local_kst(data.get('vote_open_at'))
+            new_close = parse_local_kst(data.get('vote_close_at'))
+            if new_open and new_close and new_open >= new_close:
+                return jsonify({'status': 'error', 'message': '오픈 시각은 마감 시각보다 빨라야 합니다.'}), 400
+
+        supabase.table('seminar_sessions').update({
+            'vote_open_at': new_open,
+            'vote_close_at': new_close,
+        }).eq('id', session_id).execute()
+
+        # 새 윈도우를 다시 계산해서 반환 (NULL이면 기본 규칙으로)
+        sess = supabase.table('seminar_sessions') \
+            .select('meeting_date, vote_open_at, vote_close_at') \
+            .eq('id', session_id).single().execute().data or {}
+        open_at, close_at = _voting_window_for(sess)
+        return jsonify({
+            'status': 'success',
+            'voting_open_at': open_at.strftime('%Y-%m-%d %H:%M'),
+            'voting_close_at': close_at.strftime('%Y-%m-%d %H:%M'),
+            'voting_open_at_input':  open_at.strftime('%Y-%m-%dT%H:%M'),
+            'voting_close_at_input': close_at.strftime('%Y-%m-%dT%H:%M'),
+            'voting_custom': bool(sess.get('vote_open_at') or sess.get('vote_close_at')),
+        })
+    except Exception as e:
+        app.logger.error(f"seminar_session_update_voting_window error: {e}", exc_info=True)
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
@@ -3549,9 +3645,10 @@ def seminar_vote_page():
             s['attending_count'] = counts.get(s['id'], 0)
             s['is_full'] = s['attending_count'] >= term.get('max_capacity', 32)
             s['attendee_names'] = attendees_by_session.get(s['id'], [])
-            open_at, close_at = _voting_window_for(s['meeting_date'])
+            open_at, close_at = _voting_window_for(s)
             s['voting_open_at'] = open_at.strftime('%Y-%m-%d %H:%M')
             s['voting_close_at'] = close_at.strftime('%Y-%m-%d %H:%M')
+            s['voting_close_label'] = close_at.strftime('%m월 %d일 (%a) %H:%M')
             if open_at <= now_kst <= close_at:
                 s['status'] = 'open'
                 open_sessions.append(s)
@@ -3672,7 +3769,8 @@ def seminar_vote_submit():
         is_admin = session.get('user_role') in ('admin', 'officer')
 
         # 회차 ID 화이트리스트 (이 학기 소속만 허용)
-        valid_sessions = supabase.table('seminar_sessions').select('id, meeting_date, day_type, is_active') \
+        valid_sessions = supabase.table('seminar_sessions') \
+            .select('id, meeting_date, day_type, is_active, vote_open_at, vote_close_at') \
             .eq('term_id', term['id']).execute().data or []
         valid_map = {s['id']: s for s in valid_sessions}
 
@@ -3684,7 +3782,7 @@ def seminar_vote_submit():
             label = f"{valid_map[sid]['meeting_date']} ({valid_map[sid]['day_type']})"
 
             # 투표 윈도우 체크: 관리자/임원은 언제든 가능
-            if not is_admin and not _is_voting_open(valid_map[sid]['meeting_date']):
+            if not is_admin and not _is_voting_open(valid_map[sid]):
                 skipped.append(f"{label} - 투표 기간 외")
                 continue
 
