@@ -1,3 +1,88 @@
+<style>
+    /* === 모바일 가로 스크롤 힌트 === */
+    .scroll-x-host { position: relative; }
+    .scroll-x-host > .overflow-x-auto,
+    .scroll-x-host > .overflow-auto { -webkit-overflow-scrolling: touch; }
+    .scroll-x-host::after {
+        content: '';
+        position: absolute;
+        top: 0; right: 0; bottom: 0;
+        width: 40px;
+        pointer-events: none;
+        background: linear-gradient(to right, rgba(26,26,26,0) 0%, rgba(26,26,26,0.85) 100%);
+        transition: opacity 0.25s;
+        z-index: 4;
+    }
+    .scroll-x-host.at-right::after,
+    .scroll-x-host.no-overflow::after { opacity: 0; }
+    .scroll-x-host .scroll-hint-arrow {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: #00FF7F;
+        color: #000;
+        font-weight: 700;
+        font-size: 0.7rem;
+        padding: 3px 9px;
+        border-radius: 999px;
+        pointer-events: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.7);
+        animation: scrollHintPulse 1.4s ease-in-out infinite;
+        transition: opacity 0.25s;
+        z-index: 5;
+        white-space: nowrap;
+    }
+    .scroll-x-host.at-right .scroll-hint-arrow,
+    .scroll-x-host.no-overflow .scroll-hint-arrow { opacity: 0; }
+    @keyframes scrollHintPulse {
+        0%, 100% { transform: translateY(-50%) translateX(0); }
+        50%      { transform: translateY(-50%) translateX(-5px); }
+    }
+    /* 모바일 가독성 보강 */
+    @media (max-width: 640px) {
+        table { font-size: 0.78rem; }
+        .min-w-\[600px\], .min-w-\[700px\], .min-w-\[800px\] { min-width: 540px !important; }
+    }
+</style>
+<script>
+    (function () {
+        function applyHint(el) {
+            if (el.dataset.scrollHintApplied) return;
+            if (el.scrollWidth <= el.clientWidth + 1) return; // 실제 overflow 없으면 skip
+            const wrapper = document.createElement('div');
+            wrapper.className = 'scroll-x-host';
+            el.parentNode.insertBefore(wrapper, el);
+            wrapper.appendChild(el);
+            const hint = document.createElement('div');
+            hint.className = 'scroll-hint-arrow';
+            hint.textContent = '→ 옆으로';
+            wrapper.appendChild(hint);
+            const update = () => {
+                const noOverflow = el.scrollWidth <= el.clientWidth + 1;
+                wrapper.classList.toggle('no-overflow', noOverflow);
+                const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 2;
+                wrapper.classList.toggle('at-right', atEnd);
+            };
+            el.addEventListener('scroll', update, { passive: true });
+            update();
+            el.dataset.scrollHintApplied = '1';
+        }
+        function scan() {
+            document.querySelectorAll('.overflow-x-auto, .overflow-auto').forEach(applyHint);
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', scan);
+        } else {
+            scan();
+        }
+        let resizeT;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeT);
+            resizeT = setTimeout(scan, 120);
+        });
+    })();
+</script>
 <header class="bg-card-dark shadow-md sticky top-0 z-50 border-b border-border-dark">
     <div class="container mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between items-center py-4">
