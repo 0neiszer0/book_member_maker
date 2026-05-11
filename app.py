@@ -3017,13 +3017,20 @@ def view_shared_topics():
 
         user_name = session.get('user_name')
         user_department = None
+        user_student_id = None
         if user_name:
             try:
-                member_res = supabase.table('members').select('department').eq('name', user_name).single().execute()
-                user_department = member_res.data.get('department') if member_res.data else None
+                member_res = supabase.table('members').select('department, student_id').eq('name', user_name).single().execute()
+                if member_res.data:
+                    user_department = member_res.data.get('department')
+                    user_student_id = member_res.data.get('student_id')
             except Exception:
                 pass
-        return render_template('topic_submit.html', event=event_data, user_name=user_name, user_department=user_department)
+        return render_template('topic_submit.html',
+                               event=event_data,
+                               user_name=user_name,
+                               user_department=user_department,
+                               user_student_id=user_student_id)
     except Exception as e:
         app.logger.error(f"Error loading topic event: {e}")
         return "유효하지 않은 링크입니다.", 404
@@ -3068,6 +3075,13 @@ def submit_topics():
         existing_res = supabase.table('topic_submissions').select('id, pin_code').eq('event_id', event_id).eq(
             'author_name', author_name).eq('department', department).execute()
 
+        # 학번에서 입학년도 2자리 추출 (예: "2022123456" → "22")
+        # student_id 가 4자 이상이면 3-4번째 문자 사용
+        admission_year = ''
+        sid = (student_id or '').strip()
+        if len(sid) >= 4 and sid[2:4].isdigit():
+            admission_year = sid[2:4]
+
         if existing_res.data:
             # 수정 모드: 로그인한 본인이거나 PIN 번호가 일치해야 함
             existing_record = existing_res.data[0]
@@ -3075,10 +3089,11 @@ def submit_topics():
                 return jsonify({"error": "PIN 번호가 일치하지 않습니다. (동명이인일 경우 학과를 다르게 입력해주세요)"}), 403
 
             # 업데이트 실행
-            supabase.table('topic_submissions').update({
-                'topics': topics,
-                'updated_at': 'now()'
-            }).eq('id', existing_record['id']).execute()
+            update_payload = {'topics': topics, 'updated_at': 'now()'}
+            if admission_year:
+                update_payload['admission_year'] = admission_year
+            supabase.table('topic_submissions').update(update_payload) \
+                .eq('id', existing_record['id']).execute()
             return jsonify({"status": "success", "message": "발제문이 성공적으로 수정되었습니다."})
         else:
             # 신규 생성 모드
@@ -3086,6 +3101,7 @@ def submit_topics():
                 'event_id': event_id,
                 'author_name': author_name,
                 'department': department,
+                'admission_year': admission_year or None,
                 'pin_code': pin_code if not is_logged_in_member else 'MEMBER',
                 'topics': topics
             }).execute()
@@ -3241,7 +3257,10 @@ def download_topics_word(event_id):
             'moderator_name': '',
             'submissions': [
                 {
-                    'department': _safe(sub.get('department', '')),
+                    # template.docx 에서 '{{ sub.department }} {{ sub.author_name }}' 로 노출되던 부분을
+                    # '{입학년도} {이름}' 형태로 바꾸기 위해 department 자리에 학번 prefix 를 넣음.
+                    # (admission_year 없는 구 데이터는 기존 department 로 fallback)
+                    'department': (sub.get('admission_year') or '').strip() or _safe(sub.get('department', '')),
                     'author_name': _safe(sub.get('author_name', '')),
                     'topics': [
                         {
@@ -3296,7 +3315,8 @@ def download_topics_word(event_id):
                 r1.bold = True
                 r1.font.size = Pt(13)
                 r1.font.color.rgb = RGBColor(0, 102, 204)
-                r2 = hp.add_run(f"{sub.get('department','')} {sub.get('author_name','')}")
+                year_or_dept = (sub.get('admission_year') or '').strip() or sub.get('department','')
+                r2 = hp.add_run(f"{year_or_dept} {sub.get('author_name','')}")
                 r2.bold = True
                 r2.font.size = Pt(13)
                 # 발제 내용
