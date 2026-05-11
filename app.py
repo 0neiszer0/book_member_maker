@@ -3343,6 +3343,41 @@ def download_topics_word(event_id):
             doc2.save(buf)
             buf.seek(0)
 
+        # === 최종 폰트 일괄 적용: 함초롱바탕 ===
+        # 한글은 w:eastAsia 속성까지 함께 지정해야 Word 에서 정확히 표시됨.
+        try:
+            from docx import Document as _Doc
+            from docx.oxml.ns import qn
+            from docx.oxml import OxmlElement
+            TARGET_FONT = '함초롱바탕'
+
+            def _apply_font(run, name):
+                rPr = run._element.get_or_add_rPr()
+                rFonts = rPr.find(qn('w:rFonts'))
+                if rFonts is None:
+                    rFonts = OxmlElement('w:rFonts')
+                    rPr.insert(0, rFonts)
+                rFonts.set(qn('w:ascii'),    name)
+                rFonts.set(qn('w:hAnsi'),    name)
+                rFonts.set(qn('w:eastAsia'), name)
+                rFonts.set(qn('w:cs'),       name)
+
+            _final = _Doc(BytesIO(buf.getvalue()))
+            for p in _final.paragraphs:
+                for r in p.runs:
+                    _apply_font(r, TARGET_FONT)
+            for table in _final.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for p in cell.paragraphs:
+                            for r in p.runs:
+                                _apply_font(r, TARGET_FONT)
+            buf = BytesIO()
+            _final.save(buf)
+            buf.seek(0)
+        except Exception as fe:
+            app.logger.warning(f"폰트 적용 실패(무시 가능): {fe}")
+
         filename = f"발제문_{event.get('book_title','')}_{event.get('meeting_date','')}.docx"
         app.logger.info(f"download_topics_word: 완료, 크기={len(buf.getvalue())} bytes")
         return Response(
