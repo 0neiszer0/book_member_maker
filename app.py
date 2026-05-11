@@ -3195,67 +3195,130 @@ def view_admin_topics(event_id):
         return redirect(url_for('admin_dashboard'))
 
 
-# 4. 관리자: Word 파일로 출력 (python-docx / docxtpl 사용)
+# 4. 관리자: Word 파일로 출력
+# - docxtpl 중첩 for-loop이 일부 환경(특히 production)에서 일부 iteration을 누락하는 이슈로,
+#   python-docx만 사용해 명시적으로 모든 제출을 렌더링한다.
 @app.route('/admin/topics/<event_id>/download_word')
 @login_required(role="admin")
 def download_topics_word(event_id):
     try:
-        from docxtpl import DocxTemplate
-        import datetime
+        from docx import Document
+        from docx.shared import Pt, RGBColor
+        from docx.enum.text import WD_BREAK, WD_ALIGN_PARAGRAPH
+
         event = supabase.table('topic_events').select('*').eq('id', event_id).single().execute().data
-        submissions = supabase.table('topic_submissions').select('*').eq('event_id', event_id).order(
-            'created_at').execute().data
+        submissions = supabase.table('topic_submissions').select('*') \
+            .eq('event_id', event_id).order('created_at').execute().data or []
+        app.logger.info(f"download_topics_word: {len(submissions)}개 제출 발견")
 
-        # 템플릿 경로 설정
-        template_path = os.path.join(app.root_path, 'templates', 'template.docx')
-        if not os.path.exists(template_path):
-            flash("템플릿 워드 파일(template.docx)을 templates 폴더에서 찾을 수 없습니다.", "danger")
-            return redirect(url_for('admin_dashboard'))
+        doc = Document()
 
-        doc = DocxTemplate(template_path)
-        
-        # 템플릿에 주입할 컨텍스트 데이터 준비
-        date_str = event['meeting_date'].replace('-', '.')
-        context = {
-            'book_title': event['book_title'],
-            'meeting_date': date_str,
-            'book_author': event.get('book_author', ''),
-            'moderator_name': '',  
-            'submissions': []
-        }
-        
-        # 제출물 매핑
-        for sub in submissions:
-            topics_list = []
-            for t in sub['topics']:
-                topics_list.append({
-                    'topic': t.get('topic', ''),
-                    'page': t.get('page', ''),
-                    'reference': t.get('reference', '')
-                })
-            
-            context['submissions'].append({
-                'department': sub.get('department', ''),
-                'author_name': sub.get('author_name', ''),
-                'topics': topics_list
-            })
+        def add_para(text='', bold=False, size=11, align=None, color=None, after_pt=4):
+            p = doc.add_paragraph()
+            if align is not None:
+                p.alignment = align
+            r = p.add_run(text)
+            r.bold = bold
+            r.font.size = Pt(size)
+            if color is not None:
+                r.font.color.rgb = RGBColor(*color)
+            p.paragraph_format.space_after = Pt(after_pt)
+            return p
 
-        # 템플릿 렌더링
-        doc.render(context)
+        # === 표지/헤더 ===
+        date_str = (event.get('meeting_date') or '').replace('-', '.')
+        add_para('경북대학교 중앙 동아리 책 먹는 호반우', size=11, align=WD_ALIGN_PARAGRAPH.CENTER, after_pt=2)
+        add_para(date_str, size=11, align=WD_ALIGN_PARAGRAPH.CENTER, after_pt=2)
+        if event.get('book_author'):
+            add_para(event['book_author'], size=11, align=WD_ALIGN_PARAGRAPH.CENTER, after_pt=2)
+        add_para(f"《{event.get('book_title','')}》 발제문", bold=True, size=18,
+                 align=WD_ALIGN_PARAGRAPH.CENTER, color=(0, 102, 204), after_pt=12)
 
-        # 메모리 상에서 파일 생성 후 클라이언트로 전송
+        # === 참석자 명단 ===
+        names_text = ', '.join(
+            f"{s.get('department','')} {s.get('author_name','')}".strip()
+            for s in submissions
+        )
+        p = doc.add_paragraph()
+        r1 = p.add_run('참석자: ')
+        r1.bold = True
+        r1.font.size = Pt(11)
+        r2 = p.add_run(names_text)
+        r2.font.size = Pt(11)
+        p.paragraph_format.space_after = Pt(4)
+
+        add_para('사회자: ', bold=True, size=11, after_pt=12)
+
+        # === 각 제출별 발제 내용 ===
+        for idx, sub in enumerate(submissions):
+            # 발제자 헤더
+            p = doc.add_paragraph()
+            r1 = p.add_run('발제자: ')
+            r1.bold = True
+            r1.font.size = Pt(13)
+            r1.font.color.rgb = RGBColor(0, 102, 204)
+            r2 = p.add_run(f"{sub.get('department','')} {sub.get('author_name','')}")
+            r2.bold = True
+            r2.font.size = Pt(13)
+            p.paragraph_format.space_before = Pt(6)
+            p.paragraph_format.space_after = Pt(6)
+
+            topics = sub.get('topics') or []
+            for ti, t in enumerate(topics, start=1):
+                topic_text = (t.get('topic') or '').strip()
+                page = (t.get('page') or '').strip()
+                reference = (t.get('reference') or '').strip()
+
+                # 발제 내용
+                p = doc.add_paragraph()
+                r = p.add_run(f"{ti}. ")
+                r.bold = True
+                r.font.size = Pt(11)
+                # 줄바꿈 보존
+                first = True
+                for line in topic_text.split('\n'):
+                    if not first:
+                        p.add_run().add_break()
+                    rr = p.add_run(line)
+                    rr.font.size = Pt(11)
+                    first = False
+                p.paragraph_format.space_after = Pt(2)
+
+                # 페이지 / 참조
+                if page or reference:
+                    meta = doc.add_paragraph()
+                    parts = []
+                    if page:
+                        parts.append(f"페이지: {page}")
+                    if reference:
+                        parts.append(f"참조: {reference}")
+                    rm = meta.add_run('   ' + ' | '.join(parts))
+                    rm.italic = True
+                    rm.font.size = Pt(10)
+                    rm.font.color.rgb = RGBColor(102, 102, 102)
+                    meta.paragraph_format.space_after = Pt(8)
+                else:
+                    p.paragraph_format.space_after = Pt(8)
+
+            # 다음 제출자 전 페이지 나눔 (마지막 제출자 뒤에는 생략)
+            if idx < len(submissions) - 1:
+                br_p = doc.add_paragraph()
+                br_p.add_run().add_break(WD_BREAK.PAGE)
+
+        # 출력
         f = BytesIO()
         doc.save(f)
         f.seek(0)
 
-        filename = f"발제문_{event['book_title']}_{event['meeting_date']}.docx"
-
+        filename = f"발제문_{event.get('book_title','')}_{event.get('meeting_date','')}.docx"
+        app.logger.info(f"download_topics_word: 문서 생성 완료, 크기={len(f.getvalue())} bytes")
         return Response(
             f.getvalue(),
             mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             headers={"Content-disposition": f"attachment; filename={filename.encode('utf-8').decode('latin1')}"}
         )
     except Exception as e:
+        app.logger.error(f"download_topics_word error: {e}", exc_info=True)
         flash(f"문서 생성 중 오류 발생: {str(e)}", "danger")
         return redirect(url_for('admin_dashboard'))
 
