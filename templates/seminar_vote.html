@@ -50,6 +50,16 @@
         }
         .badge-open { background: var(--eva-green); color: #000; }
         .badge-upcoming { background: #d97706; color: #fff; }
+        .badge-closed { background: #4b5563; color: #d1d5db; }
+        .my-vote-badge {
+            display: inline-block;
+            padding: 0.1rem 0.45rem;
+            border-radius: 999px;
+            font-weight: 700;
+        }
+        .my-vote-yes  { background: var(--eva-green); color: #000; }
+        .my-vote-no   { background: #b91c1c; color: #fff; }
+        .my-vote-none { background: #374151; color: #9ca3af; }
         .badge-closed { background: #4A4A4A; color: #ccc; }
         .badge-admin { background: var(--eva-purple); color: #fff; }
     </style>
@@ -122,6 +132,7 @@
                                     {% if s.status == 'open' %}<span class="badge badge-open">투표중</span>
                                     {% elif s.status == 'upcoming' %}<span class="badge badge-upcoming">오픈 전</span>
                                     {% endif %}
+                                    <span class="my-vote-badge ml-2 text-xs hidden" data-session-id="{{ s.id }}"></span>
                                 </div>
                                 <div class="text-sm">
                                     {% if is_admin or s.status == 'open' %}
@@ -186,6 +197,37 @@
             </form>
         </div>
 
+        <!-- 마감된 회차: 내가 어떻게 투표했는지 확인 가능 -->
+        {% if closed_sessions %}
+        <div class="mt-8">
+            <h2 class="text-sm font-bold text-gray-400 mb-2">🔒 마감된 회차</h2>
+            <p class="text-xs text-gray-500 mb-2">본인 확인을 마치면 각 회차에 내가 어떻게 투표했는지 표시됩니다.</p>
+            <div class="space-y-2">
+                {% for s in closed_sessions %}
+                <div class="session-card eva-card p-3 rounded-lg opacity-90" data-session-id="{{ s.id }}" data-status="closed">
+                    <div class="flex justify-between items-center flex-wrap gap-2">
+                        <div class="text-sm">
+                            <span class="font-bold">{{ s.meeting_date }}</span>
+                            <span class="ml-1 text-xs {% if s.day_type == 'mon' %}text-blue-300{% else %}text-purple-300{% endif %}">
+                                ({% if s.day_type == 'mon' %}월{% else %}목{% endif %})
+                            </span>
+                            <span class="badge badge-closed ml-1">마감</span>
+                            <span class="my-vote-badge ml-2 text-xs hidden" data-session-id="{{ s.id }}"></span>
+                        </div>
+                        <div class="text-xs">
+                            <span class="text-eva-green font-bold count-yes">{{ s.attending_count }}</span>
+                            <span class="text-gray-400">/ {{ term.max_capacity }}</span>
+                        </div>
+                    </div>
+                    {% if s.book_title %}
+                    <div class="mt-1 text-xs text-gray-400">📚 {{ s.book_title }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
         <!-- 비관리자: 곧 열릴 회차 미리보기 (인증 전에도 노출) -->
         {% if upcoming_sessions and not is_admin %}
         <div class="mt-8">
@@ -247,6 +289,22 @@
                 Object.entries(ev).forEach(([sessId, choice]) => {
                     const el = document.getElementById(choice + '_' + sessId);
                     if (el) el.checked = true;
+                });
+                // 모든 회차(투표중/마감)에 내 투표 뱃지 표시
+                document.querySelectorAll('.my-vote-badge').forEach(badge => {
+                    const sid = badge.dataset.sessionId;
+                    const choice = ev[sid];
+                    badge.classList.remove('hidden', 'my-vote-yes', 'my-vote-no', 'my-vote-none');
+                    if (choice === 'yes') {
+                        badge.classList.add('my-vote-yes');
+                        badge.textContent = '내 투표: 참석';
+                    } else if (choice === 'no') {
+                        badge.classList.add('my-vote-no');
+                        badge.textContent = '내 투표: 불참';
+                    } else {
+                        badge.classList.add('my-vote-none');
+                        badge.textContent = '내 투표: 미투표';
+                    }
                 });
             } catch (err) { showError('네트워크 오류: ' + err.message); }
         });

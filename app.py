@@ -3831,6 +3831,7 @@ def seminar_vote_page():
         return render_template('seminar_vote.html', term=term,
                                open_sessions=open_sessions,
                                upcoming_sessions=upcoming_sessions_for_template,
+                               closed_sessions=closed_sessions,
                                is_admin=is_admin)
     except Exception as e:
         app.logger.error(f"seminar_vote_page error: {e}", exc_info=True)
@@ -4007,6 +4008,31 @@ def _can_view_member_profile(member_id):
     if session.get('user_id') == member_id:
         return True
     return False
+
+
+def _member_special_events(member_id):
+    """해당 멤버가 참여(attendee/organizer/speaker)한 스페셜 이벤트 목록.
+    최신 행사 우선으로 정렬해 반환.
+    """
+    try:
+        att_res = supabase.table('special_event_attendees') \
+            .select('event_id, role, note') \
+            .eq('member_id', member_id).execute()
+        att_rows = att_res.data or []
+        if not att_rows:
+            return []
+        ev_ids = list({r['event_id'] for r in att_rows})
+        role_by_event = {r['event_id']: (r.get('role') or 'attendee') for r in att_rows}
+        ev_res = supabase.table('special_events') \
+            .select('id, name, description, event_date, end_date, category, location, is_active') \
+            .in_('id', ev_ids).order('event_date', desc=True).execute()
+        events = ev_res.data or []
+        for e in events:
+            e['my_role'] = role_by_event.get(e['id'], 'attendee')
+        return events
+    except Exception as e:
+        app.logger.warning(f"_member_special_events error: {e}")
+        return []
 
 
 def _aggregate_member_activity(member_id, member_name):
