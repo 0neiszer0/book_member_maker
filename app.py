@@ -4536,13 +4536,37 @@ def admin_seminar_rooms():
     for p in month_posts:
         counts[p.get('status', 'pending')] = counts.get(p.get('status', 'pending'), 0) + 1
 
-    # 예약 가능 날짜 (오늘 +7 ~ +28, 학기 마지막일 이하, 월/목, 미점유)
+    # 설정 로드 (DB) + 예약 가능 날짜 계산
     from seminar_rooms import (
-        compute_available_dates,
-        CLUB_NAME, CLUB_PHONE, SEMINAR_TIME_SLOT, SEMINAR_PURPOSE,
-        SEMESTER_LAST_DATE, WRITE_URL,
+        compute_available_dates, load_settings, WRITE_URL,
     )
-    available_dates = compute_available_dates(all_by_date, today=today)
+    settings = load_settings(supabase)
+
+    def _to_date(s):
+        if not s:
+            return None
+        try:
+            return date.fromisoformat(str(s)[:10])
+        except Exception:
+            return None
+
+    sem_start = _to_date(settings.get('semester_start'))
+    sem_end = _to_date(settings.get('semester_end'))
+
+    try:
+        d_min = int(settings.get('days_ahead_min') or 7)
+        d_max = int(settings.get('days_ahead_max') or 28)
+    except (TypeError, ValueError):
+        d_min, d_max = 7, 28
+
+    available_dates = compute_available_dates(
+        all_by_date,
+        today=today,
+        days_ahead_min=d_min,
+        days_ahead_max=d_max,
+        semester_start=sem_start,
+        semester_last=sem_end,
+    )
 
     return render_template(
         'admin_seminar_rooms.html',
@@ -4556,13 +4580,23 @@ def admin_seminar_rooms():
         total_cached=len(posts),
         month_counts=counts,
         available_dates=available_dates,
-        club_name=CLUB_NAME,
-        club_phone=CLUB_PHONE,
-        time_slot=SEMINAR_TIME_SLOT,
-        purpose=SEMINAR_PURPOSE,
-        semester_last=SEMESTER_LAST_DATE,
+        settings=settings,
         write_url=WRITE_URL,
     )
+
+
+@app.route('/api/admin/seminar_rooms/settings', methods=['POST'])
+@login_required(role="admin")
+def admin_seminar_rooms_settings_save():
+    """세미나실 도우미 설정값(동아리명/전화/학기일자 등) 저장."""
+    from seminar_rooms import save_settings
+    payload = request.get_json(silent=True) or {}
+    try:
+        updated = save_settings(supabase, payload)
+        return jsonify({'status': 'success', 'settings': updated})
+    except Exception as e:
+        app.logger.error(f"세미나실 설정 저장 실패: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @app.route('/api/admin/seminar_rooms/refresh', methods=['POST'])
