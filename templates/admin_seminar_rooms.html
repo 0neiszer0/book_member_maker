@@ -607,14 +607,28 @@
                 });
                 const data = await res.json();
                 if (data.status === 'success') {
-                    alert(
-                        `갱신 완료!\n` +
+                    let msg = `갱신 완료!\n` +
                         `· 신규 발견: ${data.new}건\n` +
                         `· 재확인(대기): ${data.rechecked}건\n` +
                         `· 종착 스킵: ${data.skipped_terminal}건\n` +
-                        `· 페이지 ${data.pages_scanned}개 스캔`
-                    );
-                    location.reload();
+                        `· 페이지 ${data.pages_scanned}개 스캔\n` +
+                        `· 목록 총 ${data.total_listed ?? '?'}건 / 세미나실 매칭 ${data.seminar_matched ?? '?'}건`;
+                    if ((data.total_listed === 0 || data.seminar_matched === 0)
+                            && Array.isArray(data.diagnostics)) {
+                        msg += '\n\n[디버그]';
+                        for (const d of data.diagnostics) {
+                            msg += `\n p${d.page} http=${d.http_status} len=${d.body_len} list=${d.listing_count}`;
+                            msg += `\n  final_url=${d.final_url}`;
+                            if (d.sample_titles && d.sample_titles.length) {
+                                msg += `\n  sample=${d.sample_titles.join(' | ')}`;
+                            }
+                            if (d.body_head) msg += `\n  head=${d.body_head.slice(0, 200)}`;
+                            if (d.error) msg += `\n  ERROR=${d.error}`;
+                        }
+                        console.log('[seminar refresh diagnostics]', data.diagnostics);
+                    }
+                    alert(msg);
+                    if (data.new > 0 || data.rechecked > 0) location.reload();
                 } else {
                     alert('오류: ' + (data.message || '알 수 없음'));
                 }
