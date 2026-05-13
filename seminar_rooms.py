@@ -333,6 +333,9 @@ def crawl(supabase, *, max_pages: int = 3, recheck_pending: bool = True,
     rechecked_count = 0
     skipped_terminal = 0
     pages_scanned = 0
+    diagnostics: list = []   # 페이지별 응답 진단(디버그용)
+    total_listed = 0
+    seminar_matched = 0
 
     for page_num in range(1, max_pages + 1):
         url = f"{BOARD_URL}&page={page_num}"
@@ -341,10 +344,25 @@ def crawl(supabase, *, max_pages: int = 3, recheck_pending: bool = True,
             resp.raise_for_status()
         except requests.RequestException as e:
             log.warning(f"page {page_num} 요청 실패: {e}")
+            diagnostics.append({'page': page_num, 'error': f'{type(e).__name__}: {e}'})
             break
         pages_scanned = page_num
 
         listing = parse_listing(resp.text)
+        total_listed += len(listing)
+        sample_titles = [t[:80] for _, t, _ in listing[:3]]
+        body_snippet = resp.text[:300].replace('\n', ' ')
+        diagnostics.append({
+            'page': page_num,
+            'http_status': resp.status_code,
+            'body_len': len(resp.text),
+            'final_url': resp.url,
+            'listing_count': len(listing),
+            'sample_titles': sample_titles,
+            'body_head': body_snippet,
+        })
+        log.info(f"page {page_num}: http={resp.status_code} len={len(resp.text)} "
+                 f"final_url={resp.url} listings={len(listing)}")
         if not listing:
             log.info(f"page {page_num} 에서 게시글 없음, 중단")
             break
@@ -352,6 +370,7 @@ def crawl(supabase, *, max_pages: int = 3, recheck_pending: bool = True,
         for wr_id, title, post_url in listing:
             if not is_seminar_post(title):
                 continue
+            seminar_matched += 1
 
             prev_status = known.get(wr_id)
             is_new = prev_status is None
@@ -408,4 +427,7 @@ def crawl(supabase, *, max_pages: int = 3, recheck_pending: bool = True,
         'rechecked': rechecked_count,
         'skipped_terminal': skipped_terminal,
         'pages_scanned': pages_scanned,
+        'total_listed': total_listed,
+        'seminar_matched': seminar_matched,
+        'diagnostics': diagnostics,
     }
