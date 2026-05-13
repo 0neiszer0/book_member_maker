@@ -1,0 +1,332 @@
+"""
+경북대 총동아리연합회 세미나실 예약 게시판 크롤러 + 글 생성 헬퍼.
+
+  - dongari.knu.ac.kr 게시판은 gnuboard5 기반 서버 렌더링 HTML 이므로
+    requests + BeautifulSoup 만으로 파싱 가능하다.
+  - 게시판 **조회**는 로그인 없이 가능 (게스트).
+  - 글 **작성**은 원래 로그인이 필요하지만, 이 프로젝트에선 자동 작성을 하지 않는다.
+    대신 사용자가 복사·붙여넣기 할 수 있도록 제목/내용 텍스트만 생성한다.
+  - 게시글은 wr_id 를 PK 로 Supabase 에 캐싱한다.
+    승인/반려는 종착 상태이므로 이미 캐시된 글이면 상세 페이지를 재요청하지 않는다.
+    -> 첫 1회 크롤 이후엔 신규 글 + pending 글의 상세만 fetch.
+"""
+
+import os
+import re
+import logging
+from datetime import datetime, timedelta, date, timezone
+
+import requests
+from bs4 import BeautifulSoup
+
+BASE_URL = "https://dongari.knu.ac.kr"
+BOARD_URL = f"{BASE_URL}/bbs/board.php?bo_table=place"
+WRITE_URL = f"{BASE_URL}/bbs/write.php?bo_table=place"
+
+WEEKDAY_KR = ['월', '화', '수', '목', '금', '토', '일']
+SEMINAR_ROOMS = ['민주', '통일', '백호']
+
+USER_AGENT = (
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+    '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+)
+
+# ─────────────────────────────────────────────
+# 예약 신청 글 기본값 (env 로 덮어쓰기 가능)
+# ─────────────────────────────────────────────
+CLUB_NAME = os.environ.get('SEMINAR_CLUB_NAME', '책 먹는 호반우')
+CLUB_PHONE = os.environ.get('SEMINAR_CLUB_PHONE', '010-6509-3524')
+SEMINAR_TIME_SLOT = os.environ.get('SEMINAR_TIME_SLOT', '19:00~21:00')
+SEMINAR_PURPOSE = os.environ.get('SEMINAR_PURPOSE', '동아리 세미나 진행')
+
+# 이번 학기 마지막 세미나 날짜 (학기 바뀌면 수정)
+SEMESTER_LAST_DATE = date(2026, 6, 8)
+
+TARGET_WEEKDAYS = (0, 3)   # 월(0), 목(3)
+DAYS_AHEAD_MIN = 7         # 최소 7일 후부터 예약 가능
+DAYS_AHEAD_MAX = 28        # 최대 28일 후까지 예약 가능
+
+
+# ─────────────────────────────────────────────
+# 파싱 유틸
+# ─────────────────────────────────────────────
+def parse_dates_from_title(title: str, fallback_year: int) -> list:
+    """게시글 제목에서 날짜를 모두 추출한다.
+
+    지원 형식:
+      - "2026년 5월 14일"   (연도 포함)
+      - "5월 14일"            (연도 생략 → fallback_year)
+      - "5.14" / "5/14"      (점/슬래시 구분)
+    """
+    dates: list = []
+
+    for m in re.finditer(r'(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일', title):
+        try:
+            dates.append(date(int(m.group(1)), int(m.group(2)), int(m.group(3))))
+        except ValueError:
+            pass
+    if dates:
+        return sorted(set(dates))
+
+    for m in re.finditer(r'(\d{1,2})월\s*(\d{1,2})일', title):
+        try:
+            dates.append(date(fallback_year, int(m.group(1)), int(m.group(2))))
+        except ValueError:
+            pass
+    if dates:
+        return sorted(set(dates))
+
+    for m in re.finditer(r'(\d{1,2})[./](\d{1,2})(?!\d)', title):
+        try:
+            month, day = int(m.group(1)), int(m.group(2))
+            if 1 <= month <= 12 and 1 <= day <= 31:
+                dates.append(date(fallback_year, month, day))
+        except ValueError:
+            pass
+    return sorted(set(dates))
+
+
+def is_seminar_post(title: str) -> bool:
+    return '세미나실' in title and any(r in title for r in SEMINAR_ROOMS)
+
+
+def get_room_from_title(title: str):
+    for r in SEMINAR_ROOMS:
+        if r in title:
+            return r
+    return None
+
+
+def extract_club_name(title: str):
+    m = re.match(r'\[([^\]]+)\]', title)
+    return m.group(1).strip() if m else None
+
+
+# ─────────────────────────────────────────────
+# HTML 파서
+# ─────────────────────────────────────────────
+def parse_listing(html: str):
+    """게시판 목록에서 (wr_id, title, post_url) 리스트를 반환."""
+    soup = BeautifulSoup(html, 'html.parser')
+    rows = []
+    for div in soup.select('div.bo_tit'):
+        a = div.find('a', href=lambda h: h and 'wr_id=' in h)
+        if not a:
+            continue
+        href = a.get('href', '')
+        m = re.search(r'wr_id=(\d+)', href)
+        if not m:
+            continue
+        wr_id = int(m.group(1))
+        title = a.get_text(strip=True)
+        if not href.startswith('http'):
+            href = BASE_URL + ('' if href.startswith('/') else '/') + href.lstrip('/')
+        rows.append((wr_id, title, href))
+    return rows
+
+
+def parse_status_from_detail(html: str) -> str:
+    """글 상세 페이지에서 승인/반려/대기 상태를 판정."""
+    soup = BeautifulSoup(html, 'html.parser')
+    cmt = (soup.find(id='cmt_list')
+           or soup.find(class_='cmt_list')
+           or soup.find(id='comment_list'))
+    text = cmt.get_text(' ', strip=True) if cmt else soup.get_text(' ', strip=True)
+    if '승인' in text:
+        return 'approved'
+    if any(kw in text for kw in ['반려', '불가', '거절', '취소']):
+        return 'rejected'
+    return 'pending'
+
+
+# ─────────────────────────────────────────────
+# 세션 (게스트 조회 전용)
+# ─────────────────────────────────────────────
+def make_session():
+    """User-Agent 만 세팅한 requests.Session 반환 (로그인하지 않음)."""
+    s = requests.Session()
+    s.headers.update({'User-Agent': USER_AGENT})
+    return s
+
+
+# ─────────────────────────────────────────────
+# 글 생성 헬퍼 (복사·붙여넣기용)
+# ─────────────────────────────────────────────
+def format_date_korean(d: date) -> str:
+    """2026년 5월 14일(목)"""
+    return f"{d.year}년 {d.month}월 {d.day}일({WEEKDAY_KR[d.weekday()]})"
+
+
+def format_date_short(d: date) -> str:
+    """5월 14일(목)"""
+    return f"{d.month}월 {d.day}일({WEEKDAY_KR[d.weekday()]})"
+
+
+def generate_post_title(dates, room: str, club_name: str | None = None) -> str:
+    """예약 신청 글 제목을 생성."""
+    club_name = club_name or CLUB_NAME
+    sorted_dates = sorted(dates)
+    if not sorted_dates:
+        return ""
+    if len(sorted_dates) == 1:
+        return (f"[{club_name}] {format_date_korean(sorted_dates[0])} "
+                f"세미나실({room}) 대여 신청")
+    year = sorted_dates[0].year
+    parts = ', '.join(format_date_short(d) for d in sorted_dates)
+    return f"[{club_name}] {year}년 {parts} 세미나실({room}) 대여 신청"
+
+
+def generate_post_content(time_slot: str | None = None,
+                          purpose: str | None = None,
+                          phone: str | None = None) -> str:
+    """예약 신청 글 본문 생성 (원본 seminar_auto.py 와 동일 형식)."""
+    return (
+        f"일시: {time_slot or SEMINAR_TIME_SLOT}\n"
+        f"목적: {purpose or SEMINAR_PURPOSE}\n"
+        f"대표자번호: {phone or CLUB_PHONE}"
+    )
+
+
+def compute_available_dates(by_date: dict, *,
+                            today: date | None = None,
+                            days_ahead_min: int = DAYS_AHEAD_MIN,
+                            days_ahead_max: int = DAYS_AHEAD_MAX,
+                            semester_last: date | None = SEMESTER_LAST_DATE,
+                            target_weekdays=TARGET_WEEKDAYS) -> list:
+    """예약 가능한 월/목 날짜를 계산.
+
+    Args:
+        by_date: {'YYYY-MM-DD': [post, ...]} — 각 post 는 status 키를 가져야 함.
+                 status != 'rejected' 인 글이 있으면 그 날짜는 점유로 본다.
+    Returns:
+        list[date] — 예약 가능 날짜들(오름차순).
+    """
+    if today is None:
+        today = datetime.now().date()
+    available = []
+    for delta in range(days_ahead_min, days_ahead_max + 1):
+        d = today + timedelta(days=delta)
+        if semester_last and d > semester_last:
+            break
+        if d.weekday() not in target_weekdays:
+            continue
+        occupied = any(
+            (p.get('status') or '') != 'rejected'
+            for p in by_date.get(d.isoformat(), [])
+        )
+        if not occupied:
+            available.append(d)
+    return available
+
+
+# ─────────────────────────────────────────────
+# 크롤
+# ─────────────────────────────────────────────
+def crawl(supabase, *, max_pages: int = 3, recheck_pending: bool = True,
+          logger: logging.Logger | None = None) -> dict:
+    """게시판을 크롤링하여 seminar_room_posts 에 upsert.
+
+    Returns:
+        {
+            'new': 신규 발견 글 수,
+            'rechecked': pending 재확인 수,
+            'skipped_terminal': 종착 상태로 스킵된 수,
+            'pages_scanned': 실제로 받아본 페이지 수,
+        }
+    """
+    log = logger or logging.getLogger(__name__)
+    session = make_session()
+
+    # 기존 캐시 로드: wr_id -> status
+    try:
+        existing = supabase.table('seminar_room_posts') \
+            .select('wr_id, status').execute().data or []
+    except Exception as e:
+        log.warning(f"기존 캐시 조회 실패(빈 캐시로 진행): {e}")
+        existing = []
+    known = {row['wr_id']: row['status'] for row in existing}
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    fallback_year = datetime.now().year
+
+    upserts: list = []
+    new_count = 0
+    rechecked_count = 0
+    skipped_terminal = 0
+    pages_scanned = 0
+
+    for page_num in range(1, max_pages + 1):
+        url = f"{BOARD_URL}&page={page_num}"
+        try:
+            resp = session.get(url, timeout=20)
+            resp.raise_for_status()
+        except requests.RequestException as e:
+            log.warning(f"page {page_num} 요청 실패: {e}")
+            break
+        pages_scanned = page_num
+
+        listing = parse_listing(resp.text)
+        if not listing:
+            log.info(f"page {page_num} 에서 게시글 없음, 중단")
+            break
+
+        for wr_id, title, post_url in listing:
+            if not is_seminar_post(title):
+                continue
+
+            prev_status = known.get(wr_id)
+            is_new = prev_status is None
+            is_terminal = prev_status in ('approved', 'rejected')
+
+            if is_terminal:
+                skipped_terminal += 1
+                continue
+            if not is_new and not recheck_pending:
+                continue
+
+            dates = parse_dates_from_title(title, fallback_year)
+            room = get_room_from_title(title)
+            club = extract_club_name(title) or '알 수 없음'
+
+            try:
+                detail = session.get(post_url, timeout=20)
+                detail.raise_for_status()
+                status = parse_status_from_detail(detail.text)
+            except requests.RequestException as e:
+                log.debug(f"상세 fetch 실패 wr_id={wr_id}: {e}")
+                status = prev_status or 'pending'
+
+            row = {
+                'wr_id': wr_id,
+                'title': title[:500],
+                'club_name': club,
+                'room': room,
+                'dates': [d.isoformat() for d in dates],
+                'status': status,
+                'post_url': post_url,
+                'last_checked_at': now_iso,
+            }
+            if is_new:
+                row['discovered_at'] = now_iso
+                new_count += 1
+            else:
+                rechecked_count += 1
+
+            upserts.append(row)
+            log.info(f"  {'NEW' if is_new else 'CHK'} wr_id={wr_id} [{club}] "
+                     f"{room or '?'} {[d.isoformat() for d in dates]} → {status}")
+
+    if upserts:
+        try:
+            supabase.table('seminar_room_posts') \
+                .upsert(upserts, on_conflict='wr_id').execute()
+        except Exception as e:
+            log.error(f"upsert 실패: {e}")
+            raise
+
+    return {
+        'new': new_count,
+        'rechecked': rechecked_count,
+        'skipped_terminal': skipped_terminal,
+        'pages_scanned': pages_scanned,
+    }
