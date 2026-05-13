@@ -191,6 +191,7 @@ def compute_available_dates(by_date: dict, *,
                             today: date | None = None,
                             days_ahead_min: int = DAYS_AHEAD_MIN,
                             days_ahead_max: int = DAYS_AHEAD_MAX,
+                            semester_start: date | None = None,
                             semester_last: date | None = SEMESTER_LAST_DATE,
                             target_weekdays=TARGET_WEEKDAYS) -> list:
     """예약 가능한 월/목 날짜를 계산.
@@ -198,6 +199,8 @@ def compute_available_dates(by_date: dict, *,
     Args:
         by_date: {'YYYY-MM-DD': [post, ...]} — 각 post 는 status 키를 가져야 함.
                  status != 'rejected' 인 글이 있으면 그 날짜는 점유로 본다.
+        semester_start: 학기 시작일(이전 날짜는 제외, None 이면 제한 없음)
+        semester_last:  학기 종료일(이후 날짜는 제외, None 이면 제한 없음)
     Returns:
         list[date] — 예약 가능 날짜들(오름차순).
     """
@@ -208,6 +211,8 @@ def compute_available_dates(by_date: dict, *,
         d = today + timedelta(days=delta)
         if semester_last and d > semester_last:
             break
+        if semester_start and d < semester_start:
+            continue
         if d.weekday() not in target_weekdays:
             continue
         occupied = any(
@@ -217,6 +222,80 @@ def compute_available_dates(by_date: dict, *,
         if not occupied:
             available.append(d)
     return available
+
+
+# ─────────────────────────────────────────────
+# 설정 로드/저장 (싱글톤 행, id=1)
+# ─────────────────────────────────────────────
+SETTINGS_KEYS = (
+    'club_name', 'club_phone', 'time_slot', 'purpose',
+    'semester_start', 'semester_end',
+    'days_ahead_min', 'days_ahead_max',
+)
+
+
+def default_settings() -> dict:
+    """DB 가 비어있을 때 쓸 기본값."""
+    return {
+        'club_name': CLUB_NAME,
+        'club_phone': CLUB_PHONE,
+        'time_slot': SEMINAR_TIME_SLOT,
+        'purpose': SEMINAR_PURPOSE,
+        'semester_start': None,
+        'semester_end': SEMESTER_LAST_DATE.isoformat() if SEMESTER_LAST_DATE else None,
+        'days_ahead_min': DAYS_AHEAD_MIN,
+        'days_ahead_max': DAYS_AHEAD_MAX,
+    }
+
+
+def load_settings(supabase) -> dict:
+    """seminar_room_settings 테이블에서 설정 1행을 읽어온다.
+
+    테이블이 없거나 행이 없으면 default_settings() 를 반환.
+    날짜 컬럼은 ISO 문자열로 정규화한다.
+    """
+    settings = default_settings()
+    try:
+        res = supabase.table('seminar_room_settings') \
+            .select('*').eq('id', 1).execute()
+        rows = res.data or []
+    except Exception:
+        return settings
+    if not rows:
+        return settings
+    row = rows[0]
+    for k in SETTINGS_KEYS:
+        v = row.get(k)
+        if v is None or v == '':
+            continue
+        if k in ('semester_start', 'semester_end'):
+            settings[k] = str(v)[:10]
+        else:
+            settings[k] = v
+    return settings
+
+
+def save_settings(supabase, payload: dict) -> dict:
+    """seminar_room_settings 싱글톤(id=1)에 upsert. 허용된 키만 반영."""
+    row: dict = {'id': 1}
+    for k in SETTINGS_KEYS:
+        if k not in payload:
+            continue
+        v = payload[k]
+        if isinstance(v, str):
+            v = v.strip()
+            if v == '':
+                v = None
+        if k in ('days_ahead_min', 'days_ahead_max') and v is not None:
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                continue
+        row[k] = v
+    row['updated_at'] = datetime.now(timezone.utc).isoformat()
+    supabase.table('seminar_room_settings') \
+        .upsert(row, on_conflict='id').execute()
+    return load_settings(supabase)
 
 
 # ─────────────────────────────────────────────

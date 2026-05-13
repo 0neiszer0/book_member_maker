@@ -329,9 +329,69 @@
                 ✍️ 예약 신청 글 도우미
             </h2>
             <p class="text-xs text-gray-400 mb-4">
-                아래에서 날짜·세미나실을 고르면 게시판에 그대로 붙여넣을 <strong>제목/내용</strong>이 생성됩니다.
-                "총동연 글쓰기 페이지 열기" 버튼으로 이동해 로그인 후 붙여넣기만 하면 끝.
+                아래 설정을 채우면 게시판에 그대로 붙여넣을 <strong>제목/내용</strong>이 자동 생성됩니다.
+                "💾 저장"을 누르면 다음 방문에도 값이 유지됩니다.
             </p>
+
+            <!-- ⚙️ 기본 설정 (DB 저장) -->
+            <div class="border border-gray-700 rounded-lg p-3 mb-4 bg-gray-900/40">
+                <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                    <h3 class="text-sm font-bold text-gray-200">⚙️ 기본 설정</h3>
+                    <div class="flex items-center gap-2">
+                        <span id="saveStatus" class="text-[0.7rem] text-gray-500"></span>
+                        <button type="button" id="saveSettingsBtn"
+                            class="text-xs bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-1.5 rounded">
+                            💾 저장
+                        </button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    <div>
+                        <div class="text-[0.7rem] text-gray-400 mb-1">동아리명</div>
+                        <input id="clubName" type="text" value="{{ settings.club_name }}"
+                            class="settings-field w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
+                    </div>
+                    <div>
+                        <div class="text-[0.7rem] text-gray-400 mb-1">대표자 번호</div>
+                        <input id="phone" type="text" value="{{ settings.club_phone }}"
+                            class="settings-field w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
+                    </div>
+                    <div>
+                        <div class="text-[0.7rem] text-gray-400 mb-1">시간</div>
+                        <input id="timeSlot" type="text" value="{{ settings.time_slot }}"
+                            class="settings-field w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
+                    </div>
+                    <div>
+                        <div class="text-[0.7rem] text-gray-400 mb-1">목적</div>
+                        <input id="purpose" type="text" value="{{ settings.purpose }}"
+                            class="settings-field w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
+                    </div>
+                    <div>
+                        <div class="text-[0.7rem] text-gray-400 mb-1">학기 시작일</div>
+                        <input id="semesterStart" type="date" value="{{ settings.semester_start or '' }}"
+                            class="settings-field w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
+                    </div>
+                    <div>
+                        <div class="text-[0.7rem] text-gray-400 mb-1">학기 종료일</div>
+                        <input id="semesterEnd" type="date" value="{{ settings.semester_end or '' }}"
+                            class="settings-field w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
+                    </div>
+                    <div>
+                        <div class="text-[0.7rem] text-gray-400 mb-1">최소 N일 후부터</div>
+                        <input id="daysAheadMin" type="number" min="0" max="60" value="{{ settings.days_ahead_min }}"
+                            class="settings-field w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
+                    </div>
+                    <div>
+                        <div class="text-[0.7rem] text-gray-400 mb-1">최대 N일 후까지</div>
+                        <input id="daysAheadMax" type="number" min="1" max="180" value="{{ settings.days_ahead_max }}"
+                            class="settings-field w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
+                    </div>
+                </div>
+                <p class="text-[0.7rem] text-gray-500 mt-2 leading-relaxed">
+                    💡 학기 시작·종료일과 N일 범위는 <strong>예약 가능 날짜</strong> 계산에 사용됩니다.
+                    저장 후 페이지가 새로고침되어 후보 날짜가 다시 계산됩니다.
+                </p>
+            </div>
 
             {% if available_dates %}
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -339,7 +399,10 @@
                     <div class="text-xs text-gray-400 mb-2">
                         예약 가능한 날짜
                         <span class="text-gray-500">
-                            (오늘 +7 ~ +28일 · 월/목 · 학기 종료 {{ semester_last }}까지 · 이미 점유된 날 제외)
+                            (월/목 ·
+                            {% if settings.semester_start %}{{ settings.semester_start }} ~ {% endif %}
+                            {% if settings.semester_end %}{{ settings.semester_end }}까지{% endif %}
+                            · 이미 점유된 날 제외)
                         </span>
                     </div>
                     <div class="flex flex-wrap gap-2" id="date-options">
@@ -353,7 +416,7 @@
                 </div>
                 <div>
                     <div class="text-xs text-gray-400 mb-2">세미나실</div>
-                    <div class="flex gap-3 text-sm mb-3">
+                    <div class="flex gap-3 text-sm">
                         <label class="flex items-center gap-1 cursor-pointer">
                             <input type="radio" name="room" value="민주" checked> 민주
                         </label>
@@ -363,28 +426,6 @@
                         <label class="flex items-center gap-1 cursor-pointer">
                             <input type="radio" name="room" value="백호"> 백호
                         </label>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <div class="text-[0.7rem] text-gray-400 mb-1">동아리명</div>
-                            <input id="clubName" type="text" value="{{ club_name }}"
-                                class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
-                        </div>
-                        <div>
-                            <div class="text-[0.7rem] text-gray-400 mb-1">대표자 번호</div>
-                            <input id="phone" type="text" value="{{ club_phone }}"
-                                class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
-                        </div>
-                        <div>
-                            <div class="text-[0.7rem] text-gray-400 mb-1">시간</div>
-                            <input id="timeSlot" type="text" value="{{ time_slot }}"
-                                class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
-                        </div>
-                        <div>
-                            <div class="text-[0.7rem] text-gray-400 mb-1">목적</div>
-                            <input id="purpose" type="text" value="{{ purpose }}"
-                                class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
-                        </div>
                     </div>
                 </div>
             </div>
@@ -431,7 +472,8 @@
             <ul class="list-disc list-inside mt-1 space-y-0.5">
                 <li>외부 게시판은 <code>requests + BeautifulSoup</code> 으로 <strong>로그인 없이</strong> 읽기만 합니다.</li>
                 <li>승인/반려된 글은 <em>종착 상태</em>로 보고 다시 가져오지 않습니다. 신규 글 + 대기(pending) 글만 재확인.</li>
-                <li>실제 글 작성은 위 도우미가 생성한 제목/내용을 복사 → 총동연 사이트에 붙여넣기.</li>
+                <li>설정(동아리명·전화·학기 일자 등)은 DB에 저장되며, 학기 바뀔 때마다 이 화면에서 직접 수정하면 됩니다.</li>
+                <li>실제 글 작성은 도우미가 만든 제목/내용을 복사 → 총동연 사이트에 붙여넣기.</li>
             </ul>
         </div>
     </div>
@@ -499,6 +541,57 @@
             document.getElementById(id)?.addEventListener('input', updatePost);
         });
         updatePost();
+
+        // ─── 설정 저장 ───
+        const saveBtn = document.getElementById('saveSettingsBtn');
+        const saveStatus = document.getElementById('saveStatus');
+        let dirty = false;
+        document.querySelectorAll('.settings-field').forEach(el => {
+            el.addEventListener('input', () => {
+                dirty = true;
+                if (saveStatus) saveStatus.textContent = '변경됨 · 저장 필요';
+                if (saveStatus) saveStatus.className = 'text-[0.7rem] text-yellow-400';
+            });
+        });
+        saveBtn?.addEventListener('click', async () => {
+            const payload = {
+                club_name: document.getElementById('clubName').value.trim(),
+                club_phone: document.getElementById('phone').value.trim(),
+                time_slot: document.getElementById('timeSlot').value.trim(),
+                purpose: document.getElementById('purpose').value.trim(),
+                semester_start: document.getElementById('semesterStart').value || null,
+                semester_end: document.getElementById('semesterEnd').value || null,
+                days_ahead_min: parseInt(document.getElementById('daysAheadMin').value, 10) || 7,
+                days_ahead_max: parseInt(document.getElementById('daysAheadMax').value, 10) || 28,
+            };
+            saveBtn.disabled = true;
+            const orig = saveBtn.textContent;
+            saveBtn.textContent = '저장 중...';
+            try {
+                const res = await fetch('/api/admin/seminar_rooms/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    if (saveStatus) {
+                        saveStatus.textContent = '✓ 저장됨 · 새로고침 중';
+                        saveStatus.className = 'text-[0.7rem] text-green-400';
+                    }
+                    // 예약 가능 날짜 재계산을 위해 reload
+                    setTimeout(() => location.reload(), 400);
+                } else {
+                    alert('저장 실패: ' + (data.message || '알 수 없음'));
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = orig;
+                }
+            } catch (err) {
+                alert('네트워크 오류: ' + err.message);
+                saveBtn.disabled = false;
+                saveBtn.textContent = orig;
+            }
+        });
 
         // ─── 캐시 새로고침 ───
         document.getElementById('refreshBtn').addEventListener('click', async () => {
