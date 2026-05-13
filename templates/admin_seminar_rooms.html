@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>세미나실 예약 현황 - 책 먹는 호반우</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --eva-purple: #6A0DAD;
+            --eva-green: #00FF7F;
+            --eva-orange: #FF8C00;
+            --bg-dark: #1A1A1A;
+            --card-dark: #2D2D2D;
+            --text-light: #E5E5E5;
+            --border-dark: #444444;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+        }
+
+        h1, h2 {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .eva-card {
+            background-color: var(--card-dark);
+            border: 1px solid var(--border-dark);
+        }
+
+        .cal-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 4px;
+        }
+
+        .cal-cell {
+            background-color: #232323;
+            border: 1px solid var(--border-dark);
+            border-radius: 6px;
+            min-height: 110px;
+            padding: 6px 6px 8px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .cal-cell.out-of-month {
+            opacity: 0.35;
+        }
+
+        .cal-cell.today {
+            border-color: var(--eva-green);
+            box-shadow: 0 0 0 1px var(--eva-green) inset;
+        }
+
+        .cal-cell.target-day .day-num {
+            color: var(--eva-green);
+            font-weight: 700;
+        }
+
+        .day-num {
+            font-size: 0.78rem;
+            color: #aaa;
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .badge {
+            font-size: 0.66rem;
+            padding: 2px 5px;
+            border-radius: 4px;
+            margin-bottom: 3px;
+            line-height: 1.2;
+            display: block;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            border: 1px solid transparent;
+        }
+
+        .badge.approved {
+            background: rgba(0, 255, 127, 0.12);
+            color: #6df0a9;
+            border-color: rgba(0, 255, 127, 0.4);
+        }
+
+        .badge.pending {
+            background: rgba(255, 200, 0, 0.12);
+            color: #f4d36b;
+            border-color: rgba(255, 200, 0, 0.4);
+        }
+
+        .badge.rejected {
+            background: rgba(255, 80, 80, 0.10);
+            color: #f88;
+            border-color: rgba(255, 80, 80, 0.35);
+            text-decoration: line-through;
+            opacity: 0.7;
+        }
+
+        .badge.mine {
+            outline: 1px dashed #fff;
+        }
+
+        .wd-header {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #888;
+            padding: 6px 0;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+
+        .wd-header.sat {
+            color: #6cb6ff;
+        }
+
+        .wd-header.sun {
+            color: #ff8c8c;
+        }
+
+        .legend-chip {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 999px;
+            border: 1px solid var(--border-dark);
+        }
+
+        @media (max-width: 640px) {
+            .cal-cell {
+                min-height: 78px;
+                padding: 3px;
+            }
+            .badge {
+                font-size: 0.6rem;
+                padding: 1px 3px;
+            }
+            .day-num {
+                font-size: 0.7rem;
+            }
+        }
+    </style>
+</head>
+
+<body class="min-h-screen">
+    {% include '_header.html' %}
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+        <div class="flex items-center justify-between flex-wrap gap-2">
+            <div>
+                <h1 class="text-2xl font-bold text-eva-green" style="color: var(--eva-green)">🗓 세미나실 예약 현황</h1>
+                <p class="text-xs text-gray-400 mt-1">
+                    경북대 총동연 게시판(dongari.knu.ac.kr) 캐시 기반 · 다른 동아리/세미나실 예약을 한눈에 확인
+                </p>
+            </div>
+            <a href="{{ url_for('admin_dashboard') }}" class="text-sm text-gray-400 hover:text-white">← 대시보드</a>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}{% for category, message in messages %}
+        <div class="p-3 text-sm rounded-lg {{ 'bg-green-900 text-green-200' if category == 'success' else 'bg-red-900 text-red-200' }}">
+            {{ message }}
+        </div>
+        {% endfor %}{% endif %}
+        {% endwith %}
+
+        <!-- 컨트롤 바 -->
+        <div class="eva-card rounded-lg p-4 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <a href="?month={{ prev_month }}"
+                    class="px-3 py-1.5 rounded text-sm bg-gray-700 hover:bg-gray-600">← {{ prev_month }}</a>
+                <span class="text-lg font-bold" style="font-family:'Orbitron',sans-serif">
+                    {{ year }}년 {{ '%02d' % month }}월
+                </span>
+                <a href="?month={{ next_month }}"
+                    class="px-3 py-1.5 rounded text-sm bg-gray-700 hover:bg-gray-600">{{ next_month }} →</a>
+                <a href="{{ url_for('admin_seminar_rooms') }}"
+                    class="ml-2 px-3 py-1.5 rounded text-sm bg-gray-800 hover:bg-gray-700 text-gray-300">오늘로</a>
+            </div>
+            <div class="flex items-center gap-3 text-xs text-gray-400">
+                <div>
+                    캐시 글 수: <span class="text-gray-200 font-bold">{{ total_cached }}</span>
+                </div>
+                <div>
+                    이 달:
+                    <span class="text-green-400">승인 {{ month_counts.approved }}</span> ·
+                    <span class="text-yellow-400">대기 {{ month_counts.pending }}</span> ·
+                    <span class="text-red-400">반려 {{ month_counts.rejected }}</span>
+                </div>
+                <div>
+                    마지막 갱신:
+                    <span id="last-check" class="text-gray-200">
+                        {% if last_check %}{{ last_check }}{% else %}—{% endif %}
+                    </span>
+                </div>
+                <button id="refreshBtn"
+                    class="bg-eva-green text-black font-bold px-3 py-1.5 rounded text-sm hover:opacity-80"
+                    style="background: var(--eva-green); color: #000">
+                    🔄 지금 새로고침
+                </button>
+            </div>
+        </div>
+
+        <!-- 범례 -->
+        <div class="eva-card rounded-lg p-3 flex flex-wrap items-center gap-3 text-xs text-gray-300">
+            <span class="legend-chip" style="color:#6df0a9; border-color: rgba(0,255,127,0.4)">● 승인</span>
+            <span class="legend-chip" style="color:#f4d36b; border-color: rgba(255,200,0,0.4)">● 대기</span>
+            <span class="legend-chip" style="color:#f88;    border-color: rgba(255,80,80,0.35)">● 반려</span>
+            <span class="text-gray-500">| 월/목 = 우리 동아리 세미나 요일 (초록색 강조)</span>
+        </div>
+
+        <!-- 달력 -->
+        <div class="eva-card rounded-lg p-3">
+            <div class="cal-grid mb-1">
+                <div class="wd-header">월</div>
+                <div class="wd-header">화</div>
+                <div class="wd-header">수</div>
+                <div class="wd-header">목</div>
+                <div class="wd-header">금</div>
+                <div class="wd-header sat">토</div>
+                <div class="wd-header sun">일</div>
+            </div>
+
+            {% for week in weeks %}
+            <div class="cal-grid mb-1">
+                {% for cell in week %}
+                <div class="cal-cell
+                            {% if not cell.in_month %}out-of-month{% endif %}
+                            {% if cell.is_today %}today{% endif %}
+                            {% if cell.is_target %}target-day{% endif %}">
+                    <div class="day-num">
+                        <span>{{ cell.date.day }}</span>
+                        {% if cell.posts %}
+                        <span class="text-[0.6rem] text-gray-500">{{ cell.posts|length }}건</span>
+                        {% endif %}
+                    </div>
+                    {% for p in cell.posts %}
+                    <a href="{{ p.post_url }}" target="_blank" rel="noopener"
+                       class="badge {{ p.status }}"
+                       title="{{ p.title }}&#10;동아리: {{ p.club_name or '?' }}&#10;상태: {{ p.status }}">
+                        <span class="font-bold">{{ p.room or '?' }}</span>
+                        · {{ p.club_name or '?' }}
+                    </a>
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- 이번 달 예약 리스트 (요약 테이블) -->
+        <div class="eva-card rounded-lg p-4">
+            <h2 class="text-lg font-bold text-eva-green mb-3" style="color:var(--eva-green)">이번 달 예약 목록</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-border-dark text-left text-gray-400">
+                            <th class="p-2">날짜</th>
+                            <th class="p-2">요일</th>
+                            <th class="p-2">세미나실</th>
+                            <th class="p-2">동아리</th>
+                            <th class="p-2 text-center">상태</th>
+                            <th class="p-2">원본</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set rows = [] %}
+                        {% for week in weeks %}
+                          {% for cell in week %}
+                            {% if cell.in_month and cell.posts %}
+                              {% for p in cell.posts %}
+                                {% set _ = rows.append({'date': cell.date, 'p': p}) %}
+                              {% endfor %}
+                            {% endif %}
+                          {% endfor %}
+                        {% endfor %}
+
+                        {% if rows %}
+                          {% for row in rows %}
+                          <tr class="border-b border-gray-800/60 hover:bg-gray-800/40">
+                              <td class="p-2 font-mono">{{ row.date.isoformat() }}</td>
+                              <td class="p-2">{{ ['월','화','수','목','금','토','일'][row.date.weekday()] }}</td>
+                              <td class="p-2 font-bold">{{ row.p.room or '?' }}</td>
+                              <td class="p-2">{{ row.p.club_name or '?' }}</td>
+                              <td class="p-2 text-center">
+                                  {% if row.p.status == 'approved' %}
+                                  <span class="px-2 py-0.5 rounded text-xs"
+                                        style="background: rgba(0,255,127,.15); color:#6df0a9">승인</span>
+                                  {% elif row.p.status == 'rejected' %}
+                                  <span class="px-2 py-0.5 rounded text-xs"
+                                        style="background: rgba(255,80,80,.15); color:#f88">반려</span>
+                                  {% else %}
+                                  <span class="px-2 py-0.5 rounded text-xs"
+                                        style="background: rgba(255,200,0,.15); color:#f4d36b">대기</span>
+                                  {% endif %}
+                              </td>
+                              <td class="p-2">
+                                  {% if row.p.post_url %}
+                                  <a href="{{ row.p.post_url }}" target="_blank" rel="noopener"
+                                     class="text-blue-400 hover:underline text-xs">열기 ↗</a>
+                                  {% endif %}
+                              </td>
+                          </tr>
+                          {% endfor %}
+                        {% else %}
+                          <tr><td colspan="6" class="p-6 text-center text-gray-500">이 달에 등록된 예약이 없습니다. 우측 상단의 새로고침을 눌러보세요.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 예약 신청 글 도우미 -->
+        <div class="eva-card rounded-lg p-4">
+            <h2 class="text-lg font-bold mb-1" style="color:var(--eva-green)">
+                ✍️ 예약 신청 글 도우미
+            </h2>
+            <p class="text-xs text-gray-400 mb-4">
+                아래에서 날짜·세미나실을 고르면 게시판에 그대로 붙여넣을 <strong>제목/내용</strong>이 생성됩니다.
+                "총동연 글쓰기 페이지 열기" 버튼으로 이동해 로그인 후 붙여넣기만 하면 끝.
+            </p>
+
+            {% if available_dates %}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <div class="text-xs text-gray-400 mb-2">
+                        예약 가능한 날짜
+                        <span class="text-gray-500">
+                            (오늘 +7 ~ +28일 · 월/목 · 학기 종료 {{ semester_last }}까지 · 이미 점유된 날 제외)
+                        </span>
+                    </div>
+                    <div class="flex flex-wrap gap-2" id="date-options">
+                        {% for d in available_dates %}
+                        <label class="flex items-center gap-1 bg-gray-800 px-2 py-1 rounded cursor-pointer hover:bg-gray-700 text-sm">
+                            <input type="checkbox" class="date-cb" value="{{ d.isoformat() }}" checked>
+                            <span>{{ d.month }}/{{ d.day }} ({{ ['월','화','수','목','금','토','일'][d.weekday()] }})</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-400 mb-2">세미나실</div>
+                    <div class="flex gap-3 text-sm mb-3">
+                        <label class="flex items-center gap-1 cursor-pointer">
+                            <input type="radio" name="room" value="민주" checked> 민주
+                        </label>
+                        <label class="flex items-center gap-1 cursor-pointer">
+                            <input type="radio" name="room" value="통일"> 통일
+                        </label>
+                        <label class="flex items-center gap-1 cursor-pointer">
+                            <input type="radio" name="room" value="백호"> 백호
+                        </label>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <div class="text-[0.7rem] text-gray-400 mb-1">동아리명</div>
+                            <input id="clubName" type="text" value="{{ club_name }}"
+                                class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
+                        </div>
+                        <div>
+                            <div class="text-[0.7rem] text-gray-400 mb-1">대표자 번호</div>
+                            <input id="phone" type="text" value="{{ club_phone }}"
+                                class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
+                        </div>
+                        <div>
+                            <div class="text-[0.7rem] text-gray-400 mb-1">시간</div>
+                            <input id="timeSlot" type="text" value="{{ time_slot }}"
+                                class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
+                        </div>
+                        <div>
+                            <div class="text-[0.7rem] text-gray-400 mb-1">목적</div>
+                            <input id="purpose" type="text" value="{{ purpose }}"
+                                class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs text-gray-400">📋 제목</span>
+                        <button type="button" onclick="copyText('genTitle', this)"
+                            class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">복사</button>
+                    </div>
+                    <input id="genTitle" readonly
+                        class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-2 text-sm font-mono">
+                </div>
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs text-gray-400">📝 내용</span>
+                        <button type="button" onclick="copyText('genContent', this)"
+                            class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">복사</button>
+                    </div>
+                    <textarea id="genContent" rows="4"
+                        class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-2 text-sm font-mono"></textarea>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <a href="{{ write_url }}" target="_blank" rel="noopener"
+                        class="font-bold px-3 py-2 rounded text-sm hover:opacity-80"
+                        style="background:var(--eva-green); color:#000">
+                        ✏️ 총동연 글쓰기 페이지 열기 ↗
+                    </a>
+                    <span class="text-xs text-gray-500">로그인 후 제목/내용 붙여넣기</span>
+                </div>
+            </div>
+
+            {% else %}
+            <div class="text-sm text-gray-500 py-4 text-center">
+                예약 가능한 월/목 날짜가 없습니다. 우상단 새로고침을 눌러 최신 캐시를 받아오세요.
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- 안내 -->
+        <div class="eva-card rounded-lg p-4 text-xs text-gray-400 leading-relaxed">
+            <strong class="text-gray-200">💡 어떻게 동작하나요?</strong>
+            <ul class="list-disc list-inside mt-1 space-y-0.5">
+                <li>외부 게시판은 <code>requests + BeautifulSoup</code> 으로 <strong>로그인 없이</strong> 읽기만 합니다.</li>
+                <li>승인/반려된 글은 <em>종착 상태</em>로 보고 다시 가져오지 않습니다. 신규 글 + 대기(pending) 글만 재확인.</li>
+                <li>실제 글 작성은 위 도우미가 생성한 제목/내용을 복사 → 총동연 사이트에 붙여넣기.</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // ─── 예약 신청 글 도우미 ───
+        const WD = ['월','화','수','목','금','토','일'];
+
+        function fmtKorean(iso) {
+            const d = new Date(iso + 'T00:00:00');
+            return `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일(${WD[(d.getDay()+6)%7]})`;
+        }
+        function fmtShort(iso) {
+            const d = new Date(iso + 'T00:00:00');
+            return `${d.getMonth()+1}월 ${d.getDate()}일(${WD[(d.getDay()+6)%7]})`;
+        }
+        function getSelectedDates() {
+            return Array.from(document.querySelectorAll('.date-cb:checked'))
+                .map(cb => cb.value)
+                .sort();
+        }
+        function getRoom() {
+            const r = document.querySelector('input[name="room"]:checked');
+            return r ? r.value : '민주';
+        }
+        function updatePost() {
+            const titleEl = document.getElementById('genTitle');
+            const contentEl = document.getElementById('genContent');
+            if (!titleEl || !contentEl) return;
+
+            const dates = getSelectedDates();
+            const room = getRoom();
+            const club = (document.getElementById('clubName')?.value || '').trim();
+            const phone = (document.getElementById('phone')?.value || '').trim();
+            const time = (document.getElementById('timeSlot')?.value || '').trim();
+            const purpose = (document.getElementById('purpose')?.value || '').trim();
+
+            let title = '';
+            if (dates.length === 1) {
+                title = `[${club}] ${fmtKorean(dates[0])} 세미나실(${room}) 대여 신청`;
+            } else if (dates.length > 1) {
+                const year = new Date(dates[0]+'T00:00:00').getFullYear();
+                const parts = dates.map(fmtShort).join(', ');
+                title = `[${club}] ${year}년 ${parts} 세미나실(${room}) 대여 신청`;
+            }
+            titleEl.value = title;
+            contentEl.value = `일시: ${time}\n목적: ${purpose}\n대표자번호: ${phone}`;
+        }
+        function copyText(id, btn) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            navigator.clipboard.writeText(el.value).then(() => {
+                const orig = btn.textContent;
+                btn.textContent = '✓ 복사됨';
+                setTimeout(() => btn.textContent = orig, 1500);
+            }).catch(() => {
+                el.select();
+                alert('자동 복사 실패. 위 박스에서 Ctrl+C 로 복사하세요.');
+            });
+        }
+        document.querySelectorAll('.date-cb, input[name="room"]').forEach(el => {
+            el.addEventListener('change', updatePost);
+        });
+        ['clubName','phone','timeSlot','purpose'].forEach(id => {
+            document.getElementById(id)?.addEventListener('input', updatePost);
+        });
+        updatePost();
+
+        // ─── 캐시 새로고침 ───
+        document.getElementById('refreshBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('refreshBtn');
+            const orig = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '⏳ 크롤링 중... (10~20초)';
+            try {
+                const res = await fetch('/api/admin/seminar_rooms/refresh', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pages: 3 })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    alert(
+                        `갱신 완료!\n` +
+                        `· 신규 발견: ${data.new}건\n` +
+                        `· 재확인(대기): ${data.rechecked}건\n` +
+                        `· 종착 스킵: ${data.skipped_terminal}건\n` +
+                        `· 페이지 ${data.pages_scanned}개 스캔`
+                    );
+                    location.reload();
+                } else {
+                    alert('오류: ' + (data.message || '알 수 없음'));
+                }
+            } catch (err) {
+                alert('네트워크 오류: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = orig;
+            }
+        });
+    </script>
+</body>
+
+</html>
