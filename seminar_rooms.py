@@ -145,8 +145,93 @@ def parse_status_from_detail(html: str) -> str:
 def make_session():
     """User-Agent 만 세팅한 requests.Session 반환 (로그인하지 않음)."""
     s = requests.Session()
-    s.headers.update({'User-Agent': USER_AGENT})
+    s.headers.update({
+        'User-Agent': USER_AGENT,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'ko-KR,ko;q=0.9,en;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+    })
     return s
+
+
+# ─────────────────────────────────────────────
+# F5 BIG-IP ASM JavaScript 챌린지 솔버
+# ─────────────────────────────────────────────
+#
+# 클라우드 IP(Render 등)에서 dongari.knu.ac.kr 에 접근하면 첫 요청은 800B 짜리
+# JS 챌린지 페이지로 응답된다. 진짜 브라우저는 다음을 수행한다:
+#   1) AES-CBC 로 16바이트 평문을 복호화 → hex 인코딩
+#   2) document.cookie = "<NAME>=<HEX>" 세팅
+#   3) document.location.href 또는 reload() 로 같은 URL 재요청
+# 우리는 JS 엔진 없이 위 단계를 Python 으로 재현한다.
+
+_CHALLENGE_MARKERS = ('cupid.js', 'slowAES', 'toNumbers(', 'toHex(')
+_CHALLENGE_HEX_RE = re.compile(r'toNumbers\(\s*"([0-9a-fA-F]+)"\s*\)')
+_CHALLENGE_COOKIE_NAME_RE = re.compile(
+    r'document\.cookie\s*=\s*"\s*([A-Za-z0-9_]+)\s*=', re.IGNORECASE
+)
+
+
+def looks_like_f5_challenge(html: str) -> bool:
+    """응답이 F5/BIG-IP JS 챌린지인지 빠르게 판정."""
+    if len(html) > 8000:
+        return False
+    hits = sum(1 for m in _CHALLENGE_MARKERS if m in html)
+    return hits >= 2
+
+
+def solve_f5_challenge(html: str):
+    """챌린지 HTML 에서 (cookie_name, cookie_value) 추출.
+
+    Returns:
+        (name, value) 튜플 또는 None(실패).
+    """
+    try:
+        from Crypto.Cipher import AES
+    except ImportError:
+        return None
+
+    hex_strings = _CHALLENGE_HEX_RE.findall(html)
+    if len(hex_strings) < 3:
+        return None
+    try:
+        key = bytes.fromhex(hex_strings[0])
+        iv = bytes.fromhex(hex_strings[1])
+        ct = bytes.fromhex(hex_strings[2])
+    except ValueError:
+        return None
+    if len(key) not in (16, 24, 32) or len(iv) != 16 or len(ct) == 0 or len(ct) % 16 != 0:
+        return None
+    try:
+        pt = AES.new(key, AES.MODE_CBC, iv).decrypt(ct)
+    except Exception:
+        return None
+
+    m = _CHALLENGE_COOKIE_NAME_RE.search(html)
+    name = m.group(1) if m else None
+    if not name:
+        return None
+    return name, pt.hex()
+
+
+def fetch_with_challenge(session: requests.Session, url: str,
+                        timeout: int = 20, max_retries: int = 2):
+    """챌린지를 감지하면 쿠키 풀이 후 재요청. requests.Response 반환."""
+    last = None
+    for attempt in range(max_retries + 1):
+        resp = session.get(url, timeout=timeout)
+        resp.raise_for_status()
+        last = resp
+        if not looks_like_f5_challenge(resp.text):
+            return resp
+        solved = solve_f5_challenge(resp.text)
+        if not solved:
+            return resp
+        name, value = solved
+        host = requests.utils.urlparse(url).hostname or 'dongari.knu.ac.kr'
+        session.cookies.set(name, value, domain=host, path='/')
+    return last
 
 
 # ─────────────────────────────────────────────
@@ -340,8 +425,7 @@ def crawl(supabase, *, max_pages: int = 3, recheck_pending: bool = True,
     for page_num in range(1, max_pages + 1):
         url = f"{BOARD_URL}&page={page_num}"
         try:
-            resp = session.get(url, timeout=20)
-            resp.raise_for_status()
+            resp = fetch_with_challenge(session, url, timeout=20)
         except requests.RequestException as e:
             log.warning(f"page {page_num} 요청 실패: {e}")
             diagnostics.append({'page': page_num, 'error': f'{type(e).__name__}: {e}'})
@@ -387,8 +471,7 @@ def crawl(supabase, *, max_pages: int = 3, recheck_pending: bool = True,
             club = extract_club_name(title) or '알 수 없음'
 
             try:
-                detail = session.get(post_url, timeout=20)
-                detail.raise_for_status()
+                detail = fetch_with_challenge(session, post_url, timeout=20)
                 status = parse_status_from_detail(detail.text)
             except requests.RequestException as e:
                 log.debug(f"상세 fetch 실패 wr_id={wr_id}: {e}")
