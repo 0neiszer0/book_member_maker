@@ -4446,6 +4446,142 @@ def admin_attendance_matrix_export():
                      as_attachment=True, download_name=fname)
 
 
+# ==============================================================================
+# --- 세미나실 예약 현황 (외부 게시판 캐시 기반) ---
+# ==============================================================================
+@app.route('/admin/seminar_rooms')
+@login_required(role="admin")
+def admin_seminar_rooms():
+    """경북대 총동연 세미나실 예약 현황을 달력으로 보여준다.
+
+    데이터는 seminar_room_posts 테이블에서 가져오며,
+    실제 외부 게시판 크롤은 /api/admin/seminar_rooms/refresh 로 분리되어 있다.
+    """
+    today = datetime.now(timezone(timedelta(hours=9))).date()
+    month_str = request.args.get('month', '')
+
+    try:
+        if month_str:
+            year, month = map(int, month_str.split('-'))
+            _ = date(year, month, 1)
+        else:
+            year, month = today.year, today.month
+    except Exception:
+        year, month = today.year, today.month
+
+    first_day = date(year, month, 1)
+    next_first = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+    last_day = next_first - timedelta(days=1)
+
+    try:
+        posts_res = supabase.table('seminar_room_posts').select('*').execute()
+        posts = posts_res.data or []
+    except Exception as e:
+        app.logger.error(f"seminar_room_posts 조회 실패: {e}")
+        posts = []
+        flash(f"세미나실 캐시 조회 오류: {e}", "danger")
+
+    # 날짜 → 예약 목록 매핑 (월 한정 + 전체)
+    by_date = defaultdict(list)        # 달력에 표시할 월 내 데이터
+    all_by_date = defaultdict(list)    # 예약 가능 날짜 계산용 (전체)
+    for p in posts:
+        for d_str in (p.get('dates') or []):
+            try:
+                d = date.fromisoformat(d_str[:10])
+            except Exception:
+                continue
+            all_by_date[d.isoformat()].append(p)
+            if first_day <= d <= last_day:
+                by_date[d.isoformat()].append(p)
+
+    # 달력 그리드 (월요일 시작)
+    grid_start = first_day - timedelta(days=first_day.weekday())
+    grid_end = last_day + timedelta(days=(6 - last_day.weekday()))
+
+    weeks = []
+    cur = grid_start
+    while cur <= grid_end:
+        week = []
+        for i in range(7):
+            d = cur + timedelta(days=i)
+            week.append({
+                'date': d,
+                'iso': d.isoformat(),
+                'in_month': d.month == month,
+                'is_today': d == today,
+                'is_target': d.weekday() in (0, 3),  # 월/목 강조
+                'posts': by_date.get(d.isoformat(), []),
+            })
+        weeks.append(week)
+        cur += timedelta(days=7)
+
+    prev_month = (first_day - timedelta(days=1)).strftime('%Y-%m')
+    next_month = next_first.strftime('%Y-%m')
+
+    last_check = None
+    if posts:
+        checked_values = [p.get('last_checked_at') for p in posts if p.get('last_checked_at')]
+        if checked_values:
+            last_check = max(checked_values)
+
+    # 상태별 카운트(현재 월 한정)
+    month_posts = []
+    seen_ids = set()
+    for d_iso, lst in by_date.items():
+        for p in lst:
+            if p['wr_id'] not in seen_ids:
+                seen_ids.add(p['wr_id'])
+                month_posts.append(p)
+    counts = {'approved': 0, 'pending': 0, 'rejected': 0}
+    for p in month_posts:
+        counts[p.get('status', 'pending')] = counts.get(p.get('status', 'pending'), 0) + 1
+
+    # 예약 가능 날짜 (오늘 +7 ~ +28, 학기 마지막일 이하, 월/목, 미점유)
+    from seminar_rooms import (
+        compute_available_dates,
+        CLUB_NAME, CLUB_PHONE, SEMINAR_TIME_SLOT, SEMINAR_PURPOSE,
+        SEMESTER_LAST_DATE, WRITE_URL,
+    )
+    available_dates = compute_available_dates(all_by_date, today=today)
+
+    return render_template(
+        'admin_seminar_rooms.html',
+        weeks=weeks,
+        year=year,
+        month=month,
+        prev_month=prev_month,
+        next_month=next_month,
+        today=today,
+        last_check=last_check,
+        total_cached=len(posts),
+        month_counts=counts,
+        available_dates=available_dates,
+        club_name=CLUB_NAME,
+        club_phone=CLUB_PHONE,
+        time_slot=SEMINAR_TIME_SLOT,
+        purpose=SEMINAR_PURPOSE,
+        semester_last=SEMESTER_LAST_DATE,
+        write_url=WRITE_URL,
+    )
+
+
+@app.route('/api/admin/seminar_rooms/refresh', methods=['POST'])
+@login_required(role="admin")
+def admin_seminar_rooms_refresh():
+    """외부 게시판을 크롤링하여 캐시를 갱신한다."""
+    from seminar_rooms import crawl
+    payload = request.get_json(silent=True) or {}
+    pages = int(payload.get('pages') or 3)
+    pages = max(1, min(pages, 10))
+    try:
+        result = crawl(supabase, max_pages=pages, recheck_pending=True,
+                       logger=app.logger)
+        return jsonify({'status': 'success', **result})
+    except Exception as e:
+        app.logger.error(f"세미나실 크롤 실패: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 # --- 학기 필터 헬퍼 ---
 def _get_terms_for_filter():
     """기록 페이지의 학기 필터 드롭다운에 사용할 학기 목록 (최신순)."""
