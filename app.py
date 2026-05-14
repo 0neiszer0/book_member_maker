@@ -1665,6 +1665,15 @@ def start_group_generation():
     facilitator_names = request.args.getlist('facilitators')
     group_count_str = request.args.get('group_count')
     group_names_str = request.args.get('group_names', '')
+
+    # 방어 필터: 참석 명단에 없는 발제자는 조 편성에서 제외한다.
+    # (프런트 검증을 우회하거나 잘못된 파라미터가 들어와도 안전하도록.)
+    present_set = set(present_names)
+    dropped_facs = [n for n in facilitator_names if n not in present_set]
+    if dropped_facs:
+        app.logger.info(f"[1.5] 참석 명단에 없어 제외된 발제자: {dropped_facs}")
+        facilitator_names = [n for n in facilitator_names if n in present_set]
+
     app.logger.info(f"[1] 전달받은 참석자 명단 (총 {len(present_names)}명): {present_names}")
     app.logger.info(f"[2] 전달받은 발제자 명단: {facilitator_names}")
     app.logger.info(f"[3] 전달받은 그룹 수: '{group_count_str}'")
