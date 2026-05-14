@@ -82,6 +82,14 @@ def parse_dates_from_title(title: str, fallback_year: int) -> list:
 
 
 def is_seminar_post(title: str) -> bool:
+    """진짜 세미나실 예약 글인지 판정.
+
+    실제 예약 글은 항상 '[클럽명] ... 세미나실(민주/통일/백호) ...' 패턴이며
+    공지(예: '공용&활동공간 사용법 안내 ... 백호관 세미나실 ...') 는 '[' 로
+    시작하지 않는다. 그래서 '[' 선두 + 세미나실 + 방이름 3가지를 모두 요구.
+    """
+    if not title.startswith('['):
+        return False
     return '세미나실' in title and any(r in title for r in SEMINAR_ROOMS)
 
 
@@ -546,13 +554,21 @@ def crawl(supabase, *, max_pages: int = 3, recheck_pending: bool = True,
             log.info(f"  {'NEW' if is_new else 'CHK'} wr_id={wr_id} [{club}] "
                      f"{room or '?'} {[d.isoformat() for d in dates]} → {status}")
 
-    if upserts:
-        try:
+    # 신규 row(discovered_at 포함) 와 재확인 row(discovered_at 미포함) 를
+    # 별도 배치로 나눠 upsert. 한 배치 내 키가 동일해야 PostgREST 가
+    # 누락 컬럼을 NULL 로 패딩하지 않는다. (NOT NULL 위반 방지)
+    new_rows = [r for r in upserts if 'discovered_at' in r]
+    recheck_rows = [r for r in upserts if 'discovered_at' not in r]
+    try:
+        if new_rows:
             supabase.table('seminar_room_posts') \
-                .upsert(upserts, on_conflict='wr_id').execute()
-        except Exception as e:
-            log.error(f"upsert 실패: {e}")
-            raise
+                .upsert(new_rows, on_conflict='wr_id').execute()
+        if recheck_rows:
+            supabase.table('seminar_room_posts') \
+                .upsert(recheck_rows, on_conflict='wr_id').execute()
+    except Exception as e:
+        log.error(f"upsert 실패: {e}")
+        raise
 
     return {
         'new': new_count,
