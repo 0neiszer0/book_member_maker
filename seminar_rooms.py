@@ -54,23 +54,18 @@ def parse_dates_from_title(title: str, fallback_year: int) -> list:
     """게시글 제목에서 날짜를 모두 추출한다.
 
     지원 형식:
-      - "2026년 5월 14일"   (연도 포함)
-      - "5월 14일"            (연도 생략 → fallback_year)
-      - "5.14" / "5/14"      (점/슬래시 구분)
+      - "2026년 5월 14일"          (연도 포함)
+      - "5월 14일"                  (연도 생략 → 제목 내 첫 연도 또는 fallback_year)
+      - "2026년 5월 25일, 5월 28일" (혼합 — 모두 같은 base_year 로 해석)
+      - "5.14" / "5/14"            (점/슬래시 구분)
     """
     dates: list = []
-
-    for m in re.finditer(r'(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일', title):
-        try:
-            dates.append(date(int(m.group(1)), int(m.group(2)), int(m.group(3))))
-        except ValueError:
-            pass
-    if dates:
-        return sorted(set(dates))
+    year_match = re.search(r'(\d{4})\s*년', title)
+    base_year = int(year_match.group(1)) if year_match else fallback_year
 
     for m in re.finditer(r'(\d{1,2})월\s*(\d{1,2})일', title):
         try:
-            dates.append(date(fallback_year, int(m.group(1)), int(m.group(2))))
+            dates.append(date(base_year, int(m.group(1)), int(m.group(2))))
         except ValueError:
             pass
     if dates:
@@ -137,6 +132,37 @@ def parse_status_from_detail(html: str) -> str:
     if any(kw in text for kw in ['반려', '불가', '거절', '취소']):
         return 'rejected'
     return 'pending'
+
+
+def parse_subject_from_detail(html: str):
+    """상세 페이지의 <h1> 에서 풀 제목 추출.
+
+    gnuboard5 의 상세 페이지에서 잘리지 않은 풀 제목은 <h1> 안에 있고
+    끝에 ' > 게시판명' 이 붙는다(예: '... 대여 신청 > 공용공간 대여').
+    그 부분을 떼서 반환. 추출 실패 시 None.
+    """
+    soup = BeautifulSoup(html, 'html.parser')
+    h1 = soup.find('h1')
+    if not h1:
+        return None
+    text = h1.get_text(' ', strip=True)
+    if not text:
+        return None
+    idx = text.rfind(' > ')
+    if idx > 0:
+        text = text[:idx].rstrip()
+    return text or None
+
+
+def is_truncated_listing_title(title: str) -> bool:
+    """게시판 listing 의 제목이 잘려있는지 판정.
+
+    gnuboard 게시판은 긴 제목을 '…' 또는 '...' 으로 잘라 노출한다.
+    [동아리명] 으로 시작하는 잘린 글은 세미나실 신청글 후보로 본다.
+    """
+    if not title.startswith('['):
+        return False
+    return title.endswith('…') or title.endswith('...')
 
 
 # ─────────────────────────────────────────────
@@ -452,34 +478,57 @@ def crawl(supabase, *, max_pages: int = 3, recheck_pending: bool = True,
             break
 
         for wr_id, title, post_url in listing:
-            if not is_seminar_post(title):
+            listing_match = is_seminar_post(title)
+            truncated = (not listing_match) and is_truncated_listing_title(title)
+            if not listing_match and not truncated:
                 continue
-            seminar_matched += 1
 
             prev_status = known.get(wr_id)
             is_new = prev_status is None
             is_terminal = prev_status in ('approved', 'rejected')
 
+            # 종착 상태 글은 잘렸어도 다시 fetch 하지 않는다 (캐시된 결과 그대로).
             if is_terminal:
+                if listing_match:
+                    seminar_matched += 1
                 skipped_terminal += 1
                 continue
             if not is_new and not recheck_pending:
+                if listing_match:
+                    seminar_matched += 1
                 continue
 
-            dates = parse_dates_from_title(title, fallback_year)
-            room = get_room_from_title(title)
-            club = extract_club_name(title) or '알 수 없음'
-
+            # 상세 페이지 fetch — status 판정용. 잘린 글이면 풀 제목 복원도 함께.
+            detail_text = None
             try:
                 detail = fetch_with_challenge(session, post_url, timeout=20)
-                status = parse_status_from_detail(detail.text)
+                detail_text = detail.text
             except requests.RequestException as e:
                 log.debug(f"상세 fetch 실패 wr_id={wr_id}: {e}")
+
+            effective_title = title
+            if detail_text:
+                subj = parse_subject_from_detail(detail_text)
+                if subj:
+                    effective_title = subj
+
+            if not is_seminar_post(effective_title):
+                # 잘림 후보였지만 실제로는 세미나실 글이 아니었음.
+                continue
+            seminar_matched += 1
+
+            if detail_text:
+                status = parse_status_from_detail(detail_text)
+            else:
                 status = prev_status or 'pending'
+
+            dates = parse_dates_from_title(effective_title, fallback_year)
+            room = get_room_from_title(effective_title)
+            club = extract_club_name(effective_title) or '알 수 없음'
 
             row = {
                 'wr_id': wr_id,
-                'title': title[:500],
+                'title': effective_title[:500],
                 'club_name': club,
                 'room': room,
                 'dates': [d.isoformat() for d in dates],
