@@ -436,19 +436,42 @@
                         }
                     }
 
-                    if (pairs.length < 1) {
-                        detailsDiv.innerHTML = '<span>비교할 기록이 없습니다.</span>';
+                    // 만난 적 있는 페어만 추출 → (count 내림차순, last_met 최근순) 정렬
+                    const metPairs = [];
+                    pairs.forEach(pair => {
+                        const key = [...pair].sort().join('-');
+                        const entry = meetingHistory[key];
+                        if (entry && entry.count > 0) {
+                            metPairs.push({ pair, entry });
+                        }
+                    });
+                    metPairs.sort((a, b) => {
+                        if (b.entry.count !== a.entry.count) return b.entry.count - a.entry.count;
+                        return (b.entry.last_met || '').localeCompare(a.entry.last_met || '');
+                    });
+
+                    const totalPairs = pairs.length;
+                    const metCount = metPairs.length;
+                    const newCount = totalPairs - metCount;
+
+                    if (totalPairs < 1) {
+                        detailsDiv.innerHTML = '<span class="text-gray-400">비교할 기록이 없습니다.</span>';
+                    } else if (metCount === 0) {
+                        detailsDiv.innerHTML =
+                            `<div class="text-eva-green font-semibold">✨ 모두 새로운 만남! (${totalPairs}쌍 전부 처음)</div>`;
                     } else {
-                        let html = '<ul class="list-none space-y-1">';
-                        pairs.forEach(pair => {
-                            const key = [...pair].sort().join('-');
-                            const entry = meetingHistory[key];
-                            if (entry && entry.count > 0) {
-                                const dateStr = entry.last_met ? `<span class="text-gray-400">(${entry.last_met.slice(0, 10)})</span>` : '';
-                                html += `<li class="text-red-400 font-bold">🚨 ${pair[0]} &amp; ${pair[1]}: <span class="text-red-500">${entry.count}회</span> 만남 ${dateStr}</li>`;
-                            } else {
-                                html += `<li class="text-gray-400">${pair[0]} &amp; ${pair[1]}: <span class="font-bold text-eva-green">실제 0회</span></li>`;
-                            }
+                        let html = `<div class="mb-2 text-xs">` +
+                            `전체 ${totalPairs}쌍 중 ` +
+                            `<span class="text-red-400 font-bold">${metCount}쌍 재회</span> · ` +
+                            `<span class="text-eva-green font-bold">${newCount}쌍 첫 만남</span>` +
+                            `</div>`;
+                        html += '<ul class="list-none space-y-1">';
+                        metPairs.forEach(({ pair, entry }) => {
+                            const dateStr = entry.last_met
+                                ? `<span class="text-gray-400">(${entry.last_met.slice(0, 10)})</span>`
+                                : '';
+                            html += `<li class="text-red-400 font-bold">🚨 ${pair[0]} &amp; ${pair[1]}: ` +
+                                `<span class="text-red-500">${entry.count}회</span> 만남 ${dateStr}</li>`;
                         });
                         html += '</ul>';
                         detailsDiv.innerHTML = html;
