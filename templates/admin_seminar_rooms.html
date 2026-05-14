@@ -598,12 +598,12 @@
             const btn = document.getElementById('refreshBtn');
             const orig = btn.textContent;
             btn.disabled = true;
-            btn.textContent = '⏳ 크롤링 중... (10~20초)';
+            btn.textContent = '⏳ 크롤링 중... (30~60초)';
             try {
                 const res = await fetch('/api/admin/seminar_rooms/refresh', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ pages: 3 })
+                    body: JSON.stringify({ pages: 10 })
                 });
                 const data = await res.json();
                 if (data.status === 'success') {
