@@ -259,7 +259,9 @@
                     groups.forEach((group, index) => {
                         const groupName = (group_names && group_names[index]) ? group_names[index] : `그룹 ${index + 1}`;
                         const memberNames = [...group].sort().map(name =>
-                            facilitators.includes(name) ? `<strong style="font-weight: bold; color: #ADFF2F;">[발제자] ${name}</strong>` : name
+                            facilitators.includes(name)
+                                ? `<span style="color: #F5D58A; font-weight: 600;">${name}</span>`
+                                : name
                         ).join(', ');
                         innerHTML += `<div style="background-color: #1A1A1A; padding: 12px; border-radius: 8px; margin-bottom: 10px;"><strong style="color: #E5E5E5;">${groupName}:</strong> ${memberNames}</div>`;
                     });

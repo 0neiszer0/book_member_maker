@@ -389,12 +389,7 @@
             }
             document.querySelectorAll('input[name="present"], input[name="facilitators"]').forEach(cb => {
                 cb.addEventListener('change', () => {
-                    // 발제자로 체크되면 자동으로 참석에도 체크
-                    if (cb.name === 'facilitators' && cb.checked) {
-                        const presentCb = document.querySelector(`input[name="present"][value="${CSS.escape(cb.value)}"]`);
-                        if (presentCb && !presentCb.checked) presentCb.checked = true;
-                    }
-                    // 참석에서 빠지면 발제자에서도 제거
+                    // 참석에서 빠지면 발제자에서도 제거 (참석 안 한 발제자는 조 편성 대상이 아니므로)
                     if (cb.name === 'present' && !cb.checked) {
                         const facCb = document.querySelector(`input[name="facilitators"][value="${CSS.escape(cb.value)}"]`);
                         if (facCb && facCb.checked) facCb.checked = false;
@@ -430,7 +425,7 @@
             // --- 전체 선택/해제 버튼 ---
             document.getElementById('select-all-present').onclick = () => { document.querySelectorAll('input[name="present"]').forEach(cb => cb.checked = true); updateCounts(); };
             document.getElementById('deselect-all-present').onclick = () => { document.querySelectorAll('input[name="present"]').forEach(cb => cb.checked = false); document.querySelectorAll('input[name="facilitators"]').forEach(cb => cb.checked = false); updateCounts(); };
-            document.getElementById('select-all-facilitators').onclick = () => { document.querySelectorAll('input[name="facilitators"]').forEach(cb => cb.checked = true); document.querySelectorAll('input[name="facilitators"]:checked').forEach(cb => { const p = document.querySelector(`input[name="present"][value="${CSS.escape(cb.value)}"]`); if (p) p.checked = true; }); updateCounts(); };
+            document.getElementById('select-all-facilitators').onclick = () => { document.querySelectorAll('input[name="facilitators"]').forEach(cb => cb.checked = true); updateCounts(); };
             document.getElementById('deselect-all-facilitators').onclick = () => { document.querySelectorAll('input[name="facilitators"]').forEach(cb => cb.checked = false); updateCounts(); };
 
             // --- 벌크 붙여넣기 적용 ---
@@ -608,14 +603,32 @@
 
             generateBtn.addEventListener('click', () => {
                 const formData = new FormData(form);
-                const presentCount = formData.getAll('present').length;
+                const presentList = formData.getAll('present');
+                const presentSet = new Set(presentList);
+                const facilitatorList = formData.getAll('facilitators');
 
-                if (presentCount === 0) {
+                if (presentList.length === 0) {
                     alert('최소 1명 이상의 참석자를 선택해야 합니다.');
                     return;
                 }
 
-                const params = new URLSearchParams(formData).toString();
+                // 참석 명단에 없는 발제자는 조 편성에서 제외 (사용자 확인)
+                const orphanFacs = facilitatorList.filter(n => !presentSet.has(n));
+                if (orphanFacs.length > 0) {
+                    const ok = confirm(
+                        `다음 발제자는 참석 명단에 없어 조 편성에서 제외됩니다:\n` +
+                        `· ${orphanFacs.join(', ')}\n\n` +
+                        `계속 진행할까요? (제외하고 진행)`
+                    );
+                    if (!ok) return;
+                    // 폼에서도 제외 — URLSearchParams 에 반영되도록 체크 해제
+                    orphanFacs.forEach(n => {
+                        const cb = document.querySelector(`input[name="facilitators"][value="${CSS.escape(n)}"]`);
+                        if (cb) cb.checked = false;
+                    });
+                }
+
+                const params = new URLSearchParams(new FormData(form)).toString();
 
                 // 타이머 초기화
                 const startTime = Date.now();
