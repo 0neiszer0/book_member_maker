@@ -62,6 +62,19 @@
         .my-vote-none { background: #374151; color: #9ca3af; }
         .badge-closed { background: #4A4A4A; color: #ccc; }
         .badge-admin { background: var(--eva-purple); color: #fff; }
+
+        /* 제출 버튼을 화면 하단에 고정해 스크롤 중에도 항상 보이도록 */
+        .submit-bar {
+            position: sticky;
+            bottom: 0;
+            z-index: 20;
+            margin: 0 -1rem -1rem;
+            padding: 0.75rem 1rem 1rem;
+            background: linear-gradient(to top, var(--bg-dark) 70%, rgba(26, 26, 26, 0));
+        }
+        .submit-bar button {
+            box-shadow: 0 0 18px rgba(0, 255, 127, 0.45);
+        }
     </style>
 </head>
 
@@ -189,10 +202,13 @@
                 </div>
 
                 {% if open_sessions %}
-                <button type="submit"
-                    class="w-full bg-eva-green text-black font-bold py-3 rounded-lg text-lg hover:opacity-80">
-                    투표 제출
-                </button>
+                <div class="submit-bar">
+                    <button type="submit"
+                        class="w-full bg-eva-green text-black font-extrabold py-4 rounded-lg text-lg hover:opacity-90 shadow-lg flex items-center justify-center gap-2">
+                        <span>✅ 투표 제출하기</span>
+                    </button>
+                    <p class="text-center text-[11px] text-gray-400 mt-1.5">선택을 마친 뒤 이 버튼을 눌러야 저장됩니다</p>
+                </div>
                 {% endif %}
             </form>
         </div>

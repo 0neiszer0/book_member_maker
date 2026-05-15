@@ -4315,7 +4315,7 @@ def _build_attendance_matrix(start_date=None, end_date=None):
         .order('name').execute().data or []
 
     # 2) 세미나 history 조회 (날짜 범위 필터)
-    q = supabase.table('history').select('id, date, present, book_title, book_genre')
+    q = supabase.table('history').select('id, date, present, book_title')
     if start_date:
         q = q.gte('date', start_date)
     if end_date:
