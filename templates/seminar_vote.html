@@ -358,12 +358,40 @@
             verifyMsg.classList.add('hidden');
         });
 
+        function escapeHtml(s) {
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function renderAttendeeSection(section, names, isMyYes) {
+            const safe = (names || []).map(escapeHtml);
+            const label = isMyYes
+                ? `<span class="ml-1 text-eva-green">· 내가 참석으로 투표한 회차</span>`
+                : '';
+            section.innerHTML = `
+                <div class="text-xs text-gray-400 mb-1.5 attendee-title">🙋 신청자 명단 (${safe.length}명)${label}</div>
+                <div class="flex flex-wrap gap-1.5 attendee-list">
+                    ${safe.map(n => `<span class="text-xs bg-gray-800 border border-gray-700 rounded px-2 py-0.5">${n}</span>`).join('')}
+                </div>
+            `;
+        }
+
+        function renderAttendeeHidden(section) {
+            section.innerHTML = `<p class="text-xs text-gray-500 attendee-hidden-msg">아직 신청 인원이 적어 명단을 표시하지 않습니다. (4명 이상부터 공개)<br><span class="text-gray-600">※ 본인이 참석으로 투표한 회차는 본인 확인 후 명단을 볼 수 있습니다.</span></p>`;
+        }
+
         async function refreshCounts() {
             try {
-                const res = await fetch('/api/seminar_vote/counts?token=' + encodeURIComponent(TOKEN));
+                let url = '/api/seminar_vote/counts?token=' + encodeURIComponent(TOKEN);
+                if (verified) {
+                    url += '&student_id=' + encodeURIComponent(verified.student_id)
+                         + '&name=' + encodeURIComponent(verified.name);
+                }
+                const res = await fetch(url);
                 const data = await res.json();
                 if (data.status !== 'success') return;
                 const max = data.max_capacity || 32;
+                const pub = data.public_attendees || {};
+                const myYes = data.voted_yes_attendees || {};
                 document.querySelectorAll('.session-card').forEach(card => {
                     const id = card.dataset.sessionId;
                     const c = data.counts[id] || 0;
@@ -371,6 +399,18 @@
                     if (el) el.textContent = c;
                     if (c >= max) card.classList.add('full');
                     else card.classList.remove('full');
+
+                    // 명단 영역 갱신
+                    const section = card.querySelector('.attendee-section');
+                    if (section) {
+                        if (myYes[id]) {
+                            renderAttendeeSection(section, myYes[id], true);
+                        } else if (pub[id]) {
+                            renderAttendeeSection(section, pub[id], false);
+                        } else {
+                            renderAttendeeHidden(section);
+                        }
+                    }
                 });
             } catch (e) {}
         }
