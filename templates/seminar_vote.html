@@ -180,7 +180,7 @@
                             {% endif %}
                             {% if is_admin or s.status == 'open' %}
                             <div class="mt-3 pt-3 border-t border-gray-700">
-                                {% if s.attending_count >= 10 %}
+                                {% if s.attending_count >= 4 %}
                                 <div class="text-xs text-gray-400 mb-1.5">🙋 신청자 명단 ({{ s.attending_count }}명)</div>
                                 <div class="flex flex-wrap gap-1.5">
                                     {% for nm in s.attendee_names %}
@@ -188,7 +188,7 @@
                                     {% endfor %}
                                 </div>
                                 {% else %}
-                                <p class="text-xs text-gray-500">아직 신청 인원이 적어 명단을 표시하지 않습니다. (10명 이상부터 공개)</p>
+                                <p class="text-xs text-gray-500">아직 신청 인원이 적어 명단을 표시하지 않습니다. (4명 이상부터 공개)</p>
                                 {% endif %}
                             </div>
                             {% endif %}
