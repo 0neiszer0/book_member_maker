@@ -6,6 +6,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ term.name }} 세미나 참석 투표</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Tailwind CDN: 커스텀 색상을 클래스로 사용할 수 있도록 등록
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'eva-green': '#00FF7F',
+                        'eva-purple': '#6A0DAD',
+                    }
+                }
+            }
+        };
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -179,16 +192,16 @@
                             </div>
                             {% endif %}
                             {% if is_admin or s.status == 'open' %}
-                            <div class="mt-3 pt-3 border-t border-gray-700">
+                            <div class="mt-3 pt-3 border-t border-gray-700 attendee-section" data-session-id="{{ s.id }}">
                                 {% if s.attending_count >= 4 %}
-                                <div class="text-xs text-gray-400 mb-1.5">🙋 신청자 명단 ({{ s.attending_count }}명)</div>
-                                <div class="flex flex-wrap gap-1.5">
+                                <div class="text-xs text-gray-400 mb-1.5 attendee-title">🙋 신청자 명단 ({{ s.attending_count }}명)</div>
+                                <div class="flex flex-wrap gap-1.5 attendee-list">
                                     {% for nm in s.attendee_names %}
                                     <span class="text-xs bg-gray-800 border border-gray-700 rounded px-2 py-0.5">{{ nm }}</span>
                                     {% endfor %}
                                 </div>
                                 {% else %}
-                                <p class="text-xs text-gray-500">아직 신청 인원이 적어 명단을 표시하지 않습니다. (4명 이상부터 공개)</p>
+                                <p class="text-xs text-gray-500 attendee-hidden-msg">아직 신청 인원이 적어 명단을 표시하지 않습니다. (4명 이상부터 공개)<br><span class="text-gray-600">※ 본인이 참석으로 투표한 회차는 본인 확인 후 명단을 볼 수 있습니다.</span></p>
                                 {% endif %}
                             </div>
                             {% endif %}
@@ -321,6 +334,19 @@
                         badge.classList.add('my-vote-none');
                         badge.textContent = '내 투표: 미투표';
                     }
+                });
+                // 본인이 참석으로 투표한 회차: 명단 공개(4명 미만이어도 공개)
+                const yesAttendees = data.voted_yes_attendees || {};
+                Object.entries(yesAttendees).forEach(([sessId, names]) => {
+                    const section = document.querySelector(`.attendee-section[data-session-id="${sessId}"]`);
+                    if (!section) return;
+                    const safe = (names || []).map(n => String(n).replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+                    section.innerHTML = `
+                        <div class="text-xs text-gray-400 mb-1.5 attendee-title">🙋 신청자 명단 (${safe.length}명)<span class="ml-1 text-eva-green">· 내가 참석으로 투표한 회차</span></div>
+                        <div class="flex flex-wrap gap-1.5 attendee-list">
+                            ${safe.map(n => `<span class="text-xs bg-gray-800 border border-gray-700 rounded px-2 py-0.5">${n}</span>`).join('')}
+                        </div>
+                    `;
                 });
             } catch (err) { showError('네트워크 오류: ' + err.message); }
         });
