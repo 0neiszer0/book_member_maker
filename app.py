@@ -3904,9 +3904,16 @@ def seminar_vote_verify():
 
 @app.route('/api/seminar_vote/counts')
 def seminar_vote_counts():
-    """현재 회차별 참석 인원 수 (실시간 새로고침용)."""
+    """현재 회차별 참석 인원 수 + 명단 (실시간 새로고침용).
+
+    공개 규칙:
+      - count >= 4 인 회차: 명단 공개
+      - 본인 확인(student_id+name) 시 본인이 yes 투표한 회차도 명단 공개
+    """
     try:
         token = (request.args.get('token') or '').strip()
+        student_id = (request.args.get('student_id') or '').strip()
+        name = (request.args.get('name') or '').strip()
         if not token:
             return jsonify({'status': 'error', 'message': 'token 필요'}), 400
         term = supabase.table('seminar_terms').select('id, max_capacity') \
@@ -3917,12 +3924,46 @@ def seminar_vote_counts():
             .eq('term_id', term['id']).eq('is_active', True).execute().data or []
         sess_ids = [s['id'] for s in sess]
         counts = {sid: 0 for sid in sess_ids}
+        attendees_by_session = {sid: [] for sid in sess_ids}
         if sess_ids:
-            votes = supabase.table('seminar_votes').select('session_id') \
+            votes = supabase.table('seminar_votes') \
+                .select('session_id, members(name)') \
                 .in_('session_id', sess_ids).eq('attending', True).execute().data or []
             for v in votes:
-                counts[v['session_id']] = counts.get(v['session_id'], 0) + 1
-        return jsonify({'status': 'success', 'counts': counts, 'max_capacity': term.get('max_capacity', 32)})
+                sid = v.get('session_id')
+                if not sid:
+                    continue
+                counts[sid] = counts.get(sid, 0) + 1
+                nm = (v.get('members') or {}).get('name')
+                if nm:
+                    attendees_by_session.setdefault(sid, []).append(nm)
+            for sid in attendees_by_session:
+                attendees_by_session[sid] = sorted(attendees_by_session[sid])
+
+        # 공개 가능 명단: count >= 4 인 회차만
+        public_attendees = {sid: nms for sid, nms in attendees_by_session.items() if counts.get(sid, 0) >= 4}
+
+        # 본인 확인된 경우: 본인이 yes 투표한 회차 명단도 함께 제공 (count 무관)
+        voted_yes_attendees = {}
+        if student_id and name:
+            mres = supabase.table('members').select('id, name').eq('student_id', student_id).execute().data or []
+            cand = [m for m in mres if (m.get('name') or '').strip() == name]
+            if cand and sess_ids:
+                mid = cand[0]['id']
+                myv = supabase.table('seminar_votes').select('session_id') \
+                    .in_('session_id', sess_ids).eq('member_id', mid).eq('attending', True).execute().data or []
+                for x in myv:
+                    sid = x.get('session_id')
+                    if sid and sid in attendees_by_session:
+                        voted_yes_attendees[sid] = attendees_by_session[sid]
+
+        return jsonify({
+            'status': 'success',
+            'counts': counts,
+            'max_capacity': term.get('max_capacity', 32),
+            'public_attendees': public_attendees,
+            'voted_yes_attendees': voted_yes_attendees,
+        })
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
