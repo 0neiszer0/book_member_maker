@@ -3872,14 +3872,30 @@ def seminar_vote_verify():
             .eq('term_id', term['id']).execute().data or []
         sess_ids = [s['id'] for s in sess_res]
         existing = {}
+        voted_yes_attendees = {}  # 본인이 참석 투표한 회차의 신청자 명단
         if sess_ids:
             ev = supabase.table('seminar_votes').select('session_id, attending') \
                 .in_('session_id', sess_ids).eq('member_id', member['id']).execute().data or []
             existing = {x['session_id']: ('yes' if x['attending'] else 'no') for x in ev}
+            # 본인이 '참석'으로 투표한 회차들에 대해, 같은 날 참석자 명단 조회
+            yes_session_ids = [sid for sid, v in existing.items() if v == 'yes']
+            if yes_session_ids:
+                yes_votes = supabase.table('seminar_votes') \
+                    .select('session_id, members(name)') \
+                    .in_('session_id', yes_session_ids).eq('attending', True).execute().data or []
+                for v in yes_votes:
+                    sid = v.get('session_id')
+                    nm = (v.get('members') or {}).get('name')
+                    if sid and nm:
+                        voted_yes_attendees.setdefault(sid, []).append(nm)
+                # 이름순 정렬
+                for sid in voted_yes_attendees:
+                    voted_yes_attendees[sid] = sorted(voted_yes_attendees[sid])
         return jsonify({
             'status': 'success',
             'member_name': member['name'],
             'existing_votes': existing,
+            'voted_yes_attendees': voted_yes_attendees,
         })
     except Exception as e:
         app.logger.error(f"seminar_vote_verify error: {e}", exc_info=True)
