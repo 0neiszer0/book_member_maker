@@ -1,320 +1,500 @@
-<style>
-    /* === 모바일 가로 스크롤 힌트 === */
-    .scroll-x-host { position: relative; }
-    .scroll-x-host > .overflow-x-auto,
-    .scroll-x-host > .overflow-auto { -webkit-overflow-scrolling: touch; }
-    .scroll-x-host::after {
-        content: '';
-        position: absolute;
-        top: 0; right: 0; bottom: 0;
-        width: 40px;
-        pointer-events: none;
-        background: linear-gradient(to right, rgba(26,26,26,0) 0%, rgba(26,26,26,0.85) 100%);
-        transition: opacity 0.25s;
-        z-index: 4;
-    }
-    .scroll-x-host.at-right::after,
-    .scroll-x-host.no-overflow::after { opacity: 0; }
-    .scroll-x-host .scroll-hint-arrow {
-        position: absolute;
-        right: 8px;
-        top: 50%;
-        transform: translateY(-50%);
-        background: #00FF7F;
-        color: #000;
-        font-weight: 700;
-        font-size: 0.7rem;
-        padding: 3px 9px;
-        border-radius: 999px;
-        pointer-events: none;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.7);
-        animation: scrollHintPulse 1.4s ease-in-out infinite;
-        transition: opacity 0.25s;
-        z-index: 5;
-        white-space: nowrap;
-    }
-    .scroll-x-host.at-right .scroll-hint-arrow,
-    .scroll-x-host.no-overflow .scroll-hint-arrow { opacity: 0; }
-    @keyframes scrollHintPulse {
-        0%, 100% { transform: translateY(-50%) translateX(0); }
-        50%      { transform: translateY(-50%) translateX(-5px); }
-    }
-    /* 모바일 가독성 보강 */
-    @media (max-width: 640px) {
-        table { font-size: 0.78rem; }
-        .min-w-\[600px\], .min-w-\[700px\], .min-w-\[800px\] { min-width: 540px !important; }
-    }
-</style>
+{# =============================================================
+   책 먹는 호반우 — 우드 톤 헤더 + 하단 탭바
+   - theme.css 자동 주입(한 번만)
+   - 라우트·session·notification API 변경 없음
+   - 마지막 부분에 기존 scroll-x-host(가로 스크롤 힌트) JS 보존
+   ============================================================= #}
+
+{# --- 테마 CSS 자동 주입 (한 번만) --- #}
 <script>
-    (function () {
-        function applyHint(el) {
-            if (el.dataset.scrollHintApplied) return;
-            if (el.scrollWidth <= el.clientWidth + 1) return; // 실제 overflow 없으면 skip
-            const wrapper = document.createElement('div');
-            wrapper.className = 'scroll-x-host';
-            el.parentNode.insertBefore(wrapper, el);
-            wrapper.appendChild(el);
-            const hint = document.createElement('div');
-            hint.className = 'scroll-hint-arrow';
-            hint.textContent = '→ 옆으로';
-            wrapper.appendChild(hint);
-            const update = () => {
-                const noOverflow = el.scrollWidth <= el.clientWidth + 1;
-                wrapper.classList.toggle('no-overflow', noOverflow);
-                const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 2;
-                wrapper.classList.toggle('at-right', atEnd);
-            };
-            el.addEventListener('scroll', update, { passive: true });
-            update();
-            el.dataset.scrollHintApplied = '1';
-        }
-        function scan() {
-            document.querySelectorAll('.overflow-x-auto, .overflow-auto').forEach(applyHint);
-        }
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', scan);
-        } else {
-            scan();
-        }
-        let resizeT;
-        window.addEventListener('resize', () => {
-            clearTimeout(resizeT);
-            resizeT = setTimeout(scan, 120);
-        });
-    })();
+(function(){
+  if (!document.querySelector('link[data-wood-theme]')) {
+    var l = document.createElement('link');
+    l.rel = 'stylesheet';
+    l.href = '/static/theme.css';
+    l.setAttribute('data-wood-theme','1');
+    document.head.appendChild(l);
+  }
+  // Pretendard 폰트 자동 주입
+  if (!document.querySelector('link[data-wood-font]')) {
+    var f1 = document.createElement('link');
+    f1.rel = 'stylesheet';
+    f1.href = 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css';
+    f1.setAttribute('data-wood-font','1');
+    document.head.appendChild(f1);
+  }
+})();
 </script>
-<header class="bg-card-dark shadow-md sticky top-0 z-50 border-b border-border-dark">
-    <div class="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center py-4">
-            <a href="/" class="text-xl font-bold text-eva-green flex-shrink-0">책 먹는 호반우</a>
 
-            <div class="hidden md:flex items-center space-x-4">
-                {% if session.user_role %}
-                <a href="{{ url_for('view_all_documents') }}"
-                    class="text-sm text-gray-300 hover:text-eva-green font-bold">위키</a>
+<header class="wd-topbar">
+  <div class="wd-topbar-inner">
+    <a href="/" class="wd-brand">
+      <span class="wd-brand-mark">📚</span>
+      <span class="wd-brand-text">책 먹는 호반우</span>
+    </a>
 
-                {% if session.user_role in ['admin', 'officer'] %}
-                <div id="notification-dropdown" class="dropdown">
-                    <button id="notification-btn" type="button" class="relative text-yellow-400 hover:text-yellow-300">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
-                            stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                        </svg>
-                        <span id="notification-dot" class="notification-dot hidden"></span>
-                    </button>
-                    <div id="notification-list" class="dropdown-content"></div>
-                </div>
-                <a href="{{ url_for('admin_dashboard') }}"
-                    class="text-sm text-yellow-400 hover:text-yellow-300 font-bold">관리자</a>
-                <a href="{{ url_for('bookclub_index') }}"
-                    class="text-sm text-yellow-400 hover:text-yellow-300 font-bold">조 편성</a>
-                {% if session.user_role == 'admin' %}
-                <a href="{{ url_for('records_hub') }}"
-                    class="text-sm text-eva-green hover:opacity-80 font-bold">기록</a>
-                {% endif %}
-                <a href="{{ url_for('help_admin') }}"
-                    class="text-sm text-gray-300 hover:text-eva-green">📖 가이드</a>
-                {% endif %}
+    <nav class="wd-top-nav">
+      {% if session.user_role %}
+        <a href="{{ url_for('view_all_documents') }}" class="wd-link">위키</a>
+        {% if session.user_role in ['admin', 'officer'] %}
+          <a href="{{ url_for('admin_dashboard') }}" class="wd-link wd-link-staff">관리자</a>
+          <a href="{{ url_for('bookclub_index') }}" class="wd-link wd-link-staff">조 편성</a>
+          {% if session.user_role == 'admin' %}
+            <a href="{{ url_for('records_hub') }}" class="wd-link">기록</a>
+          {% endif %}
+        {% endif %}
+      {% endif %}
+    </nav>
 
-                <a href="{{ url_for('logout') }}" class="text-sm text-gray-400 hover:text-eva-green">로그아웃</a>
-                <a href="{{ url_for('my_page') }}"
-                    class="eva-button-secondary text-sm font-bold py-2 px-4 rounded-md">마이페이지</a>
-                {% else %}
-                <a href="{{ url_for('login') }}" class="eva-button text-sm font-bold py-2 px-4 rounded-md">로그인</a>
-                {% endif %}
-            </div>
-
-            <div class="md:hidden">
-                <button id="mobile-menu-btn" class="text-gray-300 hover:text-white">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                        xmlns="http://www.w3.org/2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 6h16M4 12h16m-7 6h7"></path>
-                    </svg>
-                </button>
-            </div>
+    <div class="wd-top-actions">
+      {% if session.user_role in ['admin', 'officer'] %}
+        <div id="notification-dropdown" class="wd-dropdown">
+          <button id="notification-btn" type="button" class="wd-icon-btn" aria-label="알림">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+            </svg>
+            <span id="notification-dot" class="wd-dot hidden"></span>
+          </button>
+          <div id="notification-list" class="wd-dropdown-panel"></div>
         </div>
-    </div>
+      {% endif %}
 
-    <div id="mobile-menu" class="hidden md:hidden bg-card-dark border-t border-border-dark">
-        <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-            {% if session.user_role %}
-            <a href="{{ url_for('view_all_documents') }}"
-                class="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700">위키</a>
+      {% if session.user_role %}
+        <div class="wd-dropdown" id="profile-dropdown">
+          <button id="profile-btn" type="button" class="wd-profile-btn" aria-label="프로필 메뉴">
+            <span class="wd-avatar">{{ (session.user_name or '나')[0] }}</span>
+            <span class="wd-profile-name">{{ session.user_name or '내 프로필' }}</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div id="profile-list" class="wd-dropdown-panel wd-dropdown-panel-sm">
+            <a href="{{ url_for('my_page') }}" class="wd-menu-item">
+              <span class="wd-menu-ico">👤</span>마이페이지
+            </a>
             {% if session.user_role in ['admin', 'officer'] %}
-            <a href="{{ url_for('admin_dashboard') }}"
-                class="block px-3 py-2 rounded-md text-base font-medium text-yellow-400 hover:text-white hover:bg-gray-700">관리자</a>
-            <a href="{{ url_for('bookclub_index') }}"
-                class="block px-3 py-2 rounded-md text-base font-medium text-yellow-400 hover:text-white hover:bg-gray-700">조
-                편성</a>
-            {% if session.user_role == 'admin' %}
-            <a href="{{ url_for('records_hub') }}"
-                class="block px-3 py-2 rounded-md text-base font-medium text-eva-green hover:text-white hover:bg-gray-700">기록</a>
-            {% endif %}
-            <a href="{{ url_for('help_admin') }}"
-                class="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700">📖 가이드</a>
-            {% endif %}
-            <a href="{{ url_for('my_page') }}"
-                class="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700">마이페이지</a>
-            <a href="{{ url_for('logout') }}"
-                class="block px-3 py-2 rounded-md text-base font-medium text-gray-400 hover:text-white hover:bg-gray-700">로그아웃</a>
+              <div class="wd-menu-divider"></div>
+              <div class="wd-menu-label">관리</div>
+              <a href="{{ url_for('admin_dashboard') }}" class="wd-menu-item">
+                <span class="wd-menu-ico">⚙️</span>관리자 대시보드
+              </a>
+              <a href="{{ url_for('bookclub_index') }}" class="wd-menu-item">
+                <span class="wd-menu-ico">🧩</span>조 편성
+              </a>
+              {% if session.user_role == 'admin' %}
+                <a href="{{ url_for('records_hub') }}" class="wd-menu-item">
+                  <span class="wd-menu-ico">📊</span>기록 시스템
+                </a>
+              {% endif %}
+              <a href="{{ url_for('help_admin') }}" class="wd-menu-item">
+                <span class="wd-menu-ico">📖</span>운영 가이드
+              </a>
             {% else %}
-            <a href="{{ url_for('login') }}"
-                class="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700">로그인</a>
+              <a href="{{ url_for('help_member') }}" class="wd-menu-item">
+                <span class="wd-menu-ico">📖</span>이용 안내
+              </a>
             {% endif %}
+            <div class="wd-menu-divider"></div>
+            <a href="{{ url_for('logout') }}" class="wd-menu-item wd-menu-quiet">
+              <span class="wd-menu-ico">🚪</span>로그아웃
+            </a>
+          </div>
         </div>
+      {% else %}
+        <a href="{{ url_for('login') }}" class="wd-btn wd-btn-primary">로그인</a>
+      {% endif %}
     </div>
+  </div>
 </header>
 
+{# --- 모바일 하단 탭바 (로그인 회원만) --- #}
+{% if session.user_role %}
+<nav class="wd-tabbar" role="navigation" aria-label="주 메뉴">
+  <a href="{{ url_for('my_page') }}"
+     class="wd-tb {% if request.endpoint == 'my_page' %}wd-tb-on{% endif %}">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8v10a2 2 0 0 1-2 2h-4a1 1 0 0 1-1-1v-5a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v5a1 1 0 0 1-1 1H5a2 2 0 0 1-2-2z"/></svg>
+    <span>홈</span>
+  </a>
+  <a href="{{ url_for('view_all_documents') }}"
+     class="wd-tb {% if request.endpoint in ['view_all_documents','view_document','edit_document'] %}wd-tb-on{% endif %}">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7a3 3 0 0 1 3 3v14a2 2 0 0 0-2-2H4z"/><path d="M20 4h-7a3 3 0 0 0-3 3v14a2 2 0 0 1 2-2h8z"/></svg>
+    <span>위키</span>
+  </a>
+  {% if session.user_role in ['admin', 'officer'] %}
+  <a href="{{ url_for('bookclub_index') }}"
+     class="wd-tb {% if request.endpoint and 'bookclub' in request.endpoint %}wd-tb-on{% endif %}">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
+    <span>조편성</span>
+  </a>
+  {% endif %}
+  {% if session.user_role == 'admin' %}
+  <a href="{{ url_for('records_hub') }}"
+     class="wd-tb {% if request.endpoint and 'records' in request.endpoint %}wd-tb-on{% endif %}">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 3 5-7"/></svg>
+    <span>기록</span>
+  </a>
+  {% endif %}
+  <a href="#" class="wd-tb wd-tb-more" onclick="document.getElementById('profile-btn')?.click();return false">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+    <span>MY</span>
+  </a>
+</nav>
+{% endif %}
+
+{# ===================================================
+   스타일 — _header.html 안에 인라인 (theme.css 변수 사용)
+   theme.css 가 정의한 토큰들을 그대로 가져다 씁니다.
+   =================================================== #}
 <style>
-    .notification-dot {
-        position: absolute;
-        top: -2px;
-        right: -2px;
-        width: 8px;
-        height: 8px;
-        background-color: #ef4444;
-        border-radius: 50%;
-    }
+  /* topbar */
+  .wd-topbar{
+    position:sticky;top:0;z-index:50;
+    background:var(--surface,#FFFCF3);
+    border-bottom:1px solid var(--line,#E5D7B8);
+    backdrop-filter:saturate(140%) blur(6px);
+  }
+  .wd-topbar-inner{
+    max-width:1280px;margin:0 auto;padding:0 20px;
+    height:60px;display:flex;align-items:center;gap:18px;
+  }
+  .wd-brand{
+    display:flex;align-items:center;gap:10px;
+    text-decoration:none;color:var(--ink,#2A241B);
+    font-weight:700;font-size:16.5px;letter-spacing:-.01em;
+    flex-shrink:0;
+  }
+  .wd-brand-mark{
+    width:34px;height:34px;border-radius:9px;
+    background:linear-gradient(135deg,#5C7A4A,#3D5C2E);
+    color:#fff;display:flex;align-items:center;justify-content:center;
+    font-size:17px;box-shadow:0 3px 8px -3px rgba(61,92,46,.5);
+  }
+  .wd-brand-text{display:inline-block}
+  @media(max-width:480px){ .wd-brand-text{display:none} }
 
-    .dropdown {
-        position: relative;
-        display: inline-block;
-    }
+  .wd-top-nav{
+    display:flex;gap:4px;align-items:center;margin-left:8px;
+  }
+  @media(max-width:900px){ .wd-top-nav{display:none} }
+  .wd-link{
+    text-decoration:none;color:var(--ink-soft,#5C5142);
+    font-size:14px;font-weight:600;padding:6px 12px;border-radius:8px;
+    transition:background .12s,color .12s;
+  }
+  .wd-link:hover{background:var(--moss-tint,#E8EFDD);color:var(--moss-deep,#3D5C2E)}
+  .wd-link-staff{color:var(--walnut,#7A5A3A)}
+  .wd-link-staff:hover{background:var(--walnut-tint,#F2E8D8);color:var(--walnut,#7A5A3A)}
 
-    .dropdown-content {
-        display: none;
-        position: absolute;
-        right: 0;
-        background-color: var(--card-dark);
-        min-width: 300px;
-        box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
-        z-index: 10;
-        border: 1px solid var(--border-dark);
-        border-radius: 4px;
-        max-height: 400px;
-        overflow-y: auto;
-    }
+  .wd-top-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
 
-    .dropdown-content.show {
-        display: block;
-    }
+  .wd-icon-btn{
+    position:relative;width:40px;height:40px;border-radius:11px;
+    background:var(--surface,#FFFCF3);border:1px solid var(--line,#E5D7B8);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    color:var(--ink-soft,#5C5142);
+  }
+  .wd-icon-btn:hover{background:var(--paper-2,#F2EBD8)}
+  .wd-dot{
+    position:absolute;top:8px;right:9px;width:9px;height:9px;background:#D24A2C;
+    border-radius:50%;border:2px solid var(--surface,#FFFCF3);
+  }
+  .wd-dot.hidden{display:none}
+
+  .wd-profile-btn{
+    display:flex;align-items:center;gap:8px;
+    background:var(--surface,#FFFCF3);border:1px solid var(--line,#E5D7B8);
+    padding:5px 12px 5px 5px;border-radius:999px;
+    font-family:inherit;font-size:13px;font-weight:600;color:var(--ink,#2A241B);
+    cursor:pointer;
+  }
+  .wd-profile-btn:hover{background:var(--paper-2,#F2EBD8)}
+  .wd-avatar{
+    width:30px;height:30px;border-radius:50%;
+    background:linear-gradient(135deg,#C9B38A,#7A5A3A);
+    color:#fff;display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:700;
+  }
+  .wd-profile-name{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  @media(max-width:600px){ .wd-profile-name{display:none} }
+
+  .wd-btn{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:9px 16px;border-radius:10px;
+    font-family:inherit;font-size:14px;font-weight:700;
+    text-decoration:none;cursor:pointer;border:none;
+  }
+  .wd-btn-primary{
+    background:var(--moss-deep,#3D5C2E);color:#fff;
+    box-shadow:0 2px 0 #2A4220, 0 6px 14px -6px rgba(61,92,46,.4);
+  }
+  .wd-btn-primary:hover{background:var(--moss,#5C7A4A)}
+
+  /* dropdown panel */
+  .wd-dropdown{position:relative}
+  .wd-dropdown-panel{
+    display:none;position:absolute;right:0;top:calc(100% + 8px);
+    min-width:300px;max-height:420px;overflow-y:auto;
+    background:var(--surface,#FFFCF3);
+    border:1px solid var(--line,#E5D7B8);border-radius:14px;
+    box-shadow:0 12px 32px -10px rgba(45,30,10,.22), 0 2px 6px -2px rgba(45,30,10,.1);
+    z-index:60;
+  }
+  .wd-dropdown-panel.show{display:block}
+  .wd-dropdown-panel-sm{min-width:240px}
+  .wd-menu-item{
+    display:flex;align-items:center;gap:12px;
+    padding:11px 16px;text-decoration:none;
+    color:var(--ink,#2A241B);font-size:14px;font-weight:500;
+  }
+  .wd-menu-item:hover{background:var(--moss-tint,#E8EFDD);color:var(--moss-deep,#3D5C2E)}
+  .wd-menu-quiet{color:var(--ink-faint,#9C8E78)}
+  .wd-menu-quiet:hover{background:var(--paper-2,#F2EBD8);color:var(--warn,#C97A3A)}
+  .wd-menu-ico{font-size:16px;width:20px;text-align:center}
+  .wd-menu-divider{height:1px;background:var(--line,#E5D7B8);margin:4px 0}
+  .wd-menu-label{
+    padding:8px 16px 4px;font-size:11px;font-weight:700;
+    color:var(--ink-faint,#9C8E78);letter-spacing:.06em;text-transform:uppercase;
+  }
+
+  /* notification list (기존 API 동작) */
+  #notification-list .wd-notif-item{
+    padding:12px 16px;border-bottom:1px solid var(--line,#E5D7B8);
+  }
+  #notification-list .wd-notif-item:last-child{border-bottom:none}
+  #notification-list .wd-notif-title{font-size:13.5px;font-weight:700;line-height:1.4}
+  #notification-list .wd-notif-meta{font-size:11.5px;color:var(--ink-faint,#9C8E78);margin-top:2px}
+  #notification-list .wd-notif-actions{display:flex;gap:6px;margin-top:8px;justify-content:flex-end}
+  #notification-list .wd-notif-btn{
+    font-family:inherit;border:none;border-radius:7px;padding:5px 11px;
+    font-size:12px;font-weight:700;cursor:pointer;
+  }
+  #notification-list .wd-notif-approve{background:var(--moss-deep,#3D5C2E);color:#fff}
+  #notification-list .wd-notif-deny{background:var(--paper-2,#F2EBD8);color:var(--warn,#C97A3A)}
+  #notification-list .wd-notif-empty{padding:20px 16px;color:var(--ink-faint,#9C8E78);font-size:13px;text-align:center}
+
+  /* bottom tab bar */
+  .wd-tabbar{
+    position:fixed;bottom:0;left:0;right:0;z-index:45;
+    display:none;
+    grid-template-columns:repeat(var(--wd-tab-count,5),1fr);
+    background:var(--surface,#FFFCF3);
+    border-top:1px solid var(--line,#E5D7B8);
+    box-shadow:0 -4px 16px -8px rgba(45,30,10,.12);
+    padding:6px 0 calc(6px + env(safe-area-inset-bottom));
+  }
+  .wd-tb{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+    text-decoration:none;color:var(--ink-faint,#9C8E78);
+    font-size:10.5px;font-weight:500;padding:6px 0;position:relative;
+  }
+  .wd-tb svg{color:currentColor}
+  .wd-tb-on{color:var(--moss-deep,#3D5C2E);font-weight:700}
+  .wd-tb-on::before{
+    content:'';position:absolute;top:-6px;left:50%;transform:translateX(-50%);
+    width:30px;height:3px;background:var(--moss-deep,#3D5C2E);border-radius:0 0 4px 4px;
+  }
+  @media(max-width:768px){
+    .wd-tabbar{display:grid}
+    body{padding-bottom:72px}
+    .wd-top-nav{display:none}
+  }
+
+  /* === 기존 _header.html: 모바일 가로 스크롤 힌트 (보존) === */
+  .scroll-x-host { position: relative; }
+  .scroll-x-host > .overflow-x-auto,
+  .scroll-x-host > .overflow-auto { -webkit-overflow-scrolling: touch; }
+  .scroll-x-host::after {
+      content: '';
+      position: absolute;
+      top: 0; right: 0; bottom: 0;
+      width: 40px;
+      pointer-events: none;
+      background: linear-gradient(to right, rgba(250,246,236,0) 0%, rgba(250,246,236,0.92) 100%);
+      transition: opacity 0.25s;
+      z-index: 4;
+  }
+  .scroll-x-host.at-right::after,
+  .scroll-x-host.no-overflow::after { opacity: 0; }
+  .scroll-x-host .scroll-hint-arrow {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: var(--moss-deep, #3D5C2E);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.7rem;
+      padding: 3px 9px;
+      border-radius: 999px;
+      pointer-events: none;
+      box-shadow: 0 2px 8px rgba(45,30,10,0.18);
+      animation: scrollHintPulse 1.4s ease-in-out infinite;
+      transition: opacity 0.25s;
+      z-index: 5;
+      white-space: nowrap;
+  }
+  .scroll-x-host.at-right .scroll-hint-arrow,
+  .scroll-x-host.no-overflow .scroll-hint-arrow { opacity: 0; }
+  @keyframes scrollHintPulse {
+      0%, 100% { transform: translateY(-50%) translateX(0); }
+      50%      { transform: translateY(-50%) translateX(-5px); }
+  }
+  /* 모바일 가독성 보강 */
+  @media (max-width: 640px) {
+      table { font-size: 0.78rem; }
+      .min-w-\[600px\], .min-w-\[700px\], .min-w-\[800px\] { min-width: 540px !important; }
+  }
 </style>
 
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        // --- 모바일 메뉴 토글 로직 ---
-        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
-        const mobileMenu = document.getElementById('mobile-menu');
-        if (mobileMenuBtn) {
-            mobileMenuBtn.addEventListener('click', () => {
-                mobileMenu.classList.toggle('hidden');
-            });
+(function(){
+  document.addEventListener('DOMContentLoaded', function(){
+    /* ----- 드롭다운 토글 ----- */
+    function bindDropdown(btnId, panelId){
+      var btn = document.getElementById(btnId);
+      var panel = document.getElementById(panelId);
+      if (!btn || !panel) return;
+      btn.addEventListener('click', function(e){
+        e.stopPropagation();
+        // close others
+        document.querySelectorAll('.wd-dropdown-panel.show').forEach(function(p){
+          if (p !== panel) p.classList.remove('show');
+        });
+        panel.classList.toggle('show');
+        if (panel.classList.contains('show') && btnId === 'notification-btn'){
+          window.__fetchWoodNotifications && window.__fetchWoodNotifications();
         }
-
-        // --- 관리자/임원 알림 로직 ---
-        const currentUserRole = "{{ session.user_role }}";
-        if (currentUserRole === 'admin' || currentUserRole === 'officer') {
-            const notifBtn = document.getElementById('notification-btn');
-            const notifDot = document.getElementById('notification-dot');
-            const notifDropdown = document.getElementById('notification-dropdown');
-            const notifList = document.getElementById('notification-list');
-
-            async function fetchNotifications() {
-                try {
-                    const response = await fetch('/api/notifications');
-                    if (!response.ok) {
-                        console.error("Failed to fetch notifications, server responded with status: " + response.status);
-                        notifList.innerHTML = '<div class="p-4 text-sm text-red-400">알림 로딩 실패</div>';
-                        return;
-                    };
-                    const notifications = await response.json();
-
-                    notifDot.classList.toggle('hidden', notifications.length === 0);
-
-                    notifList.innerHTML = '';
-                    if (notifications.length === 0) {
-                        notifList.innerHTML = '<div class="p-4 text-sm text-gray-400">새로운 알림이 없습니다.</div>';
-                        return;
-                    }
-
-                    notifications.forEach(notif => {
-                        const item = document.createElement('div');
-                        item.className = 'p-3 border-b border-border-dark';
-                        let contentHtml = '';
-                        if (notif.type === 'new_user_request') {
-                            contentHtml = `<p class="font-bold">${notif.details.name} 님의 신규 가입 요청</p><p class="text-xs text-gray-400">${notif.details.email}</p>`;
-                        } else if (notif.type === 'account_link_request') {
-                            contentHtml = `<p class="font-bold">${notif.details.original_name} 님의 계정 연결 요청</p><p class="text-xs text-gray-400">소셜: ${notif.details.social_name} (${notif.details.social_email})</p>`;
-                        } else if (notif.type === 'absence_request') {
-                            contentHtml = `<p class="font-bold">${notif.details.name} 님의 불참 요청</p><p class="text-xs text-gray-400">사유: ${notif.details.reason}</p>`;
-                        } else if (notif.type === 'absence_request') {
-                            contentHtml = `<p class="font-bold">${notif.details.name} 님의 불참 요청</p><p class="text-xs text-gray-400">사유: ${notif.details.reason}</p>`;
-                        }
-
-                        item.innerHTML = `${contentHtml}
-                    <div class="mt-2 text-right space-x-2">
-                        <button data-id="${notif.id}" data-action="deny" class="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 rounded">거절</button>
-                        <button data-id="${notif.id}" data-action="approve" class="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 rounded">승인</button>
-                    </div>`;
-                        notifList.appendChild(item);
-                    });
-                } catch (error) {
-                    console.error("Failed to fetch notifications:", error);
-                    notifList.innerHTML = '<div class="p-4 text-sm text-red-400">알림을 불러오는 중 오류 발생</div>';
-                }
-            }
-
-            if (notifBtn) {
-                notifBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const isShown = notifList.classList.toggle('show');
-                    if (isShown) fetchNotifications();
-                });
-
-                notifList.addEventListener('click', async (e) => {
-                    const target = e.target;
-                    if (target.tagName === 'BUTTON' && target.dataset.id) {
-                        e.stopPropagation();
-                        const notifId = target.dataset.id;
-                        const action = target.dataset.action;
-                        target.textContent = '처리 중...';
-                        target.disabled = true;
-
-                        try {
-                            const response = await fetch(`/api/notifications/${notifId}/handle`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ action: action })
-                            });
-                            const result = await response.json();
-                            if (result.status !== 'success') throw new Error(result.message);
-
-                            target.closest('.p-3').remove();
-                            if (notifList.childElementCount === 0) {
-                                notifDot.classList.add('hidden');
-                                notifList.innerHTML = '<div class="p-4 text-sm text-gray-400">새로운 알림이 없습니다.</div>';
-                            }
-                        } catch (error) {
-                            alert(`처리 실패: ${error.message}`);
-                            target.textContent = action === 'approve' ? '승인' : '거절';
-                            target.disabled = false;
-                        }
-                    }
-                });
-
-                // 초기 로드
-                fetchNotifications();
-            }
-
-            window.addEventListener('click', (e) => {
-                if (notifDropdown && !notifDropdown.contains(e.target)) {
-                    if (notifList) {
-                        notifList.classList.remove('show');
-                    }
-                }
-            });
-        }
+      });
+    }
+    bindDropdown('notification-btn','notification-list');
+    bindDropdown('profile-btn','profile-list');
+    document.addEventListener('click', function(e){
+      document.querySelectorAll('.wd-dropdown-panel.show').forEach(function(p){
+        if (!p.parentElement.contains(e.target)) p.classList.remove('show');
+      });
     });
+
+    /* ----- 탭바 칸 수 자동 계산 ----- */
+    var tabbar = document.querySelector('.wd-tabbar');
+    if (tabbar){
+      var n = tabbar.querySelectorAll('a').length;
+      tabbar.style.setProperty('--wd-tab-count', n);
+    }
+
+    /* ----- 알림 로직 (기존 API 호환) ----- */
+    var role = "{{ session.user_role or '' }}";
+    if (role !== 'admin' && role !== 'officer') return;
+
+    var notifList = document.getElementById('notification-list');
+    var notifDot  = document.getElementById('notification-dot');
+    if (!notifList) return;
+
+    function render(notifs){
+      if (notifDot) notifDot.classList.toggle('hidden', notifs.length === 0);
+      if (notifs.length === 0){
+        notifList.innerHTML = '<div class="wd-notif-empty">새로운 알림이 없어요</div>';
+        return;
+      }
+      notifList.innerHTML = '';
+      notifs.forEach(function(n){
+        var d = document.createElement('div');
+        d.className = 'wd-notif-item';
+        var title='', meta='';
+        if (n.type === 'new_user_request'){
+          title = n.details.name + ' 님 신규 가입 요청';
+          meta  = n.details.email;
+        } else if (n.type === 'account_link_request'){
+          title = n.details.original_name + ' 님 계정 연결 요청';
+          meta  = '소셜: ' + n.details.social_name + ' (' + n.details.social_email + ')';
+        } else if (n.type === 'absence_request'){
+          title = n.details.name + ' 님 불참 요청';
+          meta  = '사유: ' + (n.details.reason || '미입력');
+        }
+        d.innerHTML =
+          '<div class="wd-notif-title">'+title+'</div>'+
+          '<div class="wd-notif-meta">'+meta+'</div>'+
+          '<div class="wd-notif-actions">'+
+            '<button class="wd-notif-btn wd-notif-deny"   data-id="'+n.id+'" data-action="deny">거절</button>'+
+            '<button class="wd-notif-btn wd-notif-approve" data-id="'+n.id+'" data-action="approve">승인</button>'+
+          '</div>';
+        notifList.appendChild(d);
+      });
+    }
+
+    window.__fetchWoodNotifications = function(){
+      fetch('/api/notifications')
+        .then(function(r){return r.ok ? r.json() : Promise.reject(r.status)})
+        .then(render)
+        .catch(function(){ notifList.innerHTML = '<div class="wd-notif-empty">알림을 불러오지 못했어요</div>'; });
+    };
+
+    notifList.addEventListener('click', function(e){
+      var b = e.target.closest('.wd-notif-btn');
+      if (!b) return;
+      e.stopPropagation();
+      var id = b.dataset.id, act = b.dataset.action;
+      b.disabled = true; b.textContent = '처리중...';
+      fetch('/api/notifications/'+id+'/handle', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({action: act})
+      })
+      .then(function(r){return r.json()})
+      .then(function(res){
+        if (res.status !== 'success') throw new Error(res.message);
+        b.closest('.wd-notif-item').remove();
+        if (!notifList.querySelector('.wd-notif-item')){
+          notifList.innerHTML = '<div class="wd-notif-empty">새로운 알림이 없어요</div>';
+          notifDot.classList.add('hidden');
+        }
+      })
+      .catch(function(err){
+        alert('처리 실패: ' + err.message);
+        b.disabled = false; b.textContent = (act === 'approve' ? '승인' : '거절');
+      });
+    });
+
+    // 초기 1회
+    window.__fetchWoodNotifications();
+  });
+})();
+</script>
+
+<script>
+/* === 기존 _header.html: 가로 스크롤 힌트 자동 적용 (보존) === */
+(function () {
+    function applyHint(el) {
+        if (el.dataset.scrollHintApplied) return;
+        if (el.scrollWidth <= el.clientWidth + 1) return;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'scroll-x-host';
+        el.parentNode.insertBefore(wrapper, el);
+        wrapper.appendChild(el);
+        const hint = document.createElement('div');
+        hint.className = 'scroll-hint-arrow';
+        hint.textContent = '→ 옆으로';
+        wrapper.appendChild(hint);
+        const update = () => {
+            const noOverflow = el.scrollWidth <= el.clientWidth + 1;
+            wrapper.classList.toggle('no-overflow', noOverflow);
+            const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 2;
+            wrapper.classList.toggle('at-right', atEnd);
+        };
+        el.addEventListener('scroll', update, { passive: true });
+        update();
+        el.dataset.scrollHintApplied = '1';
+    }
+    function scan() {
+        document.querySelectorAll('.overflow-x-auto, .overflow-auto').forEach(applyHint);
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', scan);
+    } else {
+        scan();
+    }
+    let resizeT;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeT);
+        resizeT = setTimeout(scan, 120);
+    });
+})();
 </script>

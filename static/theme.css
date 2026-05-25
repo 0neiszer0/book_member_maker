@@ -1,0 +1,192 @@
+/* =============================================================
+   책 먹는 호반우 — Wood Theme (drop-in)
+   -------------------------------------------------------------
+   적용 방법:
+   1) 이 파일을 `static/theme.css` 로 저장.
+   2) 각 템플릿 <head> 의 인라인 <style> 블록 *아래* 에 link 추가
+      <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+      (CSS 순서상 마지막에 와야 :root 변수 오버라이드가 먹습니다.)
+   3) 기존 변수명(--eva-*, --bg-dark, ...)을 그대로 두면 모든 페이지가
+      한 번에 우드 톤으로 전환됩니다. 라우트/JS/Jinja 변경 없음.
+   ============================================================= */
+
+:root,
+html { /* :root 와 동일 specificity, 더 뒤에 위치해서 승리 */
+  /* ---- 신규 우드 토큰 ---- */
+  --paper:        #FAF6EC;   /* 페이지 배경 (크림 페이퍼) */
+  --paper-2:      #F2EBD8;   /* 부드러운 블록 */
+  --surface:      #FFFCF3;   /* 카드 배경 */
+  --ink:          #2A241B;   /* 본문 (월넛 다크) */
+  --ink-soft:     #5C5142;   /* 보조 본문 */
+  --ink-faint:    #9C8E78;   /* 메타·캡션 */
+  --moss:         #5C7A4A;   /* 강조 그린 */
+  --moss-deep:    #3D5C2E;   /* 진한 그린 (CTA) */
+  --moss-tint:    #E8EFDD;   /* 그린 매우 옅게 (배경) */
+  --walnut:       #7A5A3A;   /* 보조 갈색 */
+  --walnut-tint:  #F2E8D8;   /* 월넛 옅게 */
+  --oak:          #C9B38A;   /* 라이트 우드 */
+  --leaf:         #8FAE6E;   /* 보조 그린 */
+  --warn:         #C97A3A;   /* 경고 (테라코타) */
+  --danger:       #B14A2D;
+  --line:         #C9B38A;   /* 외곽선 (오크) */
+  --line-soft:    #E5D7B8;
+
+  /* ---- 기존 변수 alias (호환) ---- */
+  --eva-green:   var(--moss);
+  --eva-purple:  var(--walnut);
+  --eva-orange:  var(--warn);
+  --bg-dark:     var(--paper);
+  --card-dark:   var(--surface);
+  --text-light:  var(--ink);
+  --border-dark: var(--line);
+}
+
+/* ---- 본문 ---- */
+body {
+  background-color: var(--paper) !important;
+  color: var(--ink) !important;
+  font-family: 'Pretendard', 'Noto Sans KR', -apple-system, sans-serif;
+}
+
+/* Orbitron 의존 제거 — 카테고리 제목·강조는 Pretendard 700 으로 */
+h1, h2, h3, h4, h5, h6, summary {
+  font-family: 'Pretendard', 'Noto Sans KR', sans-serif !important;
+  text-transform: none !important;
+  letter-spacing: -0.01em !important;
+  color: var(--ink);
+}
+
+/* ---- eva-card / 일반 카드 ---- */
+.eva-card,
+.bg-card-dark,
+.bg-gray-800 {
+  background-color: var(--surface) !important;
+  border-color: var(--line) !important;
+  color: var(--ink) !important;
+  box-shadow: 0 1px 0 rgba(122,90,58,.06), 0 4px 14px -8px rgba(122,90,58,.18);
+}
+
+/* ---- 버튼 ---- */
+.eva-button,
+.eva-button-primary {
+  background-color: var(--moss-deep) !important;
+  color: #fff !important;
+  border: 1px solid var(--moss-deep) !important;
+}
+.eva-button:hover,
+.eva-button-primary:hover {
+  background-color: var(--moss) !important;
+  box-shadow: 0 6px 14px -6px rgba(61,92,46,.5);
+}
+.eva-button-secondary {
+  background-color: var(--paper-2) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--line) !important;
+}
+.eva-button-secondary:hover {
+  background-color: var(--oak) !important;
+}
+.eva-button-delete {
+  background-color: var(--warn) !important;
+  color: #fff !important;
+}
+.eva-button-delete:hover { background-color: var(--danger) !important; }
+
+/* ---- 링크·강조 ---- */
+.eva-link, .text-eva-green {
+  color: var(--moss-deep) !important;
+}
+.text-eva-purple { color: var(--walnut) !important; }
+.text-eva-orange { color: var(--warn) !important; }
+.eva-link:hover, .text-eva-green:hover { color: var(--moss) !important; }
+
+.bg-eva-green { background-color: var(--moss-deep) !important; color: #fff !important; }
+.bg-eva-purple { background-color: var(--walnut) !important; color: #fff !important; }
+.border-eva-green { border-color: var(--moss-deep) !important; }
+.border-eva-purple { border-color: var(--walnut) !important; }
+
+/* ---- 입력 ---- */
+.eva-input,
+input[type="text"], input[type="email"], input[type="tel"],
+input[type="date"], input[type="number"], input[type="password"],
+select, textarea {
+  background-color: var(--surface) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 8px !important;
+}
+.eva-input:focus,
+input:focus, select:focus, textarea:focus {
+  border-color: var(--moss-deep) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(92,122,74,.22) !important;
+}
+
+/* ---- 다크 Tailwind 유틸 보정 (자주 쓰이는 것만 swap) ---- */
+.bg-gray-700, .bg-gray-900 { background-color: var(--paper-2) !important; color: var(--ink) !important; }
+.bg-gray-800\/50 { background-color: rgba(242,235,216,.6) !important; }
+.bg-gray-700\/30 { background-color: rgba(242,235,216,.4) !important; }
+.bg-gray-900\/20 { background-color: rgba(242,235,216,.4) !important; }
+.text-gray-200, .text-gray-300, .text-gray-400 { color: var(--ink-soft) !important; }
+.text-gray-500, .text-gray-600 { color: var(--ink-faint) !important; }
+.border-gray-600, .border-gray-700, .border-border-dark { border-color: var(--line) !important; }
+.bg-bg-dark { background-color: var(--paper) !important; }
+
+/* 테이블 zebra */
+.eva-table-header { background-color: var(--walnut-tint) !important; color: var(--ink) !important; }
+.eva-table-row:nth-child(even) { background-color: rgba(242,235,216,.5) !important; }
+
+/* 상태 뱃지 */
+.bg-green-700, .bg-green-900\/50, .bg-emerald-700 { background-color: var(--moss-deep) !important; color: #fff !important; }
+.bg-yellow-700, .bg-yellow-900\/50 { background-color: var(--warn) !important; color: #fff !important; }
+.bg-red-700, .bg-red-800, .bg-red-900\/50 { background-color: var(--danger) !important; color: #fff !important; }
+.bg-blue-600, .bg-blue-700 { background-color: var(--walnut) !important; color: #fff !important; }
+.text-green-300, .text-green-400 { color: var(--moss-deep) !important; }
+.text-yellow-300, .text-yellow-400 { color: var(--warn) !important; }
+.text-red-300, .text-red-400 { color: var(--danger) !important; }
+
+/* 헤더 그림자/보더 */
+header.bg-card-dark {
+  background: var(--surface) !important;
+  border-bottom: 1px solid var(--line) !important;
+  box-shadow: 0 1px 0 rgba(122,90,58,.06);
+}
+
+/* 로그인 카드 글로우 제거 */
+.eva-card { box-shadow: 0 1px 0 rgba(122,90,58,.08), 0 8px 24px -16px rgba(122,90,58,.25) !important; }
+
+/* ---- 새로 더할 컴포넌트 — 와이어프레임 → 하이파이 동선용 ---- */
+.wood-hero {
+  background: linear-gradient(180deg, var(--moss-tint), var(--surface));
+  border: 1px solid var(--moss);
+  border-radius: 16px;
+}
+.wood-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--line);
+  font-size: 12px; font-weight: 600; color: var(--ink-soft);
+}
+.wood-chip.on { background: var(--moss-deep); color: #fff; border-color: var(--moss-deep); }
+.wood-chip.warn { background: var(--warn); color: #fff; border-color: var(--warn); }
+
+/* 하단 탭바 (모바일 전용) — _header.html 에 추가 후 활용 */
+.tabbar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
+  display: none;
+  grid-template-columns: repeat(5, 1fr);
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
+}
+.tabbar a {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  font-size: 11px; color: var(--ink-faint); padding: 4px 0;
+  text-decoration: none;
+}
+.tabbar a.active { color: var(--moss-deep); font-weight: 700; }
+.tabbar a .ico { font-size: 18px; line-height: 1; }
+@media (max-width: 768px) {
+  .tabbar { display: grid; }
+  body { padding-bottom: 72px; }
+}
