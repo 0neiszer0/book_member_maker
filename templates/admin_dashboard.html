@@ -165,6 +165,16 @@
                 </div>
                 <span class="text-2xl">→</span>
             </a>
+            {% if latest_history %}
+            <a href="{{ url_for('records_seminar_detail', history_id=latest_history.id) }}"
+                class="eva-card rounded-lg p-4 hover:border-eva-green transition flex items-center justify-between">
+                <div>
+                    <div class="font-bold text-eva-green">최근 조 편성 수정</div>
+                    <div class="text-xs text-gray-400 mt-1">{{ latest_history.date }}{% if latest_history.book_title %} · {{ latest_history.book_title }}{% endif %} — 인원 추가·제외, 조 이동</div>
+                </div>
+                <span class="text-2xl">→</span>
+            </a>
+            {% endif %}
         </div>
 
         <div class="space-y-8">

@@ -699,6 +699,11 @@ def admin_dashboard():
         topic_events_res = supabase.table('topic_events').select('*').order('created_at', desc=True).execute()
         topic_events = topic_events_res.data
 
+        # 최근 조 편성 기록 (바로 수정하러 갈 수 있게 대시보드에 노출)
+        latest_history_res = supabase.table('history').select('id, date, book_title') \
+            .order('date', desc=True).limit(1).execute()
+        latest_history = latest_history_res.data[0] if latest_history_res.data else None
+
         # 세미나 출석 투표 학기 목록
         seminar_terms_res = supabase.table('seminar_terms').select('*') \
             .order('start_date', desc=True).execute()
@@ -720,6 +725,7 @@ def admin_dashboard():
         all_members_res = []
         topic_events = []
         seminar_terms = []
+        latest_history = None
 
     return render_template(
         'admin_dashboard.html',
@@ -727,6 +733,7 @@ def admin_dashboard():
         meeting_date=next_monday,
         topic_events=topic_events,
         seminar_terms=seminar_terms,
+        latest_history=latest_history,
     )
 
 
@@ -1523,7 +1530,8 @@ def save_group_record_to_db(date, present, facilitators, groups, book_title=None
             record["book_title"] = book_title.strip()
         if genre:
             record["genre"] = genre.strip()
-        supabase.table("history").insert(record).execute()
+        insert_res = supabase.table("history").insert(record).execute()
+        history_id = insert_res.data[0]['id'] if insert_res.data else None
 
         # 2. bookclub_co_matrix 업데이트
         keys_to_update = {}
@@ -1545,7 +1553,7 @@ def save_group_record_to_db(date, present, facilitators, groups, book_title=None
 
             supabase.table("bookclub_co_matrix").upsert(final_upsert_data, on_conflict='pair_key').execute()
 
-        return {"status": "ok"}
+        return {"status": "ok", "history_id": history_id}
     except Exception as e:
         app.logger.error(f"Error saving group record: {e}")
         return {"status": "error", "message": str(e)}
@@ -1621,7 +1629,9 @@ def save_manual_groups():
                                          book_title=book_title, genre=genre)
 
         if result["status"] == "ok":
-            flash("수동 조 편성 기록이 성공적으로 저장되었습니다.", "success")
+            flash("수동 조 편성 기록이 성공적으로 저장되었습니다. 이 페이지에서 바로 수정할 수 있습니다.", "success")
+            if result.get("history_id"):
+                return redirect(url_for('records_seminar_detail', history_id=result["history_id"]))
             return redirect(url_for('records_seminars'))
         else:
             flash(f"저장 중 오류 발생: {result['message']}", "danger")
