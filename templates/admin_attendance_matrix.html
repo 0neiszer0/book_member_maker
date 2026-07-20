@@ -59,12 +59,16 @@
             <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
                 <div class="md:col-span-2">
                     <label class="block text-xs text-gray-400 mb-1">학기 선택 (자동으로 기간 채움)</label>
-                    <select name="term_id" class="eva-input w-full rounded px-3 py-2 text-sm">
-                        <option value="">직접 기간 지정</option>
-                        {% for t in terms %}
-                        <option value="{{ t.id }}" {% if t.id == term_id %}selected{% endif %}>{{ t.name }} ({{ t.start_date }}~{{ t.end_date }})</option>
-                        {% endfor %}
-                    </select>
+                    <div class="flex gap-2">
+                        <select name="term_id" class="eva-input flex-1 rounded px-3 py-2 text-sm">
+                            <option value="">직접 기간 지정</option>
+                            {% for t in terms %}
+                            <option value="{{ t.id }}" {% if t.id == term_id %}selected{% endif %}>{{ t.name }} ({{ t.start_date }}~{{ t.end_date }})</option>
+                            {% endfor %}
+                        </select>
+                        <button type="button" id="addTermBtn"
+                            class="bg-gray-700 hover:bg-gray-600 text-white font-bold px-3 py-2 rounded text-sm whitespace-nowrap">+ 학기 추가</button>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">시작일</label>
@@ -84,9 +88,24 @@
                 </div>
             </div>
             <p class="text-xs text-gray-500 mt-2">
-                💡 같은 주의 월/목 회차는 한 칸으로 묶입니다 (둘 중 하나라도 출석하면 O). 데이터 출처: 확정된 세미나 기록(history).
+                같은 주의 월/목 회차는 한 칸으로 묶입니다 (둘 중 하나라도 출석하면 O). 데이터 출처: 확정된 세미나 기록(history).
             </p>
         </form>
+
+        <!-- 표시 옵션 -->
+        <div class="flex flex-wrap items-center gap-4 mb-3 text-sm">
+            <label class="flex items-center gap-2 cursor-pointer text-gray-300">
+                <input type="checkbox" id="hideInactive" class="h-4 w-4 rounded">
+                비활성 멤버 숨기기
+            </label>
+            <label class="flex items-center gap-2 text-gray-300">
+                정렬:
+                <select id="sortMode" class="eva-input rounded px-2 py-1 text-sm">
+                    <option value="name">이름순</option>
+                    <option value="count">출석수순</option>
+                </select>
+            </label>
+        </div>
 
         <!-- 매트릭스 -->
         <div class="eva-card rounded-lg p-3 overflow-auto" style="max-height:75vh;">
@@ -109,7 +128,7 @@
                     {% for m in members %}
                     {% set cnt = member_counts[m.id] %}
                     {% if cnt > 0 or m.is_active %}
-                    <tr>
+                    <tr data-name="{{ m.name }}" data-count="{{ cnt }}" data-inactive="{{ '1' if not m.is_active else '0' }}">
                         <td class="row-header">
                             <div class="font-bold">{{ m.name }}</div>
                             {% if not m.is_active %}<span class="text-[9px] text-gray-500">(비활성)</span>{% endif %}
@@ -137,6 +156,35 @@
         </p>
     </div>
 
+    <!-- 학기 추가 모달 -->
+    <div id="termModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+        <div class="eva-card rounded-xl p-6 w-full max-w-sm shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-eva-green">학기 추가</h3>
+                <button type="button" id="closeTermModal" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">학기명 <span class="text-red-400">*</span></label>
+                    <input id="tName" type="text" class="eva-input w-full rounded px-3 py-2 text-sm" placeholder="예: 2026-2학기">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">시작일 <span class="text-red-400">*</span></label>
+                        <input id="tStart" type="date" class="eva-input w-full rounded px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">종료일 <span class="text-red-400">*</span></label>
+                        <input id="tEnd" type="date" class="eva-input w-full rounded px-3 py-2 text-sm">
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500">기간 내 월/목 세미나 회차가 자동 생성되고, 세미나 투표에서도 바로 사용할 수 있습니다.</p>
+                <button type="button" id="saveTermBtn"
+                    class="w-full bg-eva-green text-black font-bold py-2 rounded hover:opacity-80">추가하기</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         document.querySelector('select[name=term_id]')?.addEventListener('change', function() {
             if (this.value) {
@@ -144,6 +192,48 @@
                 document.querySelector('input[name=end_date]').value = '';
             }
         });
+
+        // --- 학기 추가 모달 ---
+        const termModal = document.getElementById('termModal');
+        document.getElementById('addTermBtn').addEventListener('click', () => termModal.classList.remove('hidden'));
+        document.getElementById('closeTermModal').addEventListener('click', () => termModal.classList.add('hidden'));
+        termModal.addEventListener('click', (e) => { if (e.target === termModal) termModal.classList.add('hidden'); });
+        document.getElementById('saveTermBtn').addEventListener('click', async () => {
+            const name = document.getElementById('tName').value.trim();
+            const start = document.getElementById('tStart').value;
+            const end = document.getElementById('tEnd').value;
+            if (!name || !start || !end) { alert('학기명/시작일/종료일을 모두 입력해주세요.'); return; }
+            try {
+                const res = await fetch('/api/admin/seminar_terms/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, start_date: start, end_date: end }),
+                });
+                const result = await res.json();
+                if (!res.ok || result.status !== 'success') throw new Error(result.message || '학기 추가 실패');
+                // 새 학기가 선택된 상태로 리로드
+                const termId = result.term ? result.term.id : (result.term_id || '');
+                window.location.href = '?term_id=' + encodeURIComponent(termId);
+            } catch (err) {
+                alert('오류: ' + err.message);
+            }
+        });
+
+        // --- 표시 옵션: 비활성 숨기기 / 정렬 ---
+        const tbody = document.querySelector('.matrix-table tbody');
+        function applyDisplayOptions() {
+            if (!tbody) return;
+            const hideInactive = document.getElementById('hideInactive').checked;
+            const mode = document.getElementById('sortMode').value;
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            rows.forEach(r => { r.style.display = (hideInactive && r.dataset.inactive === '1') ? 'none' : ''; });
+            rows.sort((a, b) => mode === 'count'
+                ? (parseInt(b.dataset.count) - parseInt(a.dataset.count)) || a.dataset.name.localeCompare(b.dataset.name, 'ko')
+                : a.dataset.name.localeCompare(b.dataset.name, 'ko'));
+            rows.forEach(r => tbody.appendChild(r));
+        }
+        document.getElementById('hideInactive').addEventListener('change', applyDisplayOptions);
+        document.getElementById('sortMode').addEventListener('change', applyDisplayOptions);
     </script>
 </body>
 </html>
