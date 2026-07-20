@@ -166,12 +166,12 @@ async function addNewGenre(btn) {
 {# 페이지 container 안에 들어가도 자연스럽게 보이는 sticky 서브바 #}
 <div class="records-subbar -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 mb-6 -mt-4 sm:-mt-6 lg:-mt-8">
     <div class="records-subbar-inner">
-        <a href="{{ url_for('records_hub') }}" class="records-tab {% if active == 'hub' %}active{% endif %}">📚 홈</a>
-        <a href="{{ url_for('records_members') }}" class="records-tab {% if active == 'members' %}active{% endif %}">👥 회원</a>
-        <a href="{{ url_for('records_seminars') }}" class="records-tab {% if active == 'seminars' %}active{% endif %}">📖 세미나</a>
-        <a href="{{ url_for('records_brick_books') }}" class="records-tab {% if active == 'brick' %}active{% endif %}">🧱 벽돌책</a>
-        <a href="{{ url_for('records_study_groups') }}" class="records-tab {% if active == 'study' %}active{% endif %}">🤝 소모임</a>
-        <a href="{{ url_for('records_analytics') }}" class="records-tab {% if active == 'analytics' %}active{% endif %}">📊 통계</a>
+        <a href="{{ url_for('records_hub') }}" class="records-tab {% if active == 'hub' %}active{% endif %}"><i data-lucide="book" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 홈</a>
+        <a href="{{ url_for('records_members') }}" class="records-tab {% if active == 'members' %}active{% endif %}"><i data-lucide="users" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 회원</a>
+        <a href="{{ url_for('records_seminars') }}" class="records-tab {% if active == 'seminars' %}active{% endif %}"><i data-lucide="book-open" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 세미나</a>
+        <a href="{{ url_for('records_brick_books') }}" class="records-tab {% if active == 'brick' %}active{% endif %}"><i data-lucide="blocks" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 벽돌책</a>
+        <a href="{{ url_for('records_study_groups') }}" class="records-tab {% if active == 'study' %}active{% endif %}"><i data-lucide="handshake" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 소모임</a>
+        <a href="{{ url_for('records_analytics') }}" class="records-tab {% if active == 'analytics' %}active{% endif %}"><i data-lucide="chart-column" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 통계</a>
     </div>
 </div>
 {% endmacro %}
@@ -179,7 +179,7 @@ async function addNewGenre(btn) {
 {# 학기 필터 — 페이지 상단에 배치. id="termFilter" 의 change 이벤트로 navigate. #}
 {% macro term_filter(terms, selected_term_id, route_name) %}
 <div class="flex items-center gap-2 mb-4 flex-wrap">
-    <label class="text-xs text-gray-400 font-bold">📅 학기 필터:</label>
+    <label class="text-xs text-gray-400 font-bold"><i data-lucide="calendar" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 학기 필터:</label>
     <select id="termFilter" onchange="navTerm(this.value, '{{ route_name }}')"
         class="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm">
         <option value="">전체 (모든 기간)</option>

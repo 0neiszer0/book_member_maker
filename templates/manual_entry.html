@@ -52,14 +52,14 @@
                         class="eva-input w-full p-2 rounded-md">
                 </div>
                 <div>
-                    <label for="book_title" class="block text-sm font-bold text-eva-purple mb-1">📚 도서명</label>
+                    <label for="book_title" class="block text-sm font-bold text-eva-purple mb-1"><i data-lucide="book" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 도서명</label>
                     <input type="text" id="book_title" name="book_title"
                         value="{{ prefill.book_title or '' }}"
                         placeholder="예: 데미안 — 헤르만 헤세"
                         class="eva-input w-full p-2 rounded-md">
                 </div>
                 <div>
-                    <label for="genre" class="block text-sm font-bold text-eva-purple mb-1">🏷️ 장르</label>
+                    <label for="genre" class="block text-sm font-bold text-eva-purple mb-1"><i data-lucide="tag" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 장르</label>
                     <select id="genre" name="genre" class="eva-input w-full p-2 rounded-md">
                         <option value="">미분류</option>
                         {% for g in genres %}
@@ -236,5 +236,6 @@
         }
     });
     </script>
+{% include '_icons.html' %}
 </body>
 </html>

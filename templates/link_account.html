@@ -50,7 +50,7 @@
             <img src="{{ profile_pic }}" alt="profile" class="w-20 h-20 rounded-full mx-auto mb-3 border-2 border-eva-green">
             {% endif %}
             <h1 class="text-2xl font-bold text-eva-green">{{ social_name }}님, 환영합니다!</h1>
-            {% if email %}<p class="text-xs text-gray-400 mt-1">📧 {{ email }}</p>{% endif %}
+            {% if email %}<p class="text-xs text-gray-400 mt-1"><i data-lucide="mail" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> {{ email }}</p>{% endif %}
         </div>
 
         {# ============================================================ #}
@@ -59,7 +59,7 @@
         {% if matched_member %}
         <div class="eva-card rounded-lg p-6 mb-4">
             <div class="text-center mb-5">
-                <div class="text-4xl mb-3">👋</div>
+                <div class="text-4xl mb-3"></div>
                 <h2 class="text-xl font-bold text-eva-green mb-2">혹시 이 분 맞으신가요?</h2>
                 <div class="bg-gray-900/50 rounded-lg p-4 my-4">
                     <p class="text-2xl font-bold text-white">{{ matched_member.name }} 님</p>
@@ -98,7 +98,7 @@
             <div class="mt-4 pt-4 border-t border-gray-700 text-center">
                 <button type="button" onclick="document.getElementById('manual_section').classList.remove('hidden'); this.style.display='none';"
                     class="text-xs text-gray-400 hover:text-eva-green underline">
-                    🤔 저 아닌데요 / 다른 이름으로 등록되어 있어요
+                     저 아닌데요 / 다른 이름으로 등록되어 있어요
                 </button>
             </div>
         </div>
@@ -112,7 +112,7 @@
         {# ============================================================ #}
         {% if multiple_matches %}
         <div class="eva-card rounded-lg p-5 mb-4 bg-yellow-900/20 border-yellow-700">
-            <h2 class="text-base font-bold text-yellow-400 mb-2">⚠️ 같은 이름이 {{ multiple_matches|length }}명 있어요</h2>
+            <h2 class="text-base font-bold text-yellow-400 mb-2"><i data-lucide="triangle-alert" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 같은 이름이 {{ multiple_matches|length }}명 있어요</h2>
             <p class="text-xs text-gray-300">
                 동명이인이 있어 자동 매칭이 어렵습니다.<br>
                 아래에서 <strong>학번까지 입력</strong>해서 정확한 본인을 식별해주세요.
@@ -170,13 +170,13 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <button type="button" onclick="selectPath('link')" id="pathLink"
                 class="path-card rounded-lg p-4 text-left hover:border-eva-green">
-                <div class="text-2xl mb-2">🔗</div>
+                <div class="text-2xl mb-2"><i data-lucide="link" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></div>
                 <h2 class="text-base font-bold text-eva-green mb-1">기존 부원이에요</h2>
                 <p class="text-xs text-gray-400">동아리 명부에 등록되어 있어요. 이름·학번으로 본인 확인.</p>
             </button>
             <button type="button" onclick="selectPath('create')" id="pathCreate"
                 class="path-card rounded-lg p-4 text-left hover:border-eva-green">
-                <div class="text-2xl mb-2">✨</div>
+                <div class="text-2xl mb-2"><i data-lucide="sparkles" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></div>
                 <h2 class="text-base font-bold text-eva-green mb-1">신규 가입이에요</h2>
                 <p class="text-xs text-gray-400">처음입니다. 카카오 정보로 신청 후 관리자 승인.</p>
             </button>
@@ -193,7 +193,7 @@
 
             <!-- 기존 부원 입력 -->
             <div id="linkFields" class="eva-card rounded-lg p-5 hidden">
-                <h2 class="text-lg font-bold text-eva-green mb-2">🔗 기존 계정 연결</h2>
+                <h2 class="text-lg font-bold text-eva-green mb-2"><i data-lucide="link" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 기존 계정 연결</h2>
                 <p class="text-xs text-gray-400 mb-4">
                     이름과 학번이 모두 일치하면 <strong class="text-eva-green">즉시 자동 승인</strong>됩니다.<br>
                     학번 없이 이름만 입력하면 관리자 승인 대기 상태가 됩니다.
@@ -218,7 +218,7 @@
 
             <!-- 신규 가입 입력 -->
             <div id="createFields" class="eva-card rounded-lg p-5 hidden">
-                <h2 class="text-lg font-bold text-eva-green mb-2">✨ 신규 회원 가입</h2>
+                <h2 class="text-lg font-bold text-eva-green mb-2"><i data-lucide="sparkles" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 신규 회원 가입</h2>
                 <p class="text-xs text-gray-400 mb-4">
                     아래 카카오 정보로 가입 신청을 보냅니다.<br>
                     <strong class="text-yellow-400">관리자 승인 후</strong> 정상 활동이 가능합니다.
@@ -240,7 +240,7 @@
 
         <!-- 도움말 -->
         <details class="mt-6">
-            <summary class="cursor-pointer text-xs text-gray-400 hover:text-eva-green text-center">❓ 어느 쪽인지 잘 모르겠어요</summary>
+            <summary class="cursor-pointer text-xs text-gray-400 hover:text-eva-green text-center"><i data-lucide="circle-help" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 어느 쪽인지 잘 모르겠어요</summary>
             <div class="eva-card rounded-lg p-4 mt-3 text-xs text-gray-300 space-y-2">
                 <p><strong class="text-eva-green">기존 부원</strong>: 동아리 활동을 한 번이라도 한 적이 있다면 이쪽입니다. 운영진이 회원명부에 등록한 이름·학번으로 확인합니다.</p>
                 <p><strong class="text-eva-green">신규 가입</strong>: 처음 동아리에 들어왔다면 이쪽입니다. 관리자 승인 후 활동할 수 있습니다.</p>
@@ -251,7 +251,7 @@
         <!-- 보안/개인정보 안내 -->
         <div class="mt-6 p-3 rounded-lg bg-gray-900/50 border border-gray-700">
             <p class="text-[11px] text-gray-400 leading-relaxed">
-                🔒 <strong class="text-eva-green">카카오 OAuth 인증</strong>을 사용해 비밀번호를 직접 받지 않으며,
+                <i data-lucide="lock" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> <strong class="text-eva-green">카카오 OAuth 인증</strong>을 사용해 비밀번호를 직접 받지 않으며,
                 <strong>닉네임·프로필 사진·이메일</strong>만 동아리 운영 목적으로 사용합니다.
                 학번은 본인 확인용이며 외부에 공개되지 않습니다.
             </p>
@@ -332,6 +332,7 @@
             }
         }
     </script>
+{% include '_icons.html' %}
 </body>
 
 </html>

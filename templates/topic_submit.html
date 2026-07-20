@@ -72,18 +72,18 @@
     <div class="max-w-3xl mx-auto">
         <!-- 헤더 -->
         <div class="text-center mb-6">
-            <p class="text-xs text-gray-400 mb-1">📚 발제문 제출</p>
+            <p class="text-xs text-gray-400 mb-1"><i data-lucide="book" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 발제문 제출</p>
             <h1 class="text-2xl md:text-3xl font-bold text-eva-green">{{ event.book_title }}</h1>
             {% if event.book_author %}
             <p class="text-sm text-gray-300 mt-1">{{ event.book_author }}</p>
             {% endif %}
-            <p class="text-gray-400 mt-2 text-sm">📅 모임 날짜: {{ event.meeting_date }}</p>
+            <p class="text-gray-400 mt-2 text-sm"><i data-lucide="calendar" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 모임 날짜: {{ event.meeting_date }}</p>
         </div>
 
         <!-- 가이드 카드 -->
         <details class="eva-card rounded-lg mb-6 overflow-hidden">
             <summary class="cursor-pointer px-4 py-3 bg-gray-800/50 text-eva-green font-bold text-sm">
-                💡 처음이신가요? 작성 방법 보기
+                <i data-lucide="lightbulb" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 처음이신가요? 작성 방법 보기
             </summary>
             <div class="p-4 text-sm text-gray-300 space-y-2">
                 <p><strong class="text-eva-green">1단계.</strong> 아래 <strong>본인 확인</strong> 폼에 이름·소속·학번(또는 PIN 4자리)을 입력하고 <strong>확인하기</strong>를 누르세요.</p>
@@ -373,6 +373,7 @@
             if (el) el.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); tryVerify(); }});
         });
     </script>
+{% include '_icons.html' %}
 </body>
 
 </html>

@@ -133,7 +133,7 @@
                     <span id="memberName" class="text-eva-green font-bold"></span>
                     <button type="button" id="resetBtn" class="text-xs text-gray-400 hover:text-eva-green ml-2 underline">변경</button>
                 </div>
-                <button type="button" id="refreshBtn" class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">🔄 인원 새로고침</button>
+                <button type="button" id="refreshBtn" class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded"><i data-lucide="refresh-cw" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 인원 새로고침</button>
             </div>
 
             <form id="voteForm" class="space-y-6">
@@ -172,7 +172,7 @@
                             </div>
                             {% if s.book_title %}
                             <div class="mb-3 text-sm bg-gray-900/50 border border-gray-700 rounded px-3 py-2">
-                                <span class="text-gray-500">📚 도서:</span>
+                                <span class="text-gray-500"><i data-lucide="book" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 도서:</span>
                                 <span class="text-eva-green font-bold ml-1">{{ s.book_title }}</span>
                             </div>
                             {% endif %}
@@ -180,7 +180,7 @@
                             <p class="text-xs text-yellow-400">⏳ {{ s.voting_open_at }}부터 투표 가능 (마감 {{ s.voting_close_at }})</p>
                             {% else %}
                             {% if s.status == 'open' and not is_admin %}
-                            <p class="text-xs text-yellow-300 mb-2">🕛 마감: <strong>{{ s.voting_close_at }}</strong></p>
+                            <p class="text-xs text-yellow-300 mb-2"><i data-lucide="clock" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 마감: <strong>{{ s.voting_close_at }}</strong></p>
                             {% endif %}
                             <div class="grid grid-cols-3 gap-2 text-center text-sm">
                                 <input type="radio" name="vote_{{ s.id }}" id="yes_{{ s.id }}" value="yes" class="hidden peer/yes">
@@ -194,7 +194,7 @@
                             {% if is_admin or s.status == 'open' %}
                             <div class="mt-3 pt-3 border-t border-gray-700 attendee-section" data-session-id="{{ s.id }}">
                                 {% if s.attending_count >= 4 %}
-                                <div class="text-xs text-gray-400 mb-1.5 attendee-title">🙋 신청자 명단 ({{ s.attending_count }}명)</div>
+                                <div class="text-xs text-gray-400 mb-1.5 attendee-title"><i data-lucide="hand" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 신청자 명단 ({{ s.attending_count }}명)</div>
                                 <div class="flex flex-wrap gap-1.5 attendee-list">
                                     {% for nm in s.attendee_names %}
                                     <span class="text-xs bg-gray-800 border border-gray-700 rounded px-2 py-0.5">{{ nm }}</span>
@@ -218,7 +218,7 @@
                 <div class="submit-bar">
                     <button type="submit"
                         class="w-full bg-eva-green text-black font-extrabold py-4 rounded-lg text-lg hover:opacity-90 shadow-lg flex items-center justify-center gap-2">
-                        <span>✅ 투표 제출하기</span>
+                        <span><i data-lucide="circle-check" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 투표 제출하기</span>
                     </button>
                     <p class="text-center text-[11px] text-gray-400 mt-1.5">선택을 마친 뒤 이 버튼을 눌러야 저장됩니다</p>
                 </div>
@@ -229,7 +229,7 @@
         <!-- 마감된 회차: 내가 어떻게 투표했는지 확인 가능 -->
         {% if closed_sessions %}
         <div class="mt-8">
-            <h2 class="text-sm font-bold text-gray-400 mb-2">🔒 마감된 회차</h2>
+            <h2 class="text-sm font-bold text-gray-400 mb-2"><i data-lucide="lock" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 마감된 회차</h2>
             <p class="text-xs text-gray-500 mb-2">본인 확인을 마치면 각 회차에 내가 어떻게 투표했는지 표시됩니다.</p>
             <div class="space-y-2">
                 {% for s in closed_sessions %}
@@ -249,7 +249,7 @@
                         </div>
                     </div>
                     {% if s.book_title %}
-                    <div class="mt-1 text-xs text-gray-400">📚 {{ s.book_title }}</div>
+                    <div class="mt-1 text-xs text-gray-400"><i data-lucide="book" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> {{ s.book_title }}</div>
                     {% endif %}
                 </div>
                 {% endfor %}
@@ -342,7 +342,7 @@
                     if (!section) return;
                     const safe = (names || []).map(n => String(n).replace(/</g, '&lt;').replace(/>/g, '&gt;'));
                     section.innerHTML = `
-                        <div class="text-xs text-gray-400 mb-1.5 attendee-title">🙋 신청자 명단 (${safe.length}명)<span class="ml-1 text-eva-green">· 내가 참석으로 투표한 회차</span></div>
+                        <div class="text-xs text-gray-400 mb-1.5 attendee-title"> 신청자 명단 (${safe.length}명)<span class="ml-1 text-eva-green">· 내가 참석으로 투표한 회차</span></div>
                         <div class="flex flex-wrap gap-1.5 attendee-list">
                             ${safe.map(n => `<span class="text-xs bg-gray-800 border border-gray-700 rounded px-2 py-0.5">${n}</span>`).join('')}
                         </div>
@@ -368,7 +368,7 @@
                 ? `<span class="ml-1 text-eva-green">· 내가 참석으로 투표한 회차</span>`
                 : '';
             section.innerHTML = `
-                <div class="text-xs text-gray-400 mb-1.5 attendee-title">🙋 신청자 명단 (${safe.length}명)${label}</div>
+                <div class="text-xs text-gray-400 mb-1.5 attendee-title"> 신청자 명단 (${safe.length}명)${label}</div>
                 <div class="flex flex-wrap gap-1.5 attendee-list">
                     ${safe.map(n => `<span class="text-xs bg-gray-800 border border-gray-700 rounded px-2 py-0.5">${n}</span>`).join('')}
                 </div>
@@ -450,5 +450,6 @@
             } catch (err) { alert('오류: ' + err.message); }
         });
     </script>
+{% include '_icons.html' %}
 </body>
 </html>
