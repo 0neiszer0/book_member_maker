@@ -144,6 +144,15 @@ input:focus, select:focus, textarea:focus {
 .text-green-300, .text-green-400 { color: var(--moss-deep) !important; }
 .text-yellow-300, .text-yellow-400 { color: var(--warn) !important; }
 .text-red-300, .text-red-400 { color: var(--danger) !important; }
+/* 진한 상태 뱃지 배경 위에서는 같은 계열 텍스트 색이 배경과 겹쳐 안 보이므로 밝은 글자로 보정 */
+.bg-green-700.text-green-300, .bg-green-700.text-green-400,
+.bg-green-900\/50.text-green-300, .bg-green-900\/50.text-green-400,
+.bg-emerald-700.text-green-300, .bg-emerald-700.text-green-400,
+.bg-yellow-700.text-yellow-300, .bg-yellow-700.text-yellow-400,
+.bg-yellow-900\/50.text-yellow-300, .bg-yellow-900\/50.text-yellow-400,
+.bg-red-700.text-red-300, .bg-red-700.text-red-400,
+.bg-red-800.text-red-300, .bg-red-800.text-red-400,
+.bg-red-900\/50.text-red-300, .bg-red-900\/50.text-red-400 { color: #FAF6EC !important; }
 
 /* 헤더 그림자/보더 */
 header.bg-card-dark {
