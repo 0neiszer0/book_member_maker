@@ -778,8 +778,6 @@ def admin_dashboard():
     try:
         events_res = supabase.table('events').select('*').order('created_at', desc=True).execute().data
 
-        # 기존 demerit_points 및 interviewer 쿼리 제거
-        # department 컬럼이 DB에 없어 발생하는 42703 오류를 임시로 방지하기 위해 쿼리에서 제거
         all_members_res = supabase.table('members').select(
             'id, name, is_active, member_status, role, email, department, gender, student_id, recruiting_class'
         ).order('name').execute().data
@@ -853,15 +851,20 @@ def create_member():
         name = data.get('name', '').strip()
         if not name:
             return jsonify({"status": "error", "message": "이름은 필수입니다."}), 400
-        supabase.table('members').insert({
+        insert_fields = {
             'name': name,
-            'email': data.get('email', ''),
-            'gender': data.get('gender', ''),
             'role': data.get('role', 'member'),
             'member_status': 'active',
             'is_active': True,
             'account_status': 'active'
-        }).execute()
+        }
+        # 빈 문자열은 NULL로 (email은 UNIQUE 제약이 있어 ''가 중복되면 insert가 실패함)
+        for field in ('email', 'gender', 'department', 'student_id', 'recruiting_class'):
+            val = data.get(field)
+            if isinstance(val, str) and val.strip() == '':
+                val = None
+            insert_fields[field] = val
+        supabase.table('members').insert(insert_fields).execute()
         return jsonify({"status": "success", "message": f"{name} 멤버가 추가되었습니다."})
     except Exception as e:
         app.logger.error(f"Error creating member: {e}")
