@@ -445,6 +445,43 @@ def link_account_page():
                            multiple_matches=multiple_matches)
 
 
+@app.route('/api/link/lookup', methods=['POST'])
+def link_lookup():
+    """계정 연동 중 학번으로 미연동 멤버 프로필을 조회합니다.
+    이름은 일부 마스킹해서 반환하고, 실제 연결은 member_id + 학번 재검증으로 처리한다."""
+    if 'temp_social_data' not in session:
+        return jsonify({'error': '인증 세션이 만료되었습니다. 카카오 로그인부터 다시 진행해주세요.'}), 403
+    sid = ((request.json or {}).get('student_id') or '').strip()
+    if not sid.isdigit() or len(sid) < 4:
+        return jsonify({'error': '학번을 숫자로 정확히 입력해주세요.'}), 400
+    try:
+        res = supabase.table('members').select('id, name, department, recruiting_class, social_id') \
+            .eq('student_id', sid).execute()
+        rows = res.data or []
+        if not rows:
+            return jsonify({'found': False})
+        if all(r.get('social_id') for r in rows):
+            return jsonify({'found': False, 'already_linked': True})
+        m = next(r for r in rows if not r.get('social_id'))
+        name = (m.get('name') or '').strip()
+        if len(name) >= 3:
+            masked = name[0] + '*' * (len(name) - 2) + name[-1]
+        elif len(name) == 2:
+            masked = name[0] + '*'
+        else:
+            masked = name
+        return jsonify({
+            'found': True,
+            'member_id': m['id'],
+            'masked_name': masked,
+            'department': m.get('department') or '',
+            'recruiting_class': m.get('recruiting_class'),
+        })
+    except Exception as e:
+        app.logger.error(f"link_lookup error: {e}")
+        return jsonify({'error': '조회 중 오류가 발생했습니다.'}), 500
+
+
 @app.route('/link_account', methods=['POST'])
 def link_account_submit():
     if 'temp_social_data' not in session:
@@ -456,14 +493,20 @@ def link_account_submit():
 
     member = None
     if action == 'link':
+        member_id = form.get('member_id', '').strip()
         existing_name = form.get('existing_name', '').strip()
         student_id = form.get('student_id', '').strip()
-        if not existing_name:
+
+        if member_id:
+            # 학번 조회 흐름: /api/link/lookup으로 찾은 프로필을 선택한 경우
+            member_res = supabase.table("members").select("*").eq("id", member_id)\
+                .or_("social_id.is.null,social_id.eq.").execute()
+        elif existing_name:
+            member_res = supabase.table("members").select("*").eq("name", existing_name)\
+                .or_("social_id.is.null,social_id.eq.").execute()
+        else:
             flash("기존 활동명을 입력해주세요.", "danger")
             return redirect(url_for('link_account_page'))
-
-        member_res = supabase.table("members").select("*").eq("name", existing_name)\
-            .or_("social_id.is.null,social_id.eq.").execute()
         member_to_link = member_res.data[0] if member_res.data else None
 
         if member_to_link:
