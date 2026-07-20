@@ -161,7 +161,7 @@
 
         <div class="flex items-center justify-between flex-wrap gap-2">
             <div>
-                <h1 class="text-2xl font-bold text-eva-green" style="color: var(--eva-green)">🗓 세미나실 예약 현황</h1>
+                <h1 class="text-2xl font-bold text-eva-green" style="color: var(--eva-green)"><i data-lucide="calendar-days" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 세미나실 예약 현황</h1>
                 <p class="text-xs text-gray-400 mt-1">
                     경북대 총동연 게시판(dongari.knu.ac.kr) 캐시 기반 · 다른 동아리/세미나실 예약을 한눈에 확인
                 </p>
@@ -209,7 +209,7 @@
                 <button id="refreshBtn"
                     class="bg-eva-green text-black font-bold px-3 py-1.5 rounded text-sm hover:opacity-80"
                     style="background: var(--eva-green); color: #000">
-                    🔄 지금 새로고침
+                    <i data-lucide="refresh-cw" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 지금 새로고침
                 </button>
             </div>
         </div>
@@ -326,22 +326,22 @@
         <!-- 예약 신청 글 도우미 -->
         <div class="eva-card rounded-lg p-4">
             <h2 class="text-lg font-bold mb-1" style="color:var(--eva-green)">
-                ✍️ 예약 신청 글 도우미
+                <i data-lucide="pen-line" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 예약 신청 글 도우미
             </h2>
             <p class="text-xs text-gray-400 mb-4">
                 아래 설정을 채우면 게시판에 그대로 붙여넣을 <strong>제목/내용</strong>이 자동 생성됩니다.
-                "💾 저장"을 누르면 다음 방문에도 값이 유지됩니다.
+                "<i data-lucide="save" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 저장"을 누르면 다음 방문에도 값이 유지됩니다.
             </p>
 
-            <!-- ⚙️ 기본 설정 (DB 저장) -->
+            <!--  기본 설정 (DB 저장) -->
             <div class="border border-gray-700 rounded-lg p-3 mb-4 bg-gray-900/40">
                 <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-                    <h3 class="text-sm font-bold text-gray-200">⚙️ 기본 설정</h3>
+                    <h3 class="text-sm font-bold text-gray-200"><i data-lucide="settings" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 기본 설정</h3>
                     <div class="flex items-center gap-2">
                         <span id="saveStatus" class="text-[0.7rem] text-gray-500"></span>
                         <button type="button" id="saveSettingsBtn"
                             class="text-xs bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-1.5 rounded">
-                            💾 저장
+                            <i data-lucide="save" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 저장
                         </button>
                     </div>
                 </div>
@@ -388,7 +388,7 @@
                     </div>
                 </div>
                 <p class="text-[0.7rem] text-gray-500 mt-2 leading-relaxed">
-                    💡 학기 시작·종료일과 N일 범위는 <strong>예약 가능 날짜</strong> 계산에 사용됩니다.
+                    <i data-lucide="lightbulb" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 학기 시작·종료일과 N일 범위는 <strong>예약 가능 날짜</strong> 계산에 사용됩니다.
                     저장 후 페이지가 새로고침되어 후보 날짜가 다시 계산됩니다.
                 </p>
             </div>
@@ -433,7 +433,7 @@
             <div class="space-y-3">
                 <div>
                     <div class="flex items-center justify-between mb-1">
-                        <span class="text-xs text-gray-400">📋 제목</span>
+                        <span class="text-xs text-gray-400"><i data-lucide="clipboard-list" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 제목</span>
                         <button type="button" onclick="copyText('genTitle', this)"
                             class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">복사</button>
                     </div>
@@ -442,7 +442,7 @@
                 </div>
                 <div>
                     <div class="flex items-center justify-between mb-1">
-                        <span class="text-xs text-gray-400">📝 내용</span>
+                        <span class="text-xs text-gray-400"><i data-lucide="notebook-pen" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 내용</span>
                         <button type="button" onclick="copyText('genContent', this)"
                             class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">복사</button>
                     </div>
@@ -453,7 +453,7 @@
                     <a href="{{ write_url }}" target="_blank" rel="noopener"
                         class="font-bold px-3 py-2 rounded text-sm hover:opacity-80"
                         style="background:var(--eva-green); color:#000">
-                        ✏️ 총동연 글쓰기 페이지 열기 ↗
+                        <i data-lucide="pencil" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 총동연 글쓰기 페이지 열기 ↗
                     </a>
                     <span class="text-xs text-gray-500">로그인 후 제목/내용 붙여넣기</span>
                 </div>
@@ -468,7 +468,7 @@
 
         <!-- 안내 -->
         <div class="eva-card rounded-lg p-4 text-xs text-gray-400 leading-relaxed">
-            <strong class="text-gray-200">💡 어떻게 동작하나요?</strong>
+            <strong class="text-gray-200"><i data-lucide="lightbulb" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 어떻게 동작하나요?</strong>
             <ul class="list-disc list-inside mt-1 space-y-0.5">
                 <li>외부 게시판은 <code>requests + BeautifulSoup</code> 으로 <strong>로그인 없이</strong> 읽기만 합니다.</li>
                 <li>승인/반려된 글은 <em>종착 상태</em>로 보고 다시 가져오지 않습니다. 신규 글 + 대기(pending) 글만 재확인.</li>

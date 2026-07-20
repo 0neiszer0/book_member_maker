@@ -103,12 +103,12 @@
         <div class="eva-card p-6 rounded-lg">
             <h2 class="text-lg font-bold mb-4 text-eva-green">회차 목록 ({{ sessions|length }}개)</h2>
             <p class="text-xs text-gray-500 mb-3">
-                💡 책 제목은 인라인으로 즉시 저장됩니다. 회차 카드에서 <strong>참석자 관리</strong>·<strong>진행 기록 연동</strong>이 가능합니다.
+                <i data-lucide="lightbulb" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 책 제목은 인라인으로 즉시 저장됩니다. 회차 카드에서 <strong>참석자 관리</strong>·<strong>진행 기록 연동</strong>이 가능합니다.
             </p>
 
             {# === 예정/현재 회차 (펼친 상태) === #}
             {% if upcoming_sessions %}
-            <h3 class="text-sm font-bold text-eva-green mb-2">📅 예정/오늘 ({{ upcoming_sessions|length }}개)</h3>
+            <h3 class="text-sm font-bold text-eva-green mb-2"><i data-lucide="calendar" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 예정/오늘 ({{ upcoming_sessions|length }}개)</h3>
             <div class="space-y-3 mb-6">
                 {% for s in upcoming_sessions %}
                 {% include '_session_card.html' %}
@@ -120,7 +120,7 @@
             {% if past_sessions %}
             <details class="bg-gray-900/40 rounded-lg border border-border-dark">
                 <summary class="cursor-pointer px-4 py-3 text-sm text-gray-300 hover:text-white">
-                    🗂️ 지난 회차 {{ past_sessions|length }}개 보기
+                    <i data-lucide="folder-open" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 지난 회차 {{ past_sessions|length }}개 보기
                 </summary>
                 <div class="space-y-3 p-4">
                     {% for s in past_sessions %}

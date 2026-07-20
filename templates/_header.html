@@ -29,7 +29,7 @@
 <header class="wd-topbar">
   <div class="wd-topbar-inner">
     <a href="/" class="wd-brand">
-      <span class="wd-brand-mark">📚</span>
+      <span class="wd-brand-mark"><i data-lucide="book" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>
       <span class="wd-brand-text">책 먹는 호반우</span>
     </a>
 
@@ -70,33 +70,33 @@
           </button>
           <div id="profile-list" class="wd-dropdown-panel wd-dropdown-panel-sm">
             <a href="{{ url_for('my_page') }}" class="wd-menu-item">
-              <span class="wd-menu-ico">👤</span>마이페이지
+              <span class="wd-menu-ico"><i data-lucide="user" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>마이페이지
             </a>
             {% if session.user_role in ['admin', 'officer'] %}
               <div class="wd-menu-divider"></div>
               <div class="wd-menu-label">관리</div>
               <a href="{{ url_for('admin_dashboard') }}" class="wd-menu-item">
-                <span class="wd-menu-ico">⚙️</span>관리자 대시보드
+                <span class="wd-menu-ico"><i data-lucide="settings" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>관리자 대시보드
               </a>
               <a href="{{ url_for('bookclub_index') }}" class="wd-menu-item">
-                <span class="wd-menu-ico">🧩</span>조 편성
+                <span class="wd-menu-ico"><i data-lucide="puzzle" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>조 편성
               </a>
               {% if session.user_role == 'admin' %}
                 <a href="{{ url_for('records_hub') }}" class="wd-menu-item">
-                  <span class="wd-menu-ico">📊</span>기록 시스템
+                  <span class="wd-menu-ico"><i data-lucide="chart-column" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>기록 시스템
                 </a>
               {% endif %}
               <a href="{{ url_for('help_admin') }}" class="wd-menu-item">
-                <span class="wd-menu-ico">📖</span>운영 가이드
+                <span class="wd-menu-ico"><i data-lucide="book-open" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>운영 가이드
               </a>
             {% else %}
               <a href="{{ url_for('help_member') }}" class="wd-menu-item">
-                <span class="wd-menu-ico">📖</span>이용 안내
+                <span class="wd-menu-ico"><i data-lucide="book-open" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>이용 안내
               </a>
             {% endif %}
             <div class="wd-menu-divider"></div>
             <a href="{{ url_for('logout') }}" class="wd-menu-item wd-menu-quiet">
-              <span class="wd-menu-ico">🚪</span>로그아웃
+              <span class="wd-menu-ico"><i data-lucide="log-out" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>로그아웃
             </a>
           </div>
         </div>
@@ -498,3 +498,4 @@
     });
 })();
 </script>
+{% include '_icons.html' %}

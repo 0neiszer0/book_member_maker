@@ -50,7 +50,7 @@
             <div>
                 <a href="{{ url_for('kakao_login', mode='signup') }}"
                    class="flex items-center justify-center bg-transparent border-2 border-eva-green text-eva-green font-bold py-4 px-6 rounded-lg w-full hover:bg-eva-green hover:text-black transition-colors">
-                    <span>✨ 회원가입 / 계정 연결</span>
+                    <span><i data-lucide="sparkles" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 회원가입 / 계정 연결</span>
                 </a>
                 <p class="text-xs text-gray-500 mt-2 text-center">카카오 인증 후 본인 확인을 진행합니다</p>
             </div>
@@ -58,7 +58,7 @@
             <!-- 보안/개인정보 안내 -->
             <div class="mt-6 p-3 rounded-lg bg-gray-900/50 border border-gray-700">
                 <p class="text-[11px] text-gray-400 leading-relaxed">
-                    🔒 <strong class="text-eva-green">카카오 OAuth 인증</strong>을 사용해 비밀번호를 직접 받지 않으며,
+                    <i data-lucide="lock" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> <strong class="text-eva-green">카카오 OAuth 인증</strong>을 사용해 비밀번호를 직접 받지 않으며,
                     동아리 운영에 필요한 <strong>닉네임·프로필 사진·이메일</strong>만 받아 사용합니다.
                     카카오 비밀번호는 절대 저장되지 않습니다.
                 </p>
@@ -71,6 +71,7 @@
             </div>
         </div>
     </div>
+{% include '_icons.html' %}
 </body>
 </html>
 
