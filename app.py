@@ -2240,9 +2240,8 @@ def submit_topics():
         return jsonify({"error": "비회원은 4자리 PIN 번호를 입력해야 합니다."}), 400
 
     try:
-        # 기존 제출 내역 확인
-        existing_res = supabase.table('topic_submissions').select('id, pin_code').eq('event_id', event_id).eq(
-            'author_name', author_name).eq('department', department).execute()
+        # 기존 제출 내역 확인 (학번 우선 매칭 — 학과 표기만 바꿔 여러 건 제출하는 것 방지)
+        existing_record = _find_topic_submission(event_id, author_name, department, student_id)
 
         # 학번에서 입학년도 2자리 추출 (예: "2022123456" → "22")
         # student_id 가 4자 이상이면 3-4번째 문자 사용
@@ -2251,16 +2250,22 @@ def submit_topics():
         if len(sid) >= 4 and sid[2:4].isdigit():
             admission_year = sid[2:4]
 
-        if existing_res.data:
+        # 발제문 개수 제한: 기본 1개, 회장이 개별적으로 상향한 경우 그 한도까지
+        topic_limit = (existing_record or {}).get('topic_limit') or 1
+        if len(topics) > topic_limit:
+            return jsonify({"error": f"발제문은 {topic_limit}개까지 작성할 수 있습니다. 더 쓰고 싶다면 회장에게 문의해주세요."}), 400
+
+        if existing_record:
             # 수정 모드: 로그인한 본인이거나 PIN 번호가 일치해야 함
-            existing_record = existing_res.data[0]
             if not is_logged_in_member and existing_record['pin_code'] != pin_code:
                 return jsonify({"error": "PIN 번호가 일치하지 않습니다. (동명이인일 경우 학과를 다르게 입력해주세요)"}), 403
 
             # 업데이트 실행
-            update_payload = {'topics': topics, 'updated_at': 'now()'}
+            update_payload = {'topics': topics, 'updated_at': 'now()', 'department': department}
             if admission_year:
                 update_payload['admission_year'] = admission_year
+            if sid:
+                update_payload['student_id'] = sid
             supabase.table('topic_submissions').update(update_payload) \
                 .eq('id', existing_record['id']).execute()
             return jsonify({"status": "success", "message": "발제문이 성공적으로 수정되었습니다."})
@@ -2271,6 +2276,7 @@ def submit_topics():
                 'author_name': author_name,
                 'department': department,
                 'admission_year': admission_year or None,
+                'student_id': sid or None,
                 'pin_code': pin_code if not is_logged_in_member else 'MEMBER',
                 'topics': topics
             }).execute()
@@ -2279,6 +2285,21 @@ def submit_topics():
     except Exception as e:
         app.logger.error(f"Error submitting topics: {e}")
         return jsonify({"error": "제출 중 서버 오류가 발생했습니다."}), 500
+
+
+def _find_topic_submission(event_id, author_name, department, student_id):
+    """같은 이벤트에서 같은 사람의 기존 제출물을 찾는다.
+    학번이 있으면 (event_id, student_id)로 우선 매칭하고,
+    없거나 매칭 실패 시 과거 데이터 호환을 위해 (event_id, author_name, department)로 폴백한다."""
+    sid = (student_id or '').strip()
+    if sid:
+        res = supabase.table('topic_submissions').select('*') \
+            .eq('event_id', event_id).eq('student_id', sid).execute()
+        if res.data:
+            return res.data[0]
+    res = supabase.table('topic_submissions').select('*') \
+        .eq('event_id', event_id).eq('author_name', author_name).eq('department', department).execute()
+    return res.data[0] if res.data else None
 
 
 # 3.5. 사용자: 발제문 불러오기 API
@@ -2315,15 +2336,17 @@ def load_topics():
         return jsonify({"error": "비회원은 4자리 PIN 번호를 입력해야 합니다."}), 400
 
     try:
-        existing_res = supabase.table('topic_submissions').select('*').eq('event_id', event_id).eq(
-            'author_name', author_name).eq('department', department).execute()
+        existing_record = _find_topic_submission(event_id, author_name, department, student_id)
 
-        if existing_res.data:
-            existing_record = existing_res.data[0]
+        if existing_record:
             if not is_logged_in_member and str(existing_record['pin_code']) != str(pin_code):
                 return jsonify({"error": "PIN 번호가 일치하지 않습니다. (동명이인일 경우 학과를 다르게 입력해주세요)"}), 403
 
-            return jsonify({"status": "success", "topics": existing_record['topics']})
+            return jsonify({
+                "status": "success",
+                "topics": existing_record['topics'],
+                "topic_limit": existing_record.get('topic_limit') or 1,
+            })
         else:
             return jsonify({"error": "작성된 발제문 내역이 없습니다. 처음 작성하는 것이 맞나요?"}), 404
 
@@ -2363,6 +2386,23 @@ def admin_update_topic_submission(submission_id):
     except Exception as e:
         app.logger.error(f"admin_update_topic_submission error: {e}")
         return jsonify({"error": "수정 중 오류가 발생했습니다."}), 500
+
+
+@app.route('/api/admin/topic_submissions/<submission_id>/set_limit', methods=['POST'])
+@login_required(role="admin")
+def admin_set_topic_limit(submission_id):
+    """회장이 특정 제출자의 발제문 한도를 개별적으로 조정합니다."""
+    try:
+        limit = int((request.json or {}).get('topic_limit', 1))
+        if not (1 <= limit <= 10):
+            return jsonify({"error": "한도는 1~10 사이여야 합니다."}), 400
+        supabase.table('topic_submissions').update({'topic_limit': limit}).eq('id', submission_id).execute()
+        return jsonify({"status": "success", "message": f"발제문 한도가 {limit}개로 변경되었습니다."})
+    except (TypeError, ValueError):
+        return jsonify({"error": "올바른 숫자를 입력해주세요."}), 400
+    except Exception as e:
+        app.logger.error(f"admin_set_topic_limit error: {e}")
+        return jsonify({"error": "한도 변경 중 오류가 발생했습니다."}), 500
 
 
 # 3.8 관리자: 발제문 상세 보기 및 취합 페이지

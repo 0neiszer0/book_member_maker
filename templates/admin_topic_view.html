@@ -92,6 +92,14 @@
                     </h2>
                     <div class="flex items-center gap-2">
                         <span class="text-xs text-gray-500">{{ sub.created_at | datetime('%Y-%m-%d %H:%M') }}</span>
+                        <label class="text-xs text-gray-400 flex items-center gap-1" title="이 제출자가 작성할 수 있는 발제문 개수 (기본 1개)">
+                            한도
+                            <select class="limit-select eva-input rounded text-xs py-1 px-1">
+                                {% for n in range(1, 11) %}
+                                <option value="{{ n }}" {% if (sub.topic_limit or 1) == n %}selected{% endif %}>{{ n }}개</option>
+                                {% endfor %}
+                            </select>
+                        </label>
                         <button type="button" class="btn-mini bg-blue-600 hover:bg-blue-500 text-white edit-btn">✏️ 편집</button>
                         <button type="button" class="btn-mini bg-red-700 hover:bg-red-600 text-white delete-btn">🗑️ 삭제</button>
                     </div>
@@ -234,6 +242,23 @@
                     location.reload();
                 } catch (err) {
                     alert('오류: ' + err.message);
+                }
+            });
+
+            card.querySelector('.limit-select').addEventListener('change', async (e) => {
+                const select = e.target;
+                const newLimit = parseInt(select.value);
+                try {
+                    const res = await fetch(`/api/admin/topic_submissions/${subId}/set_limit`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ topic_limit: newLimit }),
+                    });
+                    const result = await res.json();
+                    if (!res.ok) throw new Error(result.error || '한도 변경 실패');
+                } catch (err) {
+                    alert('오류: ' + err.message);
+                    location.reload();
                 }
             });
 
