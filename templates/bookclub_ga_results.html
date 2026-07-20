@@ -236,8 +236,11 @@
                     });
                     const result = await response.json();
                     if (result.status === 'ok') {
-                        alert('성공적으로 저장되었습니다!');
-                        window.location.href = "/making_team";
+                        if (result.history_id && confirm('저장되었습니다!\n\n저장된 조 편성을 바로 확인/수정하러 갈까요?\n(인원 추가·제외, 조 이동을 그 페이지에서 할 수 있습니다)')) {
+                            window.location.href = `/records/seminars/${result.history_id}`;
+                        } else {
+                            window.location.href = "/making_team";
+                        }
                     } else { throw new Error(result.message || '저장에 실패했습니다.'); }
                 } catch (error) { alert('오류: ' + error.message); }
             }
