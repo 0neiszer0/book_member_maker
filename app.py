@@ -447,16 +447,19 @@ def link_account_page():
 
 @app.route('/api/link/lookup', methods=['POST'])
 def link_lookup():
-    """계정 연동 중 학번으로 미연동 멤버 프로필을 조회합니다.
-    이름은 일부 마스킹해서 반환하고, 실제 연결은 member_id + 학번 재검증으로 처리한다."""
+    """계정 연동 중 이름과 학번으로 미연동 멤버 프로필을 조회합니다."""
     if 'temp_social_data' not in session:
         return jsonify({'error': '인증 세션이 만료되었습니다. 카카오 로그인부터 다시 진행해주세요.'}), 403
-    sid = ((request.json or {}).get('student_id') or '').strip()
+    data = request.json or {}
+    name = (data.get('name') or '').strip()
+    sid = (data.get('student_id') or '').strip()
+    if not name:
+        return jsonify({'error': '동아리 명부에 등록된 이름을 입력해주세요.'}), 400
     if not sid.isdigit() or len(sid) < 4:
         return jsonify({'error': '학번을 숫자로 정확히 입력해주세요.'}), 400
     try:
         res = supabase.table('members').select('id, name, department, recruiting_class, social_id') \
-            .eq('student_id', sid).execute()
+            .eq('student_id', sid).eq('name', name).execute()
         rows = res.data or []
         if not rows:
             return jsonify({'found': False})
@@ -472,7 +475,6 @@ def link_lookup():
             masked = name
         return jsonify({
             'found': True,
-            'member_id': m['id'],
             'masked_name': masked,
             'department': m.get('department') or '',
             'recruiting_class': m.get('recruiting_class'),
@@ -493,13 +495,13 @@ def link_account_submit():
 
     member = None
     if action == 'link':
-        member_id = form.get('member_id', '').strip()
         existing_name = form.get('existing_name', '').strip()
         student_id = form.get('student_id', '').strip()
 
-        if member_id:
-            # 학번 조회 흐름: /api/link/lookup으로 찾은 프로필을 선택한 경우
-            member_res = supabase.table("members").select("*").eq("id", member_id)\
+        if existing_name and student_id:
+            # 자동 승인 경로는 이름과 학번을 서버에서 다시 함께 검증합니다.
+            member_res = supabase.table("members").select("*").eq("name", existing_name)\
+                .eq("student_id", student_id)\
                 .or_("social_id.is.null,social_id.eq.").execute()
         elif existing_name:
             member_res = supabase.table("members").select("*").eq("name", existing_name)\
@@ -510,9 +512,14 @@ def link_account_submit():
         member_to_link = member_res.data[0] if member_res.data else None
 
         if member_to_link:
-            # 학번음 입력했고 DB 학번과 일치하면 자동 승인
-            db_student_id = member_to_link.get('student_id')
-            auto_approve = student_id and db_student_id and str(student_id).strip() == str(db_student_id).strip()
+            # 이름과 학번이 모두 DB 값과 정확히 일치할 때만 자동 승인합니다.
+            db_student_id = str(member_to_link.get('student_id') or '').strip()
+            db_name = str(member_to_link.get('name') or '').strip()
+            auto_approve = bool(
+                existing_name and student_id
+                and existing_name == db_name
+                and student_id == db_student_id
+            )
 
             update_data = {
                 "social_id": social_info['social_id'],
