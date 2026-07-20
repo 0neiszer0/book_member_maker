@@ -16,7 +16,7 @@
             <div class="flex gap-2 w-full md:w-auto">
                 <button type="button" id="openMergeBtn"
                     class="bg-yellow-700 hover:bg-yellow-600 text-white text-xs px-3 py-2 rounded whitespace-nowrap">
-                    🧩 멤버 합치기
+                    <i data-lucide="puzzle" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 멤버 합치기
                 </button>
                 <input type="text" id="memberSearch" placeholder="이름·학번·학과로 검색"
                     class="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm w-full md:w-72">
@@ -27,7 +27,7 @@
         <div id="mergePanel" class="eva-card rounded-lg p-5 mb-6 hidden">
             <div class="flex justify-between items-start mb-3">
                 <div>
-                    <h2 class="text-lg font-bold text-yellow-400">🧩 중복 멤버 합치기</h2>
+                    <h2 class="text-lg font-bold text-yellow-400"><i data-lucide="puzzle" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 중복 멤버 합치기</h2>
                     <p class="text-xs text-gray-400 mt-1">
                         예: "민수"로 가입했던 활동을 "김민수" 계정으로 모두 이전합니다.
                         <strong class="text-red-400">source 멤버는 삭제</strong>되며, 모든 활동(세미나·발제·벽돌책·소모임·스페셜이벤트)이 target 으로 이전됩니다.
@@ -162,15 +162,15 @@
                 const data = await res.json();
                 if (data.status === 'success') {
                     resultBox.className = 'mt-3 text-sm text-eva-green';
-                    resultBox.innerHTML = '✅ 합치기 완료. 페이지를 새로고침합니다...<br><pre class="text-xs text-gray-400 mt-2">' + JSON.stringify(data.moved, null, 2) + '</pre>';
+                    resultBox.innerHTML = '합치기 완료. 페이지를 새로고침합니다...<br><pre class="text-xs text-gray-400 mt-2">'+ JSON.stringify(data.moved, null, 2) + '</pre>';
                     setTimeout(() => location.reload(), 1500);
                 } else {
                     resultBox.className = 'mt-3 text-sm text-red-400';
-                    resultBox.textContent = '❌ ' + (data.message || '실패');
+                    resultBox.textContent = ''+ (data.message || '실패');
                 }
             } catch (e) {
                 resultBox.className = 'mt-3 text-sm text-red-400';
-                resultBox.textContent = '❌ ' + e.message;
+                resultBox.textContent = ''+ e.message;
             }
         });
     </script>

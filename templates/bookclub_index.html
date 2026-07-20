@@ -265,7 +265,7 @@
                 <a href="?day=thu" class="px-2 py-1 rounded font-bold {% if day_choice == 'thu' %}bg-purple-500 text-white{% else %}bg-gray-700 text-purple-300 hover:bg-gray-600{% endif %}">목 {% if thu_date %}({{ thu_date[5:] }}){% endif %} · {{ thu_attendee_ids|length }}명</a>
                 <a href="?day=all" class="px-2 py-1 rounded font-bold {% if day_choice == 'all' %}bg-eva-green text-black{% else %}bg-gray-700 text-gray-200 hover:bg-gray-600{% endif %}">합산</a>
             </div>
-            <button type="button" id="quick-voted" class="text-xs px-2 py-1 rounded font-bold" style="background: var(--eva-green); color: #000;">🗳 투표자만</button>
+            <button type="button" id="quick-voted" class="text-xs px-2 py-1 rounded font-bold" style="background: var(--eva-green); color: #000;"><i data-lucide="vote" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 투표자만</button>
         </div>
     </div>
     <div class="container mx-auto max-w-2xl px-4 mt-3 text-xs text-gray-400">
@@ -292,7 +292,7 @@
                         </div>
                         <p id="bulk-present-msg" class="text-xs text-gray-400 mt-1"></p>
                     </div>
-                    <input type="text" class="filter-input" data-filter-target="present" placeholder="🔍 이름으로 검색…">
+                    <input type="text" class="filter-input" data-filter-target="present" placeholder=" 이름으로 검색…">
                     {% for m in all_members %}
                     <label class="form-check {% if m.id in pre_checked_attendee_ids %}is-prechecked{% endif %}" data-name="{{ m.name }}">
                         <input type="checkbox" name="present" value="{{ m.name }}" {% if m.id in
@@ -319,7 +319,7 @@
                         </div>
                         <p id="bulk-facilitators-msg" class="text-xs text-gray-400 mt-1"></p>
                     </div>
-                    <input type="text" class="filter-input" data-filter-target="facilitators" placeholder="🔍 이름으로 검색…">
+                    <input type="text" class="filter-input" data-filter-target="facilitators" placeholder=" 이름으로 검색…">
                     {% for m in all_members %}
                     <label class="form-check" data-name="{{ m.name }}">
                         <input type="checkbox" name="facilitators" value="{{ m.name }}">
@@ -330,7 +330,7 @@
             </details>
 
             <details class="section">
-                <summary>⚙️ Advanced Settings</summary>
+                <summary><i data-lucide="settings" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> Advanced Settings</summary>
                 <div class="settings">
                     <label>그룹 수 (선택)
                         <input type="number" name="group_count" min="1" max="30" placeholder="자동">
@@ -346,7 +346,7 @@
 
         <div class="mt-6 text-center space-x-4">
             <a href="/records/seminars"
-                class="text-sm text-eva-green hover:opacity-80 font-bold">📚 세미나 기록 페이지로</a>
+                class="text-sm text-eva-green hover:opacity-80 font-bold"><i data-lucide="book" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 세미나 기록 페이지로</a>
             <button type="button" id="manage-history-btn"
                 class="text-sm text-gray-400 hover:text-eva-green font-bold">이전 모임 기록 관리(빠른 보기)</button>
         </div>
@@ -470,8 +470,8 @@
                     }
                 });
 
-                let msg = `✅ ${matched.length}명 선택됨`;
-                if (unmatched.length) msg += ` · ⚠ 미일치 ${unmatched.length}명: ${unmatched.join(', ')}`;
+                let msg = `${matched.length}명 선택됨`;
+                if (unmatched.length) msg += `·  미일치 ${unmatched.length}명: ${unmatched.join(', ')}`;
                 msgEl.textContent = msg;
                 msgEl.className = unmatched.length
                     ? 'text-xs text-yellow-300 mt-1'
@@ -534,7 +534,7 @@
                         Object.entries(byDate).sort(([a], [b]) => b.localeCompare(a)).forEach(([date, recs]) => {
                             html += `<div class="border border-gray-600 rounded-lg overflow-hidden">
                         <div class="bg-gray-700 px-4 py-2 font-bold text-eva-green flex justify-between items-center">
-                            <span>📅 ${date}</span>
+                            <span> ${date}</span>
                             <span class="text-xs text-gray-300">${recs.length}개 기록</span>
                         </div>`;
 

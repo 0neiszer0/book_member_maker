@@ -12,7 +12,7 @@
         {{ term_filter(terms, selected_term_id, 'records_brick_books') }}
 
         <div class="flex items-center justify-between mb-6">
-            <h1 class="text-2xl font-bold text-eva-orange">🧱 벽돌책 ({{ books|length }}권)</h1>
+            <h1 class="text-2xl font-bold text-eva-orange"><i data-lucide="blocks" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 벽돌책 ({{ books|length }}권)</h1>
             <button onclick="document.getElementById('newBookModal').showModal()"
                 class="bg-eva-green text-black font-bold py-2 px-4 rounded text-sm hover:opacity-80">+ 새 벽돌책</button>
         </div>
@@ -23,7 +23,7 @@
                 class="eva-card p-5 rounded-lg block transition">
                 <h3 class="text-base font-bold text-eva-orange mb-2">{{ b.title }}</h3>
                 {% if b.notes %}<p class="text-xs text-gray-400 mb-3 line-clamp-2">{{ b.notes }}</p>{% endif %}
-                <div class="text-eva-green font-bold text-sm">📅 {{ b.session_count }}회 진행</div>
+                <div class="text-eva-green font-bold text-sm"><i data-lucide="calendar" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> {{ b.session_count }}회 진행</div>
             </a>
             {% else %}
             <div class="col-span-full eva-card p-8 rounded-lg text-center text-gray-500">

@@ -39,7 +39,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <!-- 세미나 참여 이력 -->
             <div class="eva-card p-5 rounded-lg">
-                <h2 class="text-lg font-bold text-eva-green mb-4">📖 세미나 참여 ({{ seminar_count }}회)</h2>
+                <h2 class="text-lg font-bold text-eva-green mb-4"><i data-lucide="book-open" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 세미나 참여 ({{ seminar_count }}회)</h2>
                 {% if seminar_records %}
                 <div class="overflow-y-auto max-h-96 space-y-1.5">
                     {% for s in seminar_records %}
@@ -64,7 +64,7 @@
             <div class="space-y-6">
                 <!-- 벽돌책 -->
                 <div class="eva-card p-5 rounded-lg">
-                    <h2 class="text-lg font-bold text-eva-orange mb-4">🧱 벽돌책 세션 ({{ brick_sessions|length }})</h2>
+                    <h2 class="text-lg font-bold text-eva-orange mb-4"><i data-lucide="blocks" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 벽돌책 세션 ({{ brick_sessions|length }})</h2>
                     {% if brick_sessions %}
                     <div class="space-y-1.5 max-h-48 overflow-y-auto">
                         {% for s in brick_sessions %}
@@ -82,7 +82,7 @@
 
                 <!-- 소모임 -->
                 <div class="eva-card p-5 rounded-lg">
-                    <h2 class="text-lg font-bold text-blue-400 mb-4">🤝 소모임 세션 ({{ study_sessions|length }})</h2>
+                    <h2 class="text-lg font-bold text-blue-400 mb-4"><i data-lucide="handshake" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 소모임 세션 ({{ study_sessions|length }})</h2>
                     {% if study_sessions %}
                     <div class="space-y-1.5 max-h-48 overflow-y-auto">
                         {% for s in study_sessions %}
@@ -102,7 +102,7 @@
 
         <!-- 스페셜 이벤트 -->
         <div class="eva-card p-5 rounded-lg mt-6">
-            <h2 class="text-lg font-bold text-eva-green mb-4">✨ 스페셜 이벤트 ({{ (special_events or [])|length }}회)</h2>
+            <h2 class="text-lg font-bold text-eva-green mb-4"><i data-lucide="sparkles" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 스페셜 이벤트 ({{ (special_events or [])|length }}회)</h2>
             {% if special_events %}
             <div class="overflow-y-auto max-h-96 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {% for ev in special_events %}

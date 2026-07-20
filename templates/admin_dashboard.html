@@ -144,7 +144,7 @@
             <a href="{{ url_for('admin_special_events') }}"
                 class="eva-card rounded-lg p-4 hover:border-eva-green transition flex items-center justify-between">
                 <div>
-                    <div class="font-bold text-eva-green">✨ 스페셜 이벤트</div>
+                    <div class="font-bold text-eva-green"><i data-lucide="sparkles" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 스페셜 이벤트</div>
                     <div class="text-xs text-gray-400 mt-1">MT, 워크숍, 강연 등 세미나 외 활동</div>
                 </div>
                 <span class="text-2xl">→</span>
@@ -152,7 +152,7 @@
             <a href="{{ url_for('admin_attendance_matrix') }}"
                 class="eva-card rounded-lg p-4 hover:border-eva-green transition flex items-center justify-between">
                 <div>
-                    <div class="font-bold text-eva-green">📊 출석 매트릭스</div>
+                    <div class="font-bold text-eva-green"><i data-lucide="chart-column" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 출석 매트릭스</div>
                     <div class="text-xs text-gray-400 mt-1">기간별 회원×회차 표 + 엑셀 내보내기</div>
                 </div>
                 <span class="text-2xl">→</span>
@@ -160,7 +160,7 @@
             <a href="{{ url_for('admin_seminar_rooms') }}"
                 class="eva-card rounded-lg p-4 hover:border-eva-green transition flex items-center justify-between">
                 <div>
-                    <div class="font-bold text-eva-green">🗓 세미나실 예약 현황</div>
+                    <div class="font-bold text-eva-green"><i data-lucide="calendar-days" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 세미나실 예약 현황</div>
                     <div class="text-xs text-gray-400 mt-1">총동연 게시판 캐시 · 달력 보기 · 다른 동아리 예약 확인</div>
                 </div>
                 <span class="text-2xl">→</span>
@@ -261,7 +261,7 @@
                 <!-- 스페셜 이벤트 (MT/워크숍/강연/친목) -->
                 <div id="sec-special" class="eva-card p-6 rounded-lg scroll-mt-20 mb-6">
                     <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
-                        <h2 class="text-xl font-bold text-eva-green">🎉 스페셜 이벤트</h2>
+                        <h2 class="text-xl font-bold text-eva-green"><i data-lucide="party-popper" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 스페셜 이벤트</h2>
                         <a href="{{ url_for('admin_special_events') }}"
                            class="text-sm bg-eva-green text-black font-bold px-3 py-1.5 rounded hover:opacity-80">
                             관리 페이지로 →
@@ -276,7 +276,7 @@
                 <!-- 출석 매트릭스 (관리자 도구) -->
                 <div class="eva-card p-6 rounded-lg scroll-mt-20 mb-6">
                     <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
-                        <h2 class="text-xl font-bold text-eva-green">📊 출석 매트릭스</h2>
+                        <h2 class="text-xl font-bold text-eva-green"><i data-lucide="chart-column" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 출석 매트릭스</h2>
                         <a href="{{ url_for('admin_attendance_matrix') }}"
                            class="text-sm bg-eva-green text-black font-bold px-3 py-1.5 rounded hover:opacity-80">
                             매트릭스 보기 →
@@ -291,7 +291,7 @@
                 <div id="sec-seminars" class="eva-card p-6 rounded-lg scroll-mt-20">
                     <h2 class="text-xl font-bold text-eva-green mb-4">세미나 출석 투표 관리</h2>
                     <p class="text-xs text-gray-500 mb-4">
-                        💡 투표는 세미나 <strong>전주 금요일 18:00 ~ 일요일 23:59 KST</strong>까지 가능합니다.
+                        <i data-lucide="lightbulb" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 투표는 세미나 <strong>전주 금요일 18:00 ~ 일요일 23:59 KST</strong>까지 가능합니다.
                         그 후엔 회차 관리에서 관리자가 직접 명단을 수정하세요.
                     </p>
 
@@ -687,7 +687,7 @@
         }
 
         async function deleteTopicEvent(eventId, bookTitle) {
-            if (!confirm(`⚠️ '${bookTitle}' 이벤트를 영구 삭제합니다.\n\n제출된 모든 발제문도 함께 삭제되며 복구할 수 없습니다.\n\n사용자에게만 숨기려면 '숨기기' 버튼을 사용하세요.\n\n계속하시겠습니까?`)) return;
+            if (!confirm(`'${bookTitle}'이벤트를 영구 삭제합니다.\n\n제출된 모든 발제문도 함께 삭제되며 복구할 수 없습니다.\n\n사용자에게만 숨기려면 '숨기기'버튼을 사용하세요.\n\n계속하시겠습니까?`)) return;
             const confirmText = prompt(`정말 삭제하려면 책 제목을 그대로 입력하세요:\n${bookTitle}`);
             if (confirmText !== bookTitle) {
                 if (confirmText !== null) alert('책 제목이 일치하지 않아 삭제를 취소했습니다.');

@@ -130,7 +130,7 @@
             </div>
             <a href="{{ url_for('help_member') }}"
                 class="text-xs bg-gray-700 hover:bg-eva-green hover:text-black border border-gray-600 px-3 py-1.5 rounded transition">
-                📖 이용 안내
+                <i data-lucide="book-open" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 이용 안내
             </a>
         </div>
 
@@ -168,7 +168,7 @@
 
         <!-- 지금 할 일 -->
         <section class="mb-6">
-            <h2 class="section-title">⚡ 지금 할 일</h2>
+            <h2 class="section-title"><i data-lucide="zap" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 지금 할 일</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                 {% if my_open_votes %}
@@ -176,7 +176,7 @@
                 <div class="action-card md:col-span-2">
                     <div class="flex items-start justify-between flex-wrap gap-2 mb-1">
                         <div>
-                            <div class="title">🗳️ 다음 세미나 참석 투표</div>
+                            <div class="title"><i data-lucide="vote" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 다음 세미나 참석 투표</div>
                             <div class="desc">현재 {{ my_open_votes|length }}개 회차에 투표할 수 있습니다.</div>
                         </div>
                     </div>
@@ -198,7 +198,7 @@
                 {% elif active_seminar_terms %}
                 <!-- 투표 창이 닫혀 있어도 학기 페이지로 들어갈 수 있게 -->
                 <div class="action-card md:col-span-2">
-                    <div class="title">🗳️ 세미나 참석 투표 페이지</div>
+                    <div class="title"><i data-lucide="vote" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 세미나 참석 투표 페이지</div>
                     <div class="desc">학기 전체 회차와 다른 회원들의 신청 현황을 볼 수 있습니다.</div>
                     <div class="flex flex-wrap gap-2 mt-1">
                         {% for t in active_seminar_terms %}
@@ -214,7 +214,7 @@
 
                 <!-- 발제문 제출 -->
                 <div class="action-card">
-                    <div class="title">📝 발제문 제출</div>
+                    <div class="title"><i data-lucide="notebook-pen" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 발제문 제출</div>
                     <div class="desc">
                         {% if active_topic_events %}진행 중 {{ active_topic_events|length }}건. 클릭해 작성·수정하세요.
                         {% else %}현재 진행 중인 발제문 수집이 없습니다.{% endif %}
@@ -235,7 +235,7 @@
 
                 <!-- 위키 -->
                 <div class="action-card">
-                    <div class="title">📖 독서모임 위키</div>
+                    <div class="title"><i data-lucide="book-open" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 독서모임 위키</div>
                     <div class="desc">지식 위키를 열람하고 새 문서를 작성해보세요.</div>
                     <a href="{{ url_for('view_all_documents') }}" class="pill pill-purple w-full">위키 열기</a>
                 </div>
@@ -245,7 +245,7 @@
 
         <!-- 내 활동 기록 -->
         <section class="mb-6">
-            <h2 class="section-title">📚 내 최근 활동</h2>
+            <h2 class="section-title"><i data-lucide="book" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 내 최근 활동</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 
                 <!-- 최근 세미나 -->
@@ -290,7 +290,7 @@
 
                 <!-- 스페셜 이벤트 -->
                 <div class="eva-card rounded-xl p-4">
-                    <h3 class="text-sm font-bold text-eva-green mb-3">✨ 스페셜 이벤트</h3>
+                    <h3 class="text-sm font-bold text-eva-green mb-3"><i data-lucide="sparkles" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 스페셜 이벤트</h3>
                     <div class="space-y-1.5 max-h-64 overflow-y-auto pr-1">
                         {% for ev in (my_special_events or []) %}
                         <div class="block px-3 py-2 rounded bg-gray-800/50 text-xs">
