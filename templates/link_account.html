@@ -134,13 +134,15 @@
         </p>
         {% endif %}
 
-        <!-- 학번으로 내 프로필 찾기 (가장 빠른 경로) -->
+        <!-- 이름과 학번으로 내 프로필 찾기 (가장 빠른 경로) -->
         <div class="eva-card rounded-lg p-5 mb-4 border-eva-green">
-            <h2 class="text-base font-bold text-eva-green mb-1">학번으로 내 프로필 찾기</h2>
-            <p class="text-xs text-gray-400 mb-3">동아리 명부에 등록된 부원이라면 학번만 입력하면 바로 연결됩니다.</p>
-            <div class="flex gap-2">
-                <input type="text" id="lookupSid" class="eva-input flex-1 rounded py-2 px-3 text-sm"
-                    placeholder="예: 2022123456" inputmode="numeric">
+            <h2 class="text-base font-bold text-eva-green mb-1">이름·학번으로 내 프로필 찾기</h2>
+            <p class="text-xs text-gray-400 mb-3">동아리 명부에 등록된 이름과 학번이 모두 일치하면 바로 연결됩니다.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2">
+                <input type="text" id="lookupName" class="eva-input rounded py-2 px-3 text-sm"
+                    placeholder="이름 (예: 홍길동)" value="{{ social_name }}" autocomplete="name">
+                <input type="text" id="lookupSid" class="eva-input rounded py-2 px-3 text-sm"
+                    placeholder="학번 (예: 2022123456)" inputmode="numeric" autocomplete="off">
                 <button type="button" onclick="lookupProfile()"
                     class="bg-eva-green text-black font-bold px-4 py-2 rounded text-sm hover:opacity-80">조회</button>
             </div>
@@ -154,7 +156,7 @@
                 </div>
                 <form action="{{ url_for('link_account_submit') }}" method="POST" class="mt-3">
                     <input type="hidden" name="action" value="link">
-                    <input type="hidden" name="member_id" id="lookupMemberId" value="">
+                    <input type="hidden" name="existing_name" id="lookupNameHidden" value="">
                     <input type="hidden" name="student_id" id="lookupSidHidden" value="">
                     <button type="submit"
                         class="w-full bg-eva-green text-black font-bold py-3 rounded-lg hover:opacity-80 transition">
@@ -264,11 +266,17 @@
 
     <script>
         async function lookupProfile() {
+            const name = document.getElementById('lookupName').value.trim();
             const sid = document.getElementById('lookupSid').value.trim();
             const msg = document.getElementById('lookupMsg');
             const result = document.getElementById('lookupResult');
             msg.classList.add('hidden');
             result.classList.add('hidden');
+            if (!name) {
+                msg.textContent = '동아리 명부에 등록된 이름을 입력해주세요.';
+                msg.classList.remove('hidden');
+                return;
+            }
             if (!/^[0-9]{4,10}$/.test(sid)) {
                 msg.textContent = '학번을 숫자로 정확히 입력해주세요. (예: 2022123456)';
                 msg.classList.remove('hidden');
@@ -278,14 +286,14 @@
                 const res = await fetch('/api/link/lookup', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ student_id: sid }),
+                    body: JSON.stringify({ name, student_id: sid }),
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || '조회 실패');
                 if (!data.found) {
                     msg.textContent = data.already_linked
-                        ? '이 학번은 이미 다른 카카오 계정과 연결되어 있어요. 본인 계정이 맞다면 관리자에게 문의해주세요.'
-                        : '해당 학번으로 등록된 부원을 찾지 못했어요. 아래에서 이름으로 연결하거나 신규 가입해주세요.';
+                        ? '이름·학번이 일치하는 프로필은 이미 다른 카카오 계정과 연결되어 있어요. 본인 계정이 맞다면 관리자에게 문의해주세요.'
+                        : '이름과 학번이 모두 일치하는 부원을 찾지 못했어요. 입력 내용을 확인하거나 아래에서 관리자 승인 방식으로 연결해주세요.';
                     msg.classList.remove('hidden');
                     return;
                 }
@@ -294,7 +302,7 @@
                 if (data.department) parts.push(data.department);
                 if (data.recruiting_class) parts.push(data.recruiting_class + '기');
                 document.getElementById('lookupDetail').textContent = parts.length ? parts.join(' · ') : '등록된 부원';
-                document.getElementById('lookupMemberId').value = data.member_id;
+                document.getElementById('lookupNameHidden').value = name;
                 document.getElementById('lookupSidHidden').value = sid;
                 result.classList.remove('hidden');
             } catch (err) {
@@ -303,6 +311,9 @@
             }
         }
         document.getElementById('lookupSid').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); lookupProfile(); }
+        });
+        document.getElementById('lookupName').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') { e.preventDefault(); lookupProfile(); }
         });
 
