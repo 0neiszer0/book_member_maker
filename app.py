@@ -2420,175 +2420,111 @@ def view_admin_topics(event_id):
         return redirect(url_for('admin_dashboard'))
 
 
-# 4. 관리자: Word 파일로 출력 (template.docx 디자인 유지)
-# - docxtpl 라이브러리 버전 차이로 production에서 일부 iteration이 누락되는 이슈가 보고됨.
-#   대응:
-#   1) requirements.txt에 python-docx, docxtpl 버전 핀 (로컬과 동일하게 맞춤)
-#   2) 렌더링 후 모든 제출자의 이름이 문서에 실제로 들어갔는지 검증
-#   3) 누락 발견 시 누락된 제출만 python-docx로 문서 끝에 append (디자인은 일부 상이하나 누락 방지)
+# 4. 관리자: Word 파일로 출력
+def _submitter_display_name(sub):
+    """'전자공학부 22 박민서' 형태의 표시 이름을 만든다."""
+    dept = (sub.get('department') or '').strip()
+    year = (sub.get('admission_year') or '').strip()
+    if not year:
+        sid = (sub.get('student_id') or '').strip()
+        if len(sid) >= 4 and sid[2:4].isdigit():
+            year = sid[2:4]
+    if len(year) == 4:
+        year = year[2:]
+    name = (sub.get('author_name') or '').strip()
+    return ' '.join(part for part in (dept, year, name) if part)
+
+
+def build_topics_docx(event, submissions):
+    """발제문 모음 Word 문서를 생성해 BytesIO로 반환한다.
+    Supabase에 의존하지 않는 순수 함수라 샘플 데이터로 바로 테스트할 수 있다.
+    1인 1발제 기준이라 제출자별 페이지 나눔 없이 연속 배치한다."""
+    from docx import Document
+    from docx.shared import Pt, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.ns import qn
+
+    FONT = '함초롱바탕'
+
+    def styled(paragraph, text, size, bold=False, italic=False, color=None):
+        run = paragraph.add_run(text)
+        run.bold = bold
+        run.italic = italic
+        run.font.size = Pt(size)
+        # 한글 폰트는 eastAsia 속성까지 지정해야 Word에서 정확히 적용됨
+        run.font.name = FONT
+        run._element.rPr.rFonts.set(qn('w:eastAsia'), FONT)
+        if color:
+            run.font.color.rgb = RGBColor(*color)
+        return run
+
+    doc = Document()
+    normal = doc.styles['Normal']
+    normal.font.name = FONT
+    normal.font.size = Pt(11)
+    normal.element.get_or_add_rPr().get_or_add_rFonts().set(qn('w:eastAsia'), FONT)
+
+    date_str = (event.get('meeting_date') or '').replace('-', '.')
+
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    styled(p, '경북대학교 중앙 독서동아리 책 먹는 호반우', 14, bold=True)
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    styled(p, date_str, 11)
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    book_line = f"『{event.get('book_title') or ''}』"
+    if event.get('book_author'):
+        book_line = f"{event.get('book_author')}, {book_line}"
+    styled(p, book_line, 13, bold=True)
+
+    doc.add_paragraph()
+    p = doc.add_paragraph()
+    styled(p, '발제자: ', 11, bold=True)
+    styled(p, ', '.join(_submitter_display_name(s) for s in submissions), 11)
+    p = doc.add_paragraph()
+    styled(p, '사회자: ', 11, bold=True)
+
+    for sub in submissions:
+        doc.add_paragraph()  # 블록 간 여백
+        hp = doc.add_paragraph()
+        styled(hp, _submitter_display_name(sub), 13, bold=True, color=(0, 102, 204))
+        for i, t in enumerate(sub.get('topics') or [], 1):
+            topic_text = (t.get('topic') or '').strip()
+            p = doc.add_paragraph()
+            styled(p, f'{i}. ', 11, bold=True)
+            for j, line in enumerate(topic_text.split('\n')):
+                if j:
+                    p.add_run().add_break()
+                styled(p, line, 11)
+            page = (t.get('page') or '').strip()
+            reference = (t.get('reference') or '').strip()
+            if page or reference:
+                meta = doc.add_paragraph()
+                parts = []
+                if page:
+                    parts.append(f'페이지: {page}')
+                if reference:
+                    parts.append(f'인용: {reference}')
+                styled(meta, '    ' + ' | '.join(parts), 10, italic=True, color=(102, 102, 102))
+
+    buf = BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return buf
+
+
 @app.route('/admin/topics/<event_id>/download_word')
 @login_required(role="admin")
 def download_topics_word(event_id):
     try:
-        from docxtpl import DocxTemplate
-        from docx import Document
-        from docx.shared import Pt, RGBColor
-        from docx.enum.text import WD_BREAK
-
         event = supabase.table('topic_events').select('*').eq('id', event_id).single().execute().data
         submissions = supabase.table('topic_submissions').select('*') \
             .eq('event_id', event_id).order('created_at').execute().data or []
-        app.logger.info(f"download_topics_word: 제출 {len(submissions)}건")
 
-        template_path = os.path.join(app.root_path, 'templates', 'template.docx')
-        if not os.path.exists(template_path):
-            flash("템플릿 워드 파일(template.docx)을 templates 폴더에서 찾을 수 없습니다.", "danger")
-            return redirect(url_for('admin_dashboard'))
-
-        # 1) docxtpl로 템플릿 렌더링 (원본 디자인 유지)
-        # ※ 발제문 내용에 '<책제목>' 같이 꺾쇠괄호가 들어가면 Word XML 구조를 깨뜨려서
-        #   해당 지점 이후 렌더링이 중단되고 파일이 손상됨.
-        #   docxtpl의 자동 escape이 production 환경에서 일관되지 않게 동작하므로,
-        #   사전에 풀-와이드 유니코드(〈, 〉)로 치환해서 시각적으로는 동일하지만 안전하게 처리.
-        def _safe(s):
-            if s is None:
-                return ''
-            return (str(s)
-                    .replace('<', '〈')
-                    .replace('>', '〉'))
-
-        doc = DocxTemplate(template_path)
-        date_str = (event.get('meeting_date') or '').replace('-', '.')
-        context = {
-            'book_title': _safe(event.get('book_title', '')),
-            'meeting_date': date_str,
-            'book_author': _safe(event.get('book_author', '')),
-            'moderator_name': '',
-            'submissions': [
-                {
-                    # template.docx 에서 '{{ sub.department }} {{ sub.author_name }}' 로 노출되던 부분을
-                    # '{입학년도} {이름}' 형태로 바꾸기 위해 department 자리에 학번 prefix 를 넣음.
-                    # (admission_year 없는 구 데이터는 기존 department 로 fallback)
-                    'department': (sub.get('admission_year') or '').strip() or _safe(sub.get('department', '')),
-                    'author_name': _safe(sub.get('author_name', '')),
-                    'topics': [
-                        {
-                            'topic': _safe(t.get('topic', '')),
-                            'page': _safe(t.get('page', '')),
-                            'reference': _safe(t.get('reference', '')),
-                        }
-                        for t in (sub.get('topics') or [])
-                    ],
-                }
-                for sub in submissions
-            ],
-        }
-        doc.render(context)
-
-        # 메모리에 저장
-        buf = BytesIO()
-        doc.save(buf)
-        buf.seek(0)
-
-        # 2) 렌더링 검증 — 모든 제출자가 본문에 들어갔는지 확인 (누락 방지)
-        import zipfile, re
-        buf.seek(0)
-        with zipfile.ZipFile(BytesIO(buf.getvalue())) as zin:
-            body_xml = zin.read('word/document.xml').decode('utf-8', errors='replace')
-        # 본문 plaintext만 추출
-        body_text = ''.join(re.findall(r'<w:t[^>]*>([^<]*)</w:t>', body_xml))
-        # 각 제출자가 '발제자' 섹션에 들어갔는지 검사: 이름 등장 횟수가 2 이상이면 OK
-        # (1회: 참석자 명단, 2회 이상: 발제자 섹션 포함)
-        missing = []
-        for sub in submissions:
-            nm = (sub.get('author_name') or '').strip()
-            dept = (sub.get('department') or '').strip()
-            if not nm:
-                continue
-            # 이름이 '발제자' 섹션에 등장하는지 검사: '발제자' 텍스트 이후에 이름이 등장하는지
-            # 간단하게 본문 전체에서 이름 등장 횟수로 판별
-            cnt = body_text.count(nm)
-            if cnt < 2:  # 참석자 명단 1회만 있고 발제 섹션엔 없음
-                missing.append(sub)
-        if missing:
-            app.logger.warning(f"download_topics_word: 누락 감지 {len(missing)}건 → python-docx로 append")
-            # 3) 누락된 제출을 문서 끝에 직접 추가
-            doc2 = Document(BytesIO(buf.getvalue()))
-            for sub in missing:
-                # 페이지 나눔
-                br_p = doc2.add_paragraph()
-                br_p.add_run().add_break(WD_BREAK.PAGE)
-                # 발제자 헤더
-                hp = doc2.add_paragraph()
-                r1 = hp.add_run('발제자: ')
-                r1.bold = True
-                r1.font.size = Pt(13)
-                r1.font.color.rgb = RGBColor(0, 102, 204)
-                year_or_dept = (sub.get('admission_year') or '').strip() or sub.get('department','')
-                r2 = hp.add_run(f"{year_or_dept} {sub.get('author_name','')}")
-                r2.bold = True
-                r2.font.size = Pt(13)
-                # 발제 내용
-                for ti, t in enumerate(sub.get('topics') or [], 1):
-                    topic_text = (t.get('topic') or '').strip()
-                    page = (t.get('page') or '').strip()
-                    reference = (t.get('reference') or '').strip()
-                    p = doc2.add_paragraph()
-                    rn = p.add_run(f"{ti}. "); rn.bold = True; rn.font.size = Pt(11)
-                    first = True
-                    for line in topic_text.split('\n'):
-                        if not first:
-                            p.add_run().add_break()
-                        rr = p.add_run(line); rr.font.size = Pt(11); first = False
-                    if page or reference:
-                        meta = doc2.add_paragraph()
-                        parts = []
-                        if page: parts.append(f"페이지: {page}")
-                        if reference: parts.append(f"참조: {reference}")
-                        rm = meta.add_run('   ' + ' | '.join(parts))
-                        rm.italic = True; rm.font.size = Pt(10)
-                        rm.font.color.rgb = RGBColor(102, 102, 102)
-            buf = BytesIO()
-            doc2.save(buf)
-            buf.seek(0)
-
-        # === 최종 폰트 일괄 적용: 함초롱바탕 ===
-        # 한글은 w:eastAsia 속성까지 함께 지정해야 Word 에서 정확히 표시됨.
-        try:
-            from docx import Document as _Doc
-            from docx.oxml.ns import qn
-            from docx.oxml import OxmlElement
-            TARGET_FONT = '함초롱바탕'
-
-            def _apply_font(run, name):
-                rPr = run._element.get_or_add_rPr()
-                rFonts = rPr.find(qn('w:rFonts'))
-                if rFonts is None:
-                    rFonts = OxmlElement('w:rFonts')
-                    rPr.insert(0, rFonts)
-                rFonts.set(qn('w:ascii'),    name)
-                rFonts.set(qn('w:hAnsi'),    name)
-                rFonts.set(qn('w:eastAsia'), name)
-                rFonts.set(qn('w:cs'),       name)
-
-            _final = _Doc(BytesIO(buf.getvalue()))
-            for p in _final.paragraphs:
-                for r in p.runs:
-                    _apply_font(r, TARGET_FONT)
-            for table in _final.tables:
-                for row in table.rows:
-                    for cell in row.cells:
-                        for p in cell.paragraphs:
-                            for r in p.runs:
-                                _apply_font(r, TARGET_FONT)
-            buf = BytesIO()
-            _final.save(buf)
-            buf.seek(0)
-        except Exception as fe:
-            app.logger.warning(f"폰트 적용 실패(무시 가능): {fe}")
-
-        filename = f"발제문_{event.get('book_title','')}_{event.get('meeting_date','')}.docx"
-        app.logger.info(f"download_topics_word: 완료, 크기={len(buf.getvalue())} bytes")
+        buf = build_topics_docx(event, submissions)
+        filename = f"발제문_{event.get('book_title', '')}_{event.get('meeting_date', '')}.docx"
         return Response(
             buf.getvalue(),
             mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
