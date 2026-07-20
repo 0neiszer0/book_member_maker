@@ -4462,5 +4462,5 @@ def records_analytics():
 # --- 7. 서버 실행 ---
 # ==============================================================================
 if __name__ == '__main__':
-
+    # 로컬 개발 전용. 프로덕션(Render)에서는 Dockerfile의 gunicorn으로 구동됨.
     app.run(host='0.0.0.0', port=5000, debug=True)
