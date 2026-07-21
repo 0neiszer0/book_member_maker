@@ -41,9 +41,18 @@ if not app.secret_key:
 # Supabase 클라이언트 초기화
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
+NOTION_PUBLIC_WIKI_URL = os.environ.get(
+    "NOTION_PUBLIC_WIKI_URL",
+    "https://quaint-sapphire-900.notion.site/bookbook",
+).split('?', 1)[0]
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("Supabase URL과 Key가 .env 파일에 설정되지 않았습니다.")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+
+@app.context_processor
+def public_navigation_context():
+    return {"notion_public_wiki_url": NOTION_PUBLIC_WIKI_URL}
 
 
 # ==============================================================================
@@ -1093,6 +1102,7 @@ def bookclub_index():
         all_active_members_res = supabase.table("members").select("id, name, student_id, department") \
             .eq('is_active', True).order("name").execute()
         all_active_members = all_active_members_res.data or []
+        active_member_ids = {member['id'] for member in all_active_members}
         app.logger.info(f"[2] DB에서 가져온 전체 활성 멤버 수: {len(all_active_members)}명")
 
         if seminar_session_id:
@@ -1109,16 +1119,31 @@ def bookclub_index():
                 thu_date_iso = meeting_date
                 target_ids = thu_attendee_ids
 
-            attendance_rows = supabase.table('attendance').select('user_id') \
-                .eq('meeting_date', meeting_date).eq('attending_seminar', True).execute().data or []
-            target_ids |= {row['user_id'] for row in attendance_rows}
-            vote_rows = supabase.table('seminar_votes').select('member_id') \
-                .eq('session_id', seminar_session_id).eq('attending', True).execute().data or []
-            target_ids |= {row['member_id'] for row in vote_rows}
+            participation_mode = selected_session.get('participation_mode') or 'legacy_explicit'
+            if participation_mode == 'absence_only':
+                absence_rows = supabase.table('seminar_absences').select('member_id') \
+                    .eq('session_id', seminar_session_id).is_('cancelled_at', 'null').execute().data or []
+                absent_ids = {row['member_id'] for row in absence_rows}
+                target_ids |= active_member_ids - absent_ids
+            elif participation_mode == 'opt_in':
+                vote_rows = supabase.table('seminar_votes').select('member_id') \
+                    .eq('session_id', seminar_session_id).eq('attending', True).execute().data or []
+                target_ids |= {row['member_id'] for row in vote_rows}
+            else:
+                attendance_rows = supabase.table('attendance').select('user_id') \
+                    .eq('meeting_date', meeting_date).eq('attending_seminar', True).execute().data or []
+                target_ids |= {row['user_id'] for row in attendance_rows}
+                vote_rows = supabase.table('seminar_votes').select('member_id') \
+                    .eq('session_id', seminar_session_id).eq('attending', True).execute().data or []
+                target_ids |= {row['member_id'] for row in vote_rows}
             pre_checked_attendee_ids = set(target_ids)
 
-            topic_rows = supabase.table('topic_events').select('*') \
-                .eq('seminar_session_id', seminar_session_id).execute().data or []
+            topic_query = supabase.table('topic_events').select('*')
+            if selected_session.get('seminar_week_id'):
+                topic_query = topic_query.eq('seminar_week_id', selected_session['seminar_week_id'])
+            else:
+                topic_query = topic_query.eq('seminar_session_id', seminar_session_id)
+            topic_rows = topic_query.execute().data or []
             if topic_rows:
                 selected_topic_event = topic_rows[0]
                 submissions = supabase.table('topic_submissions').select('author_name, student_id') \
@@ -1161,13 +1186,21 @@ def bookclub_index():
                     mon_attendee_ids.add(row['user_id'])
                 elif row.get('meeting_date') == thu_date_iso:
                     thu_attendee_ids.add(row['user_id'])
-            sess_rows = supabase.table('seminar_sessions').select('id, meeting_date, day_type') \
+            sess_rows = supabase.table('seminar_sessions').select('id, meeting_date, day_type, participation_mode') \
                 .in_('meeting_date', date_strs).eq('is_active', True).execute().data or []
-            for day_type, target_ids in [('mon', mon_attendee_ids), ('thu', thu_attendee_ids)]:
-                ids = [s['id'] for s in sess_rows if s.get('day_type') == day_type]
-                if ids:
+            for s in sess_rows:
+                target_ids = mon_attendee_ids if s.get('day_type') == 'mon' else thu_attendee_ids
+                mode = s.get('participation_mode') or 'legacy_explicit'
+                if mode == 'absence_only':
+                    target_ids.clear()
+                    absent = supabase.table('seminar_absences').select('member_id') \
+                        .eq('session_id', s['id']).is_('cancelled_at', 'null').execute().data or []
+                    target_ids |= active_member_ids - {row['member_id'] for row in absent}
+                else:
+                    if mode == 'opt_in':
+                        target_ids.clear()
                     votes = supabase.table('seminar_votes').select('member_id') \
-                        .in_('session_id', ids).eq('attending', True).execute().data or []
+                        .eq('session_id', s['id']).eq('attending', True).execute().data or []
                     target_ids |= {row['member_id'] for row in votes}
             if day_choice == 'mon':
                 pre_checked_attendee_ids = mon_attendee_ids
@@ -1786,8 +1819,8 @@ def bookclub_api_delete_history():
 #=== 위키 관련 모음
 
 @app.route('/docs/<doc_title>')
-@login_required(role="ANY")
 def view_document(doc_title):
+    return redirect(NOTION_PUBLIC_WIKI_URL, code=302)
     """
     데이터베이스에서 문서를 찾아 제목과 내용을 보여주는 페이지.
     """
@@ -1813,14 +1846,17 @@ def view_document(doc_title):
 @app.route('/docs/create')
 @login_required(role="ANY")
 def create_document_page():
-    # doc_edit.html 템플릿을 렌더링. 'edit' 모드가 아니므로 doc 객체는 전달 안 함
-    return render_template('doc_edit.html')
+    return redirect(NOTION_PUBLIC_WIKI_URL, code=302)
 
 
 # 2. 문서 생성 요청을 처리하는 API 라우트
 @app.route('/api/docs/create', methods=['POST'])
 @login_required(role="ANY")
 def handle_create_document():
+    return jsonify({
+        "status": "error", "message": "앱 위키 편집은 종료되었습니다.",
+        "wiki_url": NOTION_PUBLIC_WIKI_URL,
+    }), 410
     data = request.json
     title = data.get('title')
     content = data.get('content')
@@ -1850,8 +1886,8 @@ def handle_create_document():
 
 # 3. 전체 문서 목록을 보여주는 라우트
 @app.route('/docs')
-@login_required(role="ANY")
 def view_all_documents():
+    return redirect(NOTION_PUBLIC_WIKI_URL, code=302)
     """
     지금까지 생성된 모든 문서의 목록을 보여주는 페이지.
     """
@@ -1875,6 +1911,7 @@ def view_all_documents():
 @app.route('/docs/edit/<doc_title>')
 @login_required(role="ANY")
 def edit_document_page(doc_title):
+    return redirect(NOTION_PUBLIC_WIKI_URL, code=302)
     try:
         doc_res = supabase.table('documents').select('*').eq('title', doc_title).single().execute()
         document = doc_res.data
@@ -1902,6 +1939,10 @@ def edit_document_page(doc_title):
 @app.route('/api/docs/edit/<doc_id>', methods=['POST'])
 @login_required(role="ANY")
 def handle_edit_document(doc_id):
+    return jsonify({
+        "status": "error", "message": "앱 위키 편집은 종료되었습니다.",
+        "wiki_url": NOTION_PUBLIC_WIKI_URL,
+    }), 410
     data = request.json
     content = data.get('content')
     editor_id = session.get('user_id')
@@ -1963,6 +2004,10 @@ def get_document_history(doc_id):
 @app.route('/api/docs/delete/<doc_id>', methods=['POST'])
 @login_required(role="ANY")
 def handle_delete_document(doc_id):
+    return jsonify({
+        "status": "error", "message": "기존 위키 자료는 보존 기간이라 삭제할 수 없습니다.",
+        "wiki_url": NOTION_PUBLIC_WIKI_URL,
+    }), 410
     try:
         # 삭제 권한 확인을 위해 먼저 문서의 작성자 정보를 가져옵니다.
         doc_res = supabase.table('documents').select('author_id, title').eq('id', doc_id).single().execute()
@@ -2217,24 +2262,35 @@ def request_absence():
 
 # 1. 관리자: 발제문 이벤트 생성 API
 def _open_topic_event_for_session(session_id):
-    existing = supabase.table('topic_events').select('*') \
-        .eq('seminar_session_id', session_id).execute().data or []
-    if existing:
-        return existing[0], False
-
     seminar_session = supabase.table('seminar_sessions').select(
-        'id, meeting_date, book_title, book_author'
+        'id, meeting_date, book_title, book_author, seminar_week_id'
     ).eq('id', session_id).single().execute().data
     if not seminar_session:
         raise ValueError('세미나 회차를 찾을 수 없습니다.')
-    if not (seminar_session.get('book_title') or '').strip():
+
+    week_id = seminar_session.get('seminar_week_id')
+    existing_query = supabase.table('topic_events').select('*')
+    existing_query = (existing_query.eq('seminar_week_id', week_id) if week_id
+                      else existing_query.eq('seminar_session_id', session_id))
+    existing = existing_query.execute().data or []
+    if existing:
+        return existing[0], False
+
+    week = None
+    if week_id:
+        rows = supabase.table('seminar_weeks').select('*').eq('id', week_id).execute().data or []
+        week = rows[0] if rows else None
+    book_title = ((week or {}).get('book_title') or seminar_session.get('book_title') or '').strip()
+    book_author = ((week or {}).get('book_author') or seminar_session.get('book_author') or '').strip()
+    if not book_title:
         raise ValueError('먼저 이번 회차 도서 제목을 입력해주세요.')
 
     payload = {
         'meeting_date': seminar_session['meeting_date'],
-        'book_title': seminar_session['book_title'].strip(),
-        'book_author': (seminar_session.get('book_author') or '').strip() or None,
+        'book_title': book_title,
+        'book_author': book_author or None,
         'seminar_session_id': session_id,
+        'seminar_week_id': week_id,
         'share_token': str(uuid.uuid4()),
         'is_active': True,
     }
@@ -2243,8 +2299,10 @@ def _open_topic_event_for_session(session_id):
         return created[0], True
     except Exception:
         # 동시에 두 번 눌린 경우 unique index가 중복을 막는다.
-        raced = supabase.table('topic_events').select('*') \
-            .eq('seminar_session_id', session_id).execute().data or []
+        raced_query = supabase.table('topic_events').select('*')
+        raced_query = (raced_query.eq('seminar_week_id', week_id) if week_id
+                       else raced_query.eq('seminar_session_id', session_id))
+        raced = raced_query.execute().data or []
         if raced:
             return raced[0], False
         raise
@@ -2286,6 +2344,26 @@ def seminar_session_open_topics(session_id):
         return jsonify({'status': 'error', 'message': str(e)}), 400
     except Exception as e:
         app.logger.error(f"seminar_session_open_topics error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/seminar_weeks/<week_id>/open_topics', methods=['POST'])
+@login_required(role="admin")
+def seminar_week_open_topics(week_id):
+    try:
+        sessions = supabase.table('seminar_sessions').select('id') \
+            .eq('seminar_week_id', week_id).order('meeting_date').execute().data or []
+        if not sessions:
+            return jsonify({'status': 'error', 'message': '이 주차의 세미나 회차가 없습니다.'}), 404
+        event, created = _open_topic_event_for_session(sessions[0]['id'])
+        return jsonify({
+            'status': 'success', 'created': created, 'event': event,
+            'share_url': f"{request.host_url}shared_topics?token={event['share_token']}"
+        })
+    except ValueError as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
+    except Exception as e:
+        app.logger.error(f"seminar_week_open_topics error: {e}", exc_info=True)
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 # 1.5. 관리자: 발제문 이벤트 영구 삭제 API (제출 내역까지 포함)
@@ -2764,6 +2842,38 @@ def _enumerate_mon_thu(start_date, end_date):
     return result
 
 
+def _week_start(value):
+    d = value if isinstance(value, date) else date.fromisoformat(str(value)[:10])
+    return d - timedelta(days=d.weekday())
+
+
+def _ensure_term_weeks(term_id, dates):
+    """주차를 먼저 보장하고 week_start -> week id 매핑을 반환한다."""
+    starts = sorted({_week_start(d).isoformat() for d, _ in dates})
+    existing = supabase.table('seminar_weeks').select('id, week_start') \
+        .eq('term_id', term_id).execute().data or []
+    by_start = {row['week_start']: row['id'] for row in existing}
+    missing = [{'term_id': term_id, 'week_start': value} for value in starts if value not in by_start]
+    if missing:
+        supabase.table('seminar_weeks').insert(missing).execute()
+        existing = supabase.table('seminar_weeks').select('id, week_start') \
+            .eq('term_id', term_id).execute().data or []
+        by_start = {row['week_start']: row['id'] for row in existing}
+    return by_start
+
+
+def _session_payload(term_id, meeting_date, day_type, weeks):
+    week_id = weeks[_week_start(meeting_date).isoformat()]
+    return {
+        'term_id': term_id,
+        'seminar_week_id': week_id,
+        'meeting_date': meeting_date.isoformat(),
+        'day_type': day_type,
+        'participation_mode': 'opt_in' if day_type == 'mon' else 'absence_only',
+        'capacity': 10 if day_type == 'mon' else None,
+    }
+
+
 @app.route('/api/admin/seminar_terms/create', methods=['POST'])
 @login_required(role="admin")
 def seminar_term_create():
@@ -2785,10 +2895,9 @@ def seminar_term_create():
         }).execute()
         term = term_res.data[0]
 
-        sessions_payload = [
-            {'term_id': term['id'], 'meeting_date': d.isoformat(), 'day_type': dt}
-            for d, dt in _enumerate_mon_thu(start_date, end_date)
-        ]
+        dates = _enumerate_mon_thu(start_date, end_date)
+        weeks = _ensure_term_weeks(term['id'], dates)
+        sessions_payload = [_session_payload(term['id'], d, dt, weeks) for d, dt in dates]
         if sessions_payload:
             supabase.table('seminar_sessions').insert(sessions_payload).execute()
 
@@ -2827,10 +2936,12 @@ def seminar_term_update(term_id):
             t = term_res.data
             existing_res = supabase.table('seminar_sessions').select('meeting_date').eq('term_id', term_id).execute()
             existing_dates = {row['meeting_date'] for row in (existing_res.data or [])}
+            dates = _enumerate_mon_thu(t['start_date'], t['end_date'])
+            weeks = _ensure_term_weeks(term_id, dates)
             to_insert = []
-            for d, dt in _enumerate_mon_thu(t['start_date'], t['end_date']):
+            for d, dt in dates:
                 if d.isoformat() not in existing_dates:
-                    to_insert.append({'term_id': term_id, 'meeting_date': d.isoformat(), 'day_type': dt})
+                    to_insert.append(_session_payload(term_id, d, dt, weeks))
             if to_insert:
                 supabase.table('seminar_sessions').insert(to_insert).execute()
 
@@ -2844,8 +2955,9 @@ def seminar_term_update(term_id):
 @login_required(role="admin")
 def seminar_term_delete(term_id):
     try:
-        supabase.table('seminar_terms').delete().eq('id', term_id).execute()
-        return jsonify({'status': 'success'})
+        supabase.table('seminar_terms').update({'is_active': False}).eq('id', term_id).execute()
+        supabase.table('seminar_sessions').update({'is_active': False}).eq('term_id', term_id).execute()
+        return jsonify({'status': 'success', 'archived': True})
     except Exception as e:
         app.logger.error(f"seminar_term_delete error: {e}", exc_info=True)
         return jsonify({'status': 'error', 'message': str(e)}), 500
@@ -2867,6 +2979,7 @@ def seminar_session_toggle(session_id):
 @app.route('/admin/seminar_terms/<term_id>')
 @login_required(role="admin")
 def admin_seminar_term(term_id):
+    return redirect(url_for('admin_seminars', term_id=term_id))
     try:
         term = supabase.table('seminar_terms').select('*').eq('id', term_id).single().execute().data
         sessions = supabase.table('seminar_sessions').select('*').eq('term_id', term_id) \
@@ -2975,6 +3088,116 @@ def admin_seminar_term(term_id):
         return redirect(url_for('admin_dashboard'))
 
 
+def _load_weekly_seminar_view(term_id=None):
+    terms = supabase.table('seminar_terms').select('*').order('start_date', desc=True).execute().data or []
+    if not terms:
+        return terms, None, [], []
+    term = next((row for row in terms if str(row['id']) == str(term_id)), None)
+    if term is None:
+        term = next((row for row in terms if row.get('is_active')), terms[0])
+
+    weeks = supabase.table('seminar_weeks').select('*').eq('term_id', term['id']) \
+        .order('week_start').execute().data or []
+    week_ids = [row['id'] for row in weeks]
+    sessions = []
+    topics = []
+    if week_ids:
+        sessions = supabase.table('seminar_sessions').select('*').in_('seminar_week_id', week_ids) \
+            .order('meeting_date').execute().data or []
+        topics = supabase.table('topic_events').select('*').in_('seminar_week_id', week_ids).execute().data or []
+
+    session_ids = [row['id'] for row in sessions]
+    topic_ids = [row['id'] for row in topics]
+    votes = []
+    absences = []
+    histories = []
+    if session_ids:
+        votes = supabase.table('seminar_votes').select('session_id, member_id, attending, added_by_admin') \
+            .in_('session_id', session_ids).execute().data or []
+        absences = supabase.table('seminar_absences').select('*') \
+            .in_('session_id', session_ids).order('created_at').execute().data or []
+        histories = supabase.table('history').select('id, date, book_title, groups, seminar_session_id') \
+            .in_('seminar_session_id', session_ids).execute().data or []
+    submissions = []
+    if topic_ids:
+        submissions = supabase.table('topic_submissions').select('event_id').in_('event_id', topic_ids).execute().data or []
+
+    all_members = supabase.table('members').select('id, name, student_id, department, is_active') \
+        .order('name').execute().data or []
+    active_members = [row for row in all_members if row.get('is_active')]
+    member_by_id = {row['id']: row for row in all_members}
+    topic_by_week = {row['seminar_week_id']: row for row in topics if row.get('seminar_week_id')}
+    submission_count = defaultdict(int)
+    for row in submissions:
+        submission_count[row['event_id']] += 1
+    history_by_session = {row['seminar_session_id']: row for row in histories if row.get('seminar_session_id')}
+    votes_by_session = defaultdict(list)
+    for row in votes:
+        if row.get('attending'):
+            member = member_by_id.get(row['member_id'])
+            if member:
+                votes_by_session[row['session_id']].append(member)
+    absence_audit_by_session = defaultdict(list)
+    for row in absences:
+        member = member_by_id.get(row['member_id'])
+        if member:
+            absence_audit_by_session[row['session_id']].append({**row, 'member': member})
+
+    sessions_by_week = defaultdict(list)
+    today = datetime.now(KST).date()
+    for item in sessions:
+        item['attendees'] = sorted(votes_by_session[item['id']], key=lambda row: row.get('name') or '')
+        item['yes_count'] = len(item['attendees'])
+        audit = absence_audit_by_session[item['id']]
+        item['absence_audit'] = audit
+        item['absences'] = [row for row in audit if not row.get('cancelled_at')]
+        item['expected_count'] = max(0, len(active_members) - len(item['absences'])) \
+            if item.get('participation_mode') == 'absence_only' else item['yes_count']
+        item['history'] = history_by_session.get(item['id'])
+        item['is_past'] = date.fromisoformat(item['meeting_date']) < today
+        sessions_by_week[item['seminar_week_id']].append(item)
+
+    for week in weeks:
+        week['sessions'] = sessions_by_week.get(week['id'], [])
+        week['sessions_by_day'] = {row['day_type']: row for row in week['sessions']}
+        topic = topic_by_week.get(week['id'])
+        if topic:
+            topic['submission_count'] = submission_count[topic['id']]
+            topic['share_url'] = f"{request.host_url}shared_topics?token={topic['share_token']}"
+        week['topic_event'] = topic
+        week['is_past'] = (_week_start(week['week_start']) + timedelta(days=6)) < today
+    return terms, term, weeks, active_members
+
+
+@app.route('/admin/seminars')
+@login_required(role="admin")
+def admin_seminars():
+    try:
+        terms, term, weeks, active_members = _load_weekly_seminar_view(request.args.get('term_id'))
+        weeks = [row for row in weeks if not row['is_past']] + list(reversed([row for row in weeks if row['is_past']]))
+        share_url = f"{request.host_url}seminar_vote?token={term['share_token']}" if term else ''
+        return render_template('admin_seminars.html', terms=terms, term=term, weeks=weeks,
+                               all_members=active_members, share_url=share_url)
+    except Exception as e:
+        app.logger.error(f"admin_seminars error: {e}", exc_info=True)
+        flash(f"세미나 운영 정보를 불러오는 중 오류가 발생했습니다: {e}", 'danger')
+        return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/seminars')
+@login_required(role="ANY")
+def seminars():
+    try:
+        terms, term, weeks, _ = _load_weekly_seminar_view(request.args.get('term_id'))
+        weeks = [row for row in weeks if not row['is_past']] + list(reversed([row for row in weeks if row['is_past']]))
+        vote_url = f"{request.host_url}seminar_vote?token={term['share_token']}" if term else ''
+        return render_template('seminars.html', terms=terms, term=term, weeks=weeks, vote_url=vote_url)
+    except Exception as e:
+        app.logger.error(f"seminars error: {e}", exc_info=True)
+        flash('세미나 일정을 불러오지 못했습니다.', 'danger')
+        return redirect(url_for('main_index'))
+
+
 @app.route('/api/admin/seminar_sessions/<session_id>/update_book', methods=['POST'])
 @login_required(role="admin")
 def seminar_session_update_book(session_id):
@@ -2983,14 +3206,24 @@ def seminar_session_update_book(session_id):
         book_title = (data.get('book_title') or '').strip()
         book_author = (data.get('book_author') or '').strip()
         update = {'book_title': book_title or None, 'book_author': book_author or None}
-        supabase.table('seminar_sessions').update(update) \
-            .eq('id', session_id).execute()
-        linked = supabase.table('topic_events').select('id').eq('seminar_session_id', session_id).execute().data or []
-        if linked:
-            supabase.table('topic_events').update({
-                'book_title': book_title,
-                'book_author': book_author or None,
-            }).eq('id', linked[0]['id']).execute()
+        current = supabase.table('seminar_sessions').select('seminar_week_id') \
+            .eq('id', session_id).single().execute().data or {}
+        week_id = current.get('seminar_week_id')
+        if week_id:
+            supabase.table('seminar_weeks').update({
+                **update, 'needs_review': False, 'updated_at': datetime.now(timezone.utc).isoformat()
+            }).eq('id', week_id).execute()
+            supabase.table('seminar_sessions').update(update).eq('seminar_week_id', week_id).execute()
+            supabase.table('topic_events').update(update).eq('seminar_week_id', week_id).execute()
+            linked_sessions = supabase.table('seminar_sessions').select('id') \
+                .eq('seminar_week_id', week_id).execute().data or []
+            session_ids = [row['id'] for row in linked_sessions]
+            if session_ids:
+                supabase.table('history').update({'book_title': book_title or None}) \
+                    .in_('seminar_session_id', session_ids).execute()
+        else:
+            supabase.table('seminar_sessions').update(update).eq('id', session_id).execute()
+            supabase.table('topic_events').update(update).eq('seminar_session_id', session_id).execute()
         return jsonify({'status': 'success'})
     except Exception as e:
         app.logger.error(f"seminar_session_update_book error: {e}", exc_info=True)
@@ -3064,12 +3297,23 @@ def seminar_session_add_attendee(session_id):
         member_id = data.get('member_id')
         if not member_id:
             return jsonify({'status': 'error', 'message': 'member_id 필요'}), 400
-        supabase.table('seminar_votes').upsert({
-            'session_id': session_id,
-            'member_id': member_id,
-            'attending': True,
-            'added_by_admin': True,
-        }, on_conflict='session_id,member_id').execute()
+        target = supabase.table('seminar_sessions').select('participation_mode') \
+            .eq('id', session_id).single().execute().data or {}
+        if target.get('participation_mode') == 'opt_in':
+            claimed = supabase.rpc('claim_monday_seminar_seat', {
+                'p_session_id': session_id, 'p_member_id': int(member_id),
+            }).execute().data or {}
+            if not claimed.get('accepted'):
+                return jsonify({'status': 'error', 'message': '정원이 가득 찼습니다. 먼저 정원을 늘려주세요.'}), 409
+            supabase.table('seminar_votes').update({'added_by_admin': True}) \
+                .eq('session_id', session_id).eq('member_id', member_id).execute()
+        else:
+            supabase.table('seminar_votes').upsert({
+                'session_id': session_id,
+                'member_id': member_id,
+                'attending': True,
+                'added_by_admin': True,
+            }, on_conflict='session_id,member_id').execute()
         return jsonify({'status': 'success'})
     except Exception as e:
         app.logger.error(f"seminar_session_add_attendee error: {e}", exc_info=True)
@@ -3104,6 +3348,8 @@ def seminar_vote_page():
         sessions = supabase.table('seminar_sessions').select('*') \
             .eq('term_id', term['id']).eq('is_active', True) \
             .order('meeting_date').execute().data or []
+        # 목요일은 운영진이 불참자만 기록하므로 회원 투표 화면에 노출하지 않는다.
+        sessions = [s for s in sessions if s.get('participation_mode') != 'absence_only']
         session_ids = [s['id'] for s in sessions]
         counts = {sid: 0 for sid in session_ids}
         attendees_by_session = {sid: [] for sid in session_ids}
@@ -3128,7 +3374,9 @@ def seminar_vote_page():
         open_sessions, upcoming_sessions, closed_sessions = [], [], []
         for s in sessions:
             s['attending_count'] = counts.get(s['id'], 0)
-            s['is_full'] = s['attending_count'] >= term.get('max_capacity', 32)
+            capacity = s.get('capacity') or term.get('max_capacity', 32)
+            s['capacity'] = capacity
+            s['is_full'] = s['attending_count'] >= capacity
             s['attendee_names'] = attendees_by_session.get(s['id'], [])
             open_at, close_at = _voting_window_for(s)
             s['voting_open_at'] = open_at.strftime('%Y-%m-%d %H:%M')
@@ -3182,9 +3430,9 @@ def seminar_vote_verify():
             return jsonify({'status': 'error', 'message': '학번/이름이 일치하는 멤버를 찾을 수 없습니다.'}), 404
         member = candidates[0]
         # 기존 투표 (이 학기의 모든 세션)
-        sess_res = supabase.table('seminar_sessions').select('id') \
+        sess_res = supabase.table('seminar_sessions').select('id, participation_mode') \
             .eq('term_id', term['id']).execute().data or []
-        sess_ids = [s['id'] for s in sess_res]
+        sess_ids = [s['id'] for s in sess_res if s.get('participation_mode') != 'absence_only']
         existing = {}
         voted_yes_attendees = {}  # 본인이 참석 투표한 회차의 신청자 명단
         if sess_ids:
@@ -3234,9 +3482,11 @@ def seminar_vote_counts():
             .eq('share_token', token).single().execute().data
         if not term:
             return jsonify({'status': 'error', 'message': '유효하지 않은 링크'}), 404
-        sess = supabase.table('seminar_sessions').select('id') \
+        sess = supabase.table('seminar_sessions').select('id, capacity, participation_mode') \
             .eq('term_id', term['id']).eq('is_active', True).execute().data or []
+        sess = [s for s in sess if s.get('participation_mode') != 'absence_only']
         sess_ids = [s['id'] for s in sess]
+        capacities = {s['id']: (s.get('capacity') or term.get('max_capacity', 32)) for s in sess}
         counts = {sid: 0 for sid in sess_ids}
         attendees_by_session = {sid: [] for sid in sess_ids}
         if sess_ids:
@@ -3275,6 +3525,7 @@ def seminar_vote_counts():
             'status': 'success',
             'counts': counts,
             'max_capacity': term.get('max_capacity', 32),
+            'capacities': capacities,
             'public_attendees': public_attendees,
             'voted_yes_attendees': voted_yes_attendees,
         })
@@ -3313,7 +3564,7 @@ def seminar_vote_submit():
 
         # 회차 ID 화이트리스트 (이 학기 소속만 허용)
         valid_sessions = supabase.table('seminar_sessions') \
-            .select('id, meeting_date, day_type, is_active, vote_open_at, vote_close_at') \
+            .select('id, meeting_date, day_type, is_active, vote_open_at, vote_close_at, participation_mode, capacity') \
             .eq('term_id', term['id']).execute().data or []
         valid_map = {s['id']: s for s in valid_sessions}
 
@@ -3321,6 +3572,10 @@ def seminar_vote_submit():
             sid = v.get('session_id')
             choice = (v.get('attending') or '').lower()
             if sid not in valid_map or not valid_map[sid].get('is_active'):
+                continue
+            mode = valid_map[sid].get('participation_mode') or 'legacy_explicit'
+            if mode == 'absence_only':
+                skipped.append(f"{valid_map[sid]['meeting_date']} (목) - 운영진 불참 기록 방식")
                 continue
             label = f"{valid_map[sid]['meeting_date']} ({valid_map[sid]['day_type']})"
 
@@ -3336,6 +3591,15 @@ def seminar_vote_submit():
                 continue
 
             if choice == 'yes':
+                if mode == 'opt_in':
+                    claimed = supabase.rpc('claim_monday_seminar_seat', {
+                        'p_session_id': sid, 'p_member_id': int(member_id),
+                    }).execute().data or {}
+                    if claimed.get('accepted'):
+                        success.append(label)
+                    else:
+                        full.append(label)
+                    continue
                 # 본인 제외 현재 참석자 수 확인
                 cnt_res = supabase.table('seminar_votes').select('member_id', count='exact') \
                     .eq('session_id', sid).eq('attending', True).neq('member_id', member_id).execute()
@@ -3348,9 +3612,13 @@ def seminar_vote_submit():
                 }, on_conflict='session_id,member_id').execute()
                 success.append(label)
             elif choice == 'no':
-                supabase.table('seminar_votes').upsert({
-                    'session_id': sid, 'member_id': member_id, 'attending': False,
-                }, on_conflict='session_id,member_id').execute()
+                if mode == 'opt_in':
+                    supabase.table('seminar_votes').delete() \
+                        .eq('session_id', sid).eq('member_id', member_id).execute()
+                else:
+                    supabase.table('seminar_votes').upsert({
+                        'session_id': sid, 'member_id': member_id, 'attending': False,
+                    }, on_conflict='session_id,member_id').execute()
                 success.append(label)
 
         return jsonify({
@@ -4280,6 +4548,107 @@ def records_history_delete(history_id):
         return jsonify({'status': 'success'})
     except Exception as e:
         app.logger.error(f"records_history_delete error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/seminar_sessions/<session_id>/capacity', methods=['PATCH'])
+@login_required(role="admin")
+def seminar_session_capacity(session_id):
+    try:
+        capacity = int((request.json or {}).get('capacity') or 0)
+        if capacity < 1 or capacity > 200:
+            return jsonify({'status': 'error', 'message': '정원은 1~200명으로 입력해주세요.'}), 400
+        target = supabase.table('seminar_sessions').select('participation_mode') \
+            .eq('id', session_id).single().execute().data or {}
+        if target.get('participation_mode') != 'opt_in':
+            return jsonify({'status': 'error', 'message': '월요일 신청제 회차만 정원을 설정할 수 있습니다.'}), 400
+        count_res = supabase.table('seminar_votes').select('member_id', count='exact') \
+            .eq('session_id', session_id).eq('attending', True).execute()
+        count = count_res.count if count_res.count is not None else len(count_res.data or [])
+        if capacity < count:
+            return jsonify({'status': 'error', 'message': f'현재 신청자 {count}명보다 작게 줄일 수 없습니다.'}), 409
+        supabase.table('seminar_sessions').update({'capacity': capacity}).eq('id', session_id).execute()
+        return jsonify({'status': 'success', 'capacity': capacity})
+    except (TypeError, ValueError):
+        return jsonify({'status': 'error', 'message': '올바른 정원을 입력해주세요.'}), 400
+    except Exception as e:
+        app.logger.error(f"seminar_session_capacity error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/seminar_sessions/<session_id>/absences', methods=['POST'])
+@login_required(role="admin")
+def seminar_session_add_absence(session_id):
+    try:
+        data = request.json or {}
+        member_id = int(data.get('member_id'))
+        note = (data.get('note') or '').strip()[:500]
+        target = supabase.table('seminar_sessions').select('participation_mode') \
+            .eq('id', session_id).single().execute().data or {}
+        if target.get('participation_mode') != 'absence_only':
+            return jsonify({'status': 'error', 'message': '목요일 불참 입력 회차가 아닙니다.'}), 400
+        members = supabase.table('members').select('id').eq('id', member_id).eq('is_active', True).execute().data or []
+        if not members:
+            return jsonify({'status': 'error', 'message': '활성 회원을 찾을 수 없습니다.'}), 404
+        current = supabase.table('seminar_absences').select('id') \
+            .eq('session_id', session_id).eq('member_id', member_id).is_('cancelled_at', 'null').execute().data or []
+        stamp = datetime.now(timezone.utc).isoformat()
+        if current:
+            supabase.table('seminar_absences').update({
+                'note': note or None, 'recorded_by': session.get('user_id'), 'updated_at': stamp,
+            }).eq('id', current[0]['id']).execute()
+        else:
+            supabase.table('seminar_absences').insert({
+                'session_id': session_id, 'member_id': member_id, 'note': note or None,
+                'recorded_by': session.get('user_id'), 'updated_at': stamp,
+            }).execute()
+        return jsonify({'status': 'success'})
+    except (TypeError, ValueError):
+        return jsonify({'status': 'error', 'message': '회원을 선택해주세요.'}), 400
+    except Exception as e:
+        app.logger.error(f"seminar_session_add_absence error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/seminar_sessions/<session_id>/absences/<int:member_id>', methods=['DELETE'])
+@login_required(role="admin")
+def seminar_session_cancel_absence(session_id, member_id):
+    try:
+        stamp = datetime.now(timezone.utc).isoformat()
+        supabase.table('seminar_absences').update({
+            'cancelled_at': stamp, 'cancelled_by': session.get('user_id'), 'updated_at': stamp,
+        }).eq('session_id', session_id).eq('member_id', member_id).is_('cancelled_at', 'null').execute()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        app.logger.error(f"seminar_session_cancel_absence error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/seminar_weeks/<week_id>', methods=['PATCH'])
+@login_required(role="admin")
+def seminar_week_update(week_id):
+    try:
+        data = request.json or {}
+        sessions = supabase.table('seminar_sessions').select('id') \
+            .eq('seminar_week_id', week_id).order('meeting_date').execute().data or []
+        if not sessions:
+            return jsonify({'status': 'error', 'message': '주차를 찾을 수 없습니다.'}), 404
+        book_title = (data.get('book_title') or '').strip()
+        book_author = (data.get('book_author') or '').strip()
+        note = (data.get('note') or '').strip()
+        update = {'book_title': book_title or None, 'book_author': book_author or None}
+        supabase.table('seminar_weeks').update({
+            **update, 'note': note or None, 'needs_review': False,
+            'updated_at': datetime.now(timezone.utc).isoformat(),
+        }).eq('id', week_id).execute()
+        supabase.table('seminar_sessions').update(update).eq('seminar_week_id', week_id).execute()
+        supabase.table('topic_events').update(update).eq('seminar_week_id', week_id).execute()
+        session_ids = [row['id'] for row in sessions]
+        supabase.table('history').update({'book_title': book_title or None}) \
+            .in_('seminar_session_id', session_ids).execute()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        app.logger.error(f"seminar_week_update error: {e}", exc_info=True)
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
