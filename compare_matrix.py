@@ -4,6 +4,7 @@ from supabase import create_client, Client
 from datetime import datetime
 import os
 import itertools
+from group_history import canonical_pair_key
 
 print(f"[{datetime.now()}] 'bookclub_co_matrix' 테이블 재구축을 시작합니다.")
 
@@ -35,7 +36,7 @@ try:
 
             # 그룹 내 모든 쌍(pair)을 만듭니다.
             for name1, name2 in itertools.combinations(valid_group_members, 2):
-                pair_key = '-'.join(sorted([name1, name2]))
+                pair_key = canonical_pair_key(name1, name2)
 
                 if pair_key not in new_matrix:
                     new_matrix[pair_key] = {'count': 0, 'last_met': '1970-01-01'}

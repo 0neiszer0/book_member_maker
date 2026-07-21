@@ -173,16 +173,42 @@
             }
         });
 
-        async function updateBook(sessionId, value) {
+        async function updateBook(sessionId, card) {
+            const bookTitle = card.querySelector('[data-book-title]').value;
+            const bookAuthor = card.querySelector('[data-book-author]').value;
             try {
                 const res = await fetch(`/api/admin/seminar_sessions/${sessionId}/update_book`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ book_title: value }),
+                    body: JSON.stringify({ book_title: bookTitle, book_author: bookAuthor }),
                 });
                 const data = await res.json();
                 if (data.status !== 'success') alert('저장 실패: ' + (data.message || '오류'));
             } catch (err) { alert('오류: ' + err.message); }
+        }
+
+        async function openTopics(sessionId, btn) {
+            btn.disabled = true;
+            try {
+                const res = await fetch(`/api/admin/seminar_sessions/${sessionId}/open_topics`, { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok || data.status !== 'success') throw new Error(data.message || '발제문 개설 실패');
+                location.reload();
+            } catch (err) {
+                alert(err.message);
+                btn.disabled = false;
+            }
+        }
+
+        function copyText(value) {
+            navigator.clipboard.writeText(value).then(() => alert('링크를 복사했습니다.'));
+        }
+
+        async function toggleTopics(eventId) {
+            const res = await fetch(`/api/admin/topic_events/${eventId}/toggle_active`, { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) return alert(data.error || '상태 변경 실패');
+            location.reload();
         }
 
         async function addAttendee(sessionId, btn) {

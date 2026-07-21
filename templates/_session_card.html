@@ -34,14 +34,38 @@
         <span class="text-gray-400 text-sm">불참 {{ s.no_count }}</span>
     </div>
 
+    <div class="flex flex-wrap gap-2 mb-3 text-xs">
+        <span class="px-2 py-1 rounded bg-gray-700">1. 투표 {{ s.yes_count }}명</span>
+        <span class="px-2 py-1 rounded {% if s.topic_event %}bg-green-800 text-green-100{% else %}bg-gray-700{% endif %}">2. 발제문 {% if s.topic_event %}{{ s.topic_event.submission_count }}명{% else %}미개설{% endif %}</span>
+        <span class="px-2 py-1 rounded {% if s.history_id %}bg-green-800 text-green-100{% else %}bg-gray-700{% endif %}">3. 조 편성·기록 {% if s.history_id %}완료{% else %}대기{% endif %}</span>
+    </div>
+
     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-        <div class="md:col-span-3">
+        <div class="md:col-span-2">
             <label class="block text-xs text-gray-400 mb-1"><i data-lucide="book" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 이번 회차 도서</label>
-            <input type="text" value="{{ s.book_title or '' }}"
-                onblur="updateBook('{{ s.id }}', this.value)"
-                placeholder="예: 데미안 — 헤르만 헤세"
+            <input type="text" value="{{ s.book_title or '' }}" data-book-title
+                onblur="updateBook('{{ s.id }}', this.closest('[data-session-id]'))"
+                placeholder="예: 데미안"
                 class="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-sm focus:border-eva-green focus:outline-none">
         </div>
+        <div>
+            <label class="block text-xs text-gray-400 mb-1">저자</label>
+            <input type="text" value="{{ s.book_author or '' }}" data-book-author
+                onblur="updateBook('{{ s.id }}', this.closest('[data-session-id]'))" placeholder="예: 헤르만 헤세"
+                class="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-sm focus:border-eva-green focus:outline-none">
+        </div>
+    </div>
+
+    <div class="flex flex-wrap gap-2 mb-3">
+        {% if s.topic_event %}
+        <button type="button" onclick="copyText('{{ s.topic_event.share_url }}')" class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded">발제문 링크 복사</button>
+        <a href="{{ url_for('view_admin_topics', event_id=s.topic_event.id) }}" class="text-xs bg-eva-purple text-white px-3 py-1.5 rounded">제출 {{ s.topic_event.submission_count }}명 관리</a>
+        <a href="{{ url_for('download_topics_word', event_id=s.topic_event.id) }}" class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded">Word 다운로드</a>
+        <button type="button" onclick="toggleTopics('{{ s.topic_event.id }}')" class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded">{{ '수집 마감' if s.topic_event.is_active else '수집 다시 열기' }}</button>
+        {% else %}
+        <button type="button" onclick="openTopics('{{ s.id }}', this)" class="text-xs bg-eva-purple text-white px-3 py-1.5 rounded">발제문 수집 열기</button>
+        {% endif %}
+        <a href="{{ url_for('bookclub_index') }}?session_id={{ s.id }}" class="text-xs bg-eva-green text-black font-bold px-3 py-1.5 rounded">이 회차 조 편성</a>
     </div>
 
     <details class="text-sm mb-3" {% if s.voting_custom %}open{% endif %}>
