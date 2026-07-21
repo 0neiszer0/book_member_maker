@@ -65,6 +65,8 @@
         }
         .badge-member { background: var(--eva-green); color: #000; }
         .badge-guest { background: #d97706; color: #fff; }
+        .preview-card { border: 2px solid var(--eva-green); }
+        .preview-item { background: rgba(255,255,255,.035); border: 1px solid var(--border-dark); }
     </style>
 </head>
 
@@ -98,6 +100,48 @@
                 <p class="text-xs text-gray-500 mt-2">※ 학번(2022XXXXXX 형식)은 모든 사용자에게 필수입니다. 비회원은 추가로 4자리 PIN을 정해 입력하면 다음에 같은 PIN으로 수정할 수 있습니다.</p>
             </div>
         </details>
+
+        <!-- 중복 방지: 작성자 개인정보를 제외한 기존 발제문 -->
+        <section class="eva-card preview-card rounded-lg mb-6 overflow-hidden" aria-labelledby="existingTopicsTitle">
+            <div class="px-4 py-4 flex items-start justify-between gap-3 bg-gray-800/50">
+                <div>
+                    <h2 id="existingTopicsTitle" class="text-lg font-bold text-eva-green flex items-center gap-2">
+                        <i data-lucide="scan-search" style="width:1.05em;height:1.05em"></i>
+                        먼저 나온 발제문 확인
+                    </h2>
+                    <p class="text-xs text-gray-300 mt-1">비슷한 주제가 있는지 제출 전에 확인할 수 있습니다. 작성자의 이름·학과·학번은 공개되지 않습니다.</p>
+                </div>
+                <span class="badge badge-member whitespace-nowrap">익명 {{ existing_topic_previews|length }}개</span>
+            </div>
+            {% if existing_topic_previews %}
+            <details class="group">
+                <summary class="cursor-pointer px-4 py-3 font-bold text-sm flex items-center justify-between gap-3 hover:bg-gray-800/50">
+                    <span>기존 발제문 {{ existing_topic_previews|length }}개 보기</span>
+                    <span class="text-xs text-gray-400 group-open:hidden">펼치기</span>
+                    <span class="text-xs text-gray-400 hidden group-open:inline">접기</span>
+                </summary>
+                <div class="p-4 pt-1 space-y-3">
+                    {% for preview in existing_topic_previews %}
+                    <article class="preview-item rounded-lg p-4">
+                        <p class="text-xs text-eva-green font-bold mb-2">발제 {{ loop.index }}</p>
+                        <p class="text-sm leading-6 whitespace-pre-wrap">{{ preview.topic }}</p>
+                        {% if preview.page %}<p class="text-xs text-gray-400 mt-3">해당 페이지: {{ preview.page }}</p>{% endif %}
+                        {% if preview.reference %}
+                        <details class="mt-3">
+                            <summary class="cursor-pointer text-xs text-gray-400 hover:text-eva-green">관련 인용 보기</summary>
+                            <blockquote class="mt-2 pl-3 border-l-2 border-gray-600 text-xs text-gray-300 whitespace-pre-wrap">{{ preview.reference }}</blockquote>
+                        </details>
+                        {% endif %}
+                    </article>
+                    {% endfor %}
+                </div>
+            </details>
+            {% else %}
+            <div class="px-4 py-4 text-sm text-gray-300">
+                아직 먼저 제출된 발제문이 없습니다. 첫 발제문을 작성해 주세요.
+            </div>
+            {% endif %}
+        </section>
 
         <!-- 1단계: 본인 확인 -->
         <div id="verifyCard" class="eva-card rounded-lg p-5 mb-6">
