@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ term.name }} 세미나 참석 투표</title>
+    <title>{{ term.name }} 추가 세미나 신청</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         // Tailwind CDN: 커스텀 색상을 클래스로 사용할 수 있도록 등록
@@ -100,11 +100,11 @@
     <div class="container mx-auto p-4 sm:p-6 max-w-2xl">
         <div class="text-center mb-6 mt-4">
             <h1 class="text-2xl sm:text-3xl font-bold text-eva-green mb-2">{{ term.name }}</h1>
-            <p class="text-gray-300">세미나 참석 투표</p>
+            <p class="text-gray-300">월요일 추가 세미나 신청</p>
             {% if is_admin %}
-            <p class="text-xs mt-2"><span class="badge badge-admin">관리자/임원 모드</span> 투표 기간 전 회차도 즉시 참여 가능합니다.</p>
+            <p class="text-xs mt-2"><span class="badge badge-admin">관리자/임원 모드</span> 신청 기간 전 회차도 확인할 수 있습니다.</p>
             {% else %}
-            <p class="text-xs text-gray-500 mt-2">학번과 이름으로 본인 확인 후, 회차별로 참석 여부를 선택하세요.</p>
+            <p class="text-xs text-gray-500 mt-2">학번과 이름으로 본인 확인 후, 참여할 월요일 회차를 신청하세요.</p>
             {% endif %}
         </div>
 
@@ -143,7 +143,7 @@
 
             <form id="voteForm" class="space-y-6">
                 <div>
-                    <h2 class="text-lg font-bold text-eva-green mb-2">② 회차별 참석 선택</h2>
+                    <h2 class="text-lg font-bold text-eva-green mb-2">② 추가 세미나 신청</h2>
                     {% if not is_admin %}
                     <div class="mb-3 p-3 bg-yellow-900/20 border border-yellow-700/50 rounded text-sm">
                         <p class="font-bold">신청은 <strong>일요일 23:59까지</strong> 가능합니다.</p>
@@ -160,7 +160,7 @@
                                     <span class="ml-2 text-sm {% if s.day_type == 'mon' %}text-blue-300{% else %}text-purple-300{% endif %}">
                                         ({% if s.day_type == 'mon' %}월{% else %}목{% endif %})
                                     </span>
-                                    {% if s.status == 'open' %}<span class="badge badge-open">투표중</span>
+                                    {% if s.status == 'open' %}<span class="badge badge-open">신청 중</span>
                                     {% elif s.status == 'upcoming' %}<span class="badge badge-upcoming">오픈 전</span>
                                     {% endif %}
                                     <span class="my-vote-badge ml-2 text-xs hidden" data-session-id="{{ s.id }}"></span>
@@ -206,14 +206,14 @@
                                     {% endfor %}
                                 </div>
                                 {% else %}
-                                <p class="text-xs text-gray-500 attendee-hidden-msg">아직 신청 인원이 적어 명단을 표시하지 않습니다. (4명 이상부터 공개)<br><span class="text-gray-600">※ 본인이 참석으로 투표한 회차는 본인 확인 후 명단을 볼 수 있습니다.</span></p>
+                                <p class="text-xs text-gray-500 attendee-hidden-msg">아직 신청 인원이 적어 명단을 표시하지 않습니다. (4명 이상부터 공개)<br><span class="text-gray-600">※ 본인이 신청한 회차는 본인 확인 후 명단을 볼 수 있습니다.</span></p>
                                 {% endif %}
                             </div>
                             {% endif %}
                         </div>
                         {% else %}
                         <div class="eva-card p-6 rounded-lg text-center text-gray-500 text-sm">
-                            지금은 투표 중인 회차가 없습니다.
+                            지금은 신청 가능한 추가 세미나가 없습니다.
                         </div>
                         {% endfor %}
                     </div>
@@ -223,7 +223,7 @@
                 <div class="submit-bar">
                     <button type="submit"
                         class="w-full bg-eva-green text-white font-extrabold py-4 rounded-lg text-lg hover:opacity-90 shadow-lg flex items-center justify-center gap-2">
-                        <span><i data-lucide="circle-check" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 투표 제출하기</span>
+                        <span><i data-lucide="circle-check" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 신청 내용 저장</span>
                     </button>
                     <p class="text-center text-[11px] text-gray-400 mt-1.5">선택을 마친 뒤 이 버튼을 눌러야 저장됩니다</p>
                 </div>
@@ -235,7 +235,7 @@
         {% if closed_sessions %}
         <div class="mt-8">
             <h2 class="text-sm font-bold text-gray-400 mb-2"><i data-lucide="lock" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 마감된 회차</h2>
-            <p class="text-xs text-gray-500 mb-2">본인 확인을 마치면 각 회차에 내가 어떻게 투표했는지 표시됩니다.</p>
+            <p class="text-xs text-gray-500 mb-2">본인 확인을 마치면 각 회차의 내 신청 상태가 표시됩니다.</p>
             <div class="space-y-2">
                 {% for s in closed_sessions %}
                 <div class="session-card eva-card p-3 rounded-lg opacity-90" data-session-id="{{ s.id }}" data-status="closed">
@@ -274,14 +274,14 @@
                 </div>
                 {% endfor %}
             </div>
-            <p class="text-xs text-gray-500 mt-2">신청 인원은 투표 오픈 후 공개됩니다.</p>
+            <p class="text-xs text-gray-500 mt-2">신청 인원은 신청 시작 후 공개됩니다.</p>
         </div>
         {% endif %}
 
         <div id="result" class="hidden mt-6 eva-card p-5 rounded-lg"></div>
 
         <p class="text-center text-xs text-gray-500 mt-8">
-            책 먹는 호반우 · 학기 단위 세미나 출석 투표
+            책 먹는 호반우 · 월요일 추가 세미나 신청
         </p>
     </div>
 
@@ -331,13 +331,13 @@
                     badge.classList.remove('hidden', 'my-vote-yes', 'my-vote-no', 'my-vote-none');
                     if (choice === 'yes') {
                         badge.classList.add('my-vote-yes');
-                        badge.textContent = '내 투표: 참석';
+                        badge.textContent = '신청 완료';
                     } else if (choice === 'no') {
                         badge.classList.add('my-vote-no');
-                        badge.textContent = '내 투표: 불참';
+                        badge.textContent = '신청 취소';
                     } else {
                         badge.classList.add('my-vote-none');
-                        badge.textContent = '내 투표: 미투표';
+                        badge.textContent = '미신청';
                     }
                 });
                 // 본인이 참석으로 투표한 회차: 명단 공개(4명 미만이어도 공개)
@@ -347,7 +347,7 @@
                     if (!section) return;
                     const safe = (names || []).map(n => String(n).replace(/</g, '&lt;').replace(/>/g, '&gt;'));
                     section.innerHTML = `
-                        <div class="text-xs text-gray-400 mb-1.5 attendee-title"> 신청자 명단 (${safe.length}명)<span class="ml-1 text-eva-green">· 내가 참석으로 투표한 회차</span></div>
+                        <div class="text-xs text-gray-400 mb-1.5 attendee-title"> 신청자 명단 (${safe.length}명)<span class="ml-1 text-eva-green">· 내가 신청한 회차</span></div>
                         <div class="flex flex-wrap gap-1.5 attendee-list">
                             ${safe.map(n => `<span class="text-xs bg-gray-800 border border-gray-700 rounded px-2 py-0.5">${n}</span>`).join('')}
                         </div>
@@ -370,7 +370,7 @@
         function renderAttendeeSection(section, names, isMyYes) {
             const safe = (names || []).map(escapeHtml);
             const label = isMyYes
-                ? `<span class="ml-1 text-eva-green">· 내가 참석으로 투표한 회차</span>`
+                ? `<span class="ml-1 text-eva-green">· 내가 신청한 회차</span>`
                 : '';
             section.innerHTML = `
                 <div class="text-xs text-gray-400 mb-1.5 attendee-title"> 신청자 명단 (${safe.length}명)${label}</div>
@@ -381,7 +381,7 @@
         }
 
         function renderAttendeeHidden(section) {
-            section.innerHTML = `<p class="text-xs text-gray-500 attendee-hidden-msg">아직 신청 인원이 적어 명단을 표시하지 않습니다. (4명 이상부터 공개)<br><span class="text-gray-600">※ 본인이 참석으로 투표한 회차는 본인 확인 후 명단을 볼 수 있습니다.</span></p>`;
+                section.innerHTML = `<p class="text-xs text-gray-500 attendee-hidden-msg">아직 신청 인원이 적어 명단을 표시하지 않습니다. (4명 이상부터 공개)<br><span class="text-gray-600">※ 본인이 신청한 회차는 본인 확인 후 명단을 볼 수 있습니다.</span></p>`;
         }
 
         async function refreshCounts() {
@@ -442,11 +442,11 @@
                 const box = document.getElementById('result');
                 box.classList.remove('hidden');
                 if (data.status === 'success') {
-                    let html = `<h3 class="text-lg font-bold text-eva-green mb-3">${data.member_name}님, 투표가 제출되었습니다!</h3>`;
+                    let html = `<h3 class="text-lg font-bold text-eva-green mb-3">${data.member_name}님, 신청 내용이 저장되었습니다!</h3>`;
                     if (data.success && data.success.length) html += `<p class="mb-2"><span class="text-eva-green font-bold">✓ 등록됨:</span> ${data.success.join(', ')}</p>`;
                     if (data.full && data.full.length) html += `<p class="mb-2 text-red-400"><span class="font-bold">✗ 마감됨:</span> ${data.full.join(', ')}</p>`;
                     if (data.skipped && data.skipped.length) html += `<p class="mb-2 text-gray-400"><span class="font-bold">— 미정/제외:</span> ${data.skipped.join(', ')}</p>`;
-                    html += `<p class="text-xs text-gray-500 mt-3">동일 학번으로 다시 제출하면 기존 투표가 갱신됩니다.</p>`;
+                    html += `<p class="text-xs text-gray-500 mt-3">동일 학번으로 다시 저장하면 기존 신청 내용이 갱신됩니다.</p>`;
                     box.innerHTML = html;
                     box.scrollIntoView({behavior: 'smooth'});
                     refreshCounts();

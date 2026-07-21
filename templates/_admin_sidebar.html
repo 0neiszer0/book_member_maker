@@ -1,0 +1,30 @@
+{% set endpoint = request.endpoint or '' %}
+<aside class="wd-admin-sidebar" aria-label="운영 관리 메뉴">
+  <div class="wd-admin-sidebar-title">운영 관리</div>
+  <nav>
+    <a href="{{ url_for('admin_dashboard') }}" class="{% if endpoint == 'admin_dashboard' %}active{% endif %}">개요</a>
+    <a href="{{ url_for('admin_seminars') }}" class="{% if endpoint in ['admin_seminars', 'admin_seminar_term'] %}active{% endif %}">세미나 운영</a>
+    <a href="{{ url_for('bookclub_index') }}" class="{% if endpoint in ['bookclub_index', 'bookclub_ga_results'] %}active{% endif %}">조 편성</a>
+    <a href="{{ url_for('records_members') }}" class="{% if endpoint in ['records_members', 'records_member_profile'] %}active{% endif %}">회원 관리</a>
+    <a href="{{ url_for('admin_special_events') }}" class="{% if endpoint.startswith('admin_special_event') %}active{% endif %}">활동·행사</a>
+    <a href="{{ url_for('records_hub') }}" class="{% if (endpoint.startswith('records_') and endpoint not in ['records_members', 'records_member_profile']) or endpoint == 'admin_attendance_matrix' %}active{% endif %}">기록·통계</a>
+    {% if session.user_role == 'admin' %}<a href="{{ url_for('boards.admin_index') }}" class="{% if endpoint.startswith('boards.admin') %}active{% endif %}">게시판 관리</a>{% endif %}
+    <a href="{{ url_for('help_admin') }}" class="{% if endpoint in ['help_admin', 'admin_seminar_rooms'] %}active{% endif %}">시스템</a>
+  </nav>
+</aside>
+<style>
+  .wd-admin-sidebar{display:none}
+  @media (min-width:1280px){
+    .wd-admin-sidebar{display:block;position:fixed;left:18px;top:84px;width:205px;max-height:calc(100vh - 104px);overflow-y:auto;z-index:35;padding:12px;background:#fffdf8;border:1px solid #e5d7b8;border-radius:18px;box-shadow:0 12px 30px rgba(55,43,25,.08);font-family:Pretendard,-apple-system,BlinkMacSystemFont,sans-serif;color:#2a241b}
+    .wd-admin-sidebar-title{padding:8px 12px 10px;color:#756a59;font-size:12px;font-weight:800;letter-spacing:.08em}
+    .wd-admin-sidebar nav{display:grid;gap:3px}
+    .wd-admin-sidebar a{display:block;padding:10px 12px;border-radius:10px;color:#51493e;font-size:14px;font-weight:650;text-decoration:none}
+    .wd-admin-sidebar a:hover{background:#f2ebd8;color:#2f4924}
+    .wd-admin-sidebar a.active{background:#e8efdd;color:#304923;font-weight:800;box-shadow:inset 3px 0 #5f784b}
+    body.wd-admin-layout>main,
+    body.wd-admin-layout>.container,
+    body.wd-admin-layout>.work-header,
+    body.wd-admin-layout>.workspace{margin-left:241px!important;margin-right:18px!important;max-width:none!important;width:auto!important}
+  }
+</style>
+<script>document.body.classList.add('wd-admin-layout');</script>

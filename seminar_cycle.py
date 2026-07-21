@@ -23,3 +23,12 @@ def next_seminar_cycle(today):
     else:
         thursday = today + timedelta(days=3 - today.weekday())
     return [thursday, thursday + timedelta(days=4)]
+
+
+def is_member_signup_session(session):
+    """회원에게 노출할 월요일 추가 세미나 신청 회차인지 판별한다."""
+    return (
+        isinstance(session, dict)
+        and session.get('day_type') == 'mon'
+        and session.get('participation_mode') == 'opt_in'
+    )
