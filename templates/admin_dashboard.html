@@ -133,14 +133,17 @@
         <nav class="eva-card rounded-lg p-3 mb-6">
             <div class="flex flex-wrap gap-2 items-center text-sm">
                 <span class="text-xs text-gray-400 mr-1">이 페이지:</span>
-                <a href="#sec-topics" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 transition">발제문</a>
-                <a href="#sec-seminars" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 transition">세미나 투표</a>
+                <a href="{{ url_for('admin_seminars') }}" class="px-3 py-1 rounded bg-eva-green text-black font-bold transition">세미나 운영</a>
                 <a href="#sec-members" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 transition">회원</a>
             </div>
         </nav>
 
         <!-- 추가 관리 도구 -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            <a href="{{ url_for('admin_seminars') }}"
+                class="eva-card rounded-lg p-4 hover:border-eva-green transition flex items-center justify-between">
+                <div><div class="font-bold text-eva-green">세미나 운영</div><div class="text-xs text-gray-400 mt-1">도서·발제문·월요일 신청·목요일 불참·조 편성</div></div><span class="text-2xl">→</span>
+            </a>
             <a href="{{ url_for('admin_special_events') }}"
                 class="eva-card rounded-lg p-4 hover:border-eva-green transition flex items-center justify-between">
                 <div>
@@ -179,7 +182,7 @@
 
         <div class="space-y-8">
 
-                <div id="sec-topics" class="eva-card p-6 rounded-lg shadow-lg border-eva-purple scroll-mt-20">
+                <div id="sec-topics" class="hidden eva-card p-6 rounded-lg shadow-lg border-eva-purple scroll-mt-20">
                     <h2 class="text-xl font-bold text-eva-green mb-4 border-b border-border-dark pb-2">주간 발제문 관리</h2>
 
                     <form id="createTopicEventForm" class="flex flex-col sm:flex-row gap-4 mb-6">
@@ -288,7 +291,7 @@
                 </div>
 
                 <!-- 세미나 출석 투표 관리 -->
-                <div id="sec-seminars" class="eva-card p-6 rounded-lg scroll-mt-20">
+                <div id="sec-seminars" class="hidden eva-card p-6 rounded-lg scroll-mt-20">
                     <h2 class="text-xl font-bold text-eva-green mb-4">세미나 출석 투표 관리</h2>
                     <p class="text-xs text-gray-500 mb-4">
                         <i data-lucide="lightbulb" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 투표는 세미나 <strong>전주 금요일 18:00 ~ 일요일 23:59 KST</strong>까지 가능합니다.

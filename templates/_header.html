@@ -35,14 +35,13 @@
 
     <nav class="wd-top-nav">
       {% if session.user_role %}
-        <a href="{{ url_for('view_all_documents') }}" class="wd-link">위키</a>
+        <a href="{{ url_for('main_index') }}" class="wd-link">홈</a>
+        <a href="{{ url_for('seminars') }}" class="wd-link">세미나</a>
         <a href="{{ url_for('boards.index') }}" class="wd-link">게시판</a>
+        <a href="{{ url_for('my_page') }}" class="wd-link">내 활동</a>
+        <a href="{{ notion_public_wiki_url }}" target="_blank" rel="noopener noreferrer" class="wd-link">위키</a>
         {% if session.user_role in ['admin', 'officer'] %}
-          <a href="{{ url_for('admin_dashboard') }}" class="wd-link wd-link-staff">관리자</a>
-          <a href="{{ url_for('bookclub_index') }}" class="wd-link wd-link-staff">조 편성</a>
-          {% if session.user_role == 'admin' %}
-            <a href="{{ url_for('records_hub') }}" class="wd-link">기록</a>
-          {% endif %}
+          <a href="{{ url_for('admin_seminars') }}" class="wd-link wd-link-staff">운영 관리</a>
         {% endif %}
       {% endif %}
     </nav>
@@ -76,17 +75,17 @@
             <a href="{{ url_for('boards.index') }}" class="wd-menu-item">
               <span class="wd-menu-ico"><i data-lucide="message-square" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>게시판
             </a>
+            <a href="{{ notion_public_wiki_url }}" target="_blank" rel="noopener noreferrer" class="wd-menu-item">
+              <span class="wd-menu-ico"><i data-lucide="book-open" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>공식 위키
+            </a>
             {% for board in nav_boards %}
             <a href="{{ url_for('boards.board_list', slug=board.slug) }}" class="wd-menu-item" style="padding-left:2.6rem;font-size:.86rem">{{ board.name }}</a>
             {% endfor %}
             {% if session.user_role in ['admin', 'officer'] %}
               <div class="wd-menu-divider"></div>
               <div class="wd-menu-label">관리</div>
-              <a href="{{ url_for('admin_dashboard') }}" class="wd-menu-item">
-                <span class="wd-menu-ico"><i data-lucide="settings" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>관리자 대시보드
-              </a>
-              <a href="{{ url_for('bookclub_index') }}" class="wd-menu-item">
-                <span class="wd-menu-ico"><i data-lucide="puzzle" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>조 편성
+              <a href="{{ url_for('admin_seminars') }}" class="wd-menu-item">
+                <span class="wd-menu-ico"><i data-lucide="settings" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>운영 관리
               </a>
               {% if session.user_role == 'admin' %}
                 <a href="{{ url_for('records_hub') }}" class="wd-menu-item">
@@ -122,33 +121,23 @@
 {# --- 모바일 하단 탭바 (로그인 회원만) --- #}
 {% if session.user_role %}
 <nav class="wd-tabbar" role="navigation" aria-label="주 메뉴">
-  <a href="{{ url_for('my_page') }}"
-     class="wd-tb {% if request.endpoint == 'my_page' %}wd-tb-on{% endif %}">
+  <a href="{{ url_for('main_index') }}"
+     class="wd-tb {% if request.endpoint == 'main_index' %}wd-tb-on{% endif %}">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8v10a2 2 0 0 1-2 2h-4a1 1 0 0 1-1-1v-5a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v5a1 1 0 0 1-1 1H5a2 2 0 0 1-2-2z"/></svg>
     <span>홈</span>
   </a>
-  <a href="{{ url_for('view_all_documents') }}"
-     class="wd-tb {% if request.endpoint in ['view_all_documents','view_document','edit_document'] %}wd-tb-on{% endif %}">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7a3 3 0 0 1 3 3v14a2 2 0 0 0-2-2H4z"/><path d="M20 4h-7a3 3 0 0 0-3 3v14a2 2 0 0 1 2-2h8z"/></svg>
-    <span>위키</span>
+  <a href="{{ url_for('seminars') }}" class="wd-tb {% if request.endpoint == 'seminars' %}wd-tb-on{% endif %}">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 9h18"/><rect x="3" y="4" width="18" height="17" rx="2"/></svg><span>세미나</span>
   </a>
-  {% if session.user_role in ['admin', 'officer'] %}
-  <a href="{{ url_for('bookclub_index') }}"
-     class="wd-tb {% if request.endpoint and 'bookclub' in request.endpoint %}wd-tb-on{% endif %}">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
-    <span>조편성</span>
+  <a href="{{ url_for('boards.index') }}" class="wd-tb {% if request.endpoint and request.endpoint.startswith('boards.') %}wd-tb-on{% endif %}">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg><span>게시판</span>
   </a>
-  {% endif %}
-  {% if session.user_role == 'admin' %}
-  <a href="{{ url_for('records_hub') }}"
-     class="wd-tb {% if request.endpoint and 'records' in request.endpoint %}wd-tb-on{% endif %}">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 3 5-7"/></svg>
-    <span>기록</span>
+  <a href="{{ url_for('my_page') }}" class="wd-tb {% if request.endpoint == 'my_page' %}wd-tb-on{% endif %}">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg><span>내 활동</span>
   </a>
-  {% endif %}
   <a href="#" class="wd-tb wd-tb-more" onclick="document.getElementById('profile-btn')?.click();return false">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
-    <span>MY</span>
+    <span>더보기</span>
   </a>
 </nav>
 {% endif %}

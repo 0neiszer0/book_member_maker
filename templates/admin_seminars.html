@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>세미나 운영</title><script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <style>
+    body{background:var(--paper,#faf6ec);color:var(--ink,#2a241b);font-family:Pretendard,-apple-system,BlinkMacSystemFont,sans-serif}
+    .panel{background:var(--surface,#fffdf8);border:1px solid var(--line,#e5d7b8);border-radius:18px}
+    .field{width:100%;border:1px solid var(--line,#e5d7b8);border-radius:10px;background:#fff;padding:.65rem .75rem}
+    .btn{border-radius:10px;padding:.6rem .9rem;font-weight:700;font-size:.875rem;display:inline-flex;align-items:center;justify-content:center;gap:.35rem}
+    .primary{background:var(--moss-deep,#3d5c2e);color:#fff}.soft{background:var(--moss-tint,#e8efdd);color:var(--moss-deep,#3d5c2e)}
+    .muted{color:var(--ink-soft,#6b6255)}.chip{border-radius:999px;padding:.25rem .6rem;font-size:.75rem;font-weight:700;background:var(--paper-2,#f2ebd8)}
+  </style>
+</head>
+<body>{% include '_header.html' %}
+<main class="max-w-[1500px] mx-auto px-4 lg:px-8 py-7">
+ <div class="grid lg:grid-cols-[210px_minmax(0,1fr)] gap-6">
+  <aside class="hidden lg:block"><nav class="panel p-3 sticky top-20 text-sm space-y-1" aria-label="운영 관리 메뉴">
+    <p class="px-3 py-2 text-xs font-extrabold muted">운영 관리</p>
+    <a class="block rounded-lg px-3 py-2 hover:bg-[#f2ebd8]" href="{{ url_for('admin_dashboard') }}">개요</a>
+    <a class="block rounded-lg px-3 py-2 bg-[#e8efdd] text-[#3d5c2e] font-bold" href="{{ url_for('admin_seminars') }}">세미나 운영</a>
+    <a class="block rounded-lg px-3 py-2 hover:bg-[#f2ebd8]" href="{{ url_for('bookclub_index') }}">조 편성</a>
+    <a class="block rounded-lg px-3 py-2 hover:bg-[#f2ebd8]" href="{{ url_for('admin_dashboard') }}#sec-members">회원 관리</a>
+    <a class="block rounded-lg px-3 py-2 hover:bg-[#f2ebd8]" href="{{ url_for('admin_special_events') }}">활동·행사</a>
+    <a class="block rounded-lg px-3 py-2 hover:bg-[#f2ebd8]" href="{{ url_for('records_hub') }}">기록·통계</a>
+    {% if session.user_role == 'admin' %}<a class="block rounded-lg px-3 py-2 hover:bg-[#f2ebd8]" href="{{ url_for('boards.admin_index') }}">게시판 관리</a>{% endif %}
+    <a class="block rounded-lg px-3 py-2 hover:bg-[#f2ebd8]" href="{{ url_for('help_admin') }}">시스템·운영 안내</a>
+  </nav></aside>
+  <div class="min-w-0">
+  <div class="flex flex-wrap items-end justify-between gap-4 mb-6">
+    <div><p class="text-sm font-bold muted">운영 관리</p><h1 class="text-3xl font-extrabold tracking-tight">세미나 운영</h1><p class="muted mt-2">도서와 발제문은 주차별로, 참석과 조 편성은 월·목 회차별로 관리합니다.</p></div>
+    <div class="flex flex-wrap gap-2">
+      <select class="field !w-auto" onchange="location.href='{{ url_for('admin_seminars') }}?term_id='+this.value">
+        {% for item in terms %}<option value="{{ item.id }}" {% if term and item.id==term.id %}selected{% endif %}>{{ item.name }}{% if not item.is_active %} · 보관됨{% endif %}</option>{% endfor %}
+      </select>
+      {% if share_url %}<button class="btn soft" data-copy="{{ share_url }}">월요일 신청 링크 복사</button>{% endif %}
+    </div>
+  </div>
+
+  {% if not term %}<div class="panel p-8 text-center muted">등록된 학기가 없습니다. 기존 관리자 화면에서 학기를 먼저 추가해주세요.</div>{% endif %}
+  <div class="space-y-5">
+  {% for week in weeks %}
+    {% set mon=week.sessions_by_day.get('mon') %}{% set thu=week.sessions_by_day.get('thu') %}
+    <section class="panel p-4 lg:p-6" data-week="{{ week.id }}">
+      <div class="flex flex-wrap justify-between gap-3 mb-5">
+        <div><div class="flex flex-wrap items-center gap-2"><h2 class="text-xl font-extrabold">{{ week.week_start }} 주간</h2>{% if week.needs_review %}<span class="chip !bg-amber-100 !text-amber-800">도서 확인 필요</span>{% endif %}{% if week.is_past %}<span class="chip">지난 주차</span>{% endif %}</div><p class="muted text-sm mt-1">월요일과 목요일이 같은 도서·발제문을 공유합니다.</p></div>
+        <div class="flex gap-2 flex-wrap">
+          {% if week.topic_event %}
+            <span class="chip">발제문 {{ week.topic_event.submission_count }}명 제출</span>
+            <button class="btn soft toggle-topic" data-event-id="{{ week.topic_event.id }}">{% if week.topic_event.is_active %}접수 마감{% else %}다시 열기{% endif %}</button>
+            <button class="btn soft" data-copy="{{ week.topic_event.share_url }}">링크 복사</button>
+            <a class="btn soft" href="{{ url_for('view_admin_topics', event_id=week.topic_event.id) }}">제출 관리</a>
+            <a class="btn soft" href="{{ url_for('download_topics_word', event_id=week.topic_event.id) }}">Word</a>
+          {% else %}<button class="btn primary open-topic" data-week-id="{{ week.id }}">발제문 수집 열기</button>{% endif %}
+        </div>
+      </div>
+      <div class="grid lg:grid-cols-[1.15fr_1fr_1fr] gap-4">
+        <div class="rounded-2xl bg-[#f7f1e4] p-4">
+          <h3 class="font-extrabold mb-3">주간 도서</h3>
+          <div class="space-y-2">
+            <input class="field book-title" value="{{ week.book_title or '' }}" placeholder="도서명 · 미정이면 비워둘 수 있습니다">
+            <input class="field book-author" value="{{ week.book_author or '' }}" placeholder="저자">
+            <textarea class="field week-note" rows="2" placeholder="안내 또는 운영 메모">{{ week.note or '' }}</textarea>
+            <button class="btn primary save-week" data-week-id="{{ week.id }}">도서·안내 저장</button>
+          </div>
+        </div>
+        <div class="rounded-2xl border border-[#dce6d2] p-4">
+          <div class="flex justify-between gap-2"><div><p class="text-xs font-bold muted">MONDAY</p><h3 class="font-extrabold">월요일 신청제</h3></div>{% if mon %}<span class="chip">{{ mon.yes_count }}/{{ mon.capacity or 10 }}명</span>{% endif %}</div>
+          {% if mon %}
+            <p class="text-sm muted mt-2">{{ mon.meeting_date }} · 남은 자리 {{ [0,(mon.capacity or 10)-mon.yes_count]|max }}석</p>
+            <div class="flex gap-2 mt-3"><input class="field !w-24 capacity" type="number" min="1" value="{{ mon.capacity or 10 }}"><button class="btn soft save-capacity" data-session-id="{{ mon.id }}">정원 저장</button></div>
+            <div class="flex flex-wrap gap-1 mt-3">{% for m in mon.attendees %}<span class="chip">{{ m.name }}</span>{% else %}<span class="text-sm muted">신청자가 없습니다.</span>{% endfor %}</div>
+            <div class="flex flex-wrap gap-2 mt-4"><a class="btn primary" href="{{ url_for('bookclub_index', session_id=mon.id) }}">조 편성</a>{% if mon.history %}<a class="btn soft" href="{{ url_for('records_seminar_detail', history_id=mon.history.id) }}">진행 기록</a>{% endif %}</div>
+          {% else %}<p class="muted text-sm mt-3">이 주차에는 월요일 회차가 없습니다.</p>{% endif %}
+        </div>
+        <div class="rounded-2xl border border-[#eadac5] p-4">
+          <div class="flex justify-between gap-2"><div><p class="text-xs font-bold muted">THURSDAY</p><h3 class="font-extrabold">목요일 불참 기록</h3></div>{% if thu %}<span class="chip">예상 {{ thu.expected_count }}명</span>{% endif %}</div>
+          {% if thu %}
+            <p class="text-sm muted mt-2">{{ thu.meeting_date }} · 불참 {{ thu.absences|length }}명</p>
+            <div class="flex flex-wrap gap-1 mt-3">{% for a in thu.absences %}<button class="chip absence-cancel" title="불참 취소" data-session-id="{{ thu.id }}" data-member-id="{{ a.member.id }}">{{ a.member.name }}{% if a.note %} · {{ a.note }}{% endif %} ×</button>{% else %}<span class="text-sm muted">등록된 불참자가 없습니다.</span>{% endfor %}</div>
+            <div class="grid grid-cols-[1fr_auto] gap-2 mt-3"><select class="field absence-member"><option value="">불참 회원 선택</option>{% for m in all_members %}<option value="{{ m.id }}">{{ m.name }} · {{ m.student_id or '' }} · {{ m.department or '' }}</option>{% endfor %}</select><button class="btn soft add-absence" data-session-id="{{ thu.id }}">추가</button><input class="field absence-note col-span-2" placeholder="메모(선택)"></div>
+            <div class="flex flex-wrap gap-2 mt-4"><a class="btn primary" href="{{ url_for('bookclub_index', session_id=thu.id) }}">조 편성</a>{% if thu.history %}<a class="btn soft" href="{{ url_for('records_seminar_detail', history_id=thu.history.id) }}">진행 기록</a>{% endif %}</div>
+          {% else %}<p class="muted text-sm mt-3">이 주차에는 목요일 회차가 없습니다.</p>{% endif %}
+        </div>
+      </div>
+    </section>
+  {% else %}{% if term %}<div class="panel p-8 text-center muted">이 학기에 생성된 주차가 없습니다.</div>{% endif %}{% endfor %}
+  </div>
+  </div>
+ </div>
+</main>
+<script>
+async function api(url, options={}){const r=await fetch(url,{headers:{'Content-Type':'application/json'},...options});const j=await r.json();if(!r.ok||j.status==='error')throw new Error(j.message||'처리하지 못했습니다.');return j}
+document.addEventListener('click',async e=>{
+ const copy=e.target.closest('[data-copy]');if(copy){await navigator.clipboard.writeText(copy.dataset.copy);copy.textContent='복사됨';return}
+ const box=e.target.closest('[data-week]');
+ try{
+  if(e.target.closest('.save-week')){const b=e.target.closest('.save-week');await api('/api/admin/seminar_weeks/'+b.dataset.weekId,{method:'PATCH',body:JSON.stringify({book_title:box.querySelector('.book-title').value,book_author:box.querySelector('.book-author').value,note:box.querySelector('.week-note').value})});location.reload()}
+  if(e.target.closest('.open-topic')){const b=e.target.closest('.open-topic');await api('/api/admin/seminar_weeks/'+b.dataset.weekId+'/open_topics',{method:'POST',body:'{}'});location.reload()}
+  if(e.target.closest('.toggle-topic')){const b=e.target.closest('.toggle-topic');await api('/api/admin/topic_events/'+b.dataset.eventId+'/toggle_active',{method:'POST',body:'{}'});location.reload()}
+  if(e.target.closest('.save-capacity')){const b=e.target.closest('.save-capacity');await api('/api/admin/seminar_sessions/'+b.dataset.sessionId+'/capacity',{method:'PATCH',body:JSON.stringify({capacity:Number(b.parentElement.querySelector('.capacity').value)})});location.reload()}
+  if(e.target.closest('.add-absence')){const b=e.target.closest('.add-absence'),p=b.parentElement;await api('/api/admin/seminar_sessions/'+b.dataset.sessionId+'/absences',{method:'POST',body:JSON.stringify({member_id:p.querySelector('.absence-member').value,note:p.querySelector('.absence-note').value})});location.reload()}
+  if(e.target.closest('.absence-cancel')){const b=e.target.closest('.absence-cancel');if(confirm('이 불참 기록을 취소할까요? 기록 자체는 이력에 남습니다.')){await api('/api/admin/seminar_sessions/'+b.dataset.sessionId+'/absences/'+b.dataset.memberId,{method:'DELETE'});location.reload()}}
+ }catch(err){alert(err.message)}
+})
+</script></body></html>
