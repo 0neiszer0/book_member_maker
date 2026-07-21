@@ -29,6 +29,7 @@ from group_history import (
     matrix_rows_from_history as _matrix_rows_from_history,
 )
 from topic_preview import anonymous_topic_previews
+from seminar_cycle import cycle_monday, next_seminar_cycle
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
@@ -214,21 +215,9 @@ def get_next_monday():
 
 
 def get_next_seminar_dates():
-    """이번 주 또는 다음 주의 월요일+목요일을 한 쌍으로 반환.
-    - 오늘이 월~목 사이라면: 이번 주 월요일 + 목요일
-    - 오늘이 금/토/일이라면: 다음 주 월요일 + 목요일
-    """
+    """가장 가까운 목요일 본 세미나와 다음 월요일 추가 세미나를 반환한다."""
     today = datetime.now(timezone(timedelta(hours=9))).date()
-    wd = today.weekday()  # 0=월, 3=목, 4=금, ...
-    # 이번 주의 월요일 (0일 전~6일 전)
-    this_monday = today - timedelta(days=wd)
-    this_thursday = this_monday + timedelta(days=3)
-    if today <= this_thursday:  # 아직 목요일 전이면 이번 주 상당
-        return sorted([this_monday, this_thursday])
-    else:  # 목요일 이후(금/토/일)면 다음 주
-        next_monday = this_monday + timedelta(weeks=1)
-        next_thursday = next_monday + timedelta(days=3)
-        return [next_monday, next_thursday]
+    return next_seminar_cycle(today)
 
 
 # ==============================================================================
@@ -2850,8 +2839,7 @@ def _enumerate_mon_thu(start_date, end_date):
 
 
 def _week_start(value):
-    d = value if isinstance(value, date) else date.fromisoformat(str(value)[:10])
-    return d - timedelta(days=d.weekday())
+    return cycle_monday(value)
 
 
 def _ensure_term_weeks(term_id, dates):
@@ -3172,7 +3160,7 @@ def _load_weekly_seminar_view(term_id=None):
             topic['submission_count'] = submission_count[topic['id']]
             topic['share_url'] = f"{request.host_url}shared_topics?token={topic['share_token']}"
         week['topic_event'] = topic
-        week['is_past'] = (_week_start(week['week_start']) + timedelta(days=6)) < today
+        week['is_past'] = bool(week['sessions']) and all(row['is_past'] for row in week['sessions'])
     return terms, term, weeks, active_members
 
 
