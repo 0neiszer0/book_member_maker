@@ -28,6 +28,7 @@ from group_history import (
     pair_keys_from_groups as _pair_keys_from_groups,
     matrix_rows_from_history as _matrix_rows_from_history,
 )
+from topic_preview import anonymous_topic_previews
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
@@ -2410,6 +2411,11 @@ def view_shared_topics():
             flash("마감되었거나 유효하지 않은 링크입니다.", "warning")
             return redirect(url_for('main_index'))
 
+        # 중복 방지용 공개 영역에는 발제 JSON만 조회한다. 작성자 정보는 서버에서부터 가져오지 않는다.
+        preview_rows = supabase.table('topic_submissions').select('topics') \
+            .eq('event_id', event_data['id']).order('created_at').execute().data or []
+        existing_topic_previews = anonymous_topic_previews(preview_rows)
+
         user_name = session.get('user_name')
         user_department = None
         user_student_id = None
@@ -2425,7 +2431,8 @@ def view_shared_topics():
                                event=event_data,
                                user_name=user_name,
                                user_department=user_department,
-                               user_student_id=user_student_id)
+                               user_student_id=user_student_id,
+                               existing_topic_previews=existing_topic_previews)
     except Exception as e:
         app.logger.error(f"Error loading topic event: {e}")
         return "유효하지 않은 링크입니다.", 404
