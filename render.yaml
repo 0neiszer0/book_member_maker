@@ -2,6 +2,10 @@ services:
   - type: web
     name: bookmembers-app
     env: docker
-    plan: free
+    plan: starter
     branch: main
     autoDeploy: true
+    healthCheckPath: /keep-alive
+    envVars:
+      - key: NOTION_PUBLIC_WIKI_URL
+        value: https://quaint-sapphire-900.notion.site/bookbook
