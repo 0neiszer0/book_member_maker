@@ -4,7 +4,7 @@
 <head>
     <title>통계 - 기록 시스템</title>
     {% include '_records_base.html' %}
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
 </head>
 <body class="min-h-screen">
     {% include '_header.html' %}
@@ -13,10 +13,10 @@
         {{ records_nav('analytics') }}
         {{ term_filter(terms, selected_term_id, 'records_analytics') }}
 
-        <h1 class="text-2xl font-bold text-eva-green mb-6"><i data-lucide="chart-column" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 통계</h1>
+        <div class="flex justify-between items-center gap-3 mb-6"><h1 class="text-2xl font-bold text-eva-green"><i data-lucide="chart-column" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 통계</h1><button id="rebuild-matrix" class="wood-chip">만남 매트릭스 재계산</button></div>
 
         <!-- 요약 -->
-        <div class="grid grid-cols-3 gap-4 mb-8">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
             <div class="eva-card p-5 rounded-lg text-center">
                 <div class="text-xs text-gray-400">총 세미나</div>
                 <div class="text-3xl font-bold text-eva-purple">{{ total_seminars }}</div>
@@ -77,10 +77,16 @@
     </div>
 
     <script>
-        Chart.defaults.color = '#aaa';
-        Chart.defaults.borderColor = '#444';
+        const theme = getComputedStyle(document.documentElement);
+        const themeColor = (name, fallback) => theme.getPropertyValue(name).trim() || fallback;
+        Chart.defaults.color = themeColor('--ink-soft', '#5E5548');
+        Chart.defaults.borderColor = themeColor('--line', '#E5D7B8');
+        Chart.defaults.font.family = "Pretendard, 'Noto Sans KR', sans-serif";
 
-        const PALETTE = ['#00FF7F', '#6A0DAD', '#FF8C00', '#3b82f6', '#ec4899', '#facc15', '#22d3ee', '#a78bfa', '#f87171', '#94a3b8'];
+        const PALETTE = [
+            '#5C7A4A', '#7A5A3A', '#8A9A76', '#B88746', '#667781',
+            '#8B7565', '#708A83', '#9A7C88', '#A08C5B', '#71806C'
+        ];
 
         function makePie(canvasId, labels, data) {
             new Chart(document.getElementById(canvasId), {
@@ -90,7 +96,7 @@
                     datasets: [{
                         data,
                         backgroundColor: labels.map((_, i) => PALETTE[i % PALETTE.length]),
-                        borderColor: '#1A1A1A',
+                        borderColor: themeColor('--surface', '#FFFCF3'),
                         borderWidth: 2,
                     }],
                 },
@@ -124,14 +130,23 @@
             makePie('genreChart', Object.keys(genreData), Object.values(genreData));
         }
         if (Object.keys(monthlyData).length) {
-            makeBar('monthlyChart', Object.keys(monthlyData), Object.values(monthlyData), '#6A0DAD');
+            makeBar('monthlyChart', Object.keys(monthlyData), Object.values(monthlyData), '#5C7A4A');
         }
         if (Object.keys(bbMonthly).length) {
-            makeBar('bbMonthlyChart', Object.keys(bbMonthly), Object.values(bbMonthly), '#FF8C00');
+            makeBar('bbMonthlyChart', Object.keys(bbMonthly), Object.values(bbMonthly), '#B88746');
         }
         if (Object.keys(sgMonthly).length) {
-            makeBar('sgMonthlyChart', Object.keys(sgMonthly), Object.values(sgMonthly), '#3b82f6');
+            makeBar('sgMonthlyChart', Object.keys(sgMonthly), Object.values(sgMonthly), '#667781');
         }
+        document.getElementById('rebuild-matrix').addEventListener('click', async (event) => {
+            if (!confirm('전체 세미나 이력을 기준으로 만남 횟수와 마지막 만남일을 다시 계산할까요?')) return;
+            event.currentTarget.disabled = true;
+            const response = await fetch('/api/admin/bookclub/rebuild_matrix', { method: 'POST' });
+            const data = await response.json();
+            event.currentTarget.disabled = false;
+            if (!response.ok) return alert(data.message || '재계산 실패');
+            alert(`재계산 완료: ${data.history_count}회 기록, ${data.pair_count}개 사람 쌍`);
+        });
     </script>
 </body>
 </html>

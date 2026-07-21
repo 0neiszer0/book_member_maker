@@ -36,6 +36,7 @@
     <nav class="wd-top-nav">
       {% if session.user_role %}
         <a href="{{ url_for('view_all_documents') }}" class="wd-link">위키</a>
+        <a href="{{ url_for('boards.index') }}" class="wd-link">게시판</a>
         {% if session.user_role in ['admin', 'officer'] %}
           <a href="{{ url_for('admin_dashboard') }}" class="wd-link wd-link-staff">관리자</a>
           <a href="{{ url_for('bookclub_index') }}" class="wd-link wd-link-staff">조 편성</a>
@@ -72,6 +73,12 @@
             <a href="{{ url_for('my_page') }}" class="wd-menu-item">
               <span class="wd-menu-ico"><i data-lucide="user" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>마이페이지
             </a>
+            <a href="{{ url_for('boards.index') }}" class="wd-menu-item">
+              <span class="wd-menu-ico"><i data-lucide="message-square" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>게시판
+            </a>
+            {% for board in nav_boards %}
+            <a href="{{ url_for('boards.board_list', slug=board.slug) }}" class="wd-menu-item" style="padding-left:2.6rem;font-size:.86rem">{{ board.name }}</a>
+            {% endfor %}
             {% if session.user_role in ['admin', 'officer'] %}
               <div class="wd-menu-divider"></div>
               <div class="wd-menu-label">관리</div>
@@ -89,6 +96,11 @@
               <a href="{{ url_for('help_admin') }}" class="wd-menu-item">
                 <span class="wd-menu-ico"><i data-lucide="book-open" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>운영 가이드
               </a>
+              {% if session.user_role == 'admin' %}
+              <a href="{{ url_for('boards.admin_index') }}" class="wd-menu-item">
+                <span class="wd-menu-ico"><i data-lucide="panel-top" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>게시판 관리
+              </a>
+              {% endif %}
             {% else %}
               <a href="{{ url_for('help_member') }}" class="wd-menu-item">
                 <span class="wd-menu-ico"><i data-lucide="book-open" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>이용 안내

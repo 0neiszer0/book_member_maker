@@ -13,12 +13,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         :root {
-            --eva-purple: #6A0DAD;
-            --eva-green: #00FF7F;
-            --bg-dark: #1A1A1A;
-            --card-dark: #2D2D2D;
-            --text-light: #E5E5E5;
-            --border-dark: #444444;
+            --eva-purple: #7A5A3A;
+            --eva-green: #3D5C2E;
+            --bg-dark: #FAF6EC;
+            --card-dark: #FFFCF3;
+            --text-light: #2F2A22;
+            --border-dark: #E5D7B8;
         }
 
         body {
@@ -31,9 +31,8 @@
         h2,
         h3,
         summary {
-            font-family: 'Orbitron', sans-serif;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
+            font-family: 'Noto Sans KR', sans-serif;
+            letter-spacing: -0.02em;
         }
 
         .eva-card {
@@ -246,111 +245,99 @@
 
         .form-check.hidden-by-filter { display: none; }
         .form-check.is-prechecked { border-left: 3px solid var(--eva-green); }
+
+        .work-header { max-width: 1180px; margin: 1rem auto 0; padding: 1rem 1.25rem; background: var(--surface, #FFFCF3); border: 1px solid var(--line, #E5D7B8); border-radius: 16px; color: var(--ink, #2F2A22); }
+        .work-header-title { font-family: inherit; text-transform: none; letter-spacing: 0; color: var(--moss-deep, #3D5C2E); }
+        .work-chip { display:inline-flex; align-items:center; gap:.3rem; padding:.35rem .65rem; border-radius:999px; background:var(--paper-2,#F2EBD8); color:var(--ink-soft,#5E5548); font-size:.8rem; font-weight:700; }
+        .workspace { max-width:1180px; margin:1rem auto 3rem; padding:0 1rem; display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:1rem; align-items:start; }
+        .member-panel,.settings-panel { background:var(--surface,#FFFCF3); border:1px solid var(--line,#E5D7B8); border-radius:16px; color:var(--ink,#2F2A22); }
+        .member-panel { padding:1rem; }
+        .settings-panel { padding:1rem; position:sticky; top:84px; }
+        .member-toolbar { display:grid; grid-template-columns:minmax(180px,1fr) auto; gap:.75rem; align-items:center; margin-bottom:.75rem; }
+        .member-table-head,.member-row { display:grid; grid-template-columns:minmax(130px,1fr) 72px 72px; gap:.5rem; align-items:center; }
+        .member-table-head { padding:.4rem .75rem; color:var(--ink-soft,#5E5548); font-size:.75rem; font-weight:800; }
+        .member-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.45rem; max-height:62vh; overflow:auto; padding:.15rem; }
+        .member-row { background:var(--paper,#FAF6EC); border:1px solid var(--line,#E5D7B8); border-radius:10px; padding:.55rem .7rem; }
+        .member-row.is-prechecked { border-left:4px solid var(--moss,#5C7A4A); }
+        .member-row input { accent-color:var(--moss-deep,#3D5C2E); width:18px; height:18px; justify-self:center; }
+        .member-meta { color:var(--ink-muted,#8A7E6A); font-size:.72rem; }
+        .settings-panel label { display:block; font-size:.8rem; font-weight:700; margin-bottom:.9rem; }
+        .settings-panel input { width:100%; margin-top:.35rem; padding:.65rem; border:1px solid var(--line,#E5D7B8); border-radius:10px; background:#fff; color:var(--ink,#2F2A22); }
+        .bulk-tools { margin-top:.9rem; border-top:1px solid var(--line,#E5D7B8); padding-top:.9rem; }
+        .bulk-tools summary { font-family:inherit; text-transform:none; letter-spacing:0; color:var(--moss-deep,#3D5C2E); cursor:pointer; font-weight:800; }
+        @media(max-width:900px){ .workspace{grid-template-columns:1fr}.settings-panel{position:static}.member-list{grid-template-columns:1fr;max-height:none}.member-toolbar{grid-template-columns:1fr}.work-header{margin:.75rem 1rem 0} }
     </style>
 </head>
 
 <body class="w-full">
     {% include '_header.html' %}
 
-    <div class="summary-bar">
-        <div class="flex items-center gap-2 flex-wrap">
-            <span class="stat">참석 <span id="cnt-present" class="num">0</span></span>
-            <span class="stat">발제 <span id="cnt-facilitators" class="num">0</span></span>
-            <span class="stat" title="선택한 요일에 참석 투표한 사람 수">투표자 <span id="cnt-voted" class="num">{{ pre_checked_attendee_ids|length }}</span></span>
-        </div>
-        <div class="flex items-center gap-2 flex-wrap">
-            <div class="flex items-center gap-1 text-xs">
-                <span class="text-gray-400">요일:</span>
-                <a href="?day=mon" class="px-2 py-1 rounded font-bold {% if day_choice == 'mon' %}bg-blue-500 text-white{% else %}bg-gray-700 text-blue-300 hover:bg-gray-600{% endif %}">월 {% if mon_date %}({{ mon_date[5:] }}){% endif %} · {{ mon_attendee_ids|length }}명</a>
-                <a href="?day=thu" class="px-2 py-1 rounded font-bold {% if day_choice == 'thu' %}bg-purple-500 text-white{% else %}bg-gray-700 text-purple-300 hover:bg-gray-600{% endif %}">목 {% if thu_date %}({{ thu_date[5:] }}){% endif %} · {{ thu_attendee_ids|length }}명</a>
-                <a href="?day=all" class="px-2 py-1 rounded font-bold {% if day_choice == 'all' %}bg-eva-green text-black{% else %}bg-gray-700 text-gray-200 hover:bg-gray-600{% endif %}">합산</a>
+    <section class="work-header">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+                <h1 class="work-header-title text-2xl font-bold">조 편성 작업</h1>
+                <p class="text-sm mt-1">{% if selected_session %}{{ selected_session.meeting_date }} · {% if selected_session.day_type == 'mon' %}월요일{% else %}목요일{% endif %} · {{ selected_session.book_title or '도서 미입력' }}{% else %}다음 세미나 참석 투표를 기준으로 명단을 준비했습니다.{% endif %}</p>
             </div>
-            <button type="button" id="quick-voted" class="text-xs px-2 py-1 rounded font-bold" style="background: var(--eva-green); color: #000;"><i data-lucide="vote" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 투표자만</button>
+            <div class="flex gap-2 flex-wrap">
+                <span class="work-chip">참석 <strong id="cnt-present">0</strong></span>
+                <span class="work-chip">발제 <strong id="cnt-facilitators">0</strong></span>
+                <span class="work-chip">투표 <strong id="cnt-voted">{{ pre_checked_attendee_ids|length }}</strong></span>
+                <span class="work-chip">발제문 {% if selected_topic_event %}연결됨{% else %}미연결{% endif %}</span>
+            </div>
         </div>
-    </div>
-    <div class="container mx-auto max-w-2xl px-4 mt-3 text-xs text-gray-400">
-        현재 <strong class="text-eva-green">{% if day_choice == 'mon' %}월요일{% elif day_choice == 'thu' %}목요일{% else %}월+목 합산{% endif %}</strong> 기준으로 조 편성 중입니다. 다른 요일은 위 탭에서 전환하세요.
-    </div>
-
-    <div class="container mx-auto max-w-2xl px-4 mt-6">
-        <h1 class="text-3xl text-eva-green mb-6 text-center">Bookclub Grouping</h1>
-
-        <form id="group-form">
-            <details class="section" open>
-                <summary>Attendee Select</summary>
-                <div class="content">
-                    <div class="controls">
-                        <button type="button" id="select-all-present">전체</button>
-                        <button type="button" class="secondary" id="deselect-all-present">해제</button>
-                    </div>
-                    <div style="grid-column: 1 / -1;" class="bulk-paste-wrap">
-                        <div class="flex gap-2 items-stretch">
-                            <textarea id="bulk-present-input" rows="2"
-                                placeholder="이름을 쉼표/공백/줄바꿈으로 붙여넣기 (예: 홍길동, 김철수 이영희)"
-                                class="flex-grow eva-input p-2 rounded-md text-sm" style="background:#1A1A1A;border:1px solid #444;color:#E5E5E5;"></textarea>
-                            <button type="button" id="bulk-present-apply" class="px-3 rounded-md text-sm font-bold" style="background: var(--eva-green); color:#000;">적용</button>
-                        </div>
-                        <p id="bulk-present-msg" class="text-xs text-gray-400 mt-1"></p>
-                    </div>
-                    <input type="text" class="filter-input" data-filter-target="present" placeholder=" 이름으로 검색…">
-                    {% for m in all_members %}
-                    <label class="form-check {% if m.id in pre_checked_attendee_ids %}is-prechecked{% endif %}" data-name="{{ m.name }}">
-                        <input type="checkbox" name="present" value="{{ m.name }}" {% if m.id in
-                            pre_checked_attendee_ids %}checked{% endif %}>
-                        <span>{{ m.name }}{% if m.id in pre_checked_attendee_ids %}<span class="voted-badge">투표</span>{% endif %}</span>
-                    </label>
-                    {% endfor %}
-                </div>
-            </details>
-
-            <details class="section">
-                <summary>Facilitator Select</summary>
-                <div class="content">
-                    <div class="controls">
-                        <button type="button" id="select-all-facilitators">전체</button>
-                        <button type="button" class="secondary" id="deselect-all-facilitators">해제</button>
-                    </div>
-                    <div style="grid-column: 1 / -1;" class="bulk-paste-wrap">
-                        <div class="flex gap-2 items-stretch">
-                            <textarea id="bulk-facilitators-input" rows="2"
-                                placeholder="발제자 이름을 쉼표/공백/줄바꿈으로 붙여넣기"
-                                class="flex-grow eva-input p-2 rounded-md text-sm" style="background:#1A1A1A;border:1px solid #444;color:#E5E5E5;"></textarea>
-                            <button type="button" id="bulk-facilitators-apply" class="px-3 rounded-md text-sm font-bold" style="background: var(--eva-green); color:#000;">적용</button>
-                        </div>
-                        <p id="bulk-facilitators-msg" class="text-xs text-gray-400 mt-1"></p>
-                    </div>
-                    <input type="text" class="filter-input" data-filter-target="facilitators" placeholder=" 이름으로 검색…">
-                    {% for m in all_members %}
-                    <label class="form-check" data-name="{{ m.name }}">
-                        <input type="checkbox" name="facilitators" value="{{ m.name }}">
-                        <span>{{ m.name }}</span>
-                    </label>
-                    {% endfor %}
-                </div>
-            </details>
-
-            <details class="section">
-                <summary><i data-lucide="settings" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> Advanced Settings</summary>
-                <div class="settings">
-                    <label>그룹 수 (선택)
-                        <input type="number" name="group_count" min="1" max="30" placeholder="자동">
-                    </label>
-                    <label>그룹 이름 (쉼표로 구분)
-                        <input type="text" name="group_names" placeholder="A팀,B팀,C팀">
-                    </label>
-                </div>
-            </details>
-
-            <button type="button" id="generate-btn" class="btn-submit mt-4">GENERATE GROUPS</button>
-        </form>
-
-        <div class="mt-6 text-center space-x-4">
-            <a href="/records/seminars"
-                class="text-sm text-eva-green hover:opacity-80 font-bold"><i data-lucide="book" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 세미나 기록 페이지로</a>
-            <button type="button" id="manage-history-btn"
-                class="text-sm text-gray-400 hover:text-eva-green font-bold">이전 모임 기록 관리(빠른 보기)</button>
+        {% if not selected_session %}
+        <div class="flex gap-2 mt-3 flex-wrap text-sm">
+            <a href="?day=mon" class="work-chip {% if day_choice == 'mon' %}bg-eva-green{% endif %}">월 {{ mon_date }} · {{ mon_attendee_ids|length }}명</a>
+            <a href="?day=thu" class="work-chip {% if day_choice == 'thu' %}bg-eva-green{% endif %}">목 {{ thu_date }} · {{ thu_attendee_ids|length }}명</a>
+            <a href="?day=all" class="work-chip {% if day_choice == 'all' %}bg-eva-green{% endif %}">월·목 합산</a>
         </div>
-    </div>
+        {% endif %}
+        {% if unmatched_facilitators %}<p class="text-sm mt-3" style="color:var(--warn,#C97A3A)">멤버와 자동 연결하지 못한 제출자: {% for item in unmatched_facilitators %}{{ item.author_name }}{% if item.student_id %}({{ item.student_id }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+    </section>
+
+    <form id="group-form" class="workspace">
+        <input type="hidden" name="seminar_session_id" value="{{ seminar_session_id or '' }}">
+        <input type="hidden" name="meeting_date" value="{% if selected_session %}{{ selected_session.meeting_date }}{% elif day_choice == 'mon' %}{{ mon_date }}{% elif day_choice == 'thu' %}{{ thu_date }}{% endif %}">
+        <section class="member-panel">
+            <div class="member-toolbar">
+                <input type="text" class="filter-input" data-filter-target="members" placeholder="이름·학번·학과로 검색…">
+                <div class="flex gap-2 flex-wrap text-xs">
+                    <button type="button" id="quick-voted" class="wood-chip on">투표자만</button>
+                    <button type="button" id="select-all-present" class="wood-chip">참석 전체</button>
+                    <button type="button" id="deselect-all-present" class="wood-chip">참석 해제</button>
+                    <button type="button" id="select-all-facilitators" class="wood-chip">발제 전체</button>
+                    <button type="button" id="deselect-all-facilitators" class="wood-chip">발제 해제</button>
+                </div>
+            </div>
+            <div class="member-table-head"><span>멤버</span><span class="text-center">참석</span><span class="text-center">발제</span></div>
+            <div class="member-list content">
+                {% for m in all_members %}
+                <label class="member-row form-check {% if m.id in pre_checked_attendee_ids %}is-prechecked{% endif %}" data-name="{{ m.name }} {{ m.student_id or '' }} {{ m.department or '' }}">
+                    <span><strong>{{ m.name }}</strong><span class="member-meta block">{{ m.student_id or '학번 없음' }}{% if m.department %} · {{ m.department }}{% endif %}</span></span>
+                    <input type="checkbox" name="present" value="{{ m.name }}" {% if m.id in pre_checked_attendee_ids %}checked{% endif %} aria-label="{{ m.name }} 참석">
+                    <input type="checkbox" name="facilitators" value="{{ m.name }}" {% if m.name in pre_checked_facilitator_names %}checked{% endif %} aria-label="{{ m.name }} 발제">
+                </label>
+                {% endfor %}
+            </div>
+            <details class="bulk-tools">
+                <summary>명단 붙여넣기</summary>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                    <div><textarea id="bulk-present-input" rows="3" placeholder="참석자 이름 붙여넣기" class="w-full p-2 rounded border"></textarea><button type="button" id="bulk-present-apply" class="wood-chip on mt-1">참석 적용</button><p id="bulk-present-msg" class="text-xs mt-1"></p></div>
+                    <div><textarea id="bulk-facilitators-input" rows="3" placeholder="발제자 이름 붙여넣기" class="w-full p-2 rounded border"></textarea><button type="button" id="bulk-facilitators-apply" class="wood-chip on mt-1">발제 적용</button><p id="bulk-facilitators-msg" class="text-xs mt-1"></p></div>
+                </div>
+            </details>
+        </section>
+        <aside class="settings-panel">
+            <h2 class="text-lg font-bold mb-4" style="color:var(--moss-deep,#3D5C2E)">편성 설정</h2>
+            <label>그룹 수<input type="number" name="group_count" min="1" max="30" placeholder="자동 계산"></label>
+            <label>그룹 이름<input type="text" name="group_names" placeholder="A팀, B팀, C팀"></label>
+            <button type="button" id="generate-btn" class="btn-submit">조 편성 시작</button>
+            <div class="mt-4 space-y-2 text-sm">
+                <a href="/records/seminars" class="block font-bold" style="color:var(--moss-deep,#3D5C2E)">세미나 기록으로 이동</a>
+                <button type="button" id="manage-history-btn" class="font-bold">이전 모임 빠른 보기</button>
+            </div>
+        </aside>
+    </form>
 
     <dialog id="history-dialog" class="p-6">
         <div class="flex justify-between items-center mb-4">
@@ -403,8 +390,7 @@
             document.querySelectorAll('.filter-input').forEach(input => {
                 input.addEventListener('input', () => {
                     const q = input.value.trim().toLowerCase();
-                    const target = input.dataset.filterTarget;
-                    const scope = input.closest('.content');
+                    const scope = input.closest('.member-panel') || document;
                     scope.querySelectorAll('label.form-check').forEach(lbl => {
                         const name = (lbl.dataset.name || '').toLowerCase();
                         const matches = !q || name.includes(q);

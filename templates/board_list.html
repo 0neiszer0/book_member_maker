@@ -1,0 +1,21 @@
+{% extends 'board_base.html' %}
+{% block title %}{{ board.name }}{% endblock %}
+{% block content %}
+<div class="flex items-end justify-between gap-4 mb-5">
+    <div><a href="{{ url_for('boards.index') }}" class="text-sm text-gray-500">← 전체 게시판</a><h1 class="text-2xl font-bold text-eva-green mt-2">{{ board.name }}</h1></div>
+    {% if can_write %}<a href="{{ url_for('boards.write', slug=board.slug) }}" class="wd-btn wd-btn-primary">글쓰기</a>{% endif %}
+</div>
+<form method="get" class="flex gap-2 mb-4"><input name="q" value="{{ q }}" placeholder="제목과 본문 검색" class="flex-1 rounded-xl border px-4 py-2 bg-white"><button class="wood-chip on px-4">검색</button></form>
+<div class="eva-card rounded-2xl overflow-hidden divide-y">
+    {% for post in posts %}
+    <a href="{{ url_for('boards.post_detail', slug=board.slug, post_id=post.id) }}" class="block p-4 hover:bg-gray-50">
+        <div class="flex items-center gap-2">{% if post.is_pinned %}<span class="wood-chip on">공지</span>{% endif %}<h2 class="font-bold truncate">{{ post.title }}</h2></div>
+        <div class="text-xs text-gray-500 mt-2">{{ post.author.name }} · {{ post.created_at|datetime('%Y.%m.%d %H:%M') }}</div>
+    </a>
+    {% else %}<div class="p-10 text-center text-gray-500">아직 작성된 글이 없습니다.</div>{% endfor %}
+</div>
+<div class="flex justify-between mt-5">
+    {% if page > 1 %}<a class="wood-chip" href="?page={{ page - 1 }}&q={{ q|urlencode }}">이전</a>{% else %}<span></span>{% endif %}
+    {% if has_next %}<a class="wood-chip" href="?page={{ page + 1 }}&q={{ q|urlencode }}">다음</a>{% endif %}
+</div>
+{% endblock %}
