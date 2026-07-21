@@ -23,6 +23,11 @@ from docx import Document
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from collections import defaultdict
+from group_history import (
+    canonical_pair_key as _canonical_pair_key,
+    pair_keys_from_groups as _pair_keys_from_groups,
+    matrix_rows_from_history as _matrix_rows_from_history,
+)
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
@@ -1070,7 +1075,7 @@ def handle_notification(notif_id):
 @login_required(role="admin")
 def bookclub_index():
     app.logger.info("---/making_team 경로 함수 실행 시작---")
-    # 어느 요일 기준으로 조 편성할지 (월/목 분리). 기본은 '월'.
+    seminar_session_id = (request.args.get('session_id') or '').strip() or None
     day_choice = (request.args.get('day') or 'mon').lower()
     if day_choice not in ('mon', 'thu', 'all'):
         day_choice = 'mon'
@@ -1079,63 +1084,97 @@ def bookclub_index():
     thu_attendee_ids: set = set()
     mon_date_iso = ''
     thu_date_iso = ''
+    selected_session = None
+    selected_topic_event = None
+    pre_checked_facilitator_names = set()
+    unmatched_facilitators = []
 
     try:
-        seminar_dates = get_next_seminar_dates()  # [월요일, 목요일] (혹은 비슷한 묶음)
-        app.logger.info(f"[1] 다음 세미나 날짜: {[d.isoformat() for d in seminar_dates]}")
-        for d in seminar_dates:
-            wd = d.weekday()  # 월=0, 목=3
-            if wd == 0:
-                mon_date_iso = d.isoformat()
-            elif wd == 3:
-                thu_date_iso = d.isoformat()
-
-        # 1. 모든 활성 멤버 목록.
-        all_active_members_res = supabase.table("members").select("id, name") \
+        all_active_members_res = supabase.table("members").select("id, name, student_id, department") \
             .eq('is_active', True).order("name").execute()
-        all_active_members = all_active_members_res.data
+        all_active_members = all_active_members_res.data or []
         app.logger.info(f"[2] DB에서 가져온 전체 활성 멤버 수: {len(all_active_members)}명")
 
-        # 2. attendance 테이블 - 날짜별로 분리해서 집계
-        date_strs = [d.isoformat() for d in seminar_dates]
-        if date_strs:
+        if seminar_session_id:
+            selected_session = supabase.table('seminar_sessions').select('*') \
+                .eq('id', seminar_session_id).single().execute().data
+            if not selected_session:
+                raise ValueError('선택한 세미나 회차를 찾을 수 없습니다.')
+            meeting_date = selected_session['meeting_date']
+            day_choice = selected_session.get('day_type') or day_choice
+            if day_choice == 'mon':
+                mon_date_iso = meeting_date
+                target_ids = mon_attendee_ids
+            else:
+                thu_date_iso = meeting_date
+                target_ids = thu_attendee_ids
+
+            attendance_rows = supabase.table('attendance').select('user_id') \
+                .eq('meeting_date', meeting_date).eq('attending_seminar', True).execute().data or []
+            target_ids |= {row['user_id'] for row in attendance_rows}
+            vote_rows = supabase.table('seminar_votes').select('member_id') \
+                .eq('session_id', seminar_session_id).eq('attending', True).execute().data or []
+            target_ids |= {row['member_id'] for row in vote_rows}
+            pre_checked_attendee_ids = set(target_ids)
+
+            topic_rows = supabase.table('topic_events').select('*') \
+                .eq('seminar_session_id', seminar_session_id).execute().data or []
+            if topic_rows:
+                selected_topic_event = topic_rows[0]
+                submissions = supabase.table('topic_submissions').select('author_name, student_id') \
+                    .eq('event_id', selected_topic_event['id']).execute().data or []
+                by_student_id = {
+                    str(member.get('student_id')).strip(): member
+                    for member in all_active_members if member.get('student_id')
+                }
+                by_name = defaultdict(list)
+                for member in all_active_members:
+                    by_name[(member.get('name') or '').strip()].append(member)
+                for submission in submissions:
+                    member = None
+                    student_id = str(submission.get('student_id') or '').strip()
+                    author_name = (submission.get('author_name') or '').strip()
+                    if student_id:
+                        member = by_student_id.get(student_id)
+                    if member is None and len(by_name.get(author_name, [])) == 1:
+                        member = by_name[author_name][0]
+                    if member:
+                        pre_checked_facilitator_names.add(member['name'])
+                    else:
+                        unmatched_facilitators.append({
+                            'author_name': author_name,
+                            'student_id': student_id,
+                        })
+        else:
+            seminar_dates = get_next_seminar_dates()
+            app.logger.info(f"[1] 다음 세미나 날짜: {[d.isoformat() for d in seminar_dates]}")
+            for d in seminar_dates:
+                if d.weekday() == 0:
+                    mon_date_iso = d.isoformat()
+                elif d.weekday() == 3:
+                    thu_date_iso = d.isoformat()
+            date_strs = [d.isoformat() for d in seminar_dates]
             attendance_res = supabase.table('attendance').select('user_id, meeting_date') \
-                .in_('meeting_date', date_strs) \
-                .eq('attending_seminar', True) \
-                .execute()
+                .in_('meeting_date', date_strs).eq('attending_seminar', True).execute()
             for row in (attendance_res.data or []):
-                md = row.get('meeting_date')
-                if md == mon_date_iso:
+                if row.get('meeting_date') == mon_date_iso:
                     mon_attendee_ids.add(row['user_id'])
-                elif md == thu_date_iso:
+                elif row.get('meeting_date') == thu_date_iso:
                     thu_attendee_ids.add(row['user_id'])
-
-        # 3. seminar_votes도 day_type별로 분리
-        try:
-            sess_res = supabase.table('seminar_sessions') \
-                .select('id, meeting_date, day_type') \
-                .in_('meeting_date', date_strs).eq('is_active', True).execute()
-            sess_rows = sess_res.data or []
-            mon_sess_ids = [s['id'] for s in sess_rows if s.get('day_type') == 'mon']
-            thu_sess_ids = [s['id'] for s in sess_rows if s.get('day_type') == 'thu']
-            if mon_sess_ids:
-                v = supabase.table('seminar_votes').select('member_id') \
-                    .in_('session_id', mon_sess_ids).eq('attending', True).execute()
-                mon_attendee_ids |= {x['member_id'] for x in (v.data or [])}
-            if thu_sess_ids:
-                v = supabase.table('seminar_votes').select('member_id') \
-                    .in_('session_id', thu_sess_ids).eq('attending', True).execute()
-                thu_attendee_ids |= {x['member_id'] for x in (v.data or [])}
-        except Exception as e:
-            app.logger.warning(f"seminar_votes 통합 실패 (무시 가능): {e}")
-
-        # 4. day_choice 에 따라 pre_checked 결정
-        if day_choice == 'mon':
-            pre_checked_attendee_ids = mon_attendee_ids
-        elif day_choice == 'thu':
-            pre_checked_attendee_ids = thu_attendee_ids
-        else:  # 'all'
-            pre_checked_attendee_ids = mon_attendee_ids | thu_attendee_ids
+            sess_rows = supabase.table('seminar_sessions').select('id, meeting_date, day_type') \
+                .in_('meeting_date', date_strs).eq('is_active', True).execute().data or []
+            for day_type, target_ids in [('mon', mon_attendee_ids), ('thu', thu_attendee_ids)]:
+                ids = [s['id'] for s in sess_rows if s.get('day_type') == day_type]
+                if ids:
+                    votes = supabase.table('seminar_votes').select('member_id') \
+                        .in_('session_id', ids).eq('attending', True).execute().data or []
+                    target_ids |= {row['member_id'] for row in votes}
+            if day_choice == 'mon':
+                pre_checked_attendee_ids = mon_attendee_ids
+            elif day_choice == 'thu':
+                pre_checked_attendee_ids = thu_attendee_ids
+            else:
+                pre_checked_attendee_ids = mon_attendee_ids | thu_attendee_ids
         app.logger.info(f"[5] day={day_choice}, 미리 체크될 참석자 수: {len(pre_checked_attendee_ids)}명 (월 {len(mon_attendee_ids)} / 목 {len(thu_attendee_ids)})")
 
     except Exception as e:
@@ -1153,6 +1192,11 @@ def bookclub_index():
         mon_date=mon_date_iso,
         thu_date=thu_date_iso,
         day_choice=day_choice,
+        selected_session=selected_session,
+        selected_topic_event=selected_topic_event,
+        seminar_session_id=seminar_session_id,
+        pre_checked_facilitator_names=pre_checked_facilitator_names,
+        unmatched_facilitators=unmatched_facilitators,
     )
 
 
@@ -1165,6 +1209,16 @@ def start_group_generation():
     facilitator_names = request.args.getlist('facilitators')
     group_count_str = request.args.get('group_count')
     group_names_str = request.args.get('group_names', '')
+    seminar_session_id = (request.args.get('seminar_session_id') or '').strip() or None
+    meeting_date = (request.args.get('meeting_date') or '').strip() or None
+    session_book_title = None
+    if seminar_session_id:
+        selected_session = supabase.table('seminar_sessions').select('meeting_date, book_title') \
+            .eq('id', seminar_session_id).single().execute().data
+        if not selected_session:
+            return jsonify({'error': '선택한 세미나 회차를 찾을 수 없습니다.'}), 404
+        meeting_date = selected_session['meeting_date']
+        session_book_title = selected_session.get('book_title')
 
     # 방어 필터: 참석 명단에 없는 발제자는 조 편성에서 제외한다.
     # (프런트 검증을 우회하거나 잘못된 파라미터가 들어와도 안전하도록.)
@@ -1282,7 +1336,10 @@ def start_group_generation():
                     group_names=group_names,
                     meeting_history=meeting_history,
                     member_genders=member_genders,
-                    manual_entry_url=manual_url
+                    manual_entry_url=manual_url,
+                    seminar_session_id=seminar_session_id,
+                    meeting_date=meeting_date,
+                    book_title=session_book_title,
                 )
                 complete_data = json.dumps({'html': final_html})
                 yield f"event: complete\ndata: {complete_data}\n\n"
@@ -1351,7 +1408,7 @@ def run_cp_grouping(members_df, co_matrix, attendee_names, presenter_names,
 
     # 쌍별 만남 횟수
     def get_pair_count(a, b):
-        key = '-'.join(sorted([a, b]))
+        key = _canonical_pair_key(a, b)
         return co_matrix.get(key, 0)
 
     # objective 계산을 위한 쌍 사전
@@ -1524,7 +1581,11 @@ def run_cp_grouping(members_df, co_matrix, attendee_names, presenter_names,
 def bookclub_save():
     data = request.json
     # 헬퍼 함수를 호출하여 저장 로직 실행
-    result = save_group_record_to_db(data["date"], data["present"], data["facilitators"], data["groups"])
+    result = save_group_record_to_db(
+        data.get("date"), data["present"], data["facilitators"], data["groups"],
+        book_title=data.get('book_title'), genre=data.get('genre'),
+        seminar_session_id=data.get('seminar_session_id')
+    )
 
     if result["status"] == "ok":
         return jsonify(result)
@@ -1532,50 +1593,58 @@ def bookclub_save():
         return jsonify(result), 500
 
 
-def _adjust_co_matrix(groups, date_str, sign):
-    """groups의 모든 페어에 대해 bookclub_co_matrix count를 sign(+1/-1)만큼 조정.
-    sign=+1: 증가 (upsert), sign=-1: 감소 (0이 되면 row 삭제, 그렇지 않으면 upsert).
-    last_met은 sign=+1일 때 더 최근 날짜로 갱신, sign=-1일 때는 건드리지 않음.
+def _chunks(items, size=100):
+    seq = list(items)
+    for idx in range(0, len(seq), size):
+        yield seq[idx:idx + size]
+
+
+def rebuild_co_matrix(pair_keys=None):
+    """history를 원본으로 만남 매트릭스를 재계산한다.
+
+    pair_keys가 주어지면 해당 쌍만 갱신하고, None이면 전체를 복구한다.
     """
-    deltas = {}
-    for g in groups or []:
-        for a, b in itertools.combinations(g, 2):
-            key = '-'.join(sorted([a, b]))
-            deltas[key] = deltas.get(key, 0) + sign
-    if not deltas:
-        return
-    keys = list(deltas.keys())
-    matrix_res = supabase.table('bookclub_co_matrix').select('pair_key, count, last_met').in_('pair_key', keys).execute()
-    current = {row['pair_key']: row for row in (matrix_res.data or [])}
+    target_keys = set(pair_keys) if pair_keys is not None else None
+    history_rows = supabase.table('history').select('date, groups').execute().data or []
+    calculated = _matrix_rows_from_history(history_rows, target_keys)
 
-    upsert_rows = []
-    del_keys = []
-    for key, delta in deltas.items():
-        cur = current.get(key)
-        cur_count = (cur or {}).get('count', 0)
-        new_count = max(0, cur_count + delta)
-        if new_count == 0:
-            if cur:
-                del_keys.append(key)
-            continue
-        row = {"pair_key": key, "count": new_count}
-        if sign > 0:
-            cur_last = (cur or {}).get('last_met') or ''
-            row["last_met"] = date_str if (not cur_last or date_str >= cur_last) else cur_last
-        upsert_rows.append(row)
+    if target_keys is None:
+        existing_rows = supabase.table('bookclub_co_matrix').select('pair_key').execute().data or []
+        existing_keys = {row['pair_key'] for row in existing_rows}
+        target_keys = existing_keys | set(calculated)
 
-    if del_keys:
-        supabase.table('bookclub_co_matrix').delete().in_('pair_key', del_keys).execute()
-    if upsert_rows:
-        supabase.table('bookclub_co_matrix').upsert(upsert_rows, on_conflict='pair_key').execute()
+    stale_keys = target_keys - set(calculated)
+    for batch in _chunks(stale_keys):
+        supabase.table('bookclub_co_matrix').delete().in_('pair_key', batch).execute()
+    for batch in _chunks(calculated.values()):
+        supabase.table('bookclub_co_matrix').upsert(batch, on_conflict='pair_key').execute()
+
+    return {
+        'history_count': len(history_rows),
+        'pair_count': len(calculated),
+        'removed_count': len(stale_keys),
+        'scope': 'full' if pair_keys is None else 'affected',
+    }
 
 
 # [신규] 조 편성 기록을 DB에 저장하는 헬퍼 함수
-def save_group_record_to_db(date, present, facilitators, groups, book_title=None, genre=None):
+def save_group_record_to_db(date, present, facilitators, groups, book_title=None, genre=None,
+                            seminar_session_id=None):
     """주어진 데이터로 조 편성 기록과 만남 횟수 매트릭스를 DB에 저장/업데이트합니다."""
     try:
         # 1. history 테이블에 기록 저장
+        if seminar_session_id:
+            sess_res = supabase.table('seminar_sessions').select('id, meeting_date, book_title') \
+                .eq('id', seminar_session_id).single().execute().data
+            if not sess_res:
+                raise ValueError('연결할 세미나 회차를 찾을 수 없습니다.')
+            date = sess_res['meeting_date']
+            if not book_title:
+                book_title = sess_res.get('book_title')
+
         record = {"date": date, "present": present, "facilitators": facilitators, "groups": groups}
+        if seminar_session_id:
+            record['seminar_session_id'] = seminar_session_id
         if book_title:
             record["book_title"] = book_title.strip()
         if genre:
@@ -1583,25 +1652,10 @@ def save_group_record_to_db(date, present, facilitators, groups, book_title=None
         insert_res = supabase.table("history").insert(record).execute()
         history_id = insert_res.data[0]['id'] if insert_res.data else None
 
-        # 2. bookclub_co_matrix 업데이트
-        keys_to_update = {}
-        for g in groups:
-            for a, b in itertools.combinations(g, 2):
-                key = '-'.join(sorted([a, b]))
-                keys_to_update[key] = keys_to_update.get(key, 0) + 1
-
-        if keys_to_update:
-            keys_to_fetch = list(keys_to_update.keys())
-            matrix_res = supabase.table('bookclub_co_matrix').select('pair_key, count').in_('pair_key',
-                                                                                            keys_to_fetch).execute()
-            current_counts = {item['pair_key']: item['count'] for item in matrix_res.data}
-
-            final_upsert_data = []
-            for key, increment in keys_to_update.items():
-                new_count = current_counts.get(key, 0) + increment
-                final_upsert_data.append({"pair_key": key, "count": new_count, "last_met": date})
-
-            supabase.table("bookclub_co_matrix").upsert(final_upsert_data, on_conflict='pair_key').execute()
+        # 2. history를 원본으로 해당 사람 쌍을 다시 계산한다.
+        affected_keys = _pair_keys_from_groups(groups)
+        if affected_keys:
+            rebuild_co_matrix(affected_keys)
 
         return {"status": "ok", "history_id": history_id}
     except Exception as e:
@@ -1701,7 +1755,7 @@ def bookclub_api_get_history():
 @app.route('/api/bookclub/history/delete', methods=['POST'])
 @login_required(role="admin")
 def bookclub_api_delete_history():
-    """history 테이블에서 해당 ID의 기록을 삭제하고 co_matrix를 삭제된 만남 횟수를 바삼하여 재계산."""
+    """기록을 삭제한 뒤 영향받은 사람 쌍을 남은 전체 이력으로 재계산한다."""
     record_id = request.json.get("id")
     if not record_id:
         return jsonify({"status": "error", "message": "record id required"}), 400
@@ -1715,32 +1769,10 @@ def bookclub_api_delete_history():
         # 2. 실제 삭제
         supabase.table("history").delete().eq("id", record_id).execute()
 
-        # 3. 삭제된 기록에 릴린 쫐들의 co_matrix 횟수 괐산
-        keys_to_decrement = {}
         deleted_groups = deleted_record.get("groups", []) or []
-        for g in deleted_groups:
-            for a, b in itertools.combinations(g, 2):
-                key = '-'.join(sorted([a, b]))
-                keys_to_decrement[key] = keys_to_decrement.get(key, 0) + 1
-
-        if keys_to_decrement:
-            matrix_res = supabase.table('bookclub_co_matrix') \
-                .select('pair_key, count').in_('pair_key', list(keys_to_decrement.keys())).execute()
-            current_counts = {item['pair_key']: item['count'] for item in matrix_res.data}
-
-            upsert_rows = []
-            del_keys = []
-            for key, decrement in keys_to_decrement.items():
-                new_count = max(0, current_counts.get(key, 0) - decrement)
-                if new_count == 0:
-                    del_keys.append(key)
-                else:
-                    upsert_rows.append({"pair_key": key, "count": new_count})
-
-            if del_keys:
-                supabase.table('bookclub_co_matrix').delete().in_('pair_key', del_keys).execute()
-            if upsert_rows:
-                supabase.table('bookclub_co_matrix').upsert(upsert_rows, on_conflict='pair_key').execute()
+        affected_keys = _pair_keys_from_groups(deleted_groups)
+        if affected_keys:
+            rebuild_co_matrix(affected_keys)
 
         return jsonify({"status": "ok"})
     except Exception as e:
@@ -2000,7 +2032,7 @@ def preview_manual_groups():
 
             # itertools.combinations를 사용하여 그룹 내 모든 쌍을 생성
             for name1, name2 in itertools.combinations(group, 2):
-                pair_key = '-'.join(sorted([name1, name2]))
+                pair_key = _canonical_pair_key(name1, name2)
 
                 if pair_key in co_matrix:
                     # 만난 기록이 있는 경우
@@ -2184,11 +2216,51 @@ def request_absence():
 # ==============================================================================
 
 # 1. 관리자: 발제문 이벤트 생성 API
+def _open_topic_event_for_session(session_id):
+    existing = supabase.table('topic_events').select('*') \
+        .eq('seminar_session_id', session_id).execute().data or []
+    if existing:
+        return existing[0], False
+
+    seminar_session = supabase.table('seminar_sessions').select(
+        'id, meeting_date, book_title, book_author'
+    ).eq('id', session_id).single().execute().data
+    if not seminar_session:
+        raise ValueError('세미나 회차를 찾을 수 없습니다.')
+    if not (seminar_session.get('book_title') or '').strip():
+        raise ValueError('먼저 이번 회차 도서 제목을 입력해주세요.')
+
+    payload = {
+        'meeting_date': seminar_session['meeting_date'],
+        'book_title': seminar_session['book_title'].strip(),
+        'book_author': (seminar_session.get('book_author') or '').strip() or None,
+        'seminar_session_id': session_id,
+        'share_token': str(uuid.uuid4()),
+        'is_active': True,
+    }
+    try:
+        created = supabase.table('topic_events').insert(payload).execute().data or []
+        return created[0], True
+    except Exception:
+        # 동시에 두 번 눌린 경우 unique index가 중복을 막는다.
+        raced = supabase.table('topic_events').select('*') \
+            .eq('seminar_session_id', session_id).execute().data or []
+        if raced:
+            return raced[0], False
+        raise
+
+
 @app.route('/api/admin/topic_events/create', methods=['POST'])
 @login_required(role="admin")
 def create_topic_event():
     try:
-        data = request.json
+        data = request.json or {}
+        if data.get('seminar_session_id'):
+            event, created = _open_topic_event_for_session(data['seminar_session_id'])
+            return jsonify({
+                "status": "success", "created": created, "event": event,
+                "share_url": f"{request.host_url}shared_topics?token={event['share_token']}"
+            })
         token = str(uuid.uuid4())
         supabase.table('topic_events').insert({
             'meeting_date': data.get('meeting_date'),
@@ -2199,6 +2271,22 @@ def create_topic_event():
         return jsonify({"status": "success", "message": "발제문 수집 링크가 생성되었습니다."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/seminar_sessions/<session_id>/open_topics', methods=['POST'])
+@login_required(role="admin")
+def seminar_session_open_topics(session_id):
+    try:
+        event, created = _open_topic_event_for_session(session_id)
+        return jsonify({
+            'status': 'success', 'created': created, 'event': event,
+            'share_url': f"{request.host_url}shared_topics?token={event['share_token']}"
+        })
+    except ValueError as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
+    except Exception as e:
+        app.logger.error(f"seminar_session_open_topics error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 # 1.5. 관리자: 발제문 이벤트 영구 삭제 API (제출 내역까지 포함)
 @app.route('/api/admin/topic_events/<event_id>/delete', methods=['POST'])
@@ -2807,11 +2895,32 @@ def admin_seminar_term(term_id):
         # 진행 기록(history)과 연동: 같은 날짜의 history row 존재 여부 + id
         session_dates = [s['meeting_date'] for s in sessions]
         history_map = {}
+        history_session_map = {}
         if session_dates:
-            hres = supabase.table('history').select('id, date, book_title, genre, groups, facilitators') \
+            hres = supabase.table('history').select('id, date, book_title, genre, groups, facilitators, seminar_session_id') \
                 .in_('date', session_dates).execute().data or []
             for h in hres:
                 history_map[h['date']] = h
+                if h.get('seminar_session_id'):
+                    history_session_map[h['seminar_session_id']] = h
+
+        # 발제문 이벤트/제출 현황 연동
+        topic_map = {}
+        if session_ids:
+            topic_rows = supabase.table('topic_events').select('*') \
+                .in_('seminar_session_id', session_ids).execute().data or []
+            topic_ids = [row['id'] for row in topic_rows]
+            submission_counts = {}
+            if topic_ids:
+                submission_rows = supabase.table('topic_submissions').select('event_id') \
+                    .in_('event_id', topic_ids).execute().data or []
+                for submission in submission_rows:
+                    eid = submission['event_id']
+                    submission_counts[eid] = submission_counts.get(eid, 0) + 1
+            for topic in topic_rows:
+                topic['submission_count'] = submission_counts.get(topic['id'], 0)
+                topic['share_url'] = f"{request.host_url}shared_topics?token={topic['share_token']}"
+                topic_map[topic['seminar_session_id']] = topic
 
         today_kst = datetime.now(KST).date()
         upcoming_sessions, past_sessions = [], []
@@ -2835,10 +2944,11 @@ def admin_seminar_term(term_id):
                 s['vote_status'] = 'closed'
 
             # 기록 연동
-            h = history_map.get(s['meeting_date'])
+            h = history_session_map.get(s['id']) or history_map.get(s['meeting_date'])
             s['history_id'] = h['id'] if h else None
             if h and not s.get('book_title') and h.get('book_title'):
                 s['book_title'] = h['book_title']
+            s['topic_event'] = topic_map.get(s['id'])
 
             # 과거 회차 분리
             try:
@@ -2871,8 +2981,16 @@ def seminar_session_update_book(session_id):
     try:
         data = request.json or {}
         book_title = (data.get('book_title') or '').strip()
-        supabase.table('seminar_sessions').update({'book_title': book_title or None}) \
+        book_author = (data.get('book_author') or '').strip()
+        update = {'book_title': book_title or None, 'book_author': book_author or None}
+        supabase.table('seminar_sessions').update(update) \
             .eq('id', session_id).execute()
+        linked = supabase.table('topic_events').select('id').eq('seminar_session_id', session_id).execute().data or []
+        if linked:
+            supabase.table('topic_events').update({
+                'book_title': book_title,
+                'book_author': book_author or None,
+            }).eq('id', linked[0]['id']).execute()
         return jsonify({'status': 'success'})
     except Exception as e:
         app.logger.error(f"seminar_session_update_book error: {e}", exc_info=True)
@@ -4097,6 +4215,16 @@ def update_history_meta(history_id):
             d = (data.get('date') or '').strip()
             if not d:
                 return jsonify({'status': 'error', 'message': '날짜는 비울 수 없습니다.'}), 400
+            link_rows = supabase.table('history').select('seminar_session_id').eq('id', history_id).execute().data or []
+            linked_session_id = (link_rows[0] if link_rows else {}).get('seminar_session_id')
+            if linked_session_id:
+                linked_session = supabase.table('seminar_sessions').select('meeting_date') \
+                    .eq('id', linked_session_id).single().execute().data
+                if linked_session and d != linked_session['meeting_date']:
+                    return jsonify({
+                        'status': 'error',
+                        'message': '세미나 회차에 연결된 기록의 날짜는 변경할 수 없습니다.'
+                    }), 400
             update['date'] = d
         if 'facilitators' in data:
             facs = data.get('facilitators') or []
@@ -4127,9 +4255,9 @@ def update_history_meta(history_id):
             old_date = old_row.get('date') or ''
             new_groups = update.get('groups', old_groups)
             new_date = update.get('date', old_date)
-            # 기존 페어 카운트 차감 후 새 페어 카운트 가산
-            _adjust_co_matrix(old_groups, old_date, -1)
-            _adjust_co_matrix(new_groups, new_date, +1)
+            affected_keys = _pair_keys_from_groups(old_groups) | _pair_keys_from_groups(new_groups)
+            if affected_keys:
+                rebuild_co_matrix(affected_keys)
 
         return jsonify({'status': 'success'})
     except Exception as e:
@@ -4146,10 +4274,24 @@ def records_history_delete(history_id):
         old_row = (old_res.data or [None])[0]
         supabase.table('history').delete().eq('id', history_id).execute()
         if old_row:
-            _adjust_co_matrix(old_row.get('groups') or [], old_row.get('date') or '', -1)
+            affected_keys = _pair_keys_from_groups(old_row.get('groups') or [])
+            if affected_keys:
+                rebuild_co_matrix(affected_keys)
         return jsonify({'status': 'success'})
     except Exception as e:
         app.logger.error(f"records_history_delete error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/bookclub/rebuild_matrix', methods=['POST'])
+@login_required(role="admin")
+def admin_rebuild_bookclub_matrix():
+    """history 전체를 기준으로 만남 매트릭스를 복구한다."""
+    try:
+        result = rebuild_co_matrix()
+        return jsonify({'status': 'success', **result})
+    except Exception as e:
+        app.logger.error(f"admin_rebuild_bookclub_matrix error: {e}", exc_info=True)
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
@@ -4463,6 +4605,11 @@ def records_analytics():
         return redirect(url_for('records_hub'))
 
 
+
+
+# 게시판은 별도 모듈에 두되 기존 Flask 세션/Supabase 클라이언트를 그대로 공유한다.
+from boards import init_board_routes
+init_board_routes(app, supabase, login_required)
 
 
 # ==============================================================================

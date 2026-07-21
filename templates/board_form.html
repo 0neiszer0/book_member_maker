@@ -1,0 +1,28 @@
+{% extends 'board_base.html' %}
+{% block title %}{{ '글 수정' if post else '글쓰기' }}{% endblock %}
+{% block content %}
+<a href="{{ url_for('boards.board_list', slug=board.slug) }}" class="text-sm text-gray-500">← {{ board.name }}</a>
+<h1 class="text-2xl font-bold text-eva-green my-4">{{ '글 수정' if post else '새 글 작성' }}</h1>
+<form method="post" enctype="multipart/form-data" class="eva-card rounded-2xl p-5 space-y-4">
+    {% if board.board_type == 'seminar_review' %}
+    <label class="block text-sm font-bold">세미나 선택<select name="history_id" required class="mt-1 w-full rounded-xl border p-3 bg-white"><option value="">선택해주세요</option>{% for target in targets %}<option value="{{ target.id }}" {% if post and post.history_id == target.id %}selected{% endif %}>{{ target.date }} · {{ target.book_title or '도서 미입력' }}</option>{% endfor %}</select></label>
+    {% elif board.board_type == 'brick_book_review' %}
+    <label class="block text-sm font-bold">벽돌책 선택<select name="brick_book_id" required class="mt-1 w-full rounded-xl border p-3 bg-white"><option value="">선택해주세요</option>{% for target in targets %}<option value="{{ target.id }}" {% if post and post.brick_book_id == target.id %}selected{% endif %}>{{ target.title }}</option>{% endfor %}</select></label>
+    {% endif %}
+    <label class="block text-sm font-bold">제목<input name="title" maxlength="200" required value="{{ post.title if post else '' }}" class="mt-1 w-full rounded-xl border p-3 bg-white"></label>
+    <label class="block text-sm font-bold">본문<textarea id="post-content" name="content" maxlength="50000" required rows="14" class="mt-1 w-full rounded-xl border p-3 bg-white">{{ post.content if post else '' }}</textarea></label>
+    <label id="image-drop" class="block rounded-xl border-2 border-dashed p-5 text-center cursor-pointer"><strong>이미지 추가</strong><span class="block text-xs text-gray-500 mt-1">드래그하거나 붙여넣기 가능 · 최대 5개 · 파일당 10MB</span><input id="images" type="file" name="images" accept="image/jpeg,image/png,image/webp,image/gif" multiple class="hidden"></label>
+    <div id="preview" class="grid grid-cols-2 sm:grid-cols-5 gap-2"></div>
+    <div class="flex justify-end gap-2"><a href="{{ url_for('boards.board_list', slug=board.slug) }}" class="wood-chip">취소</a><button class="wd-btn wd-btn-primary">저장</button></div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+const input=document.getElementById('images'), drop=document.getElementById('image-drop'), preview=document.getElementById('preview');
+let files=[];
+function renderFiles(){ preview.innerHTML=''; files.slice(0,5).forEach((file,i)=>{const wrap=document.createElement('div');wrap.className='relative';const img=document.createElement('img');img.className='w-full h-24 object-cover rounded-lg';img.src=URL.createObjectURL(file);const btn=document.createElement('button');btn.type='button';btn.textContent='×';btn.className='absolute top-1 right-1 bg-black text-white rounded-full w-6 h-6';btn.onclick=()=>{files.splice(i,1);sync();};wrap.append(img,btn);preview.append(wrap);}); }
+function sync(){const dt=new DataTransfer();files.slice(0,5).forEach(f=>dt.items.add(f));input.files=dt.files;renderFiles();}
+function add(list){files=[...files,...Array.from(list)].slice(0,5);sync();}
+input.addEventListener('change',()=>add(input.files));drop.addEventListener('dragover',e=>e.preventDefault());drop.addEventListener('drop',e=>{e.preventDefault();add(e.dataTransfer.files);});document.addEventListener('paste',e=>{const imgs=[...e.clipboardData.files].filter(f=>f.type.startsWith('image/'));if(imgs.length)add(imgs);});
+</script>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends 'board_base.html' %}
+{% block title %}게시판{% endblock %}
+{% block content %}
+<div class="flex items-end justify-between gap-4 mb-6">
+    <div><h1 class="text-2xl font-bold text-eva-green">게시판</h1><p class="text-sm text-gray-500 mt-1">동아리 기록과 이야기를 한곳에서 나눠보세요.</p></div>
+    {% if session.user_role == 'admin' %}<a href="{{ url_for('boards.admin_index') }}" class="wood-chip">게시판 관리</a>{% endif %}
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    {% for board in boards %}
+    <a href="{{ url_for('boards.board_list', slug=board.slug) }}" class="eva-card rounded-2xl p-5 hover:shadow-md transition">
+        <div class="flex justify-between gap-3"><h2 class="text-lg font-bold">{{ board.name }}</h2><span class="wood-chip">{% if board.board_type == 'seminar_review' %}세미나{% elif board.board_type == 'brick_book_review' %}벽돌책{% else %}일반{% endif %}</span></div>
+        <p class="text-sm text-gray-500 mt-3">{% if board.board_type == 'seminar_review' %}세미나를 선택해 후기를 남깁니다.{% elif board.board_type == 'brick_book_review' %}함께 읽은 벽돌책 후기를 모읍니다.{% elif board.slug == 'notices' %}중요한 동아리 소식을 확인합니다.{% else %}자유롭게 이야기하는 공간입니다.{% endif %}</p>
+    </a>
+    {% else %}<p class="text-gray-500">사용 가능한 게시판이 없습니다.</p>{% endfor %}
+</div>
+{% endblock %}

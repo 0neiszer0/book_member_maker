@@ -1,0 +1,21 @@
+{% extends 'board_base.html' %}
+{% block title %}{{ post.title }}{% endblock %}
+{% block content %}
+<a href="{{ url_for('boards.board_list', slug=board.slug) }}" class="text-sm text-gray-500">← {{ board.name }}</a>
+<article class="eva-card rounded-2xl p-5 sm:p-7 mt-4">
+    {% if target_label %}<div class="wood-chip mb-3">{{ target_label }}</div>{% endif %}
+    <h1 class="text-2xl font-bold">{{ post.title }}</h1>
+    <div class="text-sm text-gray-500 mt-2">{{ post.author.name }} · {{ post.created_at|datetime('%Y.%m.%d %H:%M') }}</div>
+    <div class="mt-7 whitespace-pre-wrap leading-7">{{ post.content }}</div>
+    {% if attachments %}<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">{% for item in attachments %}{% if item.signed_url %}<a href="{{ item.signed_url }}" target="_blank"><img src="{{ item.signed_url }}" alt="{{ item.original_name }}" class="w-full max-h-96 object-contain rounded-xl border bg-white"></a>{% endif %}{% endfor %}</div>{% endif %}
+    {% if can_edit %}<div class="flex gap-2 justify-end mt-6"><a href="{{ url_for('boards.edit', slug=board.slug, post_id=post.id) }}" class="wood-chip">수정</a><button onclick="deletePost()" class="wood-chip warn">삭제</button></div>{% endif %}
+</article>
+{% if board.allow_comments %}
+<section class="mt-6"><h2 class="font-bold mb-3">댓글 {{ comments|length }}</h2><div class="space-y-2" id="comments">{% for comment in comments %}<div class="eva-card rounded-xl p-4"><div class="flex justify-between"><strong>{{ comment.author.name }}</strong>{% if comment.author_id == session.user_id or session.user_role == 'admin' %}<button onclick="deleteComment('{{ comment.id }}')" class="text-xs text-red-600">삭제</button>{% endif %}</div><p class="whitespace-pre-wrap mt-2 text-sm">{{ comment.content }}</p></div>{% else %}<p class="text-sm text-gray-500">첫 댓글을 남겨보세요.</p>{% endfor %}</div><div class="flex gap-2 mt-3"><textarea id="comment-content" rows="2" maxlength="5000" class="flex-1 rounded-xl border p-3" placeholder="댓글 입력"></textarea><button onclick="addComment()" class="wd-btn wd-btn-primary">등록</button></div></section>
+{% endif %}
+{% endblock %}
+{% block scripts %}<script>
+async function addComment(){const content=document.getElementById('comment-content').value.trim();if(!content)return;const r=await fetch('{{ url_for('boards.create_comment', post_id=post.id) }}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content})});const d=await r.json();if(!r.ok)return alert(d.message);location.reload();}
+async function deleteComment(id){if(!confirm('댓글을 삭제할까요?'))return;await fetch(`/api/board/comments/${id}/delete`,{method:'POST'});location.reload();}
+async function deletePost(){if(!confirm('글을 삭제할까요? 관리자는 복구할 수 있습니다.'))return;const r=await fetch('{{ url_for('boards.delete_post', post_id=post.id) }}',{method:'POST'});const d=await r.json();if(!r.ok)return alert(d.message);location.href='{{ url_for('boards.board_list', slug=board.slug) }}';}
+</script>{% endblock %}
