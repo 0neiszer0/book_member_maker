@@ -29,6 +29,8 @@ from group_history import (
     matrix_rows_from_history as _matrix_rows_from_history,
 )
 from topic_preview import anonymous_topic_previews
+from topic_document import topic_submitter_identity
+from seminar_absence import normalize_member_ids
 from seminar_cycle import cycle_monday, is_member_signup_session, next_seminar_cycle
 
 # .env 파일에서 환경 변수 로드
@@ -2682,29 +2684,29 @@ def download_topics_word(event_id):
 
         doc = DocxTemplate(template_path)
         date_str = (event.get('meeting_date') or '').replace('-', '.')
+        template_submissions = []
+        for sub in submissions:
+            identity = topic_submitter_identity(sub)
+            template_submissions.append({
+                # 기존 템플릿의 department + author_name 배치를 유지하면서
+                # '전자공학부 22 박민서' 형태로 표시한다.
+                'department': _safe(identity['department_and_year']),
+                'author_name': _safe(identity['author_name']),
+                'topics': [
+                    {
+                        'topic': _safe(t.get('topic', '')),
+                        'page': _safe(t.get('page', '')),
+                        'reference': _safe(t.get('reference', '')),
+                    }
+                    for t in (sub.get('topics') or [])
+                ],
+            })
         context = {
             'book_title': _safe(event.get('book_title', '')),
             'meeting_date': date_str,
             'book_author': _safe(event.get('book_author', '')),
             'moderator_name': '',
-            'submissions': [
-                {
-                    # template.docx 에서 '{{ sub.department }} {{ sub.author_name }}' 로 노출되던 부분을
-                    # '{입학년도} {이름}' 형태로 바꾸기 위해 department 자리에 학번 prefix 를 넣음.
-                    # (admission_year 없는 구 데이터는 기존 department 로 fallback)
-                    'department': (sub.get('admission_year') or '').strip() or _safe(sub.get('department', '')),
-                    'author_name': _safe(sub.get('author_name', '')),
-                    'topics': [
-                        {
-                            'topic': _safe(t.get('topic', '')),
-                            'page': _safe(t.get('page', '')),
-                            'reference': _safe(t.get('reference', '')),
-                        }
-                        for t in (sub.get('topics') or [])
-                    ],
-                }
-                for sub in submissions
-            ],
+            'submissions': template_submissions,
         }
         doc.render(context)
 
@@ -2747,8 +2749,7 @@ def download_topics_word(event_id):
                 r1.bold = True
                 r1.font.size = Pt(13)
                 r1.font.color.rgb = RGBColor(0, 102, 204)
-                year_or_dept = (sub.get('admission_year') or '').strip() or sub.get('department','')
-                r2 = hp.add_run(f"{year_or_dept} {sub.get('author_name','')}")
+                r2 = hp.add_run(topic_submitter_identity(sub)['full_label'])
                 r2.bold = True
                 r2.font.size = Pt(13)
                 # 발제 내용
@@ -3211,6 +3212,7 @@ def _load_weekly_seminar_view(term_id=None):
         audit = absence_audit_by_session[item['id']]
         item['absence_audit'] = audit
         item['absences'] = [row for row in audit if not row.get('cancelled_at')]
+        item['absent_member_ids'] = [row['member_id'] for row in item['absences']]
         item['expected_count'] = max(0, len(active_members) - len(item['absences'])) \
             if item.get('participation_mode') == 'absence_only' else item['yes_count']
         item['history'] = history_by_session.get(item['id'])
@@ -4647,30 +4649,40 @@ def seminar_session_capacity(session_id):
 def seminar_session_add_absence(session_id):
     try:
         data = request.json or {}
-        member_id = int(data.get('member_id'))
+        member_ids = normalize_member_ids(data)
         note = (data.get('note') or '').strip()[:500]
         target = supabase.table('seminar_sessions').select('participation_mode') \
             .eq('id', session_id).single().execute().data or {}
         if target.get('participation_mode') != 'absence_only':
             return jsonify({'status': 'error', 'message': '목요일 불참 입력 회차가 아닙니다.'}), 400
-        members = supabase.table('members').select('id').eq('id', member_id).eq('is_active', True).execute().data or []
-        if not members:
-            return jsonify({'status': 'error', 'message': '활성 회원을 찾을 수 없습니다.'}), 404
-        current = supabase.table('seminar_absences').select('id') \
-            .eq('session_id', session_id).eq('member_id', member_id).is_('cancelled_at', 'null').execute().data or []
+        members = supabase.table('members').select('id').in_('id', member_ids) \
+            .eq('is_active', True).execute().data or []
+        valid_member_ids = {row['id'] for row in members}
+        invalid_member_ids = [member_id for member_id in member_ids if member_id not in valid_member_ids]
+        if invalid_member_ids:
+            return jsonify({'status': 'error', 'message': '비활성 또는 존재하지 않는 회원이 포함되어 있습니다.'}), 400
+
+        current = supabase.table('seminar_absences').select('member_id') \
+            .eq('session_id', session_id).in_('member_id', member_ids) \
+            .is_('cancelled_at', 'null').execute().data or []
+        current_member_ids = {row['member_id'] for row in current}
+        new_member_ids = [member_id for member_id in member_ids if member_id not in current_member_ids]
         stamp = datetime.now(timezone.utc).isoformat()
-        if current:
-            supabase.table('seminar_absences').update({
-                'note': note or None, 'recorded_by': session.get('user_id'), 'updated_at': stamp,
-            }).eq('id', current[0]['id']).execute()
-        else:
-            supabase.table('seminar_absences').insert({
-                'session_id': session_id, 'member_id': member_id, 'note': note or None,
-                'recorded_by': session.get('user_id'), 'updated_at': stamp,
-            }).execute()
-        return jsonify({'status': 'success'})
-    except (TypeError, ValueError):
-        return jsonify({'status': 'error', 'message': '회원을 선택해주세요.'}), 400
+        if new_member_ids:
+            supabase.table('seminar_absences').insert([
+                {
+                    'session_id': session_id, 'member_id': member_id, 'note': note or None,
+                    'recorded_by': session.get('user_id'), 'updated_at': stamp,
+                }
+                for member_id in new_member_ids
+            ]).execute()
+        return jsonify({
+            'status': 'success',
+            'added_count': len(new_member_ids),
+            'already_registered_count': len(current_member_ids),
+        })
+    except ValueError as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
     except Exception as e:
         app.logger.error(f"seminar_session_add_absence error: {e}", exc_info=True)
         return jsonify({'status': 'error', 'message': str(e)}), 500
