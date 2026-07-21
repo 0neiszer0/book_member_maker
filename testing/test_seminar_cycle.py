@@ -1,7 +1,7 @@
 import unittest
 from datetime import date
 
-from seminar_cycle import cycle_monday, next_seminar_cycle
+from seminar_cycle import cycle_monday, is_member_signup_session, next_seminar_cycle
 
 
 class SeminarCycleTests(unittest.TestCase):
@@ -32,6 +32,11 @@ class SeminarCycleTests(unittest.TestCase):
             next_seminar_cycle(date(2026, 7, 27)),
             [date(2026, 7, 23), date(2026, 7, 27)],
         )
+
+    def test_member_signup_only_shows_monday_opt_in(self):
+        self.assertTrue(is_member_signup_session({'day_type': 'mon', 'participation_mode': 'opt_in'}))
+        self.assertFalse(is_member_signup_session({'day_type': 'thu', 'participation_mode': 'absence_only'}))
+        self.assertFalse(is_member_signup_session({'day_type': 'thu', 'participation_mode': 'legacy_explicit'}))
 
 
 if __name__ == '__main__':

@@ -271,12 +271,13 @@
 
 <body class="w-full">
     {% include '_header.html' %}
+    {% include '_admin_sidebar.html' %}
 
     <section class="work-header">
         <div class="flex items-start justify-between gap-4 flex-wrap">
             <div>
                 <h1 class="work-header-title text-2xl font-bold">조 편성 작업</h1>
-                <p class="text-sm mt-1">{% if selected_session %}{{ selected_session.meeting_date }} · {% if selected_session.day_type == 'mon' %}월요일{% else %}목요일{% endif %} · {{ selected_session.book_title or '도서 미입력' }}{% else %}다음 세미나 참석 투표를 기준으로 명단을 준비했습니다.{% endif %}</p>
+                <p class="text-sm mt-1">{% if selected_session %}{{ selected_session.meeting_date }} · {% if selected_session.day_type == 'mon' %}월요일{% else %}목요일{% endif %} · {{ selected_session.book_title or '도서 미입력' }}{% else %}월요일 신청과 목요일 불참 기록을 기준으로 명단을 준비했습니다.{% endif %}</p>
             </div>
             <div class="flex gap-2 flex-wrap">
                 <span class="work-chip">참석 <strong id="cnt-present">0</strong></span>

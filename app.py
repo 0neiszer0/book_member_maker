@@ -29,7 +29,7 @@ from group_history import (
     matrix_rows_from_history as _matrix_rows_from_history,
 )
 from topic_preview import anonymous_topic_previews
-from seminar_cycle import cycle_monday, next_seminar_cycle
+from seminar_cycle import cycle_monday, is_member_signup_session, next_seminar_cycle
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
@@ -782,7 +782,7 @@ def admin_dashboard():
         latest_history = None
 
     return render_template(
-        'admin_dashboard.html',
+        'admin_overview.html',
         all_members=all_members_res,
         meeting_date=next_monday,
         topic_events=topic_events,
@@ -2167,8 +2167,9 @@ def my_page():
             ]
             for term in terms:
                 t_sess = supabase.table('seminar_sessions') \
-                    .select('id, meeting_date, day_type, vote_open_at, vote_close_at') \
+                    .select('id, meeting_date, day_type, participation_mode, capacity, vote_open_at, vote_close_at') \
                     .eq('term_id', term['id']).eq('is_active', True) \
+                    .eq('day_type', 'mon').eq('participation_mode', 'opt_in') \
                     .order('meeting_date').execute().data or []
                 # 내 기존 투표
                 sids = [s['id'] for s in t_sess]
@@ -3343,8 +3344,8 @@ def seminar_vote_page():
         sessions = supabase.table('seminar_sessions').select('*') \
             .eq('term_id', term['id']).eq('is_active', True) \
             .order('meeting_date').execute().data or []
-        # 목요일은 운영진이 불참자만 기록하므로 회원 투표 화면에 노출하지 않는다.
-        sessions = [s for s in sessions if s.get('participation_mode') != 'absence_only']
+        # 회원 화면에는 월요일 추가 세미나 신청만 노출한다. 과거 legacy 목요일도 제외한다.
+        sessions = [s for s in sessions if is_member_signup_session(s)]
         session_ids = [s['id'] for s in sessions]
         counts = {sid: 0 for sid in session_ids}
         attendees_by_session = {sid: [] for sid in session_ids}
@@ -3425,9 +3426,9 @@ def seminar_vote_verify():
             return jsonify({'status': 'error', 'message': '학번/이름이 일치하는 멤버를 찾을 수 없습니다.'}), 404
         member = candidates[0]
         # 기존 투표 (이 학기의 모든 세션)
-        sess_res = supabase.table('seminar_sessions').select('id, participation_mode') \
+        sess_res = supabase.table('seminar_sessions').select('id, day_type, participation_mode') \
             .eq('term_id', term['id']).execute().data or []
-        sess_ids = [s['id'] for s in sess_res if s.get('participation_mode') != 'absence_only']
+        sess_ids = [s['id'] for s in sess_res if is_member_signup_session(s)]
         existing = {}
         voted_yes_attendees = {}  # 본인이 참석 투표한 회차의 신청자 명단
         if sess_ids:
@@ -3477,9 +3478,9 @@ def seminar_vote_counts():
             .eq('share_token', token).single().execute().data
         if not term:
             return jsonify({'status': 'error', 'message': '유효하지 않은 링크'}), 404
-        sess = supabase.table('seminar_sessions').select('id, capacity, participation_mode') \
+        sess = supabase.table('seminar_sessions').select('id, day_type, capacity, participation_mode') \
             .eq('term_id', term['id']).eq('is_active', True).execute().data or []
-        sess = [s for s in sess if s.get('participation_mode') != 'absence_only']
+        sess = [s for s in sess if is_member_signup_session(s)]
         sess_ids = [s['id'] for s in sess]
         capacities = {s['id']: (s.get('capacity') or term.get('max_capacity', 32)) for s in sess}
         counts = {sid: 0 for sid in sess_ids}
@@ -3569,8 +3570,8 @@ def seminar_vote_submit():
             if sid not in valid_map or not valid_map[sid].get('is_active'):
                 continue
             mode = valid_map[sid].get('participation_mode') or 'legacy_explicit'
-            if mode == 'absence_only':
-                skipped.append(f"{valid_map[sid]['meeting_date']} (목) - 운영진 불참 기록 방식")
+            if mode != 'opt_in' or valid_map[sid].get('day_type') != 'mon':
+                skipped.append(f"{valid_map[sid]['meeting_date']} - 회원 신청 대상이 아닌 회차")
                 continue
             label = f"{valid_map[sid]['meeting_date']} ({valid_map[sid]['day_type']})"
 
@@ -4320,14 +4321,14 @@ def records_hub():
                            study_group_count=sg_count, member_count=member_count)
 
 
-# --- 회원명부 ---
-@app.route('/records/members')
+# --- 회원 관리 ---
+@app.route('/admin/members')
 @login_required(role="admin")
 def records_members():
     try:
         members = supabase.table('members').select(
             'id, name, gender, department, student_id, recruiting_class, member_status, role, email'
-        ).eq('is_active', True).order('name').execute().data or []
+        ).order('name').execute().data or []
         # 회원명부 클릭 시 미리 활동 요약을 보여주기 위해 각 멤버의 활동 카운트 집계
         if members:
             # 1) 세미나/발제 카운트 (history.groups 이름 매칭)
@@ -4361,6 +4362,12 @@ def records_members():
         flash(f"멤버 로딩 오류: {e}", 'danger')
         members = []
     return render_template('records_members.html', members=members)
+
+
+@app.route('/records/members')
+@login_required(role="admin")
+def records_members_legacy():
+    return redirect(url_for('records_members'), code=301)
 
 
 @app.route('/records/members/<int:member_id>')

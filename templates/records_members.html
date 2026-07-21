@@ -1,178 +1,61 @@
-{% from '_records_base.html' import records_nav %}
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-    <title>회원명부 - 기록 시스템</title>
-    {% include '_records_base.html' %}
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>회원 관리</title><script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <style>
+    body{background:var(--paper,#faf6ec);color:var(--ink,#2a241b);font-family:Pretendard,-apple-system,BlinkMacSystemFont,sans-serif}
+    .panel{background:var(--surface,#fffdf8);border:1px solid var(--line,#e5d7b8);border-radius:18px}.muted{color:var(--ink-soft,#6b6255)}
+    .field{width:100%;border:1px solid var(--line,#e5d7b8);border-radius:10px;background:#fff;padding:.65rem .75rem;color:#2a241b}
+    .btn{border-radius:10px;padding:.62rem .9rem;font-size:.875rem;font-weight:750;display:inline-flex;align-items:center;justify-content:center}.primary{background:#3d5c2e;color:#fff}.soft{background:#e8efdd;color:#304923}
+    .status{border-radius:999px;padding:.25rem .6rem;font-size:.72rem;font-weight:750}.status-active{background:#e5efdb;color:#345027}.status-dormant{background:#f7e9c5;color:#73561b}.status-inactive{background:#ece7de;color:#675f54}
+    .topic-count{color:#81551a;background:#f7e8c6;border:1px solid #ddbd7e;border-radius:8px;padding:.2rem .5rem;font-weight:850}
+    dialog::backdrop{background:rgba(42,36,27,.48)}
+  </style>
 </head>
-<body class="min-h-screen">
-    {% include '_header.html' %}
+<body>{% include '_header.html' %}{% include '_admin_sidebar.html' %}
+{% set ns=namespace(active=0,dormant=0,inactive=0,incomplete=0) %}{% for m in members %}{% set st=m.member_status or 'active' %}{% if st=='active' %}{% set ns.active=ns.active+1 %}{% elif st=='dormant' %}{% set ns.dormant=ns.dormant+1 %}{% else %}{% set ns.inactive=ns.inactive+1 %}{% endif %}{% if not m.student_id or not m.department or not m.recruiting_class %}{% set ns.incomplete=ns.incomplete+1 %}{% endif %}{% endfor %}
+<main class="max-w-[1500px] mx-auto px-4 lg:px-8 py-7">
+  <div class="flex flex-wrap items-end justify-between gap-4 mb-6"><div><p class="text-sm font-bold muted">운영 관리</p><h1 class="text-3xl font-extrabold">회원 관리</h1><p class="muted mt-2">회원 정보, 활동 상태와 참여 요약을 한 화면에서 관리합니다.</p></div><div class="flex gap-2"><button class="btn soft" id="merge-open">중복 회원 합치기</button><button class="btn primary" id="member-add">회원 추가</button></div></div>
 
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
-        {{ records_nav('members') }}
+  <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+    <button class="panel p-4 text-left status-filter" data-status="active"><p class="text-xs muted font-bold">활성</p><p class="text-2xl font-extrabold mt-1">{{ ns.active }}</p></button>
+    <button class="panel p-4 text-left status-filter" data-status="dormant"><p class="text-xs muted font-bold">휴면</p><p class="text-2xl font-extrabold mt-1">{{ ns.dormant }}</p></button>
+    <button class="panel p-4 text-left status-filter" data-status="inactive"><p class="text-xs muted font-bold">비활성</p><p class="text-2xl font-extrabold mt-1">{{ ns.inactive }}</p></button>
+    <button class="panel p-4 text-left" id="incomplete-filter"><p class="text-xs muted font-bold">정보 확인 필요</p><p class="text-2xl font-extrabold mt-1">{{ ns.incomplete }}</p></button>
+  </section>
 
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-3">
-            <h1 class="text-2xl font-bold text-eva-green">회원명부 ({{ members|length }}명)</h1>
-            <div class="flex gap-2 w-full md:w-auto">
-                <button type="button" id="openMergeBtn"
-                    class="bg-yellow-700 hover:bg-yellow-600 text-white text-xs px-3 py-2 rounded whitespace-nowrap">
-                    <i data-lucide="puzzle" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 멤버 합치기
-                </button>
-                <input type="text" id="memberSearch" placeholder="이름·학번·학과로 검색"
-                    class="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm w-full md:w-72">
-            </div>
-        </div>
+  <section id="merge-panel" class="panel p-5 mb-5 hidden">
+    <div class="flex justify-between gap-3"><div><h2 class="font-extrabold">중복 회원 합치기</h2><p class="muted text-sm mt-1">삭제할 계정의 활동과 로그인 정보를 남길 계정으로 이전합니다. 실행 후에는 되돌리기 어렵습니다.</p></div><button id="merge-close" aria-label="닫기">×</button></div>
+    <div class="grid md:grid-cols-2 gap-3 mt-4"><select id="source-member" class="field"><option value="">삭제할 회원 선택</option>{% for m in members %}<option value="{{ m.id }}">{{ m.name }} · {{ m.student_id or '학번 없음' }}</option>{% endfor %}</select><select id="target-member" class="field"><option value="">남길 회원 선택</option>{% for m in members %}<option value="{{ m.id }}">{{ m.name }} · {{ m.student_id or '학번 없음' }}</option>{% endfor %}</select></div>
+    <button id="merge-run" class="btn primary mt-3">선택한 회원 합치기</button>
+  </section>
 
-        <!-- 멤버 병합 패널 (성 빠진 신청자 등 중복 정리용) -->
-        <div id="mergePanel" class="eva-card rounded-lg p-5 mb-6 hidden">
-            <div class="flex justify-between items-start mb-3">
-                <div>
-                    <h2 class="text-lg font-bold text-yellow-400"><i data-lucide="puzzle" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 중복 멤버 합치기</h2>
-                    <p class="text-xs text-gray-400 mt-1">
-                        예: "민수"로 가입했던 활동을 "김민수" 계정으로 모두 이전합니다.
-                        <strong class="text-red-400">source 멤버는 삭제</strong>되며, 모든 활동(세미나·발제·벽돌책·소모임·스페셜이벤트)이 target 으로 이전됩니다.
-                    </p>
-                </div>
-                <button type="button" id="closeMergeBtn" class="text-gray-400 hover:text-white text-xl leading-none">&times;</button>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="text-xs text-gray-400 block mb-1">Source (삭제될 멤버)</label>
-                    <select id="sourceSelect" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-2 text-sm">
-                        <option value="">-- 선택 --</option>
-                        {% for m in members %}
-                        <option value="{{ m.id }}">{{ m.name }} {% if m.student_id %}({{ m.student_id }}){% endif %} {% if m.department %}- {{ m.department }}{% endif %}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div>
-                    <label class="text-xs text-gray-400 block mb-1">Target (남길 멤버)</label>
-                    <select id="targetSelect" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-2 text-sm">
-                        <option value="">-- 선택 --</option>
-                        {% for m in members %}
-                        <option value="{{ m.id }}">{{ m.name }} {% if m.student_id %}({{ m.student_id }}){% endif %} {% if m.department %}- {{ m.department }}{% endif %}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-            <div class="mt-4 flex justify-end gap-2">
-                <button type="button" id="mergeRunBtn"
-                    class="bg-yellow-600 hover:bg-yellow-500 text-black font-bold text-sm px-4 py-2 rounded">
-                    합치기 실행
-                </button>
-            </div>
-            <div id="mergeResult" class="mt-3 text-sm hidden"></div>
-        </div>
+  <div class="panel p-4 mb-4 grid md:grid-cols-[1fr_auto] gap-3"><input id="member-search" class="field" placeholder="이름·학번·학과로 검색"><button class="btn soft" id="show-all">전체 상태 보기</button></div>
 
-        <div class="eva-card rounded-lg overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="bg-gray-700/50 text-left text-gray-300">
-                            <th class="p-3">이름</th>
-                            <th class="p-3">학번</th>
-                            <th class="p-3">학과</th>
-                            <th class="p-3 text-center">기수</th>
-                            <th class="p-3 text-center">성별</th>
-                            <th class="p-3 text-center" title="세미나 참석">세미나</th>
-                            <th class="p-3 text-center" title="발제 횟수">발제</th>
-                            <th class="p-3 text-center" title="벽돌책 세션">벽돌책</th>
-                            <th class="p-3 text-center" title="소모임 세션">소모임</th>
-                            <th class="p-3 text-center">권한</th>
-                            <th class="p-3 text-center">프로필</th>
-                        </tr>
-                    </thead>
-                    <tbody id="memberTableBody">
-                        {% for m in members %}
-                        <tr class="member-row border-t border-border-dark/50 hover:bg-gray-700/20"
-                            data-search="{{ (m.name or '') ~ ' ' ~ (m.student_id or '') ~ ' ' ~ (m.department or '') }}">
-                            <td class="p-3 font-semibold">{{ m.name }}</td>
-                            <td class="p-3 font-mono text-gray-300">{{ m.student_id or '-' }}</td>
-                            <td class="p-3 text-gray-300">{{ m.department or '-' }}</td>
-                            <td class="p-3 text-center text-gray-300">{{ m.recruiting_class or '-' }}</td>
-                            <td class="p-3 text-center">
-                                {% if m.gender in ('M','남','남성','남자','male') %}
-                                <span class="text-blue-300">남</span>
-                                {% elif m.gender in ('W','F','여','여성','여자','female') %}
-                                <span class="text-pink-300">여</span>
-                                {% else %}-{% endif %}
-                            </td>
-                            <td class="p-3 text-center font-bold text-eva-green">{{ m.seminar_count or 0 }}</td>
-                            <td class="p-3 text-center font-bold text-eva-purple">{{ m.facilitator_count or 0 }}</td>
-                            <td class="p-3 text-center font-bold text-eva-orange">{{ m.brick_count or 0 }}</td>
-                            <td class="p-3 text-center font-bold text-blue-300">{{ m.study_count or 0 }}</td>
-                            <td class="p-3 text-center text-xs">
-                                {% if m.role == 'admin' %}<span class="bg-red-700 text-white px-2 py-0.5 rounded">관리자</span>
-                                {% elif m.role == 'officer' %}<span class="bg-yellow-700 text-white px-2 py-0.5 rounded">임원</span>
-                                {% else %}<span class="text-gray-500">일반</span>{% endif %}
-                            </td>
-                            <td class="p-3 text-center">
-                                <a href="{{ url_for('records_member_profile', member_id=m.id) }}"
-                                    class="bg-blue-700 hover:bg-blue-600 text-white text-xs py-1 px-3 rounded">
-                                    보기 →
-                                </a>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="11" class="p-6 text-center text-gray-500">멤버가 없습니다.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
+  <section class="panel overflow-hidden">
+    <div class="overflow-x-auto"><table class="w-full text-sm min-w-[1050px]"><thead class="bg-[#f2ebd8] text-left"><tr><th class="p-3">회원</th><th class="p-3">학번·학과</th><th class="p-3 text-center">기수</th><th class="p-3 text-center">세미나</th><th class="p-3 text-center">발제</th><th class="p-3 text-center">벽돌책</th><th class="p-3 text-center">소모임</th><th class="p-3">활동 상태</th><th class="p-3 text-right">관리</th></tr></thead>
+    <tbody id="member-list">{% for m in members %}{% set st=m.member_status or 'active' %}<tr class="member-row border-t border-[#eee3cc] hover:bg-[#fbf7ed]" data-status="{{ st }}" data-incomplete="{{ '1' if not m.student_id or not m.department or not m.recruiting_class else '0' }}" data-search="{{ ((m.name or '') ~ ' ' ~ (m.student_id or '') ~ ' ' ~ (m.department or ''))|lower }}">
+      <td class="p-3"><div class="font-extrabold">{{ m.name }}</div><div class="text-xs muted mt-1">{% if m.role=='admin' %}관리자{% elif m.role=='officer' %}운영진{% else %}회원{% endif %}{% if not m.email %} · 이메일 없음{% endif %}</div></td>
+      <td class="p-3"><div>{{ m.student_id or '학번 미입력' }}</div><div class="text-xs muted">{{ m.department or '학과 미입력' }}</div></td><td class="p-3 text-center">{{ m.recruiting_class or '-' }}</td><td class="p-3 text-center font-extrabold text-[#3d5c2e]">{{ m.seminar_count or 0 }}</td><td class="p-3 text-center"><span class="topic-count">{{ m.facilitator_count or 0 }}</span></td><td class="p-3 text-center font-bold text-[#8a5c2a]">{{ m.brick_count or 0 }}</td><td class="p-3 text-center font-bold text-[#4d6572]">{{ m.study_count or 0 }}</td>
+      <td class="p-3"><select class="field !py-2 status-select" data-member-id="{{ m.id }}"><option value="active" {% if st=='active' %}selected{% endif %}>활성</option><option value="dormant" {% if st=='dormant' %}selected{% endif %}>휴면</option><option value="inactive" {% if st=='inactive' %}selected{% endif %}>비활성</option></select></td>
+      <td class="p-3"><div class="flex justify-end gap-2"><a class="btn soft" href="{{ url_for('records_member_profile', member_id=m.id) }}">활동</a><button class="btn primary edit-member" data-id="{{ m.id }}" data-name="{{ m.name }}" data-email="{{ m.email or '' }}" data-department="{{ m.department or '' }}" data-gender="{{ m.gender or '' }}" data-student-id="{{ m.student_id or '' }}" data-recruiting-class="{{ m.recruiting_class or '' }}" data-role="{{ m.role or 'member' }}">편집</button></div></td>
+    </tr>{% else %}<tr><td colspan="9" class="p-8 text-center muted">등록된 회원이 없습니다.</td></tr>{% endfor %}</tbody></table></div>
+  </section>
+</main>
 
-    <script>
-        const searchInput = document.getElementById('memberSearch');
-        const rows = document.querySelectorAll('.member-row');
-        searchInput?.addEventListener('input', () => {
-            const q = searchInput.value.trim().toLowerCase();
-            rows.forEach(r => {
-                const txt = (r.dataset.search || '').toLowerCase();
-                r.style.display = (!q || txt.includes(q)) ? '' : 'none';
-            });
-        });
+<dialog id="member-dialog" class="w-[min(92vw,560px)] rounded-2xl border border-[#e5d7b8] p-0 bg-[#fffdf8] text-[#2a241b]"><form method="dialog" id="member-form" class="p-6"><div class="flex justify-between items-center"><h2 id="dialog-title" class="text-xl font-extrabold">회원 추가</h2><button value="cancel" aria-label="닫기">×</button></div><div class="grid sm:grid-cols-2 gap-3 mt-5"><label class="text-sm font-bold">이름 *<input id="m-name" class="field mt-1" required></label><label class="text-sm font-bold">학번<input id="m-student-id" class="field mt-1"></label><label class="text-sm font-bold sm:col-span-2">학과<input id="m-department" class="field mt-1"></label><label class="text-sm font-bold sm:col-span-2">이메일 <span class="muted font-normal">(선택)</span><input id="m-email" type="email" class="field mt-1"></label><label class="text-sm font-bold">기수<input id="m-class" type="number" class="field mt-1"></label><label class="text-sm font-bold">성별<select id="m-gender" class="field mt-1"><option value="">선택 안 함</option><option value="M">남성</option><option value="W">여성</option></select></label><label class="text-sm font-bold sm:col-span-2">권한<select id="m-role" class="field mt-1"><option value="member">회원</option><option value="officer">운영진</option><option value="admin">관리자</option></select></label></div><div class="flex justify-end gap-2 mt-6"><button value="cancel" class="btn soft">취소</button><button value="default" class="btn primary" id="member-save">저장</button></div></form></dialog>
 
-        // --- 멤버 병합 ---
-        const mergePanel = document.getElementById('mergePanel');
-        document.getElementById('openMergeBtn')?.addEventListener('click', () => mergePanel.classList.remove('hidden'));
-        document.getElementById('closeMergeBtn')?.addEventListener('click', () => mergePanel.classList.add('hidden'));
-
-        document.getElementById('mergeRunBtn')?.addEventListener('click', async () => {
-            const sourceSel = document.getElementById('sourceSelect');
-            const targetSel = document.getElementById('targetSelect');
-            const resultBox = document.getElementById('mergeResult');
-            const sourceId = sourceSel.value;
-            const targetId = targetSel.value;
-            if (!sourceId || !targetId) { alert('source / target 둘 다 선택해주세요.'); return; }
-            if (sourceId === targetId) { alert('서로 다른 멤버를 선택해주세요.'); return; }
-            const sLabel = sourceSel.options[sourceSel.selectedIndex].text;
-            const tLabel = targetSel.options[targetSel.selectedIndex].text;
-            if (!confirm(`정말로 합치시겠습니까?\n\nSource (삭제): ${sLabel}\nTarget (유지): ${tLabel}\n\n되돌릴 수 없습니다.`)) return;
-
-            resultBox.className = 'mt-3 text-sm text-gray-400';
-            resultBox.textContent = '처리 중...';
-            resultBox.classList.remove('hidden');
-            try {
-                const res = await fetch('/api/admin/members/merge', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ source_id: parseInt(sourceId), target_id: parseInt(targetId) }),
-                });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    resultBox.className = 'mt-3 text-sm text-eva-green';
-                    resultBox.innerHTML = '합치기 완료. 페이지를 새로고침합니다...<br><pre class="text-xs text-gray-400 mt-2">'+ JSON.stringify(data.moved, null, 2) + '</pre>';
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    resultBox.className = 'mt-3 text-sm text-red-400';
-                    resultBox.textContent = ''+ (data.message || '실패');
-                }
-            } catch (e) {
-                resultBox.className = 'mt-3 text-sm text-red-400';
-                resultBox.textContent = ''+ e.message;
-            }
-        });
-    </script>
-</body>
-</html>
+<script>
+let statusFilter='', incompleteOnly=false, editingId=null;
+const rows=[...document.querySelectorAll('.member-row')], search=document.getElementById('member-search');
+function filterRows(){const q=search.value.trim().toLowerCase();rows.forEach(row=>row.hidden=!!((statusFilter&&row.dataset.status!==statusFilter)||(incompleteOnly&&row.dataset.incomplete!=='1')||(q&&!row.dataset.search.includes(q))))}
+search.addEventListener('input',filterRows);document.querySelectorAll('.status-filter').forEach(b=>b.onclick=()=>{statusFilter=b.dataset.status;incompleteOnly=false;filterRows()});document.getElementById('incomplete-filter').onclick=()=>{statusFilter='';incompleteOnly=true;filterRows()};document.getElementById('show-all').onclick=()=>{statusFilter='';incompleteOnly=false;search.value='';filterRows()};
+document.querySelectorAll('.status-select').forEach(sel=>sel.onchange=async()=>{const old=sel.closest('tr').dataset.status;const r=await fetch(`/api/admin/members/${sel.dataset.memberId}/set_status`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({member_status:sel.value})});const d=await r.json();if(!r.ok||d.status!=='success'){sel.value=old;return alert(d.message||'상태를 변경하지 못했습니다.')}sel.closest('tr').dataset.status=sel.value;filterRows()});
+const dialog=document.getElementById('member-dialog');
+function openMember(data={}){editingId=data.id||null;document.getElementById('dialog-title').textContent=editingId?'회원 편집':'회원 추가';document.getElementById('m-name').value=data.name||'';document.getElementById('m-student-id').value=data.studentId||'';document.getElementById('m-department').value=data.department||'';document.getElementById('m-email').value=data.email||'';document.getElementById('m-class').value=data.recruitingClass||'';document.getElementById('m-gender').value=data.gender||'';document.getElementById('m-role').value=data.role||'member';dialog.showModal()}
+document.getElementById('member-add').onclick=()=>openMember();document.querySelectorAll('.edit-member').forEach(b=>b.onclick=()=>openMember({...b.dataset,studentId:b.dataset.studentId,recruitingClass:b.dataset.recruitingClass}));
+document.getElementById('member-form').addEventListener('submit',async e=>{if(e.submitter?.value==='cancel')return;e.preventDefault();const body={name:document.getElementById('m-name').value.trim(),student_id:document.getElementById('m-student-id').value.trim(),department:document.getElementById('m-department').value.trim(),email:document.getElementById('m-email').value.trim(),recruiting_class:document.getElementById('m-class').value?Number(document.getElementById('m-class').value):null,gender:document.getElementById('m-gender').value,role:document.getElementById('m-role').value};const url=editingId?`/api/admin/members/${editingId}/edit`:'/api/admin/members/create';const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json();if(!r.ok||d.status!=='success')return alert(d.message||'저장하지 못했습니다.');location.reload()});
+const merge=document.getElementById('merge-panel');document.getElementById('merge-open').onclick=()=>merge.classList.remove('hidden');document.getElementById('merge-close').onclick=()=>merge.classList.add('hidden');document.getElementById('merge-run').onclick=async()=>{const source=document.getElementById('source-member'),target=document.getElementById('target-member');if(!source.value||!target.value||source.value===target.value)return alert('서로 다른 두 회원을 선택해주세요.');if(!confirm(`${source.options[source.selectedIndex].text} 계정을 합치고 삭제할까요?`))return;const r=await fetch('/api/admin/members/merge',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source_id:Number(source.value),target_id:Number(target.value)})});const d=await r.json();if(!r.ok||d.status!=='success')return alert(d.message||'합치지 못했습니다.');location.reload()};
+</script></body></html>

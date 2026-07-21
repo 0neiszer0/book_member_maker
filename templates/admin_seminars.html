@@ -13,20 +13,9 @@
     .muted{color:var(--ink-soft,#6b6255)}.chip{border-radius:999px;padding:.25rem .6rem;font-size:.75rem;font-weight:700;background:var(--paper-2,#f2ebd8)}
   </style>
 </head>
-<body>{% include '_header.html' %}
+<body>{% include '_header.html' %}{% include '_admin_sidebar.html' %}
 <main class="max-w-[1500px] mx-auto px-4 lg:px-8 py-7">
- <div class="grid lg:grid-cols-[210px_minmax(0,1fr)] gap-6">
-  <aside class="hidden lg:block"><nav class="panel p-3 sticky top-20 text-sm space-y-1" aria-label="운영 관리 메뉴">
-    <p class="px-3 py-2 text-xs font-extrabold muted">운영 관리</p>
-    <a class="block rounded-lg px-3 py-2 hover:bg-[#f2ebd8]" href="{{ url_for('admin_dashboard') }}">개요</a>
-    <a class="block rounded-lg px-3 py-2 bg-[#e8efdd] text-[#3d5c2e] font-bold" href="{{ url_for('admin_seminars') }}">세미나 운영</a>
-    <a class="block rounded-lg px-3 py-2 hover:bg-[#f2ebd8]" href="{{ url_for('bookclub_index') }}">조 편성</a>
-    <a class="block rounded-lg px-3 py-2 hover:bg-[#f2ebd8]" href="{{ url_for('admin_dashboard') }}#sec-members">회원 관리</a>
-    <a class="block rounded-lg px-3 py-2 hover:bg-[#f2ebd8]" href="{{ url_for('admin_special_events') }}">활동·행사</a>
-    <a class="block rounded-lg px-3 py-2 hover:bg-[#f2ebd8]" href="{{ url_for('records_hub') }}">기록·통계</a>
-    {% if session.user_role == 'admin' %}<a class="block rounded-lg px-3 py-2 hover:bg-[#f2ebd8]" href="{{ url_for('boards.admin_index') }}">게시판 관리</a>{% endif %}
-    <a class="block rounded-lg px-3 py-2 hover:bg-[#f2ebd8]" href="{{ url_for('help_admin') }}">시스템·운영 안내</a>
-  </nav></aside>
+ <div>
   <div class="min-w-0">
   <div class="flex flex-wrap items-end justify-between gap-4 mb-6">
     <div><p class="text-sm font-bold muted">운영 관리</p><h1 class="text-3xl font-extrabold tracking-tight">세미나 운영</h1><p class="muted mt-2">도서와 발제문은 목요일 본 세미나부터 다음 월요일 추가 세미나까지 함께 관리합니다.</p></div>

@@ -9,7 +9,7 @@
     rel="stylesheet">
 <style>
     :root {
-        --eva-purple: #6A0DAD;
+        --eva-purple: #F0C879;
         --eva-green: #00FF7F;
         --eva-orange: #FF8C00;
         --bg-dark: #1A1A1A;
@@ -40,6 +40,7 @@
 
     .text-eva-green { color: var(--eva-green); }
     .text-eva-purple { color: var(--eva-purple); }
+    .bg-eva-purple { background-color: #76501f; }
     .text-eva-orange { color: var(--eva-orange); }
     .bg-eva-green { background-color: var(--eva-green); }
     .border-eva-green { border-color: var(--eva-green); }
@@ -163,6 +164,7 @@ async function addNewGenre(btn) {
 {% endmacro %}
 
 {% macro records_nav(active) %}
+{% include '_admin_sidebar.html' %}
 {# 페이지 container 안에 들어가도 자연스럽게 보이는 sticky 서브바 #}
 <div class="records-subbar -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 mb-6 -mt-4 sm:-mt-6 lg:-mt-8">
     <div class="records-subbar-inner">
