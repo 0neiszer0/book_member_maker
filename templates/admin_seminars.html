@@ -10,7 +10,9 @@
     .field{width:100%;border:1px solid var(--line,#e5d7b8);border-radius:10px;background:#fff;padding:.65rem .75rem}
     .btn{border-radius:10px;padding:.6rem .9rem;font-weight:700;font-size:.875rem;display:inline-flex;align-items:center;justify-content:center;gap:.35rem}
     .primary{background:var(--moss-deep,#3d5c2e);color:#fff}.soft{background:var(--moss-tint,#e8efdd);color:var(--moss-deep,#3d5c2e)}
-    .muted{color:var(--ink-soft,#6b6255)}.chip{border-radius:999px;padding:.25rem .6rem;font-size:.75rem;font-weight:700;background:var(--paper-2,#f2ebd8)}
+    .muted{color:var(--ink-soft,#6b6255)}.chip{display:inline-flex;flex:none;align-items:center;justify-content:center;white-space:nowrap;line-height:1.25;border-radius:999px;padding:.25rem .6rem;font-size:.75rem;font-weight:700;background:var(--paper-2,#f2ebd8)}
+    .absence-option{border:1px solid var(--line,#e5d7b8);border-radius:10px;background:#fff;padding:.55rem .65rem;cursor:pointer}
+    .absence-option:has(input:checked){border-color:var(--moss-deep,#3d5c2e);background:var(--moss-tint,#e8efdd)}
   </style>
 </head>
 <body>{% include '_header.html' %}{% include '_admin_sidebar.html' %}
@@ -50,13 +52,13 @@
   {% for week in weeks %}
     {% set mon=week.sessions_by_day.get('mon') %}{% set thu=week.sessions_by_day.get('thu') %}
     <section class="panel p-4 lg:p-6" data-week="{{ week.id }}" data-schedule-date="{{ thu.meeting_date if thu else (mon.meeting_date if mon else week.week_start) }}">
-      <div class="flex flex-wrap justify-between gap-3 mb-5">
+      <div class="flex flex-wrap items-start justify-between gap-3 mb-5">
         <div>
           <div class="flex flex-wrap items-center gap-2"><h2 class="text-xl font-extrabold">{% if thu %}{{ thu.meeting_date }} 목요일 본 세미나{% elif mon %}{{ mon.meeting_date }} 월요일 추가 세미나{% else %}세미나 일정{% endif %}</h2>{% if week.needs_review %}<span class="chip !bg-amber-100 !text-amber-800">도서 확인 필요</span>{% endif %}{% if week.is_past %}<span class="chip">지난 세미나</span>{% endif %}</div>
           <div class="flex flex-wrap gap-2 mt-2">{% if thu %}<span class="chip">본 세미나 · {{ thu.meeting_date }} (목)</span>{% endif %}{% if mon %}<span class="chip">추가 세미나 · {{ mon.meeting_date }} (월)</span>{% endif %}</div>
           <p class="muted text-sm mt-2">위 두 회차는 같은 도서와 발제문을 사용하고, 참석자와 조 편성은 따로 관리합니다.</p>
         </div>
-        <div class="flex gap-2 flex-wrap">
+        <div class="flex items-center self-start gap-2 flex-wrap">
           {% if week.topic_event %}
             <span class="chip">발제문 {{ week.topic_event.submission_count }}명 제출</span>
             <button class="btn soft toggle-topic" data-event-id="{{ week.topic_event.id }}">{% if week.topic_event.is_active %}접수 마감{% else %}다시 열기{% endif %}</button>
@@ -91,7 +93,25 @@
           {% if thu %}
             <p class="text-sm muted mt-2">{{ thu.meeting_date }} · 불참 {{ thu.absences|length }}명</p>
             <div class="flex flex-wrap gap-1 mt-3">{% for a in thu.absences %}<button class="chip absence-cancel" title="불참 취소" data-session-id="{{ thu.id }}" data-member-id="{{ a.member.id }}">{{ a.member.name }}{% if a.note %} · {{ a.note }}{% endif %} ×</button>{% else %}<span class="text-sm muted">등록된 불참자가 없습니다.</span>{% endfor %}</div>
-            <div class="grid grid-cols-[1fr_auto] gap-2 mt-3"><select class="field absence-member"><option value="">불참 회원 선택</option>{% for m in all_members %}<option value="{{ m.id }}">{{ m.name }} · {{ m.student_id or '' }} · {{ m.department or '' }}</option>{% endfor %}</select><button class="btn soft add-absence" data-session-id="{{ thu.id }}">추가</button><input class="field absence-note col-span-2" placeholder="메모(선택)"></div>
+            <details class="absence-picker mt-3 rounded-xl border border-[#eadac5] bg-[#fffdf8] p-3">
+              <summary class="font-bold cursor-pointer">여러 명 한 번에 선택</summary>
+              <div class="mt-3">
+                <div class="flex flex-wrap items-center gap-2">
+                  <input class="field absence-search flex-1 min-w-[180px]" type="search" placeholder="이름·학번·학과 검색" aria-label="불참 회원 검색">
+                  <span class="chip absence-selected-count">0명 선택</span>
+                </div>
+                <div class="flex flex-wrap gap-2 mt-2"><button type="button" class="btn soft select-visible-absences">검색 결과 전체 선택</button><button type="button" class="btn soft clear-absence-selection">선택 해제</button></div>
+                <div class="grid sm:grid-cols-2 gap-2 mt-3 max-h-60 overflow-y-auto pr-1 absence-options">
+                  {% set picker = namespace(count=0) %}
+                  {% for m in all_members %}{% if m.id not in thu.absent_member_ids %}{% set picker.count = picker.count + 1 %}
+                    <label class="absence-option flex items-center gap-2" data-search="{{ (m.name ~ ' ' ~ (m.student_id or '') ~ ' ' ~ (m.department or ''))|lower }}"><input class="absence-checkbox" type="checkbox" value="{{ m.id }}"><span class="min-w-0"><strong>{{ m.name }}</strong><span class="block text-xs muted truncate">{{ m.student_id or '학번 없음' }} · {{ m.department or '학과 없음' }}</span></span></label>
+                  {% endif %}{% endfor %}
+                  {% if picker.count == 0 %}<p class="text-sm muted sm:col-span-2">모든 활성 회원이 이미 불참자로 등록되어 있습니다.</p>{% endif %}
+                </div>
+                <input class="field bulk-absence-note mt-3" placeholder="선택한 회원에게 공통 메모 추가(선택)">
+                <button type="button" class="btn primary add-absences mt-2" data-session-id="{{ thu.id }}" {% if picker.count == 0 %}disabled{% endif %}>선택한 회원 불참 처리</button>
+              </div>
+            </details>
             <div class="flex flex-wrap gap-2 mt-4"><a class="btn primary" href="{{ url_for('bookclub_index', session_id=thu.id) }}">조 편성</a>{% if thu.history %}<a class="btn soft" href="{{ url_for('records_seminar_detail', history_id=thu.history.id) }}">진행 기록</a>{% endif %}</div>
           {% else %}<p class="muted text-sm mt-3">이 주차에는 목요일 회차가 없습니다.</p>{% endif %}
         </div>
@@ -106,6 +126,11 @@
 async function api(url, options={}){const r=await fetch(url,{headers:{'Content-Type':'application/json'},...options});const j=await r.json();if(!r.ok||j.status==='error')throw new Error(j.message||'처리하지 못했습니다.');return j}
 document.getElementById('term-create')?.addEventListener('submit',async e=>{e.preventDefault();try{const data=Object.fromEntries(new FormData(e.target));await api('/api/admin/seminar_terms/create',{method:'POST',body:JSON.stringify(data)});location.reload()}catch(err){alert(err.message)}})
 document.getElementById('bulk-save')?.addEventListener('click',async()=>{try{const rows=document.getElementById('bulk-books').value.split(/\r?\n/).map(x=>x.split('|').map(v=>v.trim())).filter(x=>x[0]);let saved=0;for(const row of rows){const box=document.querySelector('[data-schedule-date="'+CSS.escape(row[0])+'"]');if(!box)continue;await api('/api/admin/seminar_weeks/'+box.dataset.week,{method:'PATCH',body:JSON.stringify({book_title:row[1]||'',book_author:row[2]||'',note:row[3]||''})});saved++}if(!saved)throw new Error('일치하는 목요일 본 세미나 날짜가 없습니다.');location.reload()}catch(err){alert(err.message)}})
+function updateAbsenceSelection(picker){const count=picker.querySelectorAll('.absence-checkbox:checked').length;picker.querySelector('.absence-selected-count').textContent=count+'명 선택'}
+document.addEventListener('input',e=>{
+ if(e.target.matches('.absence-search')){const picker=e.target.closest('.absence-picker'),query=e.target.value.trim().toLowerCase();picker.querySelectorAll('.absence-option').forEach(option=>option.hidden=!option.dataset.search.includes(query))}
+ if(e.target.matches('.absence-checkbox'))updateAbsenceSelection(e.target.closest('.absence-picker'))
+})
 document.addEventListener('click',async e=>{
  const copy=e.target.closest('[data-copy]');if(copy){await navigator.clipboard.writeText(copy.dataset.copy);copy.textContent='복사됨';return}
  const box=e.target.closest('[data-week]');
@@ -115,7 +140,9 @@ document.addEventListener('click',async e=>{
   if(e.target.closest('.open-topic')){const b=e.target.closest('.open-topic');await api('/api/admin/seminar_weeks/'+b.dataset.weekId+'/open_topics',{method:'POST',body:'{}'});location.reload()}
   if(e.target.closest('.toggle-topic')){const b=e.target.closest('.toggle-topic');await api('/api/admin/topic_events/'+b.dataset.eventId+'/toggle_active',{method:'POST',body:'{}'});location.reload()}
   if(e.target.closest('.save-capacity')){const b=e.target.closest('.save-capacity');await api('/api/admin/seminar_sessions/'+b.dataset.sessionId+'/capacity',{method:'PATCH',body:JSON.stringify({capacity:Number(b.parentElement.querySelector('.capacity').value)})});location.reload()}
-  if(e.target.closest('.add-absence')){const b=e.target.closest('.add-absence'),p=b.parentElement;await api('/api/admin/seminar_sessions/'+b.dataset.sessionId+'/absences',{method:'POST',body:JSON.stringify({member_id:p.querySelector('.absence-member').value,note:p.querySelector('.absence-note').value})});location.reload()}
+  if(e.target.closest('.select-visible-absences')){const picker=e.target.closest('.absence-picker');picker.querySelectorAll('.absence-option:not([hidden]) .absence-checkbox').forEach(input=>input.checked=true);updateAbsenceSelection(picker);return}
+  if(e.target.closest('.clear-absence-selection')){const picker=e.target.closest('.absence-picker');picker.querySelectorAll('.absence-checkbox').forEach(input=>input.checked=false);updateAbsenceSelection(picker);return}
+  if(e.target.closest('.add-absences')){const b=e.target.closest('.add-absences'),picker=b.closest('.absence-picker'),memberIds=[...picker.querySelectorAll('.absence-checkbox:checked')].map(input=>Number(input.value));if(!memberIds.length)throw new Error('불참 회원을 한 명 이상 선택해주세요.');b.disabled=true;b.textContent='저장 중…';await api('/api/admin/seminar_sessions/'+b.dataset.sessionId+'/absences',{method:'POST',body:JSON.stringify({member_ids:memberIds,note:picker.querySelector('.bulk-absence-note').value})});location.reload()}
   if(e.target.closest('.absence-cancel')){const b=e.target.closest('.absence-cancel');if(confirm('이 불참 기록을 취소할까요? 기록 자체는 이력에 남습니다.')){await api('/api/admin/seminar_sessions/'+b.dataset.sessionId+'/absences/'+b.dataset.memberId,{method:'DELETE'});location.reload()}}
  }catch(err){alert(err.message)}
 })
