@@ -172,34 +172,33 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                 {% if my_open_votes %}
-                <!-- 다음 세미나 참석 투표 (투표 창이 열린 동안에만 노출) -->
+                <!-- 월요일 추가 세미나 신청 (신청 창이 열린 동안에만 노출) -->
                 <div class="action-card md:col-span-2">
                     <div class="flex items-start justify-between flex-wrap gap-2 mb-1">
                         <div>
-                            <div class="title"><i data-lucide="vote" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 다음 세미나 참석 투표</div>
-                            <div class="desc">현재 {{ my_open_votes|length }}개 회차에 투표할 수 있습니다.</div>
+                            <div class="title"><i data-lucide="calendar-plus" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 추가 세미나 신청하기</div>
+                            <div class="desc">현재 {{ my_open_votes|length }}개 월요일 추가 세미나를 신청할 수 있습니다.</div>
                         </div>
                     </div>
                     <div class="flex flex-wrap gap-2">
                         {% for v in my_open_votes %}
                         <a href="/seminar_vote?token={{ v.term_token }}"
                             class="pill {% if v.my_vote == True %}pill-green{% elif v.my_vote == False %}pill-red{% else %}pill-yellow{% endif %}">
-                            <span>{{ v.meeting_date }} ({% if v.day_type == 'mon' %}월{% else %}목{% endif %})</span>
+                            <span>{{ v.meeting_date }} (월) · 정원 {{ v.capacity or 10 }}명</span>
                             <span class="text-xs">
-                                {% if v.my_vote == True %}✓ 참석
-                                {% elif v.my_vote == False %}✗ 불참
-                                {% else %}? 미정{% endif %}
+                                {% if v.my_vote == True %}신청 완료
+                                {% else %}신청하기 →{% endif %}
                             </span>
                         </a>
                         {% endfor %}
                     </div>
-                    <p class="text-xs text-yellow-300 mt-2">⏰ 투표는 <strong>일요일 자정(23:59)까지</strong> 가능합니다. 각 회차의 정확한 마감 시각은 투표 페이지에서 확인해주세요.</p>
+                    <p class="text-xs text-yellow-300 mt-2">선착순으로 확정되며, 취소하면 자리가 다시 열립니다.</p>
                 </div>
                 {% elif active_seminar_terms %}
-                <!-- 투표 창이 닫혀 있어도 학기 페이지로 들어갈 수 있게 -->
+                <!-- 신청 창이 닫혀 있어도 추가 세미나 현황을 볼 수 있게 -->
                 <div class="action-card md:col-span-2">
-                    <div class="title"><i data-lucide="vote" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 세미나 참석 투표 페이지</div>
-                    <div class="desc">학기 전체 회차와 다른 회원들의 신청 현황을 볼 수 있습니다.</div>
+                    <div class="title"><i data-lucide="calendar-plus" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 추가 세미나 신청</div>
+                    <div class="desc">월요일 추가 세미나의 신청 현황과 남은 자리를 확인할 수 있습니다.</div>
                     <div class="flex flex-wrap gap-2 mt-1">
                         {% for t in active_seminar_terms %}
                         <a href="/seminar_vote?token={{ t.share_token }}" class="pill pill-yellow">
@@ -208,7 +207,7 @@
                         </a>
                         {% endfor %}
                     </div>
-                    <p class="text-xs text-gray-500 mt-2">투표 창은 매주 금~일 자정까지만 열립니다.</p>
+                    <p class="text-xs text-gray-500 mt-2">목요일 본 세미나는 운영진이 불참자만 별도로 기록하므로 이곳에 표시하지 않습니다.</p>
                 </div>
                 {% endif %}
 

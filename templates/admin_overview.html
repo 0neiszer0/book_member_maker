@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>운영 관리 개요</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <style>
+    body{background:var(--paper,#faf6ec);color:var(--ink,#2a241b);font-family:Pretendard,-apple-system,BlinkMacSystemFont,sans-serif}
+    .panel{background:var(--surface,#fffdf8);border:1px solid var(--line,#e5d7b8);border-radius:18px}
+    .muted{color:var(--ink-soft,#6b6255)}.chip{border-radius:999px;padding:.25rem .65rem;font-size:.75rem;font-weight:750;background:var(--paper-2,#f2ebd8)}
+    .quick{display:block;padding:1.15rem;border-radius:16px;background:#fffdf8;border:1px solid #e5d7b8;transition:.15s}.quick:hover{border-color:#8ca074;transform:translateY(-1px)}
+  </style>
+</head>
+<body>{% include '_header.html' %}{% include '_admin_sidebar.html' %}
+<main class="max-w-7xl mx-auto px-4 lg:px-8 py-7">
+  <div class="mb-7"><p class="text-sm font-bold muted">운영 관리</p><h1 class="text-3xl font-extrabold tracking-tight">개요</h1><p class="muted mt-2">자주 하는 작업과 현재 상태만 모았습니다.</p></div>
+
+  {% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<div class="panel p-4 mb-4 {% if category != 'success' %}text-red-700{% endif %}">{{ message }}</div>{% endfor %}{% endwith %}
+
+  <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-7">
+    <div class="panel p-5"><p class="text-xs font-bold muted">전체 회원</p><p class="text-3xl font-extrabold mt-1">{{ all_members|length }}</p></div>
+    <div class="panel p-5"><p class="text-xs font-bold muted">활성 학기</p><p class="text-3xl font-extrabold mt-1">{{ seminar_terms|selectattr('is_active')|list|length }}</p></div>
+    <div class="panel p-5"><p class="text-xs font-bold muted">발제문 이벤트</p><p class="text-3xl font-extrabold mt-1">{{ topic_events|length }}</p></div>
+    <div class="panel p-5"><p class="text-xs font-bold muted">최근 진행 기록</p><p class="text-base font-extrabold mt-2">{% if latest_history %}{{ latest_history.date }}{% else %}기록 없음{% endif %}</p></div>
+  </section>
+
+  <section>
+    <h2 class="text-lg font-extrabold mb-3">바로가기</h2>
+    <div class="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+      <a class="quick" href="{{ url_for('admin_seminars') }}"><span class="chip">세미나</span><h3 class="font-extrabold mt-3">도서·발제문·참석 관리</h3><p class="muted text-sm mt-1">목요일 불참과 월요일 추가 세미나 신청을 함께 관리합니다.</p></a>
+      <a class="quick" href="{{ url_for('bookclub_index') }}"><span class="chip">조 편성</span><h3 class="font-extrabold mt-3">다음 조 편성 시작</h3><p class="muted text-sm mt-1">회차 참석자와 발제자를 불러와 편성합니다.</p></a>
+      <a class="quick" href="{{ url_for('records_members') }}"><span class="chip">회원</span><h3 class="font-extrabold mt-3">회원 관리</h3><p class="muted text-sm mt-1">회원 정보·상태·활동 요약을 한 화면에서 관리합니다.</p></a>
+      <a class="quick" href="{{ url_for('admin_special_events') }}"><span class="chip">활동</span><h3 class="font-extrabold mt-3">행사 기록</h3><p class="muted text-sm mt-1">MT·워크숍·강연과 참석자를 기록합니다.</p></a>
+      <a class="quick" href="{{ url_for('records_hub') }}"><span class="chip">기록</span><h3 class="font-extrabold mt-3">기록·통계 확인</h3><p class="muted text-sm mt-1">세미나 기록, 출석 매트릭스와 통계를 확인합니다.</p></a>
+      <a class="quick" href="{{ url_for('help_admin') }}"><span class="chip">시스템</span><h3 class="font-extrabold mt-3">최신 운영 가이드</h3><p class="muted text-sm mt-1">현재 운영 방식에 맞춘 순서와 점검 항목을 확인합니다.</p></a>
+    </div>
+  </section>
+</main>
+</body></html>
