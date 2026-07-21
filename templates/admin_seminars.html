@@ -38,9 +38,9 @@
         {% if term and term.is_active %}<button type="button" class="btn soft sm:col-span-3 justify-self-start archive-term" data-term-id="{{ term.id }}">현재 학기 보관</button>{% endif %}
       </form>
       <div>
-        <textarea id="bulk-books" class="field" rows="5" placeholder="기준 월요일 | 도서명 | 저자 | 안내&#10;2026-07-27 | 도서 제목 | 저자명 | 이번 묶음 안내"></textarea>
+        <textarea id="bulk-books" class="field" rows="5" placeholder="목요일 본 세미나 날짜 | 도서명 | 저자 | 안내&#10;2026-07-23 | 도서 제목 | 저자명 | 이번 주 안내"></textarea>
         <button type="button" class="btn soft mt-2" id="bulk-save">도서 일정 일괄 저장</button>
-        <p class="text-xs muted mt-2">화면에 보이는 기준 월요일과 일치하는 줄만 저장합니다.</p>
+        <p class="text-xs muted mt-2">각 카드에 표시된 목요일 본 세미나 날짜와 일치하는 줄만 저장합니다.</p>
       </div>
     </div>
   </details>
@@ -49,9 +49,13 @@
   <div class="space-y-5">
   {% for week in weeks %}
     {% set mon=week.sessions_by_day.get('mon') %}{% set thu=week.sessions_by_day.get('thu') %}
-    <section class="panel p-4 lg:p-6" data-week="{{ week.id }}" data-week-start="{{ week.week_start }}">
+    <section class="panel p-4 lg:p-6" data-week="{{ week.id }}" data-schedule-date="{{ thu.meeting_date if thu else (mon.meeting_date if mon else week.week_start) }}">
       <div class="flex flex-wrap justify-between gap-3 mb-5">
-        <div><div class="flex flex-wrap items-center gap-2"><h2 class="text-xl font-extrabold">{{ week.week_start }} 추가 세미나 기준</h2>{% if week.needs_review %}<span class="chip !bg-amber-100 !text-amber-800">도서 확인 필요</span>{% endif %}{% if week.is_past %}<span class="chip">지난 묶음</span>{% endif %}</div><p class="muted text-sm mt-1">목요일 본 세미나와 바로 다음 월요일 추가 세미나가 같은 도서·발제문을 공유합니다.</p></div>
+        <div>
+          <div class="flex flex-wrap items-center gap-2"><h2 class="text-xl font-extrabold">{% if thu %}{{ thu.meeting_date }} 목요일 본 세미나{% elif mon %}{{ mon.meeting_date }} 월요일 추가 세미나{% else %}세미나 일정{% endif %}</h2>{% if week.needs_review %}<span class="chip !bg-amber-100 !text-amber-800">도서 확인 필요</span>{% endif %}{% if week.is_past %}<span class="chip">지난 세미나</span>{% endif %}</div>
+          <div class="flex flex-wrap gap-2 mt-2">{% if thu %}<span class="chip">본 세미나 · {{ thu.meeting_date }} (목)</span>{% endif %}{% if mon %}<span class="chip">추가 세미나 · {{ mon.meeting_date }} (월)</span>{% endif %}</div>
+          <p class="muted text-sm mt-2">위 두 회차는 같은 도서와 발제문을 사용하고, 참석자와 조 편성은 따로 관리합니다.</p>
+        </div>
         <div class="flex gap-2 flex-wrap">
           {% if week.topic_event %}
             <span class="chip">발제문 {{ week.topic_event.submission_count }}명 제출</span>
@@ -76,7 +80,8 @@
           <div class="flex justify-between gap-2"><div><p class="text-xs font-bold muted">MONDAY</p><h3 class="font-extrabold">월요일 신청제</h3></div>{% if mon %}<span class="chip">{{ mon.yes_count }}/{{ mon.capacity or 10 }}명</span>{% endif %}</div>
           {% if mon %}
             <p class="text-sm muted mt-2">{{ mon.meeting_date }} · 남은 자리 {{ [0,(mon.capacity or 10)-mon.yes_count]|max }}석</p>
-            <div class="flex gap-2 mt-3"><input class="field !w-24 capacity" type="number" min="1" value="{{ mon.capacity or 10 }}"><button class="btn soft save-capacity" data-session-id="{{ mon.id }}">정원 저장</button></div>
+            <div class="flex gap-2 mt-3"><input class="field !w-24 capacity" type="number" min="1" value="{{ mon.capacity or 10 }}" aria-label="월요일 추가 세미나 정원"><button class="btn soft save-capacity" data-session-id="{{ mon.id }}">이 정원으로 변경</button></div>
+            <p class="text-xs muted mt-2">숫자를 바꾼 뒤 ‘이 정원으로 변경’을 눌러야 반영됩니다.</p>
             <div class="flex flex-wrap gap-1 mt-3">{% for m in mon.attendees %}<span class="chip">{{ m.name }}</span>{% else %}<span class="text-sm muted">신청자가 없습니다.</span>{% endfor %}</div>
             <div class="flex flex-wrap gap-2 mt-4"><a class="btn primary" href="{{ url_for('bookclub_index', session_id=mon.id) }}">조 편성</a>{% if mon.history %}<a class="btn soft" href="{{ url_for('records_seminar_detail', history_id=mon.history.id) }}">진행 기록</a>{% endif %}</div>
           {% else %}<p class="muted text-sm mt-3">이 주차에는 월요일 회차가 없습니다.</p>{% endif %}
@@ -100,7 +105,7 @@
 <script>
 async function api(url, options={}){const r=await fetch(url,{headers:{'Content-Type':'application/json'},...options});const j=await r.json();if(!r.ok||j.status==='error')throw new Error(j.message||'처리하지 못했습니다.');return j}
 document.getElementById('term-create')?.addEventListener('submit',async e=>{e.preventDefault();try{const data=Object.fromEntries(new FormData(e.target));await api('/api/admin/seminar_terms/create',{method:'POST',body:JSON.stringify(data)});location.reload()}catch(err){alert(err.message)}})
-document.getElementById('bulk-save')?.addEventListener('click',async()=>{try{const rows=document.getElementById('bulk-books').value.split(/\r?\n/).map(x=>x.split('|').map(v=>v.trim())).filter(x=>x[0]);let saved=0;for(const row of rows){const box=document.querySelector('[data-week-start="'+CSS.escape(row[0])+'"]');if(!box)continue;await api('/api/admin/seminar_weeks/'+box.dataset.week,{method:'PATCH',body:JSON.stringify({book_title:row[1]||'',book_author:row[2]||'',note:row[3]||''})});saved++}if(!saved)throw new Error('일치하는 기준 월요일이 없습니다.');location.reload()}catch(err){alert(err.message)}})
+document.getElementById('bulk-save')?.addEventListener('click',async()=>{try{const rows=document.getElementById('bulk-books').value.split(/\r?\n/).map(x=>x.split('|').map(v=>v.trim())).filter(x=>x[0]);let saved=0;for(const row of rows){const box=document.querySelector('[data-schedule-date="'+CSS.escape(row[0])+'"]');if(!box)continue;await api('/api/admin/seminar_weeks/'+box.dataset.week,{method:'PATCH',body:JSON.stringify({book_title:row[1]||'',book_author:row[2]||'',note:row[3]||''})});saved++}if(!saved)throw new Error('일치하는 목요일 본 세미나 날짜가 없습니다.');location.reload()}catch(err){alert(err.message)}})
 document.addEventListener('click',async e=>{
  const copy=e.target.closest('[data-copy]');if(copy){await navigator.clipboard.writeText(copy.dataset.copy);copy.textContent='복사됨';return}
  const box=e.target.closest('[data-week]');
