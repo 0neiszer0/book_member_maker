@@ -142,7 +142,7 @@
                                     {% endif %}
                                     {% endfor %}
                                     <span
-                                        class="text-xs font-semibold px-2 py-0.5 rounded-full mr-3 {% if m_count.value == f_count.value %}bg-blue-900 text-blue-200{% elif m_count.value > f_count.value + 1 or f_count.value > m_count.value + 1 %}bg-red-900 text-red-300{% else %}bg-gray-700 text-gray-300{% endif %}">남
+                                        class="gender-balance-badge text-xs font-semibold px-2 py-0.5 rounded-full mr-3 {% if m_count.value == f_count.value %}bg-blue-900 text-blue-200{% elif m_count.value > f_count.value + 1 or f_count.value > m_count.value + 1 %}bg-red-900 text-red-300{% else %}bg-gray-700 text-gray-300{% endif %}">남
                                         {{ m_count.value }}명 / 여 {{ f_count.value }}명</span>
 
                                     {% set facilitators_in_group = [] %}{% for name in group %}{% if name in
@@ -213,6 +213,7 @@
         <div id="modal-caption">이미지를 길게 누르거나 우클릭하여 저장/공유하세요.</div>
     </div>
 
+    {% include '_bug_report_widget.html' %}
     <script id="data-present" type="application/json">{{ present|tojson|safe }}</script>
     <script id="data-facilitators" type="application/json">{{ facilitators|tojson|safe }}</script>
     <script id="data-group-names" type="application/json">{{ group_names|tojson|safe }}</script>
@@ -227,10 +228,33 @@
             const facilitators = JSON.parse(document.getElementById('data-facilitators').textContent);
             const group_names = JSON.parse(document.getElementById('data-group-names').textContent);
             const meetingHistory = JSON.parse(document.getElementById('data-meeting-history').textContent);
+            const memberGenders = JSON.parse(document.getElementById('data-member-genders').textContent);
             const seminarSessionId = JSON.parse(document.getElementById('data-session-id').textContent);
             const meetingDate = JSON.parse(document.getElementById('data-meeting-date').textContent);
             const bookTitle = JSON.parse(document.getElementById('data-book-title').textContent);
             const manual_entry_url = "{{ manual_entry_url|safe }}";
+
+            function updateGenderBadge(badge, group) {
+                if (!badge) return;
+                const counts = group.reduce((acc, name) => {
+                    const gender = memberGenders[name];
+                    if (gender === 'M') acc.male += 1;
+                    if (gender === 'W') acc.female += 1;
+                    return acc;
+                }, { male: 0, female: 0 });
+                badge.textContent = `남 ${counts.male}명 / 여 ${counts.female}명`;
+                badge.classList.remove(
+                    'bg-blue-900', 'text-blue-200', 'bg-red-900', 'text-red-300',
+                    'bg-gray-700', 'text-gray-300'
+                );
+                if (counts.male === counts.female) {
+                    badge.classList.add('bg-blue-900', 'text-blue-200');
+                } else if (Math.abs(counts.male - counts.female) > 1) {
+                    badge.classList.add('bg-red-900', 'text-red-300');
+                } else {
+                    badge.classList.add('bg-gray-700', 'text-gray-300');
+                }
+            }
 
             async function saveGroups(groups) {
                 if (!confirm("이 조 편성 결과를 저장하시겠습니까?")) return;
@@ -268,20 +292,44 @@
                 try {
                     Object.assign(captureContainer.style, {
                         position: 'absolute', top: '-9999px', left: '0px',
-                        width: '550px', padding: '24px', backgroundColor: '#2D2D2D',
-                        color: '#E5E5E5', fontFamily: "'Noto Sans KR', sans-serif",
-                        border: '1px solid #444444', borderRadius: '12px'
+                        width: '720px', padding: '38px', backgroundColor: '#FAF6EC',
+                        color: '#2A241B', fontFamily: "'Noto Sans KR', sans-serif",
+                        border: '1px solid #E5D7B8', borderRadius: '24px'
                     });
-                    let innerHTML = `<h3 style="font-family: 'Orbitron', sans-serif; font-size: 20px; font-weight: bold; color: #00FF7F; margin-bottom: 16px; text-transform: uppercase;">Grouping Result</h3>`;
+                    const escapeText = value => String(value).replace(/[&<>"']/g, char => ({
+                        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+                    })[char]);
+                    const metaItems = [meetingDate, bookTitle].filter(Boolean).map(value =>
+                        `<span style="display:inline-block;padding:7px 12px;border-radius:999px;background:#E8EFDD;color:#3D5C2E;font-size:13px;font-weight:700;">${escapeText(value)}</span>`
+                    ).join(' ');
+                    let innerHTML = `
+                        <div style="border-bottom:2px solid #3D5C2E;padding-bottom:22px;margin-bottom:24px;">
+                            <div style="font-size:13px;font-weight:800;letter-spacing:.12em;color:#7A5A3A;margin-bottom:8px;">책 먹는 호반우</div>
+                            <h3 style="font-size:30px;line-height:1.25;font-weight:800;color:#2A241B;margin:0 0 14px;letter-spacing:-.04em;">세미나 조 편성</h3>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;">${metaItems}</div>
+                        </div>
+                        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;">`;
                     groups.forEach((group, index) => {
-                        const groupName = (group_names && group_names[index]) ? group_names[index] : `그룹 ${index + 1}`;
-                        const memberNames = [...group].sort().map(name =>
-                            facilitators.includes(name)
-                                ? `<span style="color: #F5D58A; font-weight: 600;">${name}</span>`
-                                : name
-                        ).join(', ');
-                        innerHTML += `<div style="background-color: #1A1A1A; padding: 12px; border-radius: 8px; margin-bottom: 10px;"><strong style="color: #E5E5E5;">${groupName}:</strong> ${memberNames}</div>`;
+                        const groupName = escapeText((group_names && group_names[index]) ? group_names[index] : `그룹 ${index + 1}`);
+                        const memberNames = [...group].sort().map(name => {
+                            const safeName = escapeText(name);
+                            return facilitators.includes(name)
+                                ? `<span style="display:inline-flex;align-items:center;gap:5px;padding:6px 9px;border-radius:9px;background:#F2E8D8;color:#6B4B2D;font-size:14px;font-weight:800;">${safeName}<small style="font-size:10px;">발제</small></span>`
+                                : `<span style="display:inline-block;padding:6px 9px;border-radius:9px;background:#F2EBD8;color:#40382E;font-size:14px;font-weight:650;">${safeName}</span>`;
+                        }).join('');
+                        innerHTML += `
+                            <section style="min-height:132px;padding:18px;border:1px solid #E5D7B8;border-radius:16px;background:#FFFCF3;box-shadow:0 5px 14px rgba(74,57,35,.07);">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                                    <strong style="font-size:17px;color:#3D5C2E;">${groupName}</strong>
+                                    <span style="font-size:12px;color:#7D705E;">${group.length}명</span>
+                                </div>
+                                <div style="display:flex;flex-wrap:wrap;gap:7px;">${memberNames}</div>
+                            </section>`;
                     });
+                    innerHTML += `</div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:24px;padding-top:16px;border-top:1px solid #E5D7B8;color:#807361;font-size:11px;">
+                            <span>진한 이름은 발제자입니다.</span><span>book-member-maker</span>
+                        </div>`;
                     captureContainer.innerHTML = innerHTML;
                     document.body.appendChild(captureContainer);
 
@@ -418,6 +466,7 @@
                         });
 
                         row.querySelector('.group-members-text').innerHTML = newHtml;
+                        updateGenderBadge(row.querySelector('.gender-balance-badge'), groupMembers);
 
                         row.querySelector('.group-content-view').classList.remove('hidden');
                         row.querySelector('.show-history-btn').classList.remove('hidden');

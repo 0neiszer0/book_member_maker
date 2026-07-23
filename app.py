@@ -4379,6 +4379,82 @@ def help_member():
     return render_template('help_member.html')
 
 
+# --- 버그·개선 제보 ---
+@app.route('/api/bug-reports', methods=['POST'])
+@login_required(role="ANY")
+def submit_bug_report():
+    data = request.get_json(silent=True) or {}
+    category = str(data.get('category') or 'bug').strip()
+    title = str(data.get('title') or '').strip()
+    description = str(data.get('description') or '').strip()
+    source_page = str(data.get('source_page') or 'unknown').strip()[:160]
+    if category not in ('bug', 'suggestion'):
+        return jsonify({'status': 'error', 'message': '올바른 제보 종류를 선택해주세요.'}), 400
+    if not 2 <= len(title) <= 120:
+        return jsonify({'status': 'error', 'message': '제목은 2~120자로 적어주세요.'}), 400
+    if not 10 <= len(description) <= 3000:
+        return jsonify({'status': 'error', 'message': '내용은 10~3000자로 적어주세요.'}), 400
+    try:
+        inserted = supabase.table('bug_reports').insert({
+            'reporter_id': session.get('user_id'),
+            'reporter_name': session.get('user_name') or '이름 미상',
+            'category': category,
+            'title': title,
+            'description': description,
+            'source_page': source_page or 'unknown',
+            'user_agent': (request.headers.get('User-Agent') or '')[:500] or None,
+        }).execute().data or []
+        return jsonify({'status': 'success', 'id': inserted[0]['id'] if inserted else None})
+    except Exception as e:
+        app.logger.error(f"submit_bug_report error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': '제보 저장 중 오류가 발생했습니다.'}), 500
+
+
+@app.route('/admin/bug-reports')
+@login_required(role="admin")
+def admin_bug_reports():
+    try:
+        reports = supabase.table('bug_reports').select(
+            'id, reporter_name, category, title, description, source_page, status, admin_note, created_at'
+        ).order('created_at', desc=True).limit(200).execute().data or []
+        counts = {'new': 0, 'reviewing': 0, 'resolved': 0}
+        for report in reports:
+            status = report.get('status')
+            if status in counts:
+                counts[status] += 1
+        return render_template('admin_bug_reports.html', reports=reports, counts=counts)
+    except Exception as e:
+        app.logger.error(f"admin_bug_reports error: {e}", exc_info=True)
+        flash('버그 제보 목록을 불러오지 못했습니다.', 'danger')
+        return render_template('admin_bug_reports.html', reports=[], counts={
+            'new': 0, 'reviewing': 0, 'resolved': 0
+        })
+
+
+@app.route('/api/admin/bug-reports/<report_id>', methods=['PATCH'])
+@login_required(role="admin")
+def update_bug_report(report_id):
+    data = request.get_json(silent=True) or {}
+    status = str(data.get('status') or '').strip()
+    admin_note = str(data.get('admin_note') or '').strip()
+    if status not in ('new', 'reviewing', 'resolved'):
+        return jsonify({'status': 'error', 'message': '올바른 처리 상태를 선택해주세요.'}), 400
+    if len(admin_note) > 1000:
+        return jsonify({'status': 'error', 'message': '운영진 메모는 1000자 이내로 적어주세요.'}), 400
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        supabase.table('bug_reports').update({
+            'status': status,
+            'admin_note': admin_note or None,
+            'updated_at': now,
+            'resolved_at': now if status == 'resolved' else None,
+        }).eq('id', report_id).execute()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        app.logger.error(f"update_bug_report error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': '처리 상태 저장 중 오류가 발생했습니다.'}), 500
+
+
 # --- 기록 허브 ---
 @app.route('/records')
 @login_required(role="admin")
