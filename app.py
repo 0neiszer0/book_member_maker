@@ -5,7 +5,10 @@ import itertools
 import random
 import math
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash, Response, send_file
+from flask import (
+    Flask, render_template, request, jsonify, session, redirect, url_for,
+    flash, Response, send_file, stream_with_context,
+)
 import json
 from supabase import create_client, Client
 from datetime import datetime, timedelta, timezone, date, time
@@ -1375,7 +1378,13 @@ def start_group_generation():
             error_data = json.dumps({'error': str(e)})
             yield f"event: error\ndata: {error_data}\n\n"
 
-    return Response(generate_events(manual_entry_url), mimetype='text/event-stream')
+    # Response가 generator를 순회하는 시점에는 원래 view 함수가 이미 반환된 뒤다.
+    # 요청 컨텍스트를 스트림 수명 동안 유지해야 결과 템플릿의 header/sidebar가
+    # request와 session을 안전하게 참조할 수 있다.
+    return Response(
+        stream_with_context(generate_events(manual_entry_url)),
+        mimetype='text/event-stream',
+    )
 
 
 
