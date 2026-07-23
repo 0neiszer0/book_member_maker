@@ -1,7 +1,8 @@
 {% set endpoint = request.endpoint or '' %}
 <aside class="wd-admin-sidebar" aria-label="운영 관리 메뉴">
   <div class="wd-admin-sidebar-title">운영 관리</div>
-  <nav>
+  <button class="wd-admin-scroll-button wd-admin-scroll-left" type="button" aria-label="이전 운영 메뉴">&#8249;</button>
+  <nav class="wd-admin-sidebar-nav" tabindex="0">
     <a href="{{ url_for('admin_dashboard') }}" class="{% if endpoint == 'admin_dashboard' %}active{% endif %}">개요</a>
     <a href="{{ url_for('admin_seminars') }}" class="{% if endpoint in ['admin_seminars', 'admin_seminar_term'] %}active{% endif %}">세미나 운영</a>
     <a href="{{ url_for('bookclub_index') }}" class="{% if endpoint in ['bookclub_index', 'bookclub_ga_results'] %}active{% endif %}">조 편성</a>
@@ -11,9 +12,23 @@
     {% if session.user_role == 'admin' %}<a href="{{ url_for('boards.admin_index') }}" class="{% if endpoint.startswith('boards.admin') %}active{% endif %}">게시판 관리</a>{% endif %}
     <a href="{{ url_for('help_admin') }}" class="{% if endpoint in ['help_admin', 'admin_seminar_rooms'] %}active{% endif %}">시스템</a>
   </nav>
+  <button class="wd-admin-scroll-button wd-admin-scroll-right" type="button" aria-label="다음 운영 메뉴">&#8250;</button>
 </aside>
 <style>
   .wd-admin-sidebar{display:none}
+  .wd-admin-scroll-button{display:none}
+  @media (max-width:1279px){
+    .wd-admin-sidebar{display:grid;grid-template-columns:40px minmax(0,1fr) 40px;align-items:center;position:sticky;top:60px;width:100%;z-index:45;padding:7px 8px;background:#fffdf8;border-bottom:1px solid #e5d7b8;box-shadow:0 8px 20px rgba(55,43,25,.08);font-family:Pretendard,-apple-system,BlinkMacSystemFont,sans-serif;color:#2a241b}
+    .wd-admin-sidebar-title{display:none}
+    .wd-admin-sidebar nav{display:flex;align-items:center;gap:6px;min-width:0;overflow-x:auto;overscroll-behavior-x:contain;scroll-behavior:smooth;scrollbar-width:none;padding:1px 4px}
+    .wd-admin-sidebar nav::-webkit-scrollbar{display:none}
+    .wd-admin-sidebar a{display:block;flex:0 0 auto;white-space:nowrap;padding:9px 12px;border-radius:999px;color:#51493e;font-size:14px;font-weight:650;text-decoration:none}
+    .wd-admin-sidebar a:hover{background:#f2ebd8;color:#2f4924}
+    .wd-admin-sidebar a.active{background:#e8efdd;color:#304923;font-weight:800;box-shadow:inset 0 0 0 1px #c9d8b8}
+    .wd-admin-scroll-button{display:grid;place-items:center;width:34px;height:34px;padding:0;border:1px solid #d8c9aa;border-radius:50%;background:#fffdf8;color:#3d5c2e;font:800 25px/1 system-ui;cursor:pointer;box-shadow:0 2px 8px rgba(55,43,25,.08)}
+    .wd-admin-scroll-button:hover:not(:disabled){background:#e8efdd}
+    .wd-admin-scroll-button:disabled{opacity:.3;cursor:default}
+  }
   @media (min-width:1280px){
     .wd-admin-sidebar{display:block;position:fixed;left:18px;top:84px;width:205px;max-height:calc(100vh - 104px);overflow-y:auto;z-index:35;padding:12px;background:#fffdf8;border:1px solid #e5d7b8;border-radius:18px;box-shadow:0 12px 30px rgba(55,43,25,.08);font-family:Pretendard,-apple-system,BlinkMacSystemFont,sans-serif;color:#2a241b}
     .wd-admin-sidebar-title{padding:8px 12px 10px;color:#756a59;font-size:12px;font-weight:800;letter-spacing:.08em}
@@ -27,4 +42,39 @@
     body.wd-admin-layout>.workspace{margin-left:241px!important;margin-right:18px!important;max-width:none!important;width:auto!important}
   }
 </style>
-<script>document.body.classList.add('wd-admin-layout');</script>
+<script>
+  document.body.classList.add('wd-admin-layout');
+  (function () {
+    const sidebar = document.currentScript.previousElementSibling.previousElementSibling;
+    const nav = sidebar && sidebar.querySelector('.wd-admin-sidebar-nav');
+    const previousButton = sidebar && sidebar.querySelector('.wd-admin-scroll-left');
+    const nextButton = sidebar && sidebar.querySelector('.wd-admin-scroll-right');
+    if (!nav || !previousButton || !nextButton) return;
+
+    function updateButtons() {
+      const compact = window.matchMedia('(max-width: 1279px)').matches;
+      const hasOverflow = compact && nav.scrollWidth > nav.clientWidth + 2;
+      previousButton.style.visibility = hasOverflow ? 'visible' : 'hidden';
+      nextButton.style.visibility = hasOverflow ? 'visible' : 'hidden';
+      previousButton.disabled = !hasOverflow || nav.scrollLeft <= 2;
+      nextButton.disabled = !hasOverflow || nav.scrollLeft + nav.clientWidth >= nav.scrollWidth - 2;
+    }
+
+    previousButton.addEventListener('click', function () {
+      nav.scrollBy({ left: -Math.max(180, nav.clientWidth * .72), behavior: 'smooth' });
+    });
+    nextButton.addEventListener('click', function () {
+      nav.scrollBy({ left: Math.max(180, nav.clientWidth * .72), behavior: 'smooth' });
+    });
+    nav.addEventListener('scroll', updateButtons, { passive: true });
+    window.addEventListener('resize', updateButtons);
+
+    requestAnimationFrame(function () {
+      const activeLink = nav.querySelector('a.active');
+      if (activeLink && window.matchMedia('(max-width: 1279px)').matches) {
+        activeLink.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
+      }
+      updateButtons();
+    });
+  })();
+</script>
