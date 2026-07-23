@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>버그 제보 관리 · 운영 관리</title>
+  <link rel="stylesheet" href="/static/theme.css">
+  <style>
+    body{margin:0;background:#faf6ec;color:#2a241b;font-family:Pretendard,-apple-system,BlinkMacSystemFont,sans-serif}
+    .bug-admin{max-width:1160px;margin:0 auto;padding:32px 24px 70px}
+    .bug-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-bottom:24px}
+    .bug-head h1{margin:0 0 7px;font-size:31px;letter-spacing:-.045em}.bug-head p{margin:0;color:#756a59}
+    .bug-summary{display:flex;gap:8px;flex-wrap:wrap}.bug-count{padding:8px 11px;border:1px solid #dfcfaf;border-radius:999px;background:#fffdf8;color:#5b4f40;font-size:12px;font-weight:750}
+    .bug-list{display:grid;gap:14px}.bug-card{padding:20px;border:1px solid #e1d2b5;border-radius:16px;background:#fffdf8;box-shadow:0 7px 20px rgba(66,48,27,.06)}
+    .bug-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}.bug-title-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.bug-card h2{margin:0;font-size:18px;letter-spacing:-.025em}
+    .bug-tag{padding:4px 8px;border-radius:999px;background:#f2e8d8;color:#6b4b2d;font-size:11px;font-weight:800}.bug-tag.suggestion{background:#e8efdd;color:#3d5c2e}
+    .bug-meta{margin-top:7px;color:#897b68;font-size:12px}.bug-description{margin:16px 0;padding:14px;border-radius:11px;background:#f7f0df;white-space:pre-wrap;line-height:1.65;font-size:14px}
+    .bug-controls{display:grid;grid-template-columns:180px minmax(220px,1fr) auto;gap:9px;align-items:end}.bug-controls label{display:block;margin-bottom:5px;color:#746856;font-size:11px;font-weight:750}.bug-controls select,.bug-controls input{box-sizing:border-box;width:100%;padding:10px;border:1px solid #d9c9aa;border-radius:9px;background:#fff;color:#2a241b;font:500 13px inherit}.bug-save{padding:11px 15px;border:0;border-radius:9px;background:#3d5c2e;color:#fff;font-weight:800;cursor:pointer}.bug-save:disabled{opacity:.6}.bug-empty{padding:60px 20px;text-align:center;border:1px dashed #d6c39f;border-radius:18px;background:#fffdf8;color:#7d705e}
+    @media(max-width:720px){.bug-admin{padding:24px 14px 90px}.bug-head{display:block}.bug-summary{margin-top:14px}.bug-card-top{display:block}.bug-controls{grid-template-columns:1fr}.bug-save{width:100%}}
+  </style>
+</head>
+<body>
+  {% include '_header.html' %}
+  {% include '_admin_sidebar.html' %}
+  <main class="bug-admin">
+    <div class="bug-head">
+      <div><h1>버그·개선 제보</h1><p>회원이 앱 안에서 보낸 불편 사항을 확인하고 처리 상태를 남깁니다.</p></div>
+      <div class="bug-summary">
+        <span class="bug-count">새 제보 {{ counts.new }}건</span>
+        <span class="bug-count">확인 중 {{ counts.reviewing }}건</span>
+        <span class="bug-count">해결 {{ counts.resolved }}건</span>
+      </div>
+    </div>
+    {% if reports %}
+    <div class="bug-list">
+      {% for report in reports %}
+      <article class="bug-card" data-report-id="{{ report.id }}">
+        <div class="bug-card-top">
+          <div>
+            <div class="bug-title-row"><span class="bug-tag {% if report.category == 'suggestion' %}suggestion{% endif %}">{{ '개선 제안' if report.category == 'suggestion' else '버그' }}</span><h2>{{ report.title }}</h2></div>
+            <div class="bug-meta">{{ report.reporter_name }} · {{ report.created_at[:16].replace('T', ' ') }} · {{ report.source_page }}</div>
+          </div>
+        </div>
+        <div class="bug-description">{{ report.description }}</div>
+        <div class="bug-controls">
+          <div><label>처리 상태</label><select class="bug-status"><option value="new" {% if report.status == 'new' %}selected{% endif %}>새 제보</option><option value="reviewing" {% if report.status == 'reviewing' %}selected{% endif %}>확인 중</option><option value="resolved" {% if report.status == 'resolved' %}selected{% endif %}>해결</option></select></div>
+          <div><label>운영진 메모</label><input class="bug-note" maxlength="1000" value="{{ report.admin_note or '' }}" placeholder="처리 내용이나 확인 사항"></div>
+          <button type="button" class="bug-save">저장</button>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}<div class="bug-empty">아직 접수된 제보가 없습니다.</div>{% endif %}
+  </main>
+  <script>
+    document.addEventListener('click', async function(event){
+      const button = event.target.closest('.bug-save');
+      if (!button) return;
+      const card = button.closest('.bug-card');
+      button.disabled = true; button.textContent = '저장 중…';
+      try {
+        const response = await fetch(`/api/admin/bug-reports/${card.dataset.reportId}`, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:card.querySelector('.bug-status').value,admin_note:card.querySelector('.bug-note').value.trim()})});
+        const payload = await response.json();
+        if (!response.ok || payload.status !== 'success') throw new Error(payload.message || '저장하지 못했습니다.');
+        button.textContent = '저장됨'; setTimeout(function(){button.textContent='저장';},1100);
+      } catch(error) { alert(error.message); button.textContent = '다시 저장'; }
+      finally { button.disabled = false; }
+    });
+  </script>
+</body>
+</html>
