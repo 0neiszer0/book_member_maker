@@ -9,7 +9,8 @@
     <div><span class="eg-chip">{% if 'brick_book' in item.targets %}벽돌책{% endif %}{% if 'curriculum' in item.targets %}{% if 'brick_book' in item.targets %} · {% endif %}커리큘럼{% endif %}</span><h2>{{ item.book.title }}</h2><div class="eg-muted">{{ item.book.author }}</div></div>
   </div>
   <p class="eg-muted">{{ item.note[:160] }}{% if item.note|length > 160 %}…{% endif %}</p>
-  <span class="eg-spacer"></span><span class="eg-arrow">같이 읽고 싶어요 {{ item.support_count }}명 →</span>
+  <span class="eg-spacer"></span>
+  <span class="eg-card-action">도서 보기 · 같이 읽고 싶어요 {{ item.support_count }}명</span>
 </a>
 {% else %}
 <div class="eg-panel eg-empty"><h2>아직 추천된 책이 없습니다.</h2></div>

@@ -734,13 +734,6 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
     @app.get("/admin/engagement")
     @login_required(role="admin")
     def admin_engagement():
-        seminar_forms = supabase.table("seminar_review_forms").select("*").order("created_at", desc=True).execute().data or []
-        sessions = supabase.table("seminar_sessions").select("id,meeting_date,book_title,day_type").order("meeting_date", desc=True).limit(30).execute().data or []
-        session_map = {row["id"]: row for row in sessions}
-        for row in seminar_forms:
-            row["seminar"] = session_map.get(row["seminar_session_id"], {})
-            row["share_url"] = f"{_public_base()}/review/seminar/{row['share_token']}"
-            row["submission_count"] = supabase.table("seminar_reviews").select("id", count="exact").eq("form_id", row["id"]).is_("deleted_at", "null").execute().count or 0
         suggestions = supabase.table("book_suggestions").select("*").in_(
             "status", ["suggested", "considering"]
         ).order("created_at", desc=True).execute().data or []
@@ -777,8 +770,6 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
                 row["review_form"]["share_url"] = f"{_public_base()}/brick/review/{row['review_form']['share_token']}"
         return render_template(
             "admin_engagement.html",
-            sessions=sessions,
-            seminar_forms=seminar_forms,
             suggestions=suggestions,
             projects=projects,
         )
@@ -845,7 +836,7 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
     @login_required(role="admin")
     def update_engagement_form_status(kind, form_id):
         table = FORM_TABLES.get(kind)
-        status = request.form.get("status")
+        status = request.form.get("status") or (request.get_json(silent=True) or {}).get("status")
         allowed = {"seminar": {"draft", "open", "closed"}, "brick-recruitment": {"draft", "open", "closed", "finalized"}, "brick-review": {"draft", "open", "closed"}}
         if not table or status not in allowed[kind]:
             return jsonify(ok=False, error="올바르지 않은 상태입니다."), 400

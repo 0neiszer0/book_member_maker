@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% block title %}책 먹는 호반우{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;background:var(--paper,#faf6ec);color:var(--ink,#2a241b);font-family:Pretendard,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    a{color:inherit}
+    .auth-shell{width:min(100% - 28px,620px);margin:0 auto;padding:36px 0 72px}
+    .auth-brand{display:inline-flex;align-items:center;gap:10px;text-decoration:none;font-weight:900;letter-spacing:-.03em;margin-bottom:28px}
+    .auth-brand-mark{display:grid;place-items:center;width:38px;height:38px;border-radius:13px;background:var(--moss-deep,#3d5c2e);color:#fff;font-size:18px}
+    .auth-card{background:var(--surface,#fffdf8);border:1px solid var(--line,#e5d7b8);border-radius:24px;padding:clamp(22px,5vw,38px);box-shadow:0 24px 60px -42px rgba(48,32,10,.45)}
+    .auth-eyebrow{margin:0 0 8px;color:var(--moss-deep,#3d5c2e);font-size:.78rem;font-weight:900;letter-spacing:.08em}
+    .auth-title{margin:0;font-size:clamp(2rem,7vw,3rem);line-height:1.08;letter-spacing:-.055em}
+    .auth-lead{margin:14px 0 0;color:var(--ink-soft,#655b4e);line-height:1.7}
+    .auth-actions{display:grid;gap:12px;margin-top:26px}
+    .auth-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:52px;border:0;border-radius:14px;padding:.85rem 1.1rem;text-decoration:none;font:inherit;font-weight:900;cursor:pointer;transition:transform .16s ease,filter .16s ease,background .16s ease}
+    .auth-btn:hover{transform:translateY(-1px);filter:brightness(.98)}
+    .auth-btn-kakao{background:#fee500;color:#181600}
+    .auth-btn-primary{background:var(--moss-deep,#3d5c2e);color:#fff}
+    .auth-btn-paper{background:var(--paper-2,#f2ebd8);color:var(--ink,#2a241b)}
+    .auth-callout{margin-top:18px;border-radius:18px;padding:18px;background:var(--moss-tint,#e8efdd);border:1px solid #d4dfc9}
+    .auth-callout strong{display:block;font-size:1.05rem}
+    .auth-callout p{margin:6px 0 14px;color:var(--ink-soft,#655b4e);line-height:1.55;font-size:.9rem}
+    .auth-profile{text-align:center;margin-bottom:22px}
+    .auth-avatar{width:76px;height:76px;object-fit:cover;border-radius:24px;border:3px solid var(--surface,#fffdf8);box-shadow:0 0 0 1px var(--line,#e5d7b8),0 10px 24px -16px rgba(48,32,10,.45)}
+    .auth-profile h1{margin:12px 0 4px;font-size:1.7rem;letter-spacing:-.04em}
+    .auth-profile p{margin:0;color:var(--ink-soft,#655b4e);font-size:.88rem}
+    .auth-section{margin-top:16px;border:1px solid var(--line,#e5d7b8);border-radius:20px;padding:20px;background:var(--surface,#fffdf8)}
+    .auth-section h2{margin:0;font-size:1.2rem;letter-spacing:-.03em}
+    .auth-section-lead{margin:7px 0 17px;color:var(--ink-soft,#655b4e);line-height:1.6;font-size:.9rem}
+    .auth-highlight{background:var(--moss-tint,#e8efdd);border-color:#cad9bc}
+    .auth-form{display:grid;gap:14px}
+    .auth-label{display:grid;gap:7px;font-size:.9rem;font-weight:800}
+    .auth-input{width:100%;border:1px solid var(--line,#d9ccb1);border-radius:12px;background:#fff;padding:.82rem .9rem;font:inherit;color:inherit;outline:0}
+    .auth-input:focus{border-color:var(--moss,#5c7a4a);box-shadow:0 0 0 3px rgba(92,122,74,.14)}
+    .auth-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .auth-result{border-radius:14px;padding:15px;background:var(--paper-2,#f2ebd8);text-align:center}
+    .auth-result strong{display:block;font-size:1.15rem}
+    .auth-help{font-size:.8rem;line-height:1.55;color:var(--ink-faint,#8a7d69)}
+    .auth-error{font-size:.82rem;color:#9a432f}
+    .auth-details{margin-top:16px;border-top:1px solid var(--line,#e5d7b8);padding-top:16px}
+    .auth-details summary{cursor:pointer;font-weight:800;color:var(--moss-deep,#3d5c2e)}
+    .auth-flash{border-radius:14px;padding:13px 15px;margin-bottom:14px;font-weight:700;background:#f7e3da;color:#873e2b}
+    .auth-flash-success{background:#e5efdf;color:#34502a}
+    .auth-flash-warning{background:#f8edc9;color:#725414}
+    .auth-back{display:block;margin-top:20px;text-align:center;color:var(--ink-faint,#8a7d69);font-size:.86rem}
+    .hidden{display:none!important}
+    @media(max-width:560px){.auth-shell{padding-top:20px}.auth-card{border-radius:20px}.auth-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <main class="auth-shell">
+    <a class="auth-brand" href="{{ url_for('main_index') }}"><span class="auth-brand-mark">책</span><span>책 먹는 호반우</span></a>
+    {% with messages=get_flashed_messages(with_categories=true) %}
+      {% for category,message in messages %}<div class="auth-flash auth-flash-{{ category }}">{{ message }}</div>{% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
