@@ -171,6 +171,15 @@
             <h2 class="section-title"><i data-lucide="zap" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 지금 할 일</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
+                <div class="action-card md:col-span-2">
+                    <div class="title"><i data-lucide="send" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 지금 참여하기</div>
+                    <div class="desc">현재 열려 있는 후기·벽돌책 모집·책 추천을 한곳에서 확인합니다.</div>
+                    <div class="flex flex-wrap gap-2">
+                        <a href="{{ url_for('engagement_now') }}" class="pill pill-green"><span>열린 활동 보기</span><span class="text-xs">바로가기 →</span></a>
+                        <span class="pill pill-gray">내 기록 · 후기 {{ engagement_activity.seminar_reviews + engagement_activity.brick_reviews }} · 추천 {{ engagement_activity.book_suggestions }} · 지원 {{ engagement_activity.brick_applications }}</span>
+                    </div>
+                </div>
+
                 {% if my_open_votes %}
                 <!-- 월요일 추가 세미나 신청 (신청 창이 열린 동안에만 노출) -->
                 <div class="action-card md:col-span-2">
@@ -235,8 +244,8 @@
                 <!-- 위키 -->
                 <div class="action-card">
                     <div class="title"><i data-lucide="book-open" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 독서모임 위키</div>
-                    <div class="desc">지식 위키를 열람하고 새 문서를 작성해보세요.</div>
-                    <a href="{{ url_for('view_all_documents') }}" class="pill pill-purple w-full">위키 열기</a>
+                    <div class="desc">운영진이 정리한 회칙·이용 안내·동아리 자료를 Notion에서 확인합니다.</div>
+                    <a href="{{ notion_public_wiki_url }}" target="_blank" rel="noopener noreferrer" class="pill pill-purple w-full">공식 Notion 위키 열기</a>
                 </div>
 
             </div>
