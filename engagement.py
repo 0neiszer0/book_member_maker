@@ -560,6 +560,12 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
         if member:
             rows = supabase.table("seminar_reviews").select("*").eq("form_id", form["id"]).eq("member_id", member["id"]).limit(1).execute().data or []
             existing = rows[0] if rows else None
+            if existing:
+                existing["review_content"] = "\n\n".join(filter(None, [
+                    existing.get("memorable_point"),
+                    existing.get("discussion_point"),
+                    existing.get("free_text"),
+                ]))
         if request.method == "POST":
             try:
                 if not _form_is_open(form):
@@ -567,28 +573,25 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
                 member = resolve_member(request.form)
                 rows = supabase.table("seminar_reviews").select("*").eq("form_id", form["id"]).eq("member_id", member["id"]).limit(1).execute().data or []
                 existing = rows[0] if rows else None
-                memorable = _clean_text(request.form.get("memorable_point"), 5000)
-                if not memorable:
-                    raise ValueError("기억에 남은 내용을 입력해주세요.")
-                image_path, image_type = upload_optional_image(request.files.get("photo"), "seminar-reviews")
+                review_content = _clean_text(request.form.get("review_content"), 5000)
+                if not review_content:
+                    raise ValueError("세미나 후기를 입력해주세요.")
                 payload = {
                     "form_id": form["id"],
                     "seminar_session_id": form["seminar_session_id"],
                     "member_id": member["id"],
-                    "memorable_point": memorable,
-                    "discussion_point": _clean_text(request.form.get("discussion_point"), 5000) or None,
-                    "free_text": _clean_text(request.form.get("free_text"), 10000) or None,
+                    "memorable_point": review_content,
+                    "discussion_point": None,
+                    "free_text": None,
                     "updated_at": _now_iso(),
                     "deleted_at": None,
                 }
-                if image_path:
-                    payload.update(image_path=image_path, image_mime_type=image_type)
                 if existing:
                     save_revision("seminar_review", existing)
                     supabase.table("seminar_reviews").update(payload).eq("id", existing["id"]).execute()
                 else:
                     supabase.table("seminar_reviews").insert(payload).execute()
-                flash("세미나 후기를 저장했습니다. 같은 링크에서 언제든 다시 수정할 수 있어요.", "success")
+                flash("세미나 후기를 저장했습니다.", "success")
                 return redirect(url_for("seminar_review_form", token=token))
             except ValueError as exc:
                 flash(str(exc), "danger")
@@ -646,7 +649,7 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
                     supabase.table("brick_applications").update(payload).eq("id", existing["id"]).execute()
                 else:
                     supabase.table("brick_applications").insert(payload).execute()
-                flash("벽돌책 지원을 저장했습니다. 같은 링크에서 다시 수정할 수 있어요.", "success")
+                flash("벽돌책 지원을 저장했습니다.", "success")
                 return redirect(url_for("brick_application_form", token=token))
             except ValueError as exc:
                 flash(str(exc), "danger")
@@ -707,7 +710,7 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
                     supabase.table("brick_reviews").update(payload).eq("id", existing["id"]).execute()
                 else:
                     supabase.table("brick_reviews").insert(payload).execute()
-                flash("벽돌책 후기를 저장했습니다. 같은 링크에서 다시 수정할 수 있어요.", "success")
+                flash("벽돌책 후기를 저장했습니다.", "success")
                 return redirect(url_for("brick_review_form", token=token))
             except ValueError as exc:
                 flash(str(exc), "danger")

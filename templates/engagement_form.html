@@ -2,7 +2,7 @@
 {% block content %}
 {% if form_kind == 'seminar_review' %}
   {% set page_title=(context_row.book_title or '세미나') ~ ' 후기' %}
-  {% set page_lead=(context_row.meeting_date|string) ~ ' 세미나에서 기억에 남은 내용을 편하게 남겨주세요.' %}
+  {% set page_lead=(context_row.meeting_date|string) ~ ' 세미나 후기를 자유롭게 작성해주세요.' %}
 {% elif form_kind == 'brick_application' %}
   {% set page_title=context_row.title %}
   {% set page_lead='벽돌책에 함께하고 싶다면 아래 내용을 입력해주세요.' %}
@@ -19,9 +19,7 @@
   {% else %}<div class="eg-grid"><label>학번<input class="eg-input" name="student_id" inputmode="numeric" required></label><label>이름<input class="eg-input" name="member_name" required></label></div>{% endif %}
   {% if not is_open %}<div class="eg-flash eg-flash-danger">현재 입력이 마감되어 내용을 볼 수만 있습니다.</div>{% endif %}
   {% if form_kind == 'seminar_review' %}
-    <label>기억에 남은 내용<textarea class="eg-textarea" name="memorable_point" maxlength="5000" required {% if not is_open %}disabled{% endif %}>{{ existing.memorable_point if existing else '' }}</textarea></label>
-    <label>함께 더 이야기하고 싶은 점 <span class="eg-help">선택</span><textarea class="eg-textarea" name="discussion_point" maxlength="5000" {% if not is_open %}disabled{% endif %}>{{ existing.discussion_point if existing else '' }}</textarea></label>
-    <label>그 밖의 후기 <span class="eg-help">선택</span><textarea class="eg-textarea" name="free_text" maxlength="10000" {% if not is_open %}disabled{% endif %}>{{ existing.free_text if existing else '' }}</textarea></label>
+    <label>세미나 후기<textarea class="eg-textarea" name="review_content" maxlength="5000" required {% if not is_open %}disabled{% endif %}>{{ existing.review_content if existing else '' }}</textarea></label>
   {% elif form_kind == 'brick_application' %}
     <p class="eg-muted" style="white-space:pre-wrap">{{ context_row.description }}</p>
     <label>지원 동기<textarea class="eg-textarea" name="motivation" maxlength="5000" required {% if not is_open %}disabled{% endif %}>{{ existing.motivation if existing else '' }}</textarea></label>
@@ -31,8 +29,7 @@
     <label>기억에 남은 내용<textarea class="eg-textarea" name="memorable_point" maxlength="5000" required {% if not is_open %}disabled{% endif %}>{{ existing.memorable_point if existing else '' }}</textarea></label>
     <label>그 밖의 후기 <span class="eg-help">선택</span><textarea class="eg-textarea" name="free_text" maxlength="10000" {% if not is_open %}disabled{% endif %}>{{ existing.free_text if existing else '' }}</textarea></label>
   {% endif %}
-  {% if form_kind != 'brick_application' %}<label>사진 <span class="eg-help">선택</span><input class="eg-input" type="file" name="photo" accept="image/jpeg,image/png,image/webp" {% if not is_open %}disabled{% endif %}><span class="eg-help">한 장만 선택할 수 있고, 사진은 자동으로 방향·크기를 정리해 저장합니다. 기존 사진은 새 사진을 고를 때만 바뀝니다.</span></label>{% endif %}
+  {% if form_kind == 'brick_review' %}<label>사진 <span class="eg-help">선택</span><input class="eg-input" type="file" name="photo" accept="image/jpeg,image/png,image/webp" {% if not is_open %}disabled{% endif %}><span class="eg-help">JPG, PNG, WEBP · 최대 5MB</span></label>{% endif %}
   {% if is_open %}<button class="eg-btn eg-btn-primary" type="submit">{% if existing %}수정 내용 저장{% else %}제출하기{% endif %}</button>{% endif %}
-  <p class="eg-help">별도의 수정 토큰은 없습니다. 같은 브라우저에서는 회원 정보를 기억하고, 다른 기기에서는 같은 링크에서 학번+이름을 다시 확인하면 기존 내용을 수정할 수 있습니다.</p>
 </form>
 {% endblock %}
