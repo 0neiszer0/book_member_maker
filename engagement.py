@@ -204,7 +204,7 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
                 "kind": "발제문",
                 "title": row.get("book_title") or "이번 세미나 발제문",
                 "description": f"{row.get('meeting_date')} 세미나 · 먼저 제출된 발제문을 확인하고 중복을 피할 수 있어요.",
-                "url": url_for("shared_topics", token=row["share_token"]),
+                "url": url_for("view_shared_topics", token=row["share_token"]),
                 "close_at": None,
             })
 
