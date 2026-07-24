@@ -1,9 +1,9 @@
 {% extends 'engagement_base.html' %}
 {% block content %}
 <section class="eg-hero">
-  <div class="eg-kicker">One link</div>
+  <div class="eg-kicker">참여</div>
   <h1>지금 참여하기</h1>
-  <p class="eg-lead">카카오톡이나 Notion에서 이 주소 하나만 열면, 지금 작성하거나 신청할 수 있는 활동만 보여드려요. 웹사이트 가입은 필수가 아닙니다.</p>
+  <p class="eg-lead">현재 참여할 수 있는 활동을 확인하세요.</p>
 </section>
 
 {% if remembered_member %}
@@ -25,13 +25,12 @@
   </a>
   {% endfor %}
   <a class="eg-panel eg-card" href="{{ url_for('book_suggestions') }}">
-    <span class="eg-chip">항상 열림</span>
+    <span class="eg-chip">책 추천</span>
     <h2>함께 읽을 책</h2>
     <p class="eg-muted">커리큘럼·벽돌책 후보를 추천하고, 다른 회원의 추천에 “같이 읽고 싶어요”를 남길 수 있어요.</p>
     <span class="eg-spacer"></span>
     <span class="eg-arrow">추천 둘러보기 →</span>
   </a>
 </div>
-{% if not cards %}<p class="eg-muted" style="margin-top:18px">현재 기간 한정 입력은 없어요. 책 추천은 언제든 열려 있습니다.</p>{% endif %}
 {% if session.user_role in ['admin','officer'] %}<div class="eg-admin-link"><a class="eg-btn eg-btn-soft" href="{{ url_for('admin_engagement') }}">참여 링크 운영하기</a></div>{% endif %}
 {% endblock %}

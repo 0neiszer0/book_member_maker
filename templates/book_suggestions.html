@@ -1,6 +1,6 @@
 {% extends 'engagement_base.html' %}
 {% block content %}
-<section class="eg-hero"><div class="eg-kicker">Always open</div><h1>함께 읽을 책</h1><p class="eg-lead">좋아 보이는 책에 관심을 표시하거나, 운영진이 커리큘럼·벽돌책으로 이어갈 수 있습니다.</p><div class="eg-actions"><a class="eg-btn eg-btn-primary" href="{{ url_for('book_suggest') }}">책 추천하기</a><a class="eg-btn eg-btn-paper" href="{{ url_for('engagement_now') }}">지금 참여하기</a></div></section>
+<section class="eg-hero"><div class="eg-kicker">책 추천</div><h1>함께 읽을 책</h1><p class="eg-lead">읽고 싶은 책에 관심을 표시하거나 의견을 남겨보세요.</p><div class="eg-actions"><a class="eg-btn eg-btn-primary" href="{{ url_for('book_suggest') }}">책 추천하기</a><a class="eg-btn eg-btn-paper" href="{{ url_for('engagement_now') }}">지금 참여하기</a></div></section>
 <div class="eg-grid">
 {% for item in suggestions %}
 <a class="eg-panel eg-card" href="{{ url_for('book_suggestion_detail', suggestion_id=item.id) }}">
@@ -12,7 +12,7 @@
   <span class="eg-spacer"></span><span class="eg-arrow">같이 읽고 싶어요 {{ item.support_count }}명 →</span>
 </a>
 {% else %}
-<div class="eg-panel eg-empty"><h2>첫 책을 추천해주세요</h2><p class="eg-muted">추천은 학기 구분 없이 계속 유지됩니다.</p></div>
+<div class="eg-panel eg-empty"><h2>아직 추천된 책이 없습니다.</h2></div>
 {% endfor %}
 </div>
 {% endblock %}

@@ -448,6 +448,7 @@ def kakao_callback():
         session["user_id"] = member["id"]
         session["user_role"] = member["role"]
         session["user_name"] = member["name"]  # 항상 DB 최신값으로 갱신
+        session.pop("member_preview", None)
 
         next_url = session.pop('next_url', None)
         if next_url:
@@ -596,6 +597,7 @@ def link_account_submit():
                 session['user_id'] = member['id']
                 session['user_name'] = member['name']
                 session['user_role'] = member.get('role', 'member')
+                session.pop('member_preview', None)
                 session['profile_pic'] = member.get('profile_pic', '')
                 flash(f"학번 확인이 완료되었습니다. {member['name']}님, 환영합니다!", "success")
                 return redirect(url_for('my_page'))
@@ -652,6 +654,26 @@ def logout():
     session.clear()
     flash('성공적으로 로그아웃되었습니다.', 'info')
     return redirect(url_for('main_index'))
+
+
+@app.route('/toggle-member-preview', methods=['POST'])
+@login_required(role="ANY")
+def toggle_member_preview():
+    user_id = session.get('user_id')
+    members = supabase.table('members').select('role').eq('id', user_id).limit(1).execute().data or []
+    if not members or members[0].get('role') != 'admin':
+        abort(403)
+
+    if session.get('member_preview'):
+        session.pop('member_preview', None)
+        session['user_role'] = 'admin'
+        flash('관리자 화면으로 돌아왔습니다.', 'success')
+        return redirect(url_for('admin_seminars'))
+
+    session['member_preview'] = True
+    session['user_role'] = 'member'
+    flash('회원 화면으로 전환했습니다.', 'success')
+    return redirect(url_for('my_page'))
 
 
 
