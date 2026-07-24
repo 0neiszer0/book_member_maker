@@ -28,10 +28,18 @@ class CurrentUiContractsTest(unittest.TestCase):
     def test_seminar_reviews_are_managed_in_seminar_screen(self):
         seminars = self.read("templates/admin_seminars.html")
         engagement = self.read("templates/admin_engagement.html")
-        self.assertIn('id="seminar-reviews"', seminars)
+        self.assertIn("macro review_panel(seminar_session)", seminars)
+        self.assertIn("{{ review_panel(mon) }}", seminars)
+        self.assertIn("{{ review_panel(thu) }}", seminars)
         self.assertIn("review-form-status", seminars)
-        self.assertIn("후기 모아보기", seminars)
+        self.assertNotIn("후기 모아보기", seminars)
         self.assertNotIn("세미나 후기 링크 열기", engagement)
+
+    def test_html_response_gets_a_light_first_paint(self):
+        app_source = self.read("app.py")
+        self.assertIn('data-critical-theme="wood"', app_source)
+        self.assertIn('<meta name="color-scheme" content="light">', app_source)
+        self.assertIn("body{background-color:#FAF6EC}", app_source)
 
     def test_book_cards_have_a_clear_action(self):
         books = self.read("templates/book_suggestions.html")

@@ -18,6 +18,17 @@ class AdminSeminarTemplateTests(unittest.TestCase):
         self.assertIn('class="absence-checkbox"', self.source)
         self.assertIn('member_ids:memberIds', self.source)
 
+    def test_no_show_picker_is_available_on_each_session(self):
+        self.assertIn('macro no_show_panel(seminar_session)', self.source)
+        self.assertIn('미연락 불참', self.source)
+        self.assertIn('/no_shows', self.source)
+
+    def test_review_management_is_rendered_inside_each_session(self):
+        self.assertIn('macro review_panel(seminar_session)', self.source)
+        self.assertIn('{{ review_panel(mon) }}', self.source)
+        self.assertIn('{{ review_panel(thu) }}', self.source)
+        self.assertNotIn('id="seminar-reviews"', self.source)
+
 
 if __name__ == '__main__':
     unittest.main()
