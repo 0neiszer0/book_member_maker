@@ -9,7 +9,7 @@
     <a href="{{ url_for('records_members') }}" class="{% if endpoint in ['records_members', 'records_member_profile'] %}active{% endif %}">회원 관리</a>
     <a href="{{ url_for('admin_special_events') }}" class="{% if endpoint.startswith('admin_special_event') %}active{% endif %}">활동·행사</a>
     <a href="{{ url_for('records_hub') }}" class="{% if (endpoint.startswith('records_') and endpoint not in ['records_members', 'records_member_profile']) or endpoint == 'admin_attendance_matrix' %}active{% endif %}">기록·통계</a>
-    {% if session.user_role == 'admin' %}<a href="{{ url_for('boards.admin_index') }}" class="{% if endpoint.startswith('boards.admin') %}active{% endif %}">게시판 관리</a>{% endif %}
+    <a href="{{ url_for('admin_engagement') }}" class="{% if endpoint == 'admin_engagement' %}active{% endif %}">참여 링크</a>
     <a href="{{ url_for('admin_bug_reports') }}" class="{% if endpoint == 'admin_bug_reports' %}active{% endif %}">버그 제보</a>
     <a href="{{ url_for('help_admin') }}" class="{% if endpoint in ['help_admin', 'admin_seminar_rooms'] %}active{% endif %}">시스템</a>
   </nav>

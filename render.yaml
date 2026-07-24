@@ -9,3 +9,5 @@ services:
     envVars:
       - key: NOTION_PUBLIC_WIKI_URL
         value: https://quaint-sapphire-900.notion.site/bookbook
+      - key: PUBLIC_BASE_URL
+        value: https://book-member-maker.onrender.com

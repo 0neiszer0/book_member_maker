@@ -85,7 +85,7 @@
             <div class="flex gap-2 mt-3"><input class="field !w-24 capacity" type="number" min="1" value="{{ mon.capacity or 10 }}" aria-label="월요일 추가 세미나 정원"><button class="btn soft save-capacity" data-session-id="{{ mon.id }}">이 정원으로 변경</button></div>
             <p class="text-xs muted mt-2">숫자를 바꾼 뒤 ‘이 정원으로 변경’을 눌러야 반영됩니다.</p>
             <div class="flex flex-wrap gap-1 mt-3">{% for m in mon.attendees %}<span class="chip">{{ m.name }}</span>{% else %}<span class="text-sm muted">신청자가 없습니다.</span>{% endfor %}</div>
-            <div class="flex flex-wrap gap-2 mt-4"><a class="btn primary" href="{{ url_for('bookclub_index', session_id=mon.id) }}">조 편성</a>{% if mon.history %}<a class="btn soft" href="{{ url_for('records_seminar_detail', history_id=mon.history.id) }}">진행 기록</a>{% endif %}</div>
+            <div class="flex flex-wrap gap-2 mt-4"><a class="btn primary" href="{{ url_for('bookclub_index', session_id=mon.id) }}">조 편성</a>{% if mon.history %}<a class="btn soft" href="{{ url_for('records_seminar_detail', history_id=mon.history.id) }}">진행 기록</a>{% endif %}{% if mon.review_form %}<button class="btn soft" data-copy="{{ mon.review_form.share_url }}">후기 링크 · {{ mon.review_form.submission_count }}명</button>{% else %}<button class="btn soft open-review" data-session-id="{{ mon.id }}">후기 받기</button>{% endif %}</div>
           {% else %}<p class="muted text-sm mt-3">이 주차에는 월요일 회차가 없습니다.</p>{% endif %}
         </div>
         <div class="rounded-2xl border border-[#eadac5] p-4 order-2">
@@ -112,7 +112,7 @@
                 <button type="button" class="btn primary add-absences mt-2" data-session-id="{{ thu.id }}" {% if picker.count == 0 %}disabled{% endif %}>선택한 회원 불참 처리</button>
               </div>
             </details>
-            <div class="flex flex-wrap gap-2 mt-4"><a class="btn primary" href="{{ url_for('bookclub_index', session_id=thu.id) }}">조 편성</a>{% if thu.history %}<a class="btn soft" href="{{ url_for('records_seminar_detail', history_id=thu.history.id) }}">진행 기록</a>{% endif %}</div>
+            <div class="flex flex-wrap gap-2 mt-4"><a class="btn primary" href="{{ url_for('bookclub_index', session_id=thu.id) }}">조 편성</a>{% if thu.history %}<a class="btn soft" href="{{ url_for('records_seminar_detail', history_id=thu.history.id) }}">진행 기록</a>{% endif %}{% if thu.review_form %}<button class="btn soft" data-copy="{{ thu.review_form.share_url }}">후기 링크 · {{ thu.review_form.submission_count }}명</button>{% else %}<button class="btn soft open-review" data-session-id="{{ thu.id }}">후기 받기</button>{% endif %}</div>
           {% else %}<p class="muted text-sm mt-3">이 주차에는 목요일 회차가 없습니다.</p>{% endif %}
         </div>
       </div>
@@ -139,6 +139,7 @@ document.addEventListener('click',async e=>{
   if(e.target.closest('.save-week')){const b=e.target.closest('.save-week');await api('/api/admin/seminar_weeks/'+b.dataset.weekId,{method:'PATCH',body:JSON.stringify({book_title:box.querySelector('.book-title').value,book_author:box.querySelector('.book-author').value,note:box.querySelector('.week-note').value})});location.reload()}
   if(e.target.closest('.open-topic')){const b=e.target.closest('.open-topic');await api('/api/admin/seminar_weeks/'+b.dataset.weekId+'/open_topics',{method:'POST',body:'{}'});location.reload()}
   if(e.target.closest('.toggle-topic')){const b=e.target.closest('.toggle-topic');await api('/api/admin/topic_events/'+b.dataset.eventId+'/toggle_active',{method:'POST',body:'{}'});location.reload()}
+  if(e.target.closest('.open-review')){const b=e.target.closest('.open-review'),result=await api('/api/admin/seminar_sessions/'+b.dataset.sessionId+'/review-form',{method:'POST',body:'{}'});await navigator.clipboard.writeText(result.url);alert('후기 링크를 열고 복사했습니다.');location.reload()}
   if(e.target.closest('.save-capacity')){const b=e.target.closest('.save-capacity');await api('/api/admin/seminar_sessions/'+b.dataset.sessionId+'/capacity',{method:'PATCH',body:JSON.stringify({capacity:Number(b.parentElement.querySelector('.capacity').value)})});location.reload()}
   if(e.target.closest('.select-visible-absences')){const picker=e.target.closest('.absence-picker');picker.querySelectorAll('.absence-option:not([hidden]) .absence-checkbox').forEach(input=>input.checked=true);updateAbsenceSelection(picker);return}
   if(e.target.closest('.clear-absence-selection')){const picker=e.target.closest('.absence-picker');picker.querySelectorAll('.absence-checkbox').forEach(input=>input.checked=false);updateAbsenceSelection(picker);return}

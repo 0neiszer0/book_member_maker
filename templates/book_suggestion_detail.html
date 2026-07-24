@@ -1,0 +1,30 @@
+{% extends 'engagement_base.html' %}
+{% block content %}
+<section class="eg-panel">
+  <div class="eg-book">
+    {% if book.cover_path %}<img class="eg-cover" src="{{ engagement_image_url(book.cover_path) }}" alt="{{ book.title }} 표지">{% else %}<div class="eg-cover"></div>{% endif %}
+    <div><span class="eg-chip">{{ suggestion.status }}</span><h1 style="margin:.6rem 0 .3rem">{{ book.title }}</h1><p class="eg-muted" style="margin:0">{{ book.author }}</p><a class="eg-arrow" href="{{ book.kyobo_url }}" target="_blank" rel="noopener noreferrer">교보문고에서 보기 ↗</a></div>
+  </div>
+  <hr class="eg-divider"><p style="white-space:pre-wrap;line-height:1.75">{{ suggestion.note }}</p>
+</section>
+
+<section class="eg-panel" style="margin-top:16px">
+  <h2>같이 읽고 싶어요 · {{ supporter_rows|length }}명</h2>
+  <form class="eg-form" method="post" action="{{ url_for('support_book_suggestion', suggestion_id=suggestion.id) }}">
+    {% if not member %}<div class="eg-grid"><label>학번<input class="eg-input" name="student_id" required></label><label>이름<input class="eg-input" name="member_name" required></label></div>{% endif %}
+    <label>한마디 <span class="eg-help">선택</span><input class="eg-input" name="reason" maxlength="500" placeholder="왜 같이 읽고 싶은가요?"></label>
+    <button class="eg-btn {% if supported %}eg-btn-paper{% else %}eg-btn-primary{% endif %}" type="submit">{% if supported %}관심 표시 취소{% else %}같이 읽고 싶어요{% endif %}</button>
+  </form>
+</section>
+
+<section class="eg-panel" style="margin-top:16px">
+  <h2>책에 관한 이야기</h2>
+  <div>{% for row in comments %}<div class="eg-comment"><strong>{{ row.member.name }}</strong><p style="white-space:pre-wrap;line-height:1.65;margin:.45rem 0 0">{{ row.content }}</p></div>{% else %}<p class="eg-muted">아직 댓글이 없습니다.</p>{% endfor %}</div>
+  <form class="eg-form" method="post" action="{{ url_for('comment_book_suggestion', suggestion_id=suggestion.id) }}">
+    {% if not member %}<div class="eg-grid"><label>학번<input class="eg-input" name="student_id" required></label><label>이름<input class="eg-input" name="member_name" required></label></div>{% endif %}
+    <label>댓글<textarea class="eg-textarea" name="content" maxlength="2000" required></textarea></label>
+    <button class="eg-btn eg-btn-primary" type="submit">댓글 남기기</button>
+  </form>
+</section>
+<div class="eg-actions" style="margin-top:18px"><a class="eg-btn eg-btn-paper" href="{{ url_for('book_suggestions') }}">목록으로</a></div>
+{% endblock %}
