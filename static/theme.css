@@ -12,6 +12,8 @@
 
 :root,
 html { /* :root 와 동일 specificity, 더 뒤에 위치해서 승리 */
+  color-scheme: light;
+  background-color: #FAF6EC;
   /* ---- 신규 우드 토큰 ---- */
   --paper:        #FAF6EC;   /* 페이지 배경 (크림 페이퍼) */
   --paper-2:      #F2EBD8;   /* 부드러운 블록 */
