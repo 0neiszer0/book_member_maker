@@ -78,6 +78,18 @@
             <a href="{{ notion_public_wiki_url }}" target="_blank" rel="noopener noreferrer" class="wd-menu-item">
               <span class="wd-menu-ico"><i data-lucide="book-open" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>공식 위키
             </a>
+            {% if session.user_role == 'admin' or session.member_preview %}
+              <div class="wd-menu-divider"></div>
+              <form method="post" action="{{ url_for('toggle_member_preview') }}" class="wd-preview-form">
+                <span>회원 화면으로 보기</span>
+                <button type="submit"
+                        class="wd-switch {% if session.member_preview %}wd-switch-on{% endif %}"
+                        aria-label="{% if session.member_preview %}관리자 화면으로 돌아가기{% else %}회원 화면으로 전환하기{% endif %}"
+                        aria-pressed="{{ 'true' if session.member_preview else 'false' }}">
+                  <span class="wd-switch-thumb"></span>
+                </button>
+              </form>
+            {% endif %}
             {% if session.user_role in ['admin', 'officer'] %}
               <div class="wd-menu-divider"></div>
               <div class="wd-menu-label">관리</div>
@@ -243,6 +255,21 @@
     color:var(--ink,#2A241B);font-size:14px;font-weight:500;
   }
   .wd-menu-item:hover{background:var(--moss-tint,#E8EFDD);color:var(--moss-deep,#3D5C2E)}
+  .wd-preview-form{
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+    padding:11px 16px;color:var(--ink,#2A241B);font-size:14px;font-weight:600;
+  }
+  .wd-switch{
+    width:42px;height:24px;padding:2px;border:0;border-radius:999px;
+    background:var(--line,#E5D7B8);cursor:pointer;transition:background .18s ease;
+  }
+  .wd-switch-thumb{
+    display:block;width:20px;height:20px;border-radius:50%;background:#fff;
+    box-shadow:0 1px 4px rgba(45,30,10,.24);transition:transform .18s ease;
+  }
+  .wd-switch-on{background:var(--moss-deep,#3D5C2E)}
+  .wd-switch-on .wd-switch-thumb{transform:translateX(18px)}
+  .wd-switch:focus-visible{outline:3px solid rgba(92,122,74,.28);outline-offset:2px}
   .wd-menu-quiet{color:var(--ink-faint,#9C8E78)}
   .wd-menu-quiet:hover{background:var(--paper-2,#F2EBD8);color:var(--warn,#C97A3A)}
   .wd-menu-ico{font-size:16px;width:20px;text-align:center}
