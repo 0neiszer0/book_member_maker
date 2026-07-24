@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ social_meta.title if social_meta else '책 먹는 호반우' }}</title>
+  <meta name="description" content="{{ social_meta.description if social_meta else '책 먹는 호반우 참여 페이지' }}">
+  {% if social_meta and social_meta.noindex %}<meta name="robots" content="noindex,nofollow">{% endif %}
+  <link rel="canonical" href="{{ social_meta.canonical if social_meta else request.base_url }}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="책 먹는 호반우">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:title" content="{{ social_meta.title if social_meta else '책 먹는 호반우' }}">
+  <meta property="og:description" content="{{ social_meta.description if social_meta else '책 먹는 호반우 참여 페이지' }}">
+  <meta property="og:url" content="{{ social_meta.canonical if social_meta else request.base_url }}">
+  <meta property="og:image" content="{{ social_meta.image if social_meta else default_social_image_url }}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="책 먹는 호반우">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ social_meta.title if social_meta else '책 먹는 호반우' }}">
+  <meta name="twitter:description" content="{{ social_meta.description if social_meta else '책 먹는 호반우 참여 페이지' }}">
+  <meta name="twitter:image" content="{{ social_meta.image if social_meta else default_social_image_url }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:var(--paper,#faf6ec);color:var(--ink,#2a241b);font-family:Pretendard,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    .eg-wrap{max-width:1000px;margin:0 auto;padding:42px 20px 110px}.eg-hero{margin-bottom:28px}.eg-kicker{font-size:.78rem;font-weight:800;letter-spacing:.08em;color:var(--moss-deep,#3d5c2e);text-transform:uppercase}.eg-hero h1{font-size:clamp(2rem,5vw,3.5rem);line-height:1.08;letter-spacing:-.05em;margin:.4rem 0 .8rem}.eg-lead{font-size:1.03rem;line-height:1.75;color:var(--ink-soft,#655b4e);max-width:700px}
+    .eg-panel{background:var(--surface,#fffdf8);border:1px solid var(--line,#e5d7b8);border-radius:20px;padding:22px;box-shadow:0 10px 30px -26px rgba(48,32,10,.45)}.eg-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.eg-card{display:flex;flex-direction:column;min-height:210px;text-decoration:none;color:inherit}.eg-card:hover{border-color:var(--moss,#5c7a4a);transform:translateY(-1px)}.eg-chip{display:inline-flex;width:max-content;border-radius:999px;padding:.3rem .65rem;background:var(--moss-tint,#e8efdd);color:var(--moss-deep,#3d5c2e);font-weight:800;font-size:.76rem}.eg-card h2,.eg-panel h2{margin:.8rem 0 .45rem;letter-spacing:-.025em}.eg-muted{color:var(--ink-soft,#655b4e);line-height:1.6}.eg-spacer{flex:1}.eg-arrow{font-weight:800;color:var(--moss-deep,#3d5c2e);margin-top:1.1rem}
+    .eg-form{display:grid;gap:17px}.eg-form label{display:grid;gap:7px;font-weight:750;font-size:.94rem}.eg-input,.eg-textarea,.eg-select{width:100%;border:1px solid var(--line,#d9ccb1);border-radius:12px;background:#fff;padding:.82rem .9rem;font:inherit;color:inherit;outline:none}.eg-input:focus,.eg-textarea:focus,.eg-select:focus{border-color:var(--moss,#5c7a4a);box-shadow:0 0 0 3px rgba(92,122,74,.13)}.eg-textarea{min-height:130px;resize:vertical}.eg-help{font-size:.82rem;font-weight:500;color:var(--ink-faint,#8a7d69);line-height:1.5}.eg-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.eg-btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;border:0;border-radius:12px;padding:.82rem 1.1rem;font:inherit;font-weight:800;text-decoration:none;cursor:pointer}.eg-btn-primary{background:var(--moss-deep,#3d5c2e);color:#fff}.eg-btn-soft{background:var(--moss-tint,#e8efdd);color:var(--moss-deep,#3d5c2e)}.eg-btn-paper{background:var(--paper-2,#f2ebd8);color:var(--ink,#2a241b)}.eg-divider{border:0;border-top:1px solid var(--line,#e5d7b8);margin:8px 0}.eg-identity{background:var(--paper-2,#f2ebd8);border-radius:14px;padding:15px}.eg-identity strong{display:block;margin-bottom:4px}.eg-flash{padding:13px 16px;border-radius:12px;margin-bottom:12px;font-weight:700}.eg-flash-success{background:#e5efdf;color:#34502a}.eg-flash-danger{background:#f8e0d7;color:#8f3b27}.eg-empty{text-align:center;padding:42px 22px}.eg-book{display:grid;grid-template-columns:110px 1fr;gap:18px}.eg-cover{width:110px;aspect-ratio:3/4;object-fit:cover;border-radius:8px;background:var(--paper-2,#f2ebd8)}.eg-checkboxes{display:flex;flex-wrap:wrap;gap:10px}.eg-check{display:flex!important;grid-template-columns:none!important;align-items:center;gap:7px!important;background:var(--paper-2,#f2ebd8);padding:.65rem .8rem;border-radius:10px}.eg-check input{accent-color:var(--moss-deep,#3d5c2e)}.eg-meta{display:flex;flex-wrap:wrap;gap:8px;margin:.6rem 0}.eg-comment{padding:16px 0;border-top:1px solid var(--line,#e5d7b8)}.eg-comment:first-child{border-top:0}.eg-admin-link{margin-top:30px;text-align:center}
+    @media(max-width:700px){.eg-wrap{padding:28px 14px 100px}.eg-grid{grid-template-columns:1fr}.eg-panel{padding:17px}.eg-book{grid-template-columns:80px 1fr}.eg-cover{width:80px}}
+  </style>
+</head>
+<body>
+{% include '_header.html' %}
+<main class="eg-wrap">
+  {% with messages=get_flashed_messages(with_categories=true) %}
+    {% for category,message in messages %}<div class="eg-flash eg-flash-{{ category }}">{{ message }}</div>{% endfor %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+{% include '_bug_report_widget.html' %}
+</body>
+</html>

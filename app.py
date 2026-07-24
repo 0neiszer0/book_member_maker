@@ -1,6 +1,7 @@
 # --- 1. 기본 라이브러리 및 설정 ---
 import os
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+import html
 import itertools
 import random
 import math
@@ -52,6 +53,9 @@ NOTION_PUBLIC_WIKI_URL = os.environ.get(
     "NOTION_PUBLIC_WIKI_URL",
     "https://quaint-sapphire-900.notion.site/bookbook",
 ).split('?', 1)[0]
+PUBLIC_BASE_URL = os.environ.get(
+    "PUBLIC_BASE_URL", "https://book-member-maker.onrender.com"
+).rstrip("/")
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("Supabase URL과 Key가 .env 파일에 설정되지 않았습니다.")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -60,6 +64,44 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 @app.context_processor
 def public_navigation_context():
     return {"notion_public_wiki_url": NOTION_PUBLIC_WIKI_URL}
+
+
+@app.after_request
+def add_default_social_preview(response):
+    """기존 화면도 카카오톡·Notion에서 빈 링크 카드로 보이지 않게 한다."""
+    content_type = response.headers.get("Content-Type", "")
+    if response.status_code != 200 or not content_type.startswith("text/html"):
+        return response
+    page = response.get_data(as_text=True)
+    if 'property="og:title"' in page or "</head>" not in page:
+        return response
+    title_match = re.search(r"<title[^>]*>(.*?)</title>", page, flags=re.I | re.S)
+    title = re.sub(r"<[^>]+>", "", title_match.group(1)).strip() if title_match else "책 먹는 호반우"
+    title = html.escape(title or "책 먹는 호반우", quote=True)
+    description = html.escape(
+        "책 먹는 호반우의 세미나, 발제문, 후기와 독서 활동에 참여하세요.",
+        quote=True,
+    )
+    canonical = html.escape(f"{PUBLIC_BASE_URL}{request.full_path}".rstrip("?"), quote=True)
+    image = f"{PUBLIC_BASE_URL}/static/og/club-preview.png"
+    tags = f"""
+  <meta name="description" content="{description}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="책 먹는 호반우">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:title" content="{title}">
+  <meta property="og:description" content="{description}">
+  <meta property="og:url" content="{canonical}">
+  <meta property="og:image" content="{image}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{title}">
+  <meta name="twitter:description" content="{description}">
+  <meta name="twitter:image" content="{image}">
+"""
+    response.set_data(page.replace("</head>", f"{tags}</head>", 1))
+    return response
 
 
 # ==============================================================================
@@ -2166,6 +2208,22 @@ def my_page():
         # 내가 참여한 스페셜 이벤트 (최근 5개)
         my_special_events = _member_special_events(user_id)[:5]
 
+        # 링크형 참여 기록(후기·추천·벽돌책 지원)은 로그인 계정과 같은 회원 ID로 묶인다.
+        engagement_activity = {'seminar_reviews': 0, 'book_suggestions': 0, 'brick_applications': 0, 'brick_reviews': 0}
+        try:
+            engagement_activity = {
+                'seminar_reviews': supabase.table('seminar_reviews').select('id', count='exact')
+                    .eq('member_id', user_id).is_('deleted_at', 'null').execute().count or 0,
+                'book_suggestions': supabase.table('book_suggestions').select('id', count='exact')
+                    .eq('created_by', user_id).neq('status', 'archived').execute().count or 0,
+                'brick_applications': supabase.table('brick_applications').select('id', count='exact')
+                    .eq('member_id', user_id).execute().count or 0,
+                'brick_reviews': supabase.table('brick_reviews').select('id', count='exact')
+                    .eq('member_id', user_id).is_('deleted_at', 'null').execute().count or 0,
+            }
+        except Exception as e:
+            app.logger.warning(f"my_page engagement activity error: {e}")
+
         # 현재 투표 가능한 세미나 회차 (학기별)
         my_open_votes = []
         active_seminar_terms = []
@@ -2211,6 +2269,7 @@ def my_page():
             my_open_votes=my_open_votes,
             active_seminar_terms=active_seminar_terms,
             my_special_events=my_special_events,
+            engagement_activity=engagement_activity,
         )
 
     except Exception as e:
@@ -3181,6 +3240,8 @@ def _load_weekly_seminar_view(term_id=None):
     votes = []
     absences = []
     histories = []
+    review_forms = []
+    review_submissions = []
     if session_ids:
         votes = supabase.table('seminar_votes').select('session_id, member_id, attending, added_by_admin') \
             .in_('session_id', session_ids).execute().data or []
@@ -3188,6 +3249,12 @@ def _load_weekly_seminar_view(term_id=None):
             .in_('session_id', session_ids).order('created_at').execute().data or []
         histories = supabase.table('history').select('id, date, book_title, groups, seminar_session_id') \
             .in_('seminar_session_id', session_ids).execute().data or []
+        review_forms = supabase.table('seminar_review_forms').select('*') \
+            .in_('seminar_session_id', session_ids).execute().data or []
+        review_form_ids = [row['id'] for row in review_forms]
+        if review_form_ids:
+            review_submissions = supabase.table('seminar_reviews').select('form_id') \
+                .in_('form_id', review_form_ids).is_('deleted_at', 'null').execute().data or []
     submissions = []
     if topic_ids:
         submissions = supabase.table('topic_submissions').select('event_id').in_('event_id', topic_ids).execute().data or []
@@ -3201,6 +3268,14 @@ def _load_weekly_seminar_view(term_id=None):
     for row in submissions:
         submission_count[row['event_id']] += 1
     history_by_session = {row['seminar_session_id']: row for row in histories if row.get('seminar_session_id')}
+    review_count = defaultdict(int)
+    for row in review_submissions:
+        review_count[row['form_id']] += 1
+    review_by_session = {}
+    for row in review_forms:
+        row['submission_count'] = review_count[row['id']]
+        row['share_url'] = f"{request.host_url}review/seminar/{row['share_token']}"
+        review_by_session[row['seminar_session_id']] = row
     votes_by_session = defaultdict(list)
     for row in votes:
         if row.get('attending'):
@@ -3225,6 +3300,7 @@ def _load_weekly_seminar_view(term_id=None):
         item['expected_count'] = max(0, len(active_members) - len(item['absences'])) \
             if item.get('participation_mode') == 'absence_only' else item['yes_count']
         item['history'] = history_by_session.get(item['id'])
+        item['review_form'] = review_by_session.get(item['id'])
         item['is_past'] = date.fromisoformat(item['meeting_date']) < today
         sessions_by_week[item['seminar_week_id']].append(item)
 
@@ -5142,6 +5218,10 @@ def records_analytics():
 # 게시판은 별도 모듈에 두되 기존 Flask 세션/Supabase 클라이언트를 그대로 공유한다.
 from boards import init_board_routes
 init_board_routes(app, supabase, login_required)
+
+# 공개 링크 중심 참여 흐름(후기·책 추천·벽돌책)을 별도 모듈로 관리한다.
+from engagement import init_engagement_routes
+init_engagement_routes(app, supabase, login_required, _voting_window_for)
 
 
 # ==============================================================================

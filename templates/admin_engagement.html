@@ -1,0 +1,43 @@
+{% extends 'engagement_base.html' %}
+{% block content %}
+{% include '_admin_sidebar.html' %}
+<section class="eg-hero"><div class="eg-kicker">운영 관리</div><h1>참여 링크 운영</h1><p class="eg-lead">카카오톡에는 아래 링크만 복사해 보내면 됩니다. Notion에는 <strong>{{ request.url_root.rstrip('/') }}/now</strong> 한 주소만 고정해두세요.</p><div class="eg-actions"><a class="eg-btn eg-btn-primary" href="{{ url_for('engagement_now') }}">지금 참여하기 보기</a><a class="eg-btn eg-btn-paper" href="{{ url_for('admin_seminars') }}">세미나 운영</a></div></section>
+
+<section class="eg-panel">
+  <h2>세미나 후기 링크 열기</h2>
+  <form id="seminar-form" class="eg-form">
+    <label>회차<select class="eg-select" name="session_id" required>{% for row in sessions %}<option value="{{ row.id }}">{{ row.meeting_date }} · {{ row.book_title or '도서 미정' }} · {{ '목요일' if row.day_type=='thu' else '월요일' }}</option>{% endfor %}</select></label>
+    <label>안내 <span class="eg-help">선택</span><textarea class="eg-textarea" name="instructions"></textarea></label>
+    <button class="eg-btn eg-btn-primary" type="submit">후기 링크 열고 복사</button>
+  </form>
+  <div style="margin-top:18px">{% for row in seminar_forms %}<div class="eg-comment"><strong>{{ row.seminar.meeting_date }} · {{ row.seminar.book_title or '도서 미정' }}</strong><div class="eg-meta"><span class="eg-chip">{{ row.status }}</span><span class="eg-muted">{{ row.submission_count }}명 제출</span></div><div class="eg-actions"><button class="eg-btn eg-btn-soft copy" data-url="{{ row.share_url }}">링크 복사</button><button class="eg-btn eg-btn-paper form-status" data-kind="seminar" data-id="{{ row.id }}" data-status="{{ 'closed' if row.status=='open' else 'open' }}">{{ '마감' if row.status=='open' else '다시 열기' }}</button></div></div>{% else %}<p class="eg-muted">아직 만든 세미나 후기 링크가 없습니다.</p>{% endfor %}</div>
+</section>
+
+<section class="eg-panel" style="margin-top:16px">
+  <h2>추천에서 벽돌책 모집 만들기</h2>
+  <form id="brick-form" class="eg-form">
+    <label>추천 도서<select class="eg-select" name="suggestion_id" required>{% for row in suggestions %}<option value="{{ row.id }}">{{ row.book.title }} · {{ row.book.author }}</option>{% endfor %}</select></label>
+    <label>모집 제목<input class="eg-input" name="title" required placeholder="예: 『책 제목』 같이 읽기"></label>
+    <label>설명<textarea class="eg-textarea" name="description" required></textarea></label>
+    <div class="eg-grid"><label>정원<input class="eg-input" name="capacity" type="number" min="1" max="100" value="10"></label><label>모집 마감 <span class="eg-help">선택</span><input class="eg-input" name="close_at" type="datetime-local"></label></div>
+    <div class="eg-grid"><label>예정 시작일<input class="eg-input" name="planned_start_date" type="date"></label><label>예정 종료일<input class="eg-input" name="planned_end_date" type="date"></label></div>
+    <button class="eg-btn eg-btn-primary" type="submit">모집 열고 링크 복사</button>
+  </form>
+</section>
+
+<section class="eg-panel" style="margin-top:16px">
+  <h2>벽돌책 진행 현황</h2>
+  {% for row in projects %}<div class="eg-comment"><strong>{{ row.title }}</strong><p class="eg-muted">{{ row.book.title }} · 상태 {{ row.status }}{% if row.application_count is defined %} · 지원 {{ row.application_count }}명{% endif %}</p><div class="eg-actions">{% if row.recruitment %}<button class="eg-btn eg-btn-soft copy" data-url="{{ row.recruitment.share_url }}">모집 링크</button>{% endif %}{% if row.review_form %}<button class="eg-btn eg-btn-soft copy" data-url="{{ row.review_form.share_url }}">후기 링크</button>{% endif %}{% if row.status=='recruiting' %}<button class="eg-btn eg-btn-primary project-status" data-id="{{ row.id }}" data-status="active">모집 확정·시작</button>{% elif row.status=='active' %}<button class="eg-btn eg-btn-primary project-status" data-id="{{ row.id }}" data-status="completed">종료·후기 열기</button>{% endif %}</div>
+  {% if row.applications %}<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:800">지원자 {{ row.applications|length }}명 보기</summary>{% for application in row.applications %}<div class="eg-comment"><strong>{{ application.member.name }}</strong><span class="eg-muted"> · {{ application.member.department or '학과 미입력' }} {{ application.member.student_id or '' }} · {{ application.status }}</span><p style="white-space:pre-wrap">{{ application.motivation }}</p><div class="eg-actions"><button class="eg-btn eg-btn-primary application-status" data-id="{{ application.id }}" data-status="accepted">선정</button><button class="eg-btn eg-btn-paper application-status" data-id="{{ application.id }}" data-status="rejected">미선정</button></div></div>{% endfor %}</details>{% endif %}
+  </div>{% else %}<p class="eg-muted">아직 벽돌책 프로젝트가 없습니다.</p>{% endfor %}
+</section>
+<script>
+async function sendForm(url, data){const r=await fetch(url,{method:'POST',body:data});const j=await r.json();if(!r.ok)throw new Error(j.error||'처리하지 못했습니다.');return j}
+document.querySelectorAll('.copy').forEach(b=>b.onclick=async()=>{await navigator.clipboard.writeText(b.dataset.url);b.textContent='복사됨'});
+document.querySelector('#seminar-form')?.addEventListener('submit',async e=>{e.preventDefault();try{const f=new FormData(e.target),id=f.get('session_id');f.delete('session_id');const j=await sendForm(`/api/admin/seminar_sessions/${id}/review-form`,f);await navigator.clipboard.writeText(j.url);alert('후기 링크를 열고 복사했습니다.');location.reload()}catch(x){alert(x.message)}});
+document.querySelector('#brick-form')?.addEventListener('submit',async e=>{e.preventDefault();try{const j=await sendForm('/api/admin/brick-projects',new FormData(e.target));await navigator.clipboard.writeText(j.url);alert('모집 링크를 열고 복사했습니다.');location.reload()}catch(x){alert(x.message)}});
+document.querySelectorAll('.form-status').forEach(b=>b.onclick=async()=>{try{const f=new FormData();f.set('status',b.dataset.status);await sendForm(`/api/admin/engagement/forms/${b.dataset.kind}/${b.dataset.id}/status`,f);location.reload()}catch(x){alert(x.message)}});
+document.querySelectorAll('.project-status').forEach(b=>b.onclick=async()=>{try{const f=new FormData();f.set('status',b.dataset.status);await sendForm(`/api/admin/brick-projects/${b.dataset.id}/status`,f);location.reload()}catch(x){alert(x.message)}});
+document.querySelectorAll('.application-status').forEach(b=>b.onclick=async()=>{try{const f=new FormData();f.set('status',b.dataset.status);await sendForm(`/api/admin/brick-applications/${b.dataset.id}/status`,f);location.reload()}catch(x){alert(x.message)}});
+</script>
+{% endblock %}
