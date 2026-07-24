@@ -1,17 +1,7 @@
 {% extends 'engagement_base.html' %}
 {% block content %}
 {% include '_admin_sidebar.html' %}
-<section class="eg-hero"><div class="eg-kicker">운영 관리</div><h1>참여 링크 운영</h1><p class="eg-lead">카카오톡에는 아래 링크만 복사해 보내면 됩니다. Notion에는 <strong>{{ request.url_root.rstrip('/') }}/now</strong> 한 주소만 고정해두세요.</p><div class="eg-actions"><a class="eg-btn eg-btn-primary" href="{{ url_for('engagement_now') }}">지금 참여하기 보기</a><a class="eg-btn eg-btn-paper" href="{{ url_for('admin_seminars') }}">세미나 운영</a></div></section>
-
-<section class="eg-panel">
-  <h2>세미나 후기 링크 열기</h2>
-  <form id="seminar-form" class="eg-form">
-    <label>회차<select class="eg-select" name="session_id" required>{% for row in sessions %}<option value="{{ row.id }}">{{ row.meeting_date }} · {{ row.book_title or '도서 미정' }} · {{ '목요일' if row.day_type=='thu' else '월요일' }}</option>{% endfor %}</select></label>
-    <label>안내 <span class="eg-help">선택</span><textarea class="eg-textarea" name="instructions"></textarea></label>
-    <button class="eg-btn eg-btn-primary" type="submit">후기 링크 열고 복사</button>
-  </form>
-  <div style="margin-top:18px">{% for row in seminar_forms %}<div class="eg-comment"><strong>{{ row.seminar.meeting_date }} · {{ row.seminar.book_title or '도서 미정' }}</strong><div class="eg-meta"><span class="eg-chip">{{ row.status }}</span><span class="eg-muted">{{ row.submission_count }}명 제출</span></div><div class="eg-actions"><button class="eg-btn eg-btn-soft copy" data-url="{{ row.share_url }}">링크 복사</button><button class="eg-btn eg-btn-paper form-status" data-kind="seminar" data-id="{{ row.id }}" data-status="{{ 'closed' if row.status=='open' else 'open' }}">{{ '마감' if row.status=='open' else '다시 열기' }}</button></div></div>{% else %}<p class="eg-muted">아직 만든 세미나 후기 링크가 없습니다.</p>{% endfor %}</div>
-</section>
+<section class="eg-hero"><div class="eg-kicker">운영 관리</div><h1>벽돌책·도서 추천</h1><p class="eg-lead">추천 도서를 벽돌책 모집과 후기로 이어서 관리합니다.</p><div class="eg-actions"><a class="eg-btn eg-btn-primary" href="{{ url_for('engagement_now') }}">지금 참여하기 보기</a><a class="eg-btn eg-btn-paper" href="{{ url_for('admin_seminars') }}#seminar-reviews">세미나 후기 관리</a></div></section>
 
 <section class="eg-panel" style="margin-top:16px">
   <h2>추천에서 벽돌책 모집 만들기</h2>
@@ -34,9 +24,7 @@
 <script>
 async function sendForm(url, data){const r=await fetch(url,{method:'POST',body:data});const j=await r.json();if(!r.ok)throw new Error(j.error||'처리하지 못했습니다.');return j}
 document.querySelectorAll('.copy').forEach(b=>b.onclick=async()=>{await navigator.clipboard.writeText(b.dataset.url);b.textContent='복사됨'});
-document.querySelector('#seminar-form')?.addEventListener('submit',async e=>{e.preventDefault();try{const f=new FormData(e.target),id=f.get('session_id');f.delete('session_id');const j=await sendForm(`/api/admin/seminar_sessions/${id}/review-form`,f);await navigator.clipboard.writeText(j.url);alert('후기 링크를 열고 복사했습니다.');location.reload()}catch(x){alert(x.message)}});
 document.querySelector('#brick-form')?.addEventListener('submit',async e=>{e.preventDefault();try{const j=await sendForm('/api/admin/brick-projects',new FormData(e.target));await navigator.clipboard.writeText(j.url);alert('모집 링크를 열고 복사했습니다.');location.reload()}catch(x){alert(x.message)}});
-document.querySelectorAll('.form-status').forEach(b=>b.onclick=async()=>{try{const f=new FormData();f.set('status',b.dataset.status);await sendForm(`/api/admin/engagement/forms/${b.dataset.kind}/${b.dataset.id}/status`,f);location.reload()}catch(x){alert(x.message)}});
 document.querySelectorAll('.project-status').forEach(b=>b.onclick=async()=>{try{const f=new FormData();f.set('status',b.dataset.status);await sendForm(`/api/admin/brick-projects/${b.dataset.id}/status`,f);location.reload()}catch(x){alert(x.message)}});
 document.querySelectorAll('.application-status').forEach(b=>b.onclick=async()=>{try{const f=new FormData();f.set('status',b.dataset.status);await sendForm(`/api/admin/brick-applications/${b.dataset.id}/status`,f);location.reload()}catch(x){alert(x.message)}});
 </script>

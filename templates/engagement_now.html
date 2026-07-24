@@ -32,5 +32,5 @@
     <span class="eg-arrow">추천 둘러보기 →</span>
   </a>
 </div>
-{% if session.user_role in ['admin','officer'] %}<div class="eg-admin-link"><a class="eg-btn eg-btn-soft" href="{{ url_for('admin_engagement') }}">참여 링크 운영하기</a></div>{% endif %}
+{% if session.user_role in ['admin','officer'] %}<div class="eg-admin-link"><a class="eg-btn eg-btn-soft" href="{{ url_for('admin_engagement') }}">벽돌책·추천 운영</a></div>{% endif %}
 {% endblock %}

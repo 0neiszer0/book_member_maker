@@ -1,349 +1,153 @@
-<!DOCTYPE html>
-<html lang="ko">
+{% extends 'auth_base.html' %}
+{% block title %}회원 정보 확인 · 책 먹는 호반우{% endblock %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>회원가입 / 계정 연결</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap"
-        rel="stylesheet">
-    <style>
-        :root {
-            --eva-purple: #6A0DAD;
-            --eva-green: #00FF7F;
-            --bg-dark: #1A1A1A;
-            --card-dark: #2D2D2D;
-            --text-light: #E5E5E5;
-            --border-dark: #444444;
-        }
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
-        h1, h2 { font-family: 'Orbitron', sans-serif; }
-        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
-        .eva-input { background-color: var(--bg-dark); border: 1px solid var(--border-dark); color: var(--text-light); }
-        .eva-input:focus { border-color: var(--eva-green); outline: none; box-shadow: 0 0 0 2px rgba(0, 255, 127, 0.2); }
-        .path-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); transition: all 0.2s; cursor: pointer; }
-        .path-card.selected { border-color: var(--eva-green); box-shadow: 0 0 0 2px rgba(0, 255, 127, 0.3); }
-        .path-card.dimmed { opacity: 0.5; }
-        .text-eva-green { color: var(--eva-green); }
-        .border-eva-green { border-color: var(--eva-green); }
-        .bg-eva-green { background-color: var(--eva-green); }
-    </style>
-</head>
+{% macro lookup_section() %}
+<section class="auth-section">
+  <h2>명부에서 내 정보 찾기</h2>
+  <p class="auth-section-lead">동아리에 등록된 이름과 학번을 입력해주세요.</p>
+  <div class="auth-grid">
+    <label class="auth-label">이름<input class="auth-input" id="lookupNameInput" value="{{ social_name or '' }}" autocomplete="name"></label>
+    <label class="auth-label">학번<input class="auth-input" id="lookupSidInput" inputmode="numeric" autocomplete="off" placeholder="예: 2022123456"></label>
+  </div>
+  <button class="auth-btn auth-btn-paper" id="lookupButton" type="button" style="margin-top:12px">본인 확인</button>
+  <p class="auth-error hidden" id="lookupMessage"></p>
+  <div class="hidden" id="lookupResult" style="margin-top:14px">
+    <div class="auth-result"><strong id="lookupResultName"></strong><span class="auth-help" id="lookupResultDetail"></span></div>
+    <form action="{{ url_for('link_account_submit') }}" method="post" style="margin-top:10px">
+      <input type="hidden" name="action" value="link">
+      <input type="hidden" name="existing_name" id="lookupNameHidden">
+      <input type="hidden" name="student_id" id="lookupSidHidden">
+      <button class="auth-btn auth-btn-primary" type="submit">이 프로필로 연결</button>
+    </form>
+  </div>
+</section>
+{% endmacro %}
 
-<body class="min-h-screen p-4 py-8">
-    <div class="max-w-xl mx-auto">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        {% for category, message in messages %}
-        <div class="p-3 mb-4 text-sm rounded-lg border bg-red-900/50 text-red-300 border-red-500/50">
-            {{ message }}
-        </div>
-        {% endfor %}
-        {% endif %}
-        {% endwith %}
+{% macro signup_section() %}
+<section class="auth-section auth-highlight">
+  <h2>회원가입</h2>
+  <p class="auth-section-lead">카카오 프로필로 가입 신청을 보냅니다.</p>
+  <div class="auth-result">
+    <strong>{{ social_name or '이름 미확인' }}</strong>
+    {% if email %}<span class="auth-help">{{ email }}</span>{% endif %}
+  </div>
+  <form action="{{ url_for('link_account_submit') }}" method="post" style="margin-top:12px">
+    <input type="hidden" name="action" value="create">
+    <button class="auth-btn auth-btn-primary" type="submit">가입 신청</button>
+  </form>
+</section>
+{% endmacro %}
 
-        <!-- 카카오 정보 미리보기 -->
-        <div class="text-center mb-6">
-            {% if profile_pic %}
-            <img src="{{ profile_pic }}" alt="profile" class="w-20 h-20 rounded-full mx-auto mb-3 border-2 border-eva-green">
-            {% endif %}
-            <h1 class="text-2xl font-bold text-eva-green">{{ social_name }}님, 환영합니다!</h1>
-            {% if email %}<p class="text-xs text-gray-400 mt-1"><i data-lucide="mail" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> {{ email }}</p>{% endif %}
-        </div>
+{% block content %}
+<div class="auth-profile">
+  {% if profile_pic %}<img class="auth-avatar" src="{{ profile_pic }}" alt="카카오 프로필">{% endif %}
+  <h1>{{ social_name or '회원' }}님, 반가워요</h1>
+  <p>회원 정보를 확인해주세요.</p>
+</div>
 
-        {# ============================================================ #}
-        {# CASE 1: 카카오 닉네임으로 동아리 회원이 자동 매칭됨 (1명)     #}
-        {# ============================================================ #}
-        {% if matched_member %}
-        <div class="eva-card rounded-lg p-6 mb-4">
-            <div class="text-center mb-5">
-                <div class="text-4xl mb-3"></div>
-                <h2 class="text-xl font-bold text-eva-green mb-2">혹시 이 분 맞으신가요?</h2>
-                <div class="bg-gray-900/50 rounded-lg p-4 my-4">
-                    <p class="text-2xl font-bold text-white">{{ matched_member.name }} 님</p>
-                    {% if matched_member.student_id %}
-                    <p class="text-xs text-gray-400 mt-1">학번 ****{{ matched_member.student_id|string|truncate(4, True, '') }}* (일부만 표시)</p>
-                    {% endif %}
-                </div>
-                <p class="text-sm text-gray-300">
-                    동아리 명부에 같은 이름이 있어 자동으로 찾았어요.<br>
-                    <strong class="text-eva-green">학번을 입력</strong>하시면 즉시 본인 인증 후 카카오 계정과 연결됩니다.
-                </p>
-            </div>
+{% if matched_member %}
+<section class="auth-section auth-highlight">
+  <p class="auth-eyebrow">내 프로필 확인</p>
+  <h2>{{ matched_member.name }} 님이 맞나요?</h2>
+  <p class="auth-section-lead">명부에서 같은 이름을 찾았습니다. 학번이 일치하면 바로 연결됩니다.</p>
+  <form class="auth-form" action="{{ url_for('link_account_submit') }}" method="post">
+    <input type="hidden" name="action" value="link">
+    <input type="hidden" name="existing_name" value="{{ matched_member.name }}">
+    <label class="auth-label">학번<input class="auth-input" name="student_id" inputmode="numeric" required autofocus placeholder="학번 입력"></label>
+    <button class="auth-btn auth-btn-primary" type="submit">본인 확인하고 연결</button>
+  </form>
+</section>
+<details class="auth-details">
+  <summary>이 프로필이 아니에요</summary>
+  {{ lookup_section() }}
+  {{ signup_section() }}
+</details>
+{% elif multiple_matches %}
+<section class="auth-card">
+  <p class="auth-eyebrow">본인 확인</p>
+  <h1 class="auth-title">같은 이름의<br>회원이 있어요</h1>
+  <p class="auth-lead">학번까지 확인하면 정확한 프로필을 연결할 수 있습니다.</p>
+</section>
+{{ lookup_section() }}
+<details class="auth-details">
+  <summary>동아리 활동이 처음이에요</summary>
+  {{ signup_section() }}
+</details>
+{% else %}
+<section class="auth-card">
+  <p class="auth-eyebrow">WELCOME</p>
+  <h1 class="auth-title">회원가입을<br>진행할게요</h1>
+  <p class="auth-lead">연결된 회원 정보를 찾지 못했습니다.</p>
+</section>
+{{ signup_section() }}
+<details class="auth-details">
+  <summary>이미 동아리 명부에 등록되어 있어요</summary>
+  {{ lookup_section() }}
+</details>
+{% endif %}
 
-            <form action="{{ url_for('link_account_submit') }}" method="POST">
-                <input type="hidden" name="provider" value="{{ provider }}">
-                <input type="hidden" name="social_id" value="{{ social_id }}">
-                <input type="hidden" name="email" value="{{ email }}">
-                <input type="hidden" name="social_name" value="{{ social_name }}">
-                <input type="hidden" name="profile_pic" value="{{ profile_pic }}">
-                <input type="hidden" name="action" value="link">
-                <input type="hidden" name="existing_name" value="{{ matched_member.name }}">
+<a class="auth-back" href="{{ url_for('login') }}">로그인 화면으로 돌아가기</a>
 
-                <div class="space-y-3">
-                    <div>
-                        <label class="text-sm font-bold text-eva-green block mb-2">학번 입력</label>
-                        <input type="text" name="student_id" class="eva-input w-full rounded py-3 px-4 text-base"
-                            placeholder="예: 20231234" inputmode="numeric" required autofocus>
-                        <p class="text-xs text-gray-500 mt-2">학번이 명부와 일치하면 즉시 자동 승인됩니다.</p>
-                    </div>
-                </div>
-                <button type="submit" class="mt-5 w-full bg-eva-green text-black font-bold py-3 rounded-lg hover:opacity-80 transition">
-                    ✓ 네, 저 맞아요 — 인증하고 연결
-                </button>
-            </form>
+<script>
+(() => {
+  const nameInput = document.getElementById('lookupNameInput');
+  const sidInput = document.getElementById('lookupSidInput');
+  const button = document.getElementById('lookupButton');
+  if (!nameInput || !sidInput || !button) return;
 
-            <div class="mt-4 pt-4 border-t border-gray-700 text-center">
-                <button type="button" onclick="document.getElementById('manual_section').classList.remove('hidden'); this.style.display='none';"
-                    class="text-xs text-gray-400 hover:text-eva-green underline">
-                     저 아닌데요 / 다른 이름으로 등록되어 있어요
-                </button>
-            </div>
-        </div>
+  async function lookupProfile() {
+    const name = nameInput.value.trim();
+    const studentId = sidInput.value.trim();
+    const message = document.getElementById('lookupMessage');
+    const result = document.getElementById('lookupResult');
+    message.classList.add('hidden');
+    result.classList.add('hidden');
 
-        <!-- 수동 입력 (matched 거부 시 펼침) -->
-        <div id="manual_section" class="hidden">
-        {% endif %}
+    if (!name || !/^[0-9]{4,10}$/.test(studentId)) {
+      message.textContent = '이름과 학번을 정확히 입력해주세요.';
+      message.classList.remove('hidden');
+      return;
+    }
 
-        {# ============================================================ #}
-        {# CASE 2: 동명이인 (2명 이상)                                   #}
-        {# ============================================================ #}
-        {% if multiple_matches %}
-        <div class="eva-card rounded-lg p-5 mb-4 bg-yellow-900/20 border-yellow-700">
-            <h2 class="text-base font-bold text-yellow-400 mb-2"><i data-lucide="triangle-alert" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 같은 이름이 {{ multiple_matches|length }}명 있어요</h2>
-            <p class="text-xs text-gray-300">
-                동명이인이 있어 자동 매칭이 어렵습니다.<br>
-                아래에서 <strong>학번까지 입력</strong>해서 정확한 본인을 식별해주세요.
-            </p>
-        </div>
-        {% endif %}
+    button.disabled = true;
+    button.textContent = '확인 중…';
+    try {
+      const response = await fetch('{{ url_for("link_lookup") }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name, student_id: studentId}),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '본인 확인에 실패했습니다.');
+      if (!data.found) {
+        message.textContent = data.already_linked
+          ? '이미 다른 카카오 계정과 연결된 회원입니다. 운영진에게 문의해주세요.'
+          : '일치하는 회원을 찾지 못했습니다.';
+        message.classList.remove('hidden');
+        return;
+      }
+      document.getElementById('lookupResultName').textContent = data.masked_name + ' 님';
+      document.getElementById('lookupResultDetail').textContent =
+        [data.department, data.recruiting_class ? data.recruiting_class + '기' : ''].filter(Boolean).join(' · ');
+      document.getElementById('lookupNameHidden').value = name;
+      document.getElementById('lookupSidHidden').value = studentId;
+      result.classList.remove('hidden');
+    } catch (error) {
+      message.textContent = error.message;
+      message.classList.remove('hidden');
+    } finally {
+      button.disabled = false;
+      button.textContent = '본인 확인';
+    }
+  }
 
-        {# ============================================================ #}
-        {# CASE 3: 자동 매칭 실패 또는 manual 모드 — 경로 선택 + 입력      #}
-        {# ============================================================ #}
-        {% if not matched_member %}
-        <p class="text-sm text-gray-300 text-center mb-4">
-            {% if auth_mode == 'login' %}
-            <strong class="text-yellow-400">아직 가입되지 않은 카카오 계정</strong>이에요.<br>
-            아래 두 가지 중 본인에게 맞는 경우를 선택해주세요.
-            {% else %}
-            <strong class="text-eva-green">아래 두 가지 중 본인에게 맞는 경우</strong>를 선택해주세요.
-            {% endif %}
-        </p>
-        {% endif %}
-
-        <!-- 이름과 학번으로 내 프로필 찾기 (가장 빠른 경로) -->
-        <div class="eva-card rounded-lg p-5 mb-4 border-eva-green">
-            <h2 class="text-base font-bold text-eva-green mb-1">이름·학번으로 내 프로필 찾기</h2>
-            <p class="text-xs text-gray-400 mb-3">동아리 명부에 등록된 이름과 학번이 모두 일치하면 바로 연결됩니다.</p>
-            <div class="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2">
-                <input type="text" id="lookupName" class="eva-input rounded py-2 px-3 text-sm"
-                    placeholder="이름 (예: 홍길동)" value="{{ social_name }}" autocomplete="name">
-                <input type="text" id="lookupSid" class="eva-input rounded py-2 px-3 text-sm"
-                    placeholder="학번 (예: 2022123456)" inputmode="numeric" autocomplete="off">
-                <button type="button" onclick="lookupProfile()"
-                    class="bg-eva-green text-black font-bold px-4 py-2 rounded text-sm hover:opacity-80">조회</button>
-            </div>
-            <p id="lookupMsg" class="text-xs text-red-400 mt-2 hidden"></p>
-
-            <!-- 조회 결과 프로필 카드 -->
-            <div id="lookupResult" class="hidden mt-4">
-                <div class="bg-gray-900/50 rounded-lg p-4 text-center">
-                    <p class="text-xl font-bold text-white" id="lookupName"></p>
-                    <p class="text-xs text-gray-400 mt-1" id="lookupDetail"></p>
-                </div>
-                <form action="{{ url_for('link_account_submit') }}" method="POST" class="mt-3">
-                    <input type="hidden" name="action" value="link">
-                    <input type="hidden" name="existing_name" id="lookupNameHidden" value="">
-                    <input type="hidden" name="student_id" id="lookupSidHidden" value="">
-                    <button type="submit"
-                        class="w-full bg-eva-green text-black font-bold py-3 rounded-lg hover:opacity-80 transition">
-                        네, 저 맞아요 — 이 프로필로 연결
-                    </button>
-                </form>
-            </div>
-        </div>
-
-        <p class="text-center text-xs text-gray-500 mb-4">— 또는 —</p>
-
-        <!-- 경로 선택 -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-            <button type="button" onclick="selectPath('link')" id="pathLink"
-                class="path-card rounded-lg p-4 text-left hover:border-eva-green">
-                <div class="text-2xl mb-2"><i data-lucide="link" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></div>
-                <h2 class="text-base font-bold text-eva-green mb-1">기존 부원이에요</h2>
-                <p class="text-xs text-gray-400">동아리 명부에 등록되어 있어요. 이름·학번으로 본인 확인.</p>
-            </button>
-            <button type="button" onclick="selectPath('create')" id="pathCreate"
-                class="path-card rounded-lg p-4 text-left hover:border-eva-green">
-                <div class="text-2xl mb-2"><i data-lucide="sparkles" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></div>
-                <h2 class="text-base font-bold text-eva-green mb-1">신규 가입이에요</h2>
-                <p class="text-xs text-gray-400">처음입니다. 카카오 정보로 신청 후 관리자 승인.</p>
-            </button>
-        </div>
-
-        <!-- 입력 카드 (경로 선택 후 노출) -->
-        <form id="linkForm" action="{{ url_for('link_account_submit') }}" method="POST" class="hidden">
-            <input type="hidden" name="provider" value="{{ provider }}">
-            <input type="hidden" name="social_id" value="{{ social_id }}">
-            <input type="hidden" name="email" value="{{ email }}">
-            <input type="hidden" name="social_name" value="{{ social_name }}">
-            <input type="hidden" name="profile_pic" value="{{ profile_pic }}">
-            <input type="hidden" name="action" id="actionInput" value="">
-
-            <!-- 기존 부원 입력 -->
-            <div id="linkFields" class="eva-card rounded-lg p-5 hidden">
-                <h2 class="text-lg font-bold text-eva-green mb-2"><i data-lucide="link" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 기존 계정 연결</h2>
-                <p class="text-xs text-gray-400 mb-4">
-                    이름과 학번이 모두 일치하면 <strong class="text-eva-green">즉시 자동 승인</strong>됩니다.<br>
-                    학번 없이 이름만 입력하면 관리자 승인 대기 상태가 됩니다.
-                </p>
-                <div class="space-y-3">
-                    <div>
-                        <label class="text-xs text-gray-400 block mb-1">시스템에 등록된 이름 <span class="text-red-400">*</span></label>
-                        <input type="text" name="existing_name" class="eva-input w-full rounded py-2 px-3 text-sm"
-                            placeholder="예: 홍길동" value="{{ social_name }}" required>
-                        <p class="text-xs text-gray-500 mt-1">카카오 닉네임을 미리 채웠습니다. 동아리에 등록된 이름이 다르면 수정해주세요.</p>
-                    </div>
-                    <div>
-                        <label class="text-xs text-gray-400 block mb-1">학번 <span class="text-eva-green">(입력 시 즉시 승인)</span></label>
-                        <input type="text" name="student_id" class="eva-input w-full rounded py-2 px-3 text-sm"
-                            placeholder="예: 20231234" inputmode="numeric">
-                    </div>
-                </div>
-                <button type="submit" class="mt-4 w-full bg-eva-green text-black font-bold py-3 rounded-lg hover:opacity-80 transition">
-                    ✓ 본인 확인 후 연결
-                </button>
-            </div>
-
-            <!-- 신규 가입 입력 -->
-            <div id="createFields" class="eva-card rounded-lg p-5 hidden">
-                <h2 class="text-lg font-bold text-eva-green mb-2"><i data-lucide="sparkles" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 신규 회원 가입</h2>
-                <p class="text-xs text-gray-400 mb-4">
-                    아래 카카오 정보로 가입 신청을 보냅니다.<br>
-                    <strong class="text-yellow-400">관리자 승인 후</strong> 정상 활동이 가능합니다.
-                </p>
-                <div class="bg-gray-900/50 rounded p-3 text-sm space-y-1 mb-4">
-                    <div><span class="text-gray-400">이름:</span> <span class="font-bold">{{ social_name }}</span></div>
-                    {% if email %}<div><span class="text-gray-400">이메일:</span> <span class="font-mono text-xs">{{ email }}</span></div>{% endif %}
-                </div>
-                <button type="submit" class="w-full bg-eva-green text-black font-bold py-3 rounded-lg hover:opacity-80 transition">
-                    가입 신청 보내기
-                </button>
-                <p class="text-xs text-gray-500 mt-2 text-center">신청 후 관리자에게 알림이 발송됩니다.</p>
-            </div>
-        </form>
-
-        {% if matched_member %}
-        </div>
-        {% endif %}
-
-        <!-- 도움말 -->
-        <details class="mt-6">
-            <summary class="cursor-pointer text-xs text-gray-400 hover:text-eva-green text-center"><i data-lucide="circle-help" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 어느 쪽인지 잘 모르겠어요</summary>
-            <div class="eva-card rounded-lg p-4 mt-3 text-xs text-gray-300 space-y-2">
-                <p><strong class="text-eva-green">기존 부원</strong>: 동아리 활동을 한 번이라도 한 적이 있다면 이쪽입니다. 운영진이 회원명부에 등록한 이름·학번으로 확인합니다.</p>
-                <p><strong class="text-eva-green">신규 가입</strong>: 처음 동아리에 들어왔다면 이쪽입니다. 관리자 승인 후 활동할 수 있습니다.</p>
-                <p class="text-gray-500">잘못 선택해도 다시 시도할 수 있으니 부담 없이 골라주세요.</p>
-            </div>
-        </details>
-
-        <!-- 보안/개인정보 안내 -->
-        <div class="mt-6 p-3 rounded-lg bg-gray-900/50 border border-gray-700">
-            <p class="text-[11px] text-gray-400 leading-relaxed">
-                <i data-lucide="lock" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> <strong class="text-eva-green">카카오 OAuth 인증</strong>을 사용해 비밀번호를 직접 받지 않으며,
-                <strong>닉네임·프로필 사진·이메일</strong>만 동아리 운영 목적으로 사용합니다.
-                학번은 본인 확인용이며 외부에 공개되지 않습니다.
-            </p>
-        </div>
-
-        <p class="text-center mt-4">
-            <a href="{{ url_for('login') }}" class="text-xs text-gray-500 hover:text-eva-green underline">← 로그인 화면으로 돌아가기</a>
-        </p>
-    </div>
-
-    <script>
-        async function lookupProfile() {
-            const name = document.getElementById('lookupName').value.trim();
-            const sid = document.getElementById('lookupSid').value.trim();
-            const msg = document.getElementById('lookupMsg');
-            const result = document.getElementById('lookupResult');
-            msg.classList.add('hidden');
-            result.classList.add('hidden');
-            if (!name) {
-                msg.textContent = '동아리 명부에 등록된 이름을 입력해주세요.';
-                msg.classList.remove('hidden');
-                return;
-            }
-            if (!/^[0-9]{4,10}$/.test(sid)) {
-                msg.textContent = '학번을 숫자로 정확히 입력해주세요. (예: 2022123456)';
-                msg.classList.remove('hidden');
-                return;
-            }
-            try {
-                const res = await fetch('/api/link/lookup', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, student_id: sid }),
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || '조회 실패');
-                if (!data.found) {
-                    msg.textContent = data.already_linked
-                        ? '이름·학번이 일치하는 프로필은 이미 다른 카카오 계정과 연결되어 있어요. 본인 계정이 맞다면 관리자에게 문의해주세요.'
-                        : '이름과 학번이 모두 일치하는 부원을 찾지 못했어요. 입력 내용을 확인하거나 아래에서 관리자 승인 방식으로 연결해주세요.';
-                    msg.classList.remove('hidden');
-                    return;
-                }
-                document.getElementById('lookupName').textContent = data.masked_name + ' 님';
-                const parts = [];
-                if (data.department) parts.push(data.department);
-                if (data.recruiting_class) parts.push(data.recruiting_class + '기');
-                document.getElementById('lookupDetail').textContent = parts.length ? parts.join(' · ') : '등록된 부원';
-                document.getElementById('lookupNameHidden').value = name;
-                document.getElementById('lookupSidHidden').value = sid;
-                result.classList.remove('hidden');
-            } catch (err) {
-                msg.textContent = '오류: ' + err.message;
-                msg.classList.remove('hidden');
-            }
-        }
-        document.getElementById('lookupSid').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') { e.preventDefault(); lookupProfile(); }
-        });
-        document.getElementById('lookupName').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') { e.preventDefault(); lookupProfile(); }
-        });
-
-        function selectPath(path) {
-            document.getElementById('actionInput').value = path;
-            const cardLink = document.getElementById('pathLink');
-            const cardCreate = document.getElementById('pathCreate');
-            const fieldsLink = document.getElementById('linkFields');
-            const fieldsCreate = document.getElementById('createFields');
-            const form = document.getElementById('linkForm');
-
-            form.classList.remove('hidden');
-            if (path === 'link') {
-                cardLink.classList.add('selected');
-                cardLink.classList.remove('dimmed');
-                cardCreate.classList.remove('selected');
-                cardCreate.classList.add('dimmed');
-                fieldsLink.classList.remove('hidden');
-                fieldsCreate.classList.add('hidden');
-            } else {
-                cardCreate.classList.add('selected');
-                cardCreate.classList.remove('dimmed');
-                cardLink.classList.remove('selected');
-                cardLink.classList.add('dimmed');
-                fieldsCreate.classList.remove('hidden');
-                fieldsLink.classList.add('hidden');
-            }
-        }
-    </script>
-{% include '_icons.html' %}
-</body>
-
-</html>
+  button.addEventListener('click', lookupProfile);
+  [nameInput, sidInput].forEach(input => input.addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      lookupProfile();
+    }
+  }));
+})();
+</script>
+{% endblock %}

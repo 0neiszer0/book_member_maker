@@ -13,6 +13,9 @@
     .muted{color:var(--ink-soft,#6b6255)}.chip{display:inline-flex;flex:none;align-items:center;justify-content:center;white-space:nowrap;line-height:1.25;border-radius:999px;padding:.25rem .6rem;font-size:.75rem;font-weight:700;background:var(--paper-2,#f2ebd8)}
     .absence-option{border:1px solid var(--line,#e5d7b8);border-radius:10px;background:#fff;padding:.55rem .65rem;cursor:pointer}
     .absence-option:has(input:checked){border-color:var(--moss-deep,#3d5c2e);background:var(--moss-tint,#e8efdd)}
+    .review-entry{border-top:1px solid var(--line,#e5d7b8);padding:1rem 0}
+    .review-entry:first-child{border-top:0;padding-top:0}
+    .review-content{white-space:pre-wrap;line-height:1.75;color:var(--ink,#2a241b)}
   </style>
 </head>
 <body>{% include '_header.html' %}{% include '_admin_sidebar.html' %}
@@ -26,6 +29,7 @@
         {% for item in terms %}<option value="{{ item.id }}" {% if term and item.id==term.id %}selected{% endif %}>{{ item.name }}{% if not item.is_active %} · 보관됨{% endif %}</option>{% endfor %}
       </select>
       {% if share_url %}<button class="btn soft" data-copy="{{ share_url }}">월요일 신청 링크 복사</button>{% endif %}
+      <a class="btn primary" href="#seminar-reviews">후기 모아보기</a>
     </div>
   </div>
 
@@ -46,6 +50,59 @@
       </div>
     </div>
   </details>
+
+  <section id="seminar-reviews" class="panel p-4 lg:p-6 mb-5 scroll-mt-24">
+    <div class="flex flex-wrap items-end justify-between gap-3 mb-4">
+      <div>
+        <p class="text-sm font-bold muted">REVIEW</p>
+        <h2 class="text-2xl font-extrabold">세미나 후기</h2>
+        <p class="text-sm muted mt-1">후기 링크와 제출 내용을 회차별로 관리합니다.</p>
+      </div>
+      <span class="chip">{{ review_overview|length }}개 회차</span>
+    </div>
+    <div class="space-y-3">
+      {% for item in review_overview %}
+      <details id="review-{{ item.form.id }}" class="rounded-2xl border border-[#e5d7b8] bg-[#fffdf8] p-4">
+        <summary class="cursor-pointer list-none">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <strong>{{ item.session.meeting_date }} · {{ item.week.book_title or item.session.book_title or '도서 미정' }}</strong>
+              <span class="block text-sm muted mt-1">{{ '목요일 본 세미나' if item.session.day_type == 'thu' else '월요일 추가 세미나' }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="chip">{{ '접수 중' if item.form.status == 'open' else '마감' }}</span>
+              <span class="chip">{{ item.form.submission_count }}명 제출</span>
+              <span aria-hidden="true">⌄</span>
+            </div>
+          </div>
+        </summary>
+        <div class="flex flex-wrap gap-2 mt-4 pb-4 border-b border-[#e5d7b8]">
+          <button class="btn soft" data-copy="{{ item.form.share_url }}">후기 링크 복사</button>
+          <button class="btn soft review-form-status"
+                  data-form-id="{{ item.form.id }}"
+                  data-status="{{ 'closed' if item.form.status == 'open' else 'open' }}">
+            {{ '접수 마감' if item.form.status == 'open' else '다시 열기' }}
+          </button>
+        </div>
+        <div class="pt-4">
+          {% for review in item.form.submissions %}
+          <article class="review-entry">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <strong>{{ review.member.name or '회원 정보 없음' }}</strong>
+              <span class="text-xs muted">{{ (review.updated_at or review.created_at or '')[:10] }}</span>
+            </div>
+            <p class="review-content">{{ review.review_content }}</p>
+          </article>
+          {% else %}
+          <p class="text-sm muted">아직 제출된 후기가 없습니다.</p>
+          {% endfor %}
+        </div>
+      </details>
+      {% else %}
+      <div class="rounded-2xl bg-[#f7f1e4] p-5 text-sm muted">회차 카드에서 ‘후기 받기’를 누르면 이곳에 후기 링크와 제출 내용이 표시됩니다.</div>
+      {% endfor %}
+    </div>
+  </section>
 
   {% if not term %}<div class="panel p-8 text-center muted">등록된 학기가 없습니다. 기존 관리자 화면에서 학기를 먼저 추가해주세요.</div>{% endif %}
   <div class="space-y-5">
@@ -85,7 +142,7 @@
             <div class="flex gap-2 mt-3"><input class="field !w-24 capacity" type="number" min="1" value="{{ mon.capacity or 10 }}" aria-label="월요일 추가 세미나 정원"><button class="btn soft save-capacity" data-session-id="{{ mon.id }}">이 정원으로 변경</button></div>
             <p class="text-xs muted mt-2">숫자를 바꾼 뒤 ‘이 정원으로 변경’을 눌러야 반영됩니다.</p>
             <div class="flex flex-wrap gap-1 mt-3">{% for m in mon.attendees %}<span class="chip">{{ m.name }}</span>{% else %}<span class="text-sm muted">신청자가 없습니다.</span>{% endfor %}</div>
-            <div class="flex flex-wrap gap-2 mt-4"><a class="btn primary" href="{{ url_for('bookclub_index', session_id=mon.id) }}">조 편성</a>{% if mon.history %}<a class="btn soft" href="{{ url_for('records_seminar_detail', history_id=mon.history.id) }}">진행 기록</a>{% endif %}{% if mon.review_form %}<button class="btn soft" data-copy="{{ mon.review_form.share_url }}">후기 링크 · {{ mon.review_form.submission_count }}명</button>{% else %}<button class="btn soft open-review" data-session-id="{{ mon.id }}">후기 받기</button>{% endif %}</div>
+            <div class="flex flex-wrap gap-2 mt-4"><a class="btn primary" href="{{ url_for('bookclub_index', session_id=mon.id) }}">조 편성</a>{% if mon.history %}<a class="btn soft" href="{{ url_for('records_seminar_detail', history_id=mon.history.id) }}">진행 기록</a>{% endif %}{% if mon.review_form %}<button class="btn soft" data-copy="{{ mon.review_form.share_url }}">후기 링크 복사</button><a class="btn soft" href="#review-{{ mon.review_form.id }}">후기 {{ mon.review_form.submission_count }}개 보기</a>{% else %}<button class="btn soft open-review" data-session-id="{{ mon.id }}">후기 받기</button>{% endif %}</div>
           {% else %}<p class="muted text-sm mt-3">이 주차에는 월요일 회차가 없습니다.</p>{% endif %}
         </div>
         <div class="rounded-2xl border border-[#eadac5] p-4 order-2">
@@ -112,7 +169,7 @@
                 <button type="button" class="btn primary add-absences mt-2" data-session-id="{{ thu.id }}" {% if picker.count == 0 %}disabled{% endif %}>선택한 회원 불참 처리</button>
               </div>
             </details>
-            <div class="flex flex-wrap gap-2 mt-4"><a class="btn primary" href="{{ url_for('bookclub_index', session_id=thu.id) }}">조 편성</a>{% if thu.history %}<a class="btn soft" href="{{ url_for('records_seminar_detail', history_id=thu.history.id) }}">진행 기록</a>{% endif %}{% if thu.review_form %}<button class="btn soft" data-copy="{{ thu.review_form.share_url }}">후기 링크 · {{ thu.review_form.submission_count }}명</button>{% else %}<button class="btn soft open-review" data-session-id="{{ thu.id }}">후기 받기</button>{% endif %}</div>
+            <div class="flex flex-wrap gap-2 mt-4"><a class="btn primary" href="{{ url_for('bookclub_index', session_id=thu.id) }}">조 편성</a>{% if thu.history %}<a class="btn soft" href="{{ url_for('records_seminar_detail', history_id=thu.history.id) }}">진행 기록</a>{% endif %}{% if thu.review_form %}<button class="btn soft" data-copy="{{ thu.review_form.share_url }}">후기 링크 복사</button><a class="btn soft" href="#review-{{ thu.review_form.id }}">후기 {{ thu.review_form.submission_count }}개 보기</a>{% else %}<button class="btn soft open-review" data-session-id="{{ thu.id }}">후기 받기</button>{% endif %}</div>
           {% else %}<p class="muted text-sm mt-3">이 주차에는 목요일 회차가 없습니다.</p>{% endif %}
         </div>
       </div>
@@ -140,6 +197,7 @@ document.addEventListener('click',async e=>{
   if(e.target.closest('.open-topic')){const b=e.target.closest('.open-topic');await api('/api/admin/seminar_weeks/'+b.dataset.weekId+'/open_topics',{method:'POST',body:'{}'});location.reload()}
   if(e.target.closest('.toggle-topic')){const b=e.target.closest('.toggle-topic');await api('/api/admin/topic_events/'+b.dataset.eventId+'/toggle_active',{method:'POST',body:'{}'});location.reload()}
   if(e.target.closest('.open-review')){const b=e.target.closest('.open-review'),result=await api('/api/admin/seminar_sessions/'+b.dataset.sessionId+'/review-form',{method:'POST',body:'{}'});await navigator.clipboard.writeText(result.url);alert('후기 링크를 열고 복사했습니다.');location.reload()}
+  if(e.target.closest('.review-form-status')){const b=e.target.closest('.review-form-status');await api('/api/admin/engagement/forms/seminar/'+b.dataset.formId+'/status',{method:'POST',body:JSON.stringify({status:b.dataset.status})});location.reload()}
   if(e.target.closest('.save-capacity')){const b=e.target.closest('.save-capacity');await api('/api/admin/seminar_sessions/'+b.dataset.sessionId+'/capacity',{method:'PATCH',body:JSON.stringify({capacity:Number(b.parentElement.querySelector('.capacity').value)})});location.reload()}
   if(e.target.closest('.select-visible-absences')){const picker=e.target.closest('.absence-picker');picker.querySelectorAll('.absence-option:not([hidden]) .absence-checkbox').forEach(input=>input.checked=true);updateAbsenceSelection(picker);return}
   if(e.target.closest('.clear-absence-selection')){const picker=e.target.closest('.absence-picker');picker.querySelectorAll('.absence-checkbox').forEach(input=>input.checked=false);updateAbsenceSelection(picker);return}

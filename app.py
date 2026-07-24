@@ -3275,7 +3275,9 @@ def _load_weekly_seminar_view(term_id=None):
             .in_('seminar_session_id', session_ids).execute().data or []
         review_form_ids = [row['id'] for row in review_forms]
         if review_form_ids:
-            review_submissions = supabase.table('seminar_reviews').select('form_id') \
+            review_submissions = supabase.table('seminar_reviews').select(
+                'id, form_id, member_id, memorable_point, discussion_point, free_text, created_at, updated_at'
+            ) \
                 .in_('form_id', review_form_ids).is_('deleted_at', 'null').execute().data or []
     submissions = []
     if topic_ids:
@@ -3291,11 +3293,24 @@ def _load_weekly_seminar_view(term_id=None):
         submission_count[row['event_id']] += 1
     history_by_session = {row['seminar_session_id']: row for row in histories if row.get('seminar_session_id')}
     review_count = defaultdict(int)
+    reviews_by_form = defaultdict(list)
     for row in review_submissions:
         review_count[row['form_id']] += 1
+        row['member'] = member_by_id.get(row.get('member_id'), {})
+        row['review_content'] = '\n\n'.join(filter(None, [
+            row.get('memorable_point'),
+            row.get('discussion_point'),
+            row.get('free_text'),
+        ]))
+        reviews_by_form[row['form_id']].append(row)
     review_by_session = {}
     for row in review_forms:
         row['submission_count'] = review_count[row['id']]
+        row['submissions'] = sorted(
+            reviews_by_form[row['id']],
+            key=lambda item: item.get('updated_at') or item.get('created_at') or '',
+            reverse=True,
+        )
         row['share_url'] = f"{request.host_url}review/seminar/{row['share_token']}"
         review_by_session[row['seminar_session_id']] = row
     votes_by_session = defaultdict(list)
@@ -3344,9 +3359,20 @@ def admin_seminars():
     try:
         terms, term, weeks, active_members = _load_weekly_seminar_view(request.args.get('term_id'))
         weeks = [row for row in weeks if not row['is_past']] + list(reversed([row for row in weeks if row['is_past']]))
+        review_overview = sorted([
+            {
+                'session': seminar_session,
+                'form': seminar_session['review_form'],
+                'week': week,
+            }
+            for week in weeks
+            for seminar_session in week['sessions']
+            if seminar_session.get('review_form')
+        ], key=lambda item: item['session'].get('meeting_date') or '', reverse=True)
         share_url = f"{request.host_url}seminar_vote?token={term['share_token']}" if term else ''
         return render_template('admin_seminars.html', terms=terms, term=term, weeks=weeks,
-                               all_members=active_members, share_url=share_url)
+                               all_members=active_members, share_url=share_url,
+                               review_overview=review_overview)
     except Exception as e:
         app.logger.error(f"admin_seminars error: {e}", exc_info=True)
         flash(f"세미나 운영 정보를 불러오는 중 오류가 발생했습니다: {e}", 'danger')
