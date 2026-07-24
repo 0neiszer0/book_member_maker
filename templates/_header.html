@@ -78,14 +78,14 @@
             <a href="{{ notion_public_wiki_url }}" target="_blank" rel="noopener noreferrer" class="wd-menu-item">
               <span class="wd-menu-ico"><i data-lucide="book-open" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>공식 위키
             </a>
-            {% if session.user_role == 'admin' or session.member_preview %}
+            {% if session.user_role == 'admin' or session.get('member_preview') %}
               <div class="wd-menu-divider"></div>
               <form method="post" action="{{ url_for('toggle_member_preview') }}" class="wd-preview-form">
-                <span>회원 화면으로 보기</span>
+                <span>{% if session.get('member_preview') %}회원 화면으로 보는 중{% else %}회원 화면으로 보기{% endif %}</span>
                 <button type="submit"
-                        class="wd-switch {% if session.member_preview %}wd-switch-on{% endif %}"
-                        aria-label="{% if session.member_preview %}관리자 화면으로 돌아가기{% else %}회원 화면으로 전환하기{% endif %}"
-                        aria-pressed="{{ 'true' if session.member_preview else 'false' }}">
+                        class="wd-switch {% if session.get('member_preview') %}wd-switch-on{% endif %}"
+                        aria-label="{% if session.get('member_preview') %}관리자 화면으로 돌아가기{% else %}회원 화면으로 전환하기{% endif %}"
+                        aria-pressed="{{ 'true' if session.get('member_preview') else 'false' }}">
                   <span class="wd-switch-thumb"></span>
                 </button>
               </form>
