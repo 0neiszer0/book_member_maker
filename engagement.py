@@ -187,7 +187,7 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
                         "kind": "추가 세미나 신청",
                         "title": f"{row['meeting_date']} 월요일",
                         "description": f"{row.get('book_title') or '도서 미정'} · {seats}/{capacity}명 신청 · 남은 자리 {max(0, capacity-seats)}석",
-                        "url": url_for("seminar_vote", token=term["share_token"]),
+                        "url": url_for("seminar_vote_page", token=term["share_token"]),
                         "close_at": close_at.astimezone(timezone.utc).isoformat(),
                     })
         topic_rows = (
