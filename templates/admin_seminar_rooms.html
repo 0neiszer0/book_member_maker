@@ -15,7 +15,7 @@
         :root {
             --eva-purple: #7A5A3A;
             --eva-green: #3D5C2E;
-            --eva-orange: #FF8C00;
+            --eva-orange: #C97A3A;
             --bg-dark: #FAF6EC;
             --card-dark: #FFFCF3;
             --text-light: #2A241B;
@@ -44,7 +44,7 @@
         }
 
         .cal-cell {
-            background-color: #232323;
+            background-color: var(--surface);
             border: 1px solid var(--border-dark);
             border-radius: 6px;
             min-height: 110px;
@@ -70,7 +70,7 @@
 
         .day-num {
             font-size: 0.78rem;
-            color: #aaa;
+            color: var(--ink-faint);
             margin-bottom: 4px;
             display: flex;
             justify-content: space-between;
@@ -91,44 +91,44 @@
         }
 
         .badge.approved {
-            background: rgba(0, 255, 127, 0.12);
-            color: #6df0a9;
-            border-color: rgba(0, 255, 127, 0.4);
+            background: rgba(92, 122, 74, 0.14);
+            color: #3D5C2E;
+            border-color: rgba(61, 92, 46, 0.35);
         }
 
         .badge.pending {
-            background: rgba(255, 200, 0, 0.12);
-            color: #f4d36b;
-            border-color: rgba(255, 200, 0, 0.4);
+            background: rgba(201, 122, 58, 0.12);
+            color: #81551A;
+            border-color: rgba(201, 122, 58, 0.35);
         }
 
         .badge.rejected {
-            background: rgba(255, 80, 80, 0.10);
-            color: #f88;
-            border-color: rgba(255, 80, 80, 0.35);
+            background: rgba(177, 74, 45, 0.10);
+            color: #B14A2D;
+            border-color: rgba(177, 74, 45, 0.30);
             text-decoration: line-through;
             opacity: 0.7;
         }
 
         .badge.mine {
-            outline: 1px dashed #fff;
+            outline: 1px dashed var(--walnut);
         }
 
         .wd-header {
             text-align: center;
             font-size: 0.75rem;
-            color: #888;
+                color: var(--ink-faint);
             padding: 6px 0;
             font-weight: 700;
 
         }
 
         .wd-header.sat {
-            color: #6cb6ff;
+            color: #4D6572;
         }
 
         .wd-header.sun {
-            color: #ff8c8c;
+            color: #B14A2D;
         }
 
         .legend-chip {
@@ -209,7 +209,7 @@
                 </div>
                 <button id="refreshBtn"
                     class="bg-eva-green text-black font-bold px-3 py-1.5 rounded text-sm hover:opacity-80"
-                    style="background: var(--eva-green); color: #000">
+                        style="background: var(--eva-green); color: #fff">
                     <i data-lucide="refresh-cw" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 지금 새로고침
                 </button>
             </div>
@@ -217,9 +217,9 @@
 
         <!-- 범례 -->
         <div class="eva-card rounded-lg p-3 flex flex-wrap items-center gap-3 text-xs text-gray-300">
-            <span class="legend-chip" style="color:#6df0a9; border-color: rgba(0,255,127,0.4)">● 승인</span>
-            <span class="legend-chip" style="color:#f4d36b; border-color: rgba(255,200,0,0.4)">● 대기</span>
-            <span class="legend-chip" style="color:#f88;    border-color: rgba(255,80,80,0.35)">● 반려</span>
+            <span class="legend-chip" style="color:#3D5C2E; border-color: rgba(61,92,46,.35)">● 승인</span>
+                    <span class="legend-chip" style="color:#81551A; border-color: rgba(201,122,58,.35)">● 대기</span>
+                    <span class="legend-chip" style="color:#B14A2D; border-color: rgba(177,74,45,.30)">● 반려</span>
             <span class="text-gray-500">| 월/목 = 우리 동아리 세미나 요일 (초록색 강조)</span>
         </div>
 
@@ -299,13 +299,13 @@
                               <td class="p-2 text-center">
                                   {% if row.p.status == 'approved' %}
                                   <span class="px-2 py-0.5 rounded text-xs"
-                                        style="background: rgba(0,255,127,.15); color:#6df0a9">승인</span>
+                                        style="background: rgba(92,122,74,.16); color:#3D5C2E">승인</span>
                                   {% elif row.p.status == 'rejected' %}
                                   <span class="px-2 py-0.5 rounded text-xs"
-                                        style="background: rgba(255,80,80,.15); color:#f88">반려</span>
+                                            style="background: rgba(177,74,45,.12); color:#B14A2D">반려</span>
                                   {% else %}
                                   <span class="px-2 py-0.5 rounded text-xs"
-                                        style="background: rgba(255,200,0,.15); color:#f4d36b">대기</span>
+                                            style="background: rgba(201,122,58,.12); color:#81551A">대기</span>
                                   {% endif %}
                               </td>
                               <td class="p-2">
@@ -453,7 +453,7 @@
                 <div class="flex items-center gap-2 flex-wrap">
                     <a href="{{ write_url }}" target="_blank" rel="noopener"
                         class="font-bold px-3 py-2 rounded text-sm hover:opacity-80"
-                        style="background:var(--eva-green); color:#000">
+                    style="background:var(--eva-green); color:#fff">
                         <i data-lucide="pencil" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 총동연 글쓰기 페이지 열기 ↗
                     </a>
                     <span class="text-xs text-gray-500">로그인 후 제목/내용 붙여넣기</span>
