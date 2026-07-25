@@ -9,17 +9,17 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap"
         rel="stylesheet">
     <style>
         :root {
-            --eva-purple: #6A0DAD;
-            --eva-green: #00FF7F;
+            --eva-purple: #7A5A3A;
+            --eva-green: #3D5C2E;
             --eva-orange: #FF8C00;
-            --bg-dark: #1A1A1A;
-            --card-dark: #2D2D2D;
-            --text-light: #E5E5E5;
-            --border-dark: #444444;
+            --bg-dark: #FAF6EC;
+            --card-dark: #FFFCF3;
+            --text-light: #2A241B;
+            --border-dark: #C9B38A;
         }
 
         body {
@@ -34,9 +34,9 @@
         h4,
         h5,
         h6 {
-            font-family: 'Orbitron', sans-serif;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
+            font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+
+
         }
 
         .eva-card {
@@ -88,7 +88,7 @@
         }
 
         .eva-input {
-            background-color: #1A1A1A;
+            background-color: #FAF6EC;
             border-color: var(--border-dark);
             color: var(--text-light);
             cursor: pointer;
@@ -557,7 +557,7 @@
                 }
 
                 // 시각적 피드백
-                selectEl.style.borderColor = status === 'active' ? '#00FF7F' : status === 'dormant' ? '#FBBF24' : '#6B7280';
+                selectEl.style.borderColor = status === 'active' ? '#3D5C2E' : status === 'dormant' ? '#FBBF24' : '#6B7280';
                 setTimeout(() => selectEl.style.borderColor = '', 2000);
             } catch (error) {
                 alert('오류: ' + error.message);
