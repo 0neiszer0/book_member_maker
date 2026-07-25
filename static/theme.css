@@ -20,7 +20,7 @@ html { /* :root 와 동일 specificity, 더 뒤에 위치해서 승리 */
   --surface:      #FFFCF3;   /* 카드 배경 */
   --ink:          #2A241B;   /* 본문 (월넛 다크) */
   --ink-soft:     #5C5142;   /* 보조 본문 */
-  --ink-faint:    #9C8E78;   /* 메타·캡션 */
+  --ink-faint:    #756A59;   /* 작은 설명에도 충분한 명암을 유지 */
   --moss:         #5C7A4A;   /* 강조 그린 */
   --moss-deep:    #3D5C2E;   /* 진한 그린 (CTA) */
   --moss-tint:    #E8EFDD;   /* 그린 매우 옅게 (배경) */
@@ -123,16 +123,35 @@ input:focus, select:focus, textarea:focus {
   outline: none !important;
   box-shadow: 0 0 0 3px rgba(92,122,74,.22) !important;
 }
+input::placeholder,
+textarea::placeholder {
+  color: #756A59 !important;
+  opacity: 1 !important;
+}
+.eva-input[readonly],
+input[readonly],
+textarea[readonly] {
+  background-color: var(--paper-2) !important;
+  color: var(--ink-soft) !important;
+  opacity: 1 !important;
+}
 
 /* ---- 다크 Tailwind 유틸 보정 (자주 쓰이는 것만 swap) ---- */
 .bg-gray-700, .bg-gray-900 { background-color: var(--paper-2) !important; color: var(--ink) !important; }
 .bg-gray-800\/50 { background-color: rgba(242,235,216,.6) !important; }
+.bg-gray-900\/50, .bg-gray-800\/70 { background-color: rgba(242,235,216,.76) !important; }
+.bg-gray-700\/50 { background-color: rgba(242,235,216,.58) !important; }
 .bg-gray-700\/30 { background-color: rgba(242,235,216,.4) !important; }
 .bg-gray-900\/20 { background-color: rgba(242,235,216,.4) !important; }
 .text-gray-200, .text-gray-300, .text-gray-400 { color: var(--ink-soft) !important; }
 .text-gray-500, .text-gray-600 { color: var(--ink-faint) !important; }
 .border-gray-600, .border-gray-700, .border-border-dark { border-color: var(--line) !important; }
 .bg-bg-dark { background-color: var(--paper) !important; }
+.hover\:bg-gray-700:hover,
+.hover\:bg-gray-800\/50:hover,
+.hover\:bg-gray-900\/50:hover {
+  background-color: var(--moss-tint) !important;
+}
 
 /* 테이블 zebra */
 .eva-table-header { background-color: var(--walnut-tint) !important; color: var(--ink) !important; }

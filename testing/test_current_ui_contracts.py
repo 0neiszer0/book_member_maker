@@ -38,8 +38,37 @@ class CurrentUiContractsTest(unittest.TestCase):
     def test_html_response_gets_a_light_first_paint(self):
         app_source = self.read("app.py")
         self.assertIn('data-critical-theme="wood"', app_source)
+        self.assertIn('data-wood-theme="1"', app_source)
         self.assertIn('<meta name="color-scheme" content="light">', app_source)
         self.assertIn("body{background-color:#FAF6EC}", app_source)
+
+    def test_topic_submission_has_readable_current_theme(self):
+        topic = self.read("templates/topic_submit.html")
+        self.assertIn('data-wood-theme="1"', topic)
+        self.assertIn("topic-hero", topic)
+        self.assertIn(".topic-author { color: #5C5142", topic)
+        self.assertIn("label { color: #2A241B", topic)
+        self.assertNotIn("opacity:0.7", topic)
+
+    def test_legacy_neon_theme_is_gone_from_templates(self):
+        legacy_tokens = ("Orbitron", "#00FF7F", "#6A0DAD", "#1A1A1A", "#2D2D2D")
+        for template in (ROOT / "templates").glob("*.html"):
+            source = template.read_text(encoding="utf-8")
+            for token in legacy_tokens:
+                self.assertNotIn(token, source, f"{token} remains in {template.name}")
+
+    def test_now_uses_the_registered_monday_vote_endpoint(self):
+        engagement = self.read("engagement.py")
+        self.assertIn('url_for("seminar_vote_page", token=', engagement)
+        self.assertNotIn('url_for("seminar_vote", token=', engagement)
+
+    def test_legacy_genres_are_not_shown_in_seminar_activity(self):
+        member = self.read("templates/records_member_profile.html")
+        seminars = self.read("templates/records_seminars.html")
+        detail = self.read("templates/records_seminar_detail.html")
+        self.assertNotIn("s.genre", member)
+        self.assertNotIn("genreFilter", seminars)
+        self.assertNotIn("genreSelect", detail)
 
     def test_book_cards_have_a_clear_action(self):
         books = self.read("templates/book_suggestions.html")

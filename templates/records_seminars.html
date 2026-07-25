@@ -1,4 +1,4 @@
-{% from '_records_base.html' import records_nav, genre_selector, genre_script, term_filter %}
+{% from '_records_base.html' import records_nav, term_filter %}
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -21,11 +21,6 @@
                 </a>
                 <input type="text" id="seminarSearch" placeholder="도서명·날짜 검색"
                     class="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm w-full md:w-64">
-                <select id="genreFilter" class="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm">
-                    <option value="">전체 장르</option>
-                    {% for g in genres %}<option value="{{ g.name }}">{{ g.name }}</option>{% endfor %}
-                    <option value="__none">미분류</option>
-                </select>
             </div>
         </div>
         <p class="text-xs text-gray-500 mb-3">
@@ -49,7 +44,6 @@
                         <tr class="bg-gray-700/30 text-left text-gray-300">
                             <th class="p-3">날짜</th>
                             <th class="p-3">도서명</th>
-                            <th class="p-3">장르</th>
                             <th class="p-3 text-center">참여</th>
                             <th class="p-3 text-center">조</th>
                             <th class="p-3 text-center">발제자</th>
@@ -59,22 +53,12 @@
                     <tbody>
                         {% for h in bucket.rows %}
                         <tr class="seminar-row border-t border-border-dark/50 hover:bg-gray-700/20"
-                            data-date="{{ h.date }}" data-title="{{ h.book_title or '' }}"
-                            data-genre="{{ h.genre or '__none' }}">
+                            data-date="{{ h.date }}" data-title="{{ h.book_title or '' }}">
                             <td class="p-3 font-mono text-gray-300">{{ h.date }}</td>
                             <td class="p-3">
                                 <input type="text" value="{{ h.book_title or '' }}" placeholder="(미입력)"
                                     onblur="updateMeta({{ h.id }}, 'book_title', this.value)"
                                     class="bg-transparent border-b border-transparent hover:border-gray-600 focus:border-eva-green focus:bg-gray-800 px-2 py-1 text-sm w-full focus:outline-none">
-                            </td>
-                            <td class="p-3">
-                                <select onchange="updateMeta({{ h.id }}, 'genre', this.value)"
-                                    class="genre-select bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs">
-                                    <option value="">미분류</option>
-                                    {% for g in genres %}
-                                    <option value="{{ g.name }}" {% if g.name == h.genre %}selected{% endif %}>{{ g.name }}</option>
-                                    {% endfor %}
-                                </select>
                             </td>
                             <td class="p-3 text-center text-eva-green font-bold">{{ h.present_count }}</td>
                             <td class="p-3 text-center text-gray-300">{{ h.group_count }}</td>
@@ -93,12 +77,9 @@
         </details>
         {% endfor %}
 
-        <div class="mt-4 text-xs text-gray-500">
-            도서명 · 장르는 인라인으로 수정됩니다 (관리자 전용). 새 장르가 필요하면 다른 페이지의 "+ 장르 추가" 버튼을 사용하세요.
-        </div>
+        <div class="mt-4 text-xs text-gray-500">도서명은 목록에서 바로 수정할 수 있습니다.</div>
     </div>
 
-    {{ genre_script() }}
     <script>
         async function updateMeta(historyId, field, value) {
             try {
@@ -117,17 +98,14 @@
         }
 
         const search = document.getElementById('seminarSearch');
-        const genreFilter = document.getElementById('genreFilter');
         const rows = document.querySelectorAll('.seminar-row');
         function applyFilter() {
             const q = (search.value || '').trim().toLowerCase();
-            const gf = genreFilter.value;
-            const filtering = q || gf;
+            const filtering = q;
             rows.forEach(r => {
                 const text = (r.dataset.date + ' ' + r.dataset.title).toLowerCase();
                 const matchSearch = !q || text.includes(q);
-                const matchGenre = !gf || r.dataset.genre === gf;
-                r.style.display = (matchSearch && matchGenre) ? '' : 'none';
+                r.style.display = matchSearch ? '' : 'none';
             });
             // 필터 활성 시: 매칭된 row가 있는 bucket은 자동 펼침
             document.querySelectorAll('details.eva-card').forEach(d => {
@@ -136,7 +114,6 @@
             });
         }
         search.addEventListener('input', applyFilter);
-        genreFilter.addEventListener('change', applyFilter);
     </script>
 </body>
 </html>

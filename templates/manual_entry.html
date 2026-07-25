@@ -6,11 +6,11 @@
     <title>수동 조 편성 기록</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        :root { --eva-purple: #6A0DAD; --eva-green: #00FF7F; --bg-dark: #1A1A1A; --card-dark: #2D2D2D; --text-light: #E5E5E5; --border-dark: #444444; }
+        :root { --eva-purple: #7A5A3A; --eva-green: #3D5C2E; --bg-dark: #FAF6EC; --card-dark: #FFFCF3; --text-light: #2A241B; --border-dark: #C9B38A; }
         body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
-        h1, h2, h3 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; }
+        h1, h2, h3 { font-family: 'Pretendard', 'Noto Sans KR', sans-serif;   }
         .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
         .eva-input { background-color: var(--bg-dark); border-color: var(--border-dark); color: var(--text-light); }
         .eva-button { font-weight: bold; transition: opacity 0.2s; }
@@ -44,7 +44,7 @@
         {% endwith %}
 
         <form id="manual-form" action="{{ url_for('save_manual_groups') }}" method="POST" class="eva-card p-6 rounded-lg space-y-6">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label for="meeting_date" class="block text-sm font-bold text-eva-purple mb-1">모임 날짜 *</label>
                     <input type="date" id="meeting_date" name="meeting_date" required
@@ -57,15 +57,6 @@
                         value="{{ prefill.book_title or '' }}"
                         placeholder="예: 데미안 — 헤르만 헤세"
                         class="eva-input w-full p-2 rounded-md">
-                </div>
-                <div>
-                    <label for="genre" class="block text-sm font-bold text-eva-purple mb-1"><i data-lucide="tag" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 장르</label>
-                    <select id="genre" name="genre" class="eva-input w-full p-2 rounded-md">
-                        <option value="">미분류</option>
-                        {% for g in genres %}
-                        <option value="{{ g.name }}">{{ g.name }}</option>
-                        {% endfor %}
-                    </select>
                 </div>
             </div>
 
@@ -188,12 +179,12 @@
 
                 Object.assign(captureContainer.style, {
                     position: 'absolute', top: '-9999px', left: '0px',
-                    width: '550px', padding: '24px', backgroundColor: '#2D2D2D',
-                    color: '#E5E5E5', fontFamily: "'Noto Sans KR', sans-serif",
-                    border: '1px solid #444444', borderRadius: '12px'
+                    width: '550px', padding: '24px', backgroundColor: '#FFFCF3',
+                    color: '#2A241B', fontFamily: "'Noto Sans KR', sans-serif",
+                    border: '1px solid #C9B38A', borderRadius: '12px'
                 });
 
-                let innerHTML = '<h3 style="font-family: \'Orbitron\', sans-serif; font-size: 20px; font-weight: bold; color: #00FF7F; margin-bottom: 16px; text-transform: uppercase;">수동 편성 결과</h3>';
+                let innerHTML = '<h3 style="font-family: \'Pretendard\', \'Noto Sans KR\', sans-serif; font-size: 20px; font-weight: bold; color: #3D5C2E; margin-bottom: 16px;">수동 편성 결과</h3>';
                 if (meetingDate) { innerHTML += `<p style="font-size: 14px; margin-bottom: 16px;"><strong>날짜:</strong> ${meetingDate}</p>`; }
 
                 groupsData.forEach((group, index) => {
@@ -206,7 +197,7 @@
                         return name;
                     }).sort().join(', ');
 
-                    innerHTML += `<div style="background-color: #1A1A1A; padding: 12px; border-radius: 8px; margin-bottom: 10px;"><strong style="color: #E5E5E5;">그룹 ${index + 1}:</strong> ${memberNames}</div>`;
+                    innerHTML += `<div style="background-color: #FAF6EC; padding: 12px; border-radius: 8px; margin-bottom: 10px;"><strong style="color: #2A241B;">그룹 ${index + 1}:</strong> ${memberNames}</div>`;
                 });
                 captureContainer.innerHTML = innerHTML;
                 document.body.appendChild(captureContainer);

@@ -6,17 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ event.book_title }} - 발제문 제출</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap"
         rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}" data-wood-theme="1">
     <style>
         :root {
-            --eva-purple: #6A0DAD;
-            --eva-green: #00FF7F;
-            --bg-dark: #1A1A1A;
-            --card-dark: #2D2D2D;
-            --text-light: #E5E5E5;
-            --border-dark: #444444;
+            --eva-purple: #7A5A3A;
+            --eva-green: #3D5C2E;
+            --bg-dark: #FAF6EC;
+            --card-dark: #FFFCF3;
+            --text-light: #2A241B;
+            --border-dark: #C9B38A;
         }
 
         body {
@@ -25,31 +25,33 @@
             color: var(--text-light);
         }
 
-        h1, h2 { font-family: 'Orbitron', sans-serif; }
+        h1, h2 { font-family: 'Noto Sans KR', sans-serif; }
 
         .eva-card {
             background-color: var(--card-dark);
             border: 1px solid var(--border-dark);
+            border-radius: 18px !important;
         }
 
         .eva-input {
-            background-color: #1A1A1A;
+            background-color: #FFFCF3;
             border: 1px solid var(--border-dark);
             color: var(--text-light);
+            min-height: 44px;
         }
 
         .eva-input:focus {
             border-color: var(--eva-green);
             outline: none;
-            box-shadow: 0 0 0 2px rgba(0, 255, 127, 0.2);
+            box-shadow: 0 0 0 3px rgba(61, 92, 46, 0.18);
         }
 
         .step-num {
             display: inline-flex;
             width: 1.5rem; height: 1.5rem;
             border-radius: 9999px;
-            background: var(--eva-green);
-            color: #000;
+            background: #3D5C2E;
+            color: #fff;
             align-items: center; justify-content: center;
             font-weight: 700; font-size: 0.85rem;
             margin-right: 0.5rem;
@@ -63,23 +65,53 @@
             font-weight: 700;
             margin-left: 0.4rem;
         }
-        .badge-member { background: var(--eva-green); color: #000; }
+        .badge-member { background: #3D5C2E; color: #fff; }
         .badge-guest { background: #d97706; color: #fff; }
-        .preview-card { border: 2px solid var(--eva-green); }
-        .preview-item { background: rgba(255,255,255,.035); border: 1px solid var(--border-dark); }
+        .preview-card { border: 2px solid #8FAE6E; }
+        .preview-item { background: #FAF6EC; border: 1px solid #E5D7B8; }
+        label { color: #2A241B !important; font-weight: 700; }
+        summary { color: #2A241B !important; }
+        .topic-hero {
+            padding: 1.5rem;
+            border: 1px solid #C9B38A;
+            border-radius: 22px;
+            background: linear-gradient(145deg, #E8EFDD, #FFFCF3 70%);
+            text-align: left;
+        }
+        .topic-hero h1 { color: #2A241B !important; line-height: 1.25; }
+        .topic-hero .topic-author { color: #5C5142 !important; font-weight: 700; }
+        .topic-hero .topic-date { color: #5C5142 !important; }
+        .topic-kicker {
+            color: #3D5C2E;
+            font-size: .78rem;
+            font-weight: 800;
+            letter-spacing: .04em;
+        }
+        #verifyBtn, #submitBtn {
+            background: #3D5C2E !important;
+            color: #fff !important;
+            border: 1px solid #3D5C2E;
+            box-shadow: none !important;
+        }
+        #addTopicBtn {
+            background: #F2EBD8 !important;
+            color: #2A241B !important;
+            border-color: #C9B38A !important;
+        }
+        #writeCard { color: #2A241B; }
     </style>
 </head>
 
 <body class="p-4 md:p-8">
     <div class="max-w-3xl mx-auto">
         <!-- 헤더 -->
-        <div class="text-center mb-6">
-            <p class="text-xs text-gray-400 mb-1"><i data-lucide="book" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 발제문 제출</p>
+        <div class="topic-hero mb-6">
+            <p class="topic-kicker mb-2"><i data-lucide="book" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 발제문 제출</p>
             <h1 class="text-2xl md:text-3xl font-bold text-eva-green">{{ event.book_title }}</h1>
             {% if event.book_author %}
-            <p class="text-sm text-gray-300 mt-1">{{ event.book_author }}</p>
+            <p class="topic-author text-sm mt-2">{{ event.book_author }}</p>
             {% endif %}
-            <p class="text-gray-400 mt-2 text-sm"><i data-lucide="calendar" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 모임 날짜: {{ event.meeting_date }}</p>
+            <p class="topic-date mt-3 text-sm"><i data-lucide="calendar" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 모임 날짜: {{ event.meeting_date }}</p>
         </div>
 
         <!-- 가이드 카드 -->
@@ -153,7 +185,7 @@
                     <label class="text-xs text-gray-400 block mb-1">이름</label>
                     <input type="text" id="authorName" class="eva-input w-full rounded py-2 px-3 text-sm" required
                         placeholder="홍길동"
-                        {% if user_name %}value="{{ user_name }}" readonly style="opacity:0.7;cursor:not-allowed"{% endif %}>
+                        {% if user_name %}value="{{ user_name }}" readonly style="cursor:not-allowed"{% endif %}>
                 </div>
                 <div>
                     <label class="text-xs text-gray-400 block mb-1">소속 (학과 등)</label>

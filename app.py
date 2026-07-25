@@ -75,6 +75,12 @@ def add_default_social_preview(response):
     page = response.get_data(as_text=True)
     if "</head>" not in page:
         return response
+    # Public and legacy pages do not always include the shared header. Load
+    # the current theme last so their page-local old palette cannot leak out.
+    if 'data-wood-theme="1"' not in page and "/static/theme.css" not in page:
+        theme_href = url_for("static", filename="theme.css")
+        theme_link = f'\n  <link rel="stylesheet" href="{theme_href}" data-wood-theme="1">\n'
+        page = page.replace("</head>", f"{theme_link}</head>", 1)
     if 'data-critical-theme="wood"' not in page:
         critical_theme = """
   <meta name="color-scheme" content="light">
