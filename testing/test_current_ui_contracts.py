@@ -51,7 +51,12 @@ class CurrentUiContractsTest(unittest.TestCase):
         self.assertNotIn("opacity:0.7", topic)
 
     def test_legacy_neon_theme_is_gone_from_templates(self):
-        legacy_tokens = ("Orbitron", "#00FF7F", "#6A0DAD", "#1A1A1A", "#2D2D2D")
+        legacy_tokens = (
+            "Orbitron", "#00FF7F", "#6A0DAD", "#1A1A1A", "#2D2D2D",
+            "#1F1F1F", "#232323", "#3A3A3A", "#ADFF2F",
+            "rgba(0, 255, 127", "rgba(0,255,127",
+            "rgba(106, 13, 173", "rgba(106,13,173",
+        )
         for template in (ROOT / "templates").glob("*.html"):
             source = template.read_text(encoding="utf-8")
             for token in legacy_tokens:

@@ -15,7 +15,7 @@
         :root {
             --eva-purple: #7A5A3A;
             --eva-green: #3D5C2E;
-            --eva-orange: #FF8C00;
+            --eva-orange: #C97A3A;
             --bg-dark: #FAF6EC;
             --card-dark: #FFFCF3;
             --text-light: #2A241B;
@@ -50,25 +50,25 @@
         }
 
         .eva-button-primary:hover {
-            background-color: #8A2BE2;
+            background-color: var(--walnut);
         }
 
         .eva-button-secondary {
-            background-color: #4A4A4A;
+            background-color: var(--paper-2);
             color: var(--text-light);
         }
 
         .eva-button-secondary:hover {
-            background-color: #666666;
+            background-color: var(--moss-tint);
         }
 
         .eva-button-delete {
             background-color: var(--eva-orange);
-            color: black;
+            color: white;
         }
 
         .eva-button-delete:hover {
-            background-color: #FFA500;
+            background-color: var(--danger);
         }
 
         .eva-link {
@@ -76,15 +76,15 @@
         }
 
         .eva-link:hover {
-            color: #ADFF2F;
+            color: var(--moss);
         }
 
         .eva-table-header {
-            background-color: #333333;
+            background-color: var(--walnut-tint);
         }
 
         .eva-table-row:nth-child(even) {
-            background-color: #383838;
+            background-color: var(--paper-2);
         }
 
         .eva-input {
@@ -101,7 +101,7 @@
         }
 
         .eva-toggle-bg {
-            background-color: #4A4A4A;
+            background-color: var(--oak);
         }
 
         input.event-toggle:checked+.eva-toggle-bg {
