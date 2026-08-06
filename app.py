@@ -36,6 +36,7 @@ from topic_preview import anonymous_topic_previews
 from topic_document import topic_submitter_identity
 from seminar_absence import normalize_member_ids
 from seminar_cycle import cycle_monday, is_member_signup_session, next_seminar_cycle
+from group_restrictions import find_restriction_conflicts, restricted_pairs_from_rows
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
@@ -240,6 +241,43 @@ def login_required(role="ANY"):
         return decorated_function
 
     return decorator
+
+
+def _current_user_is_primary_admin():
+    """Return True only for a currently active member whose DB role is admin.
+
+    The general admin decorator intentionally also permits officers. Confidential
+    grouping restrictions require the narrower role and are checked against the
+    database so a stale session cannot retain access after a role change.
+    """
+    user_id = session.get("user_id")
+    if not user_id or session.get("user_role") != "admin":
+        return False
+    try:
+        rows = supabase.table("members").select("role, is_active") \
+            .eq("id", user_id).limit(1).execute().data or []
+        return bool(rows and rows[0].get("role") == "admin" and rows[0].get("is_active"))
+    except Exception as exc:
+        app.logger.error("Primary admin role check failed: %s", exc)
+        return False
+
+
+def primary_admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "user_role" not in session:
+            if request.path.startswith("/api/"):
+                return jsonify({"error": "로그인이 필요합니다."}), 401
+            flash("로그인이 필요합니다.", "warning")
+            return redirect(url_for("login"))
+        if not _current_user_is_primary_admin():
+            if request.path.startswith("/api/"):
+                return jsonify({"error": "이 기능을 관리할 권한이 없습니다."}), 403
+            flash("이 기능을 관리할 권한이 없습니다.", "danger")
+            return redirect(url_for("main_index"))
+        return f(*args, **kwargs)
+
+    return decorated_function
 
 
 def send_telegram_notification(message):
@@ -1158,6 +1196,101 @@ def handle_notification(notif_id):
 # --- 4.2. 독서 모임 조 편성 (관리자 전용) ---
 
 
+def _topic_facilitators_for_session(seminar_session, all_active_members):
+    """Match a session's topic submitters to active members."""
+    if not seminar_session:
+        return None, set(), []
+
+    topic_query = supabase.table('topic_events').select('*')
+    if seminar_session.get('seminar_week_id'):
+        topic_query = topic_query.eq('seminar_week_id', seminar_session['seminar_week_id'])
+    else:
+        topic_query = topic_query.eq('seminar_session_id', seminar_session['id'])
+    topic_rows = topic_query.limit(1).execute().data or []
+    if not topic_rows:
+        return None, set(), []
+
+    topic_event = topic_rows[0]
+    submissions = supabase.table('topic_submissions').select('author_name, student_id') \
+        .eq('event_id', topic_event['id']).execute().data or []
+    by_student_id = {
+        str(member.get('student_id')).strip(): member
+        for member in all_active_members if member.get('student_id')
+    }
+    by_name = defaultdict(list)
+    for member in all_active_members:
+        by_name[(member.get('name') or '').strip()].append(member)
+
+    matched_names = set()
+    unmatched = []
+    for submission in submissions:
+        member = None
+        student_id = str(submission.get('student_id') or '').strip()
+        author_name = (submission.get('author_name') or '').strip()
+        if student_id:
+            member = by_student_id.get(student_id)
+        if member is None and len(by_name.get(author_name, [])) == 1:
+            member = by_name[author_name][0]
+        if member:
+            matched_names.add(member['name'])
+        else:
+            unmatched.append({'author_name': author_name, 'student_id': student_id})
+    return topic_event, matched_names, unmatched
+
+
+def _load_group_pair_restriction_rows():
+    return supabase.table('group_pair_restrictions') \
+        .select('id, member_a_id, member_b_id, note, created_at, updated_at') \
+        .order('created_at').execute().data or []
+
+
+def _restricted_name_pairs(member_rows=None):
+    restrictions = _load_group_pair_restriction_rows()
+    if member_rows is None:
+        member_rows = supabase.table('members').select('id, name').execute().data or []
+    return restricted_pairs_from_rows(restrictions, member_rows)
+
+
+@app.route('/api/admin/group-pair-restrictions', methods=['POST'])
+@primary_admin_required
+def create_group_pair_restriction():
+    data = request.get_json(silent=True) or {}
+    try:
+        member_ids = sorted((int(data.get('member_a_id')), int(data.get('member_b_id'))))
+    except (TypeError, ValueError):
+        return jsonify({'error': '두 회원을 모두 선택해주세요.'}), 400
+    if member_ids[0] == member_ids[1]:
+        return jsonify({'error': '서로 다른 두 회원을 선택해주세요.'}), 400
+
+    active_rows = supabase.table('members').select('id').in_('id', member_ids) \
+        .eq('is_active', True).execute().data or []
+    if {row['id'] for row in active_rows} != set(member_ids):
+        return jsonify({'error': '현재 활성 상태인 회원만 선택할 수 있습니다.'}), 400
+
+    note = (data.get('note') or '').strip()
+    if len(note) > 200:
+        return jsonify({'error': '관리 메모는 200자 이내로 입력해주세요.'}), 400
+    now_iso = datetime.now(timezone.utc).isoformat()
+    payload = {
+        'member_a_id': member_ids[0],
+        'member_b_id': member_ids[1],
+        'note': note or None,
+        'created_by_member_id': session.get('user_id'),
+        'updated_at': now_iso,
+    }
+    supabase.table('group_pair_restrictions').upsert(
+        payload, on_conflict='member_a_id,member_b_id'
+    ).execute()
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/api/admin/group-pair-restrictions/<int:restriction_id>', methods=['DELETE'])
+@primary_admin_required
+def delete_group_pair_restriction(restriction_id):
+    supabase.table('group_pair_restrictions').delete().eq('id', restriction_id).execute()
+    return jsonify({'status': 'ok'})
+
+
 @app.route('/making_team', methods=['GET'])
 @login_required(role="admin")
 def bookclub_index():
@@ -1175,6 +1308,8 @@ def bookclub_index():
     selected_topic_event = None
     pre_checked_facilitator_names = set()
     unmatched_facilitators = []
+    can_manage_pair_restrictions = False
+    pair_restrictions = []
 
     try:
         all_active_members_res = supabase.table("members").select("id, name, student_id, department") \
@@ -1216,38 +1351,8 @@ def bookclub_index():
                 target_ids |= {row['member_id'] for row in vote_rows}
             pre_checked_attendee_ids = set(target_ids)
 
-            topic_query = supabase.table('topic_events').select('*')
-            if selected_session.get('seminar_week_id'):
-                topic_query = topic_query.eq('seminar_week_id', selected_session['seminar_week_id'])
-            else:
-                topic_query = topic_query.eq('seminar_session_id', seminar_session_id)
-            topic_rows = topic_query.execute().data or []
-            if topic_rows:
-                selected_topic_event = topic_rows[0]
-                submissions = supabase.table('topic_submissions').select('author_name, student_id') \
-                    .eq('event_id', selected_topic_event['id']).execute().data or []
-                by_student_id = {
-                    str(member.get('student_id')).strip(): member
-                    for member in all_active_members if member.get('student_id')
-                }
-                by_name = defaultdict(list)
-                for member in all_active_members:
-                    by_name[(member.get('name') or '').strip()].append(member)
-                for submission in submissions:
-                    member = None
-                    student_id = str(submission.get('student_id') or '').strip()
-                    author_name = (submission.get('author_name') or '').strip()
-                    if student_id:
-                        member = by_student_id.get(student_id)
-                    if member is None and len(by_name.get(author_name, [])) == 1:
-                        member = by_name[author_name][0]
-                    if member:
-                        pre_checked_facilitator_names.add(member['name'])
-                    else:
-                        unmatched_facilitators.append({
-                            'author_name': author_name,
-                            'student_id': student_id,
-                        })
+            selected_topic_event, pre_checked_facilitator_names, unmatched_facilitators = \
+                _topic_facilitators_for_session(selected_session, all_active_members)
         else:
             seminar_dates = get_next_seminar_dates()
             app.logger.info(f"[1] 다음 세미나 날짜: {[d.isoformat() for d in seminar_dates]}")
@@ -1264,7 +1369,9 @@ def bookclub_index():
                     mon_attendee_ids.add(row['user_id'])
                 elif row.get('meeting_date') == thu_date_iso:
                     thu_attendee_ids.add(row['user_id'])
-            sess_rows = supabase.table('seminar_sessions').select('id, meeting_date, day_type, participation_mode') \
+            sess_rows = supabase.table('seminar_sessions').select(
+                'id, meeting_date, day_type, participation_mode, seminar_week_id, book_title'
+            ) \
                 .in_('meeting_date', date_strs).eq('is_active', True).execute().data or []
             for s in sess_rows:
                 target_ids = mon_attendee_ids if s.get('day_type') == 'mon' else thu_attendee_ids
@@ -1286,6 +1393,30 @@ def bookclub_index():
                 pre_checked_attendee_ids = thu_attendee_ids
             else:
                 pre_checked_attendee_ids = mon_attendee_ids | thu_attendee_ids
+
+            # 조 편성 메뉴를 직접 열어도 선택한 요일의 회차와 발제문을 연결한다.
+            # 월·목 합산은 단일 회차로 저장할 수 없으므로 회차 자동 연결을 하지 않는다.
+            if day_choice in ('mon', 'thu'):
+                linked_session = next(
+                    (row for row in sess_rows if row.get('day_type') == day_choice), None
+                )
+                if linked_session:
+                    seminar_session_id = linked_session['id']
+                    selected_topic_event, pre_checked_facilitator_names, unmatched_facilitators = \
+                        _topic_facilitators_for_session(linked_session, all_active_members)
+
+        can_manage_pair_restrictions = _current_user_is_primary_admin()
+        if can_manage_pair_restrictions:
+            member_by_id = {member['id']: member for member in all_active_members}
+            for row in _load_group_pair_restriction_rows():
+                member_a = member_by_id.get(row.get('member_a_id'))
+                member_b = member_by_id.get(row.get('member_b_id'))
+                if member_a and member_b:
+                    pair_restrictions.append({
+                        **row,
+                        'member_a': member_a,
+                        'member_b': member_b,
+                    })
         app.logger.info(f"[5] day={day_choice}, 미리 체크될 참석자 수: {len(pre_checked_attendee_ids)}명 (월 {len(mon_attendee_ids)} / 목 {len(thu_attendee_ids)})")
 
     except Exception as e:
@@ -1308,6 +1439,8 @@ def bookclub_index():
         seminar_session_id=seminar_session_id,
         pre_checked_facilitator_names=pre_checked_facilitator_names,
         unmatched_facilitators=unmatched_facilitators,
+        can_manage_pair_restrictions=can_manage_pair_restrictions,
+        pair_restrictions=pair_restrictions,
     )
 
 
@@ -1354,6 +1487,8 @@ def start_group_generation():
             history_res = supabase.table("history").select("groups").execute().data
             history_df = pd.DataFrame(history_res if history_res else [])
             app.logger.info(f"[5] 데이터 로드 완료: 회원 {len(members_df)}명, 히스토리 {len(history_df)}건")
+            restricted_pairs = _restricted_name_pairs(members_res)
+            app.logger.info("[5.5] 비공개 편성 제한 %d건 적용", len(restricted_pairs))
 
             group_count_override = None
             if group_count_str and group_count_str.isdigit():
@@ -1386,7 +1521,8 @@ def start_group_generation():
                         members_df, co_matrix, present_names, facilitator_names,
                         optimize_for='combined', top_n=12,
                         group_count_override=group_count_override,
-                        progress_callback=progress_callback
+                        progress_callback=progress_callback,
+                        restricted_pairs=restricted_pairs,
                     )
                 except Exception as ex:
                     solver_result['error'] = ex
@@ -1473,7 +1609,7 @@ def start_group_generation():
 
 def run_cp_grouping(members_df, co_matrix, attendee_names, presenter_names,
                     optimize_for='gender', top_n=10, group_count_override=None,
-                    progress_callback=None):
+                    progress_callback=None, restricted_pairs=None):
     """
     OR-Tools CP-SAT 기반 조 편성 알고리즘.
     optimize_for: 'gender' (성비우선) or 'new_face' (새만남우선)
@@ -1523,6 +1659,12 @@ def run_cp_grouping(members_df, co_matrix, attendee_names, presenter_names,
     presenter_set = set(presenter_names)
     presenter_indices = [i for i, nm in enumerate(names) if nm in presenter_set]
 
+    name_to_index = {name: index for index, name in enumerate(names)}
+    restricted_index_pairs = []
+    for first_name, second_name in (restricted_pairs or set()):
+        if first_name in name_to_index and second_name in name_to_index:
+            restricted_index_pairs.append((name_to_index[first_name], name_to_index[second_name]))
+
     # 쌍별 만남 횟수
     def get_pair_count(a, b):
         key = _canonical_pair_key(a, b)
@@ -1562,6 +1704,11 @@ def run_cp_grouping(members_df, co_matrix, attendee_names, presenter_names,
             sz = sum(x[i][g] for i in range(n))
             model.Add(sz >= min_size)
             model.Add(sz <= max_size)
+
+        # 비공개 관리자 제한: 지정된 두 사람은 어떤 추천안에서도 같은 조가 될 수 없다.
+        for left_index, right_index in restricted_index_pairs:
+            for g in range(num_groups):
+                model.Add(x[left_index][g] + x[right_index][g] <= 1)
 
         # 발제자 분산: 그룹 수 >= 발제자 수일 때 각 그룹에 1명씩
         if len(presenter_indices) <= num_groups:
@@ -1693,6 +1840,30 @@ def run_cp_grouping(members_df, co_matrix, attendee_names, presenter_names,
 
 #todo 미리보기에서도 * 거르기
 
+
+def _validate_groups_against_restrictions(groups):
+    conflicts = find_restriction_conflicts(groups, _restricted_name_pairs())
+    if conflicts:
+        app.logger.warning("조 편성 제한 조건 충돌 %d건 차단", len(conflicts))
+        return False
+    return True
+
+
+@app.route('/api/bookclub/validate-groups', methods=['POST'])
+@login_required(role="admin")
+def validate_bookclub_groups():
+    data = request.get_json(silent=True) or {}
+    groups = data.get('groups') or []
+    if not isinstance(groups, list):
+        return jsonify({'valid': False, 'message': '조 편성 데이터 형식이 올바르지 않습니다.'}), 400
+    if not _validate_groups_against_restrictions(groups):
+        return jsonify({
+            'valid': False,
+            'message': '관리자가 지정한 비공개 편성 제한 조건과 충돌합니다. 명단을 다시 편성해주세요.',
+        }), 409
+    return jsonify({'valid': True})
+
+
 @app.route('/api/bookclub/save', methods=['POST'])
 @login_required(role="admin")
 def bookclub_save():
@@ -1749,6 +1920,9 @@ def save_group_record_to_db(date, present, facilitators, groups, book_title=None
                             seminar_session_id=None):
     """주어진 데이터로 조 편성 기록과 만남 횟수 매트릭스를 DB에 저장/업데이트합니다."""
     try:
+        if not _validate_groups_against_restrictions(groups):
+            raise ValueError('관리자가 지정한 비공개 편성 제한 조건과 충돌합니다. 명단을 다시 편성해주세요.')
+
         # 1. history 테이블에 기록 저장
         if seminar_session_id:
             sess_res = supabase.table('seminar_sessions').select('id, meeting_date, book_title') \
