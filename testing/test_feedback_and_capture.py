@@ -25,6 +25,17 @@ class ResultEditingTests(unittest.TestCase):
         self.assertIn('세미나 조 편성', self.source)
         self.assertNotIn("color: #00FF7F", self.source)
 
+    def test_capture_is_rendered_on_canvas_without_offscreen_cropping(self):
+        self.assertIn("position: 'fixed', top: '0px', left: '0px'", self.source)
+        self.assertNotIn("top: '-9999px'", self.source)
+        self.assertIn('await document.fonts.ready', self.source)
+        self.assertIn("backgroundColor: '#FAF6EC'", self.source)
+        self.assertIn('PNG 이미지 다운로드', self.source)
+
+    def test_capture_checks_confidential_group_restrictions(self):
+        self.assertIn("fetch('/api/bookclub/validate-groups'", self.source)
+        self.assertIn('if (!(await validateGroups(groups))) return;', self.source)
+
 
 class BugReportTests(unittest.TestCase):
     @classmethod

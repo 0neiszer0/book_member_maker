@@ -66,12 +66,18 @@
             background-color: rgba(0, 0, 0, 0.9);
             justify-content: center;
             align-items: center;
+            flex-direction: column;
+            gap: 0.8rem;
+            padding: 2rem 1rem;
         }
 
         #image-modal-content {
             max-width: 90%;
-            max-height: 80%;
+            max-height: 76%;
             border-radius: 8px;
+            display: block;
+            object-fit: contain;
+            background: #FAF6EC;
         }
 
         #modal-caption {
@@ -79,6 +85,17 @@
             color: #ccc;
             padding: 10px 0;
             font-size: 1rem;
+        }
+
+        #modal-download {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            padding: 0.7rem 1rem;
+            background: #5C7A4A;
+            color: white;
+            font-weight: 800;
         }
 
         #modal-close {
@@ -211,6 +228,7 @@
         <span id="modal-close">&times;</span>
         <img id="image-modal-content">
         <div id="modal-caption">이미지를 길게 누르거나 우클릭하여 저장/공유하세요.</div>
+        <a id="modal-download" download="책먹는호반우-조편성.png">PNG 이미지 다운로드</a>
     </div>
 
     {% include '_bug_report_widget.html' %}
@@ -233,6 +251,25 @@
             const meetingDate = JSON.parse(document.getElementById('data-meeting-date').textContent);
             const bookTitle = JSON.parse(document.getElementById('data-book-title').textContent);
             const manual_entry_url = "{{ manual_entry_url|safe }}";
+
+            async function validateGroups(groups) {
+                try {
+                    const response = await fetch('/api/bookclub/validate-groups', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ groups })
+                    });
+                    const result = await response.json();
+                    if (!response.ok || !result.valid) {
+                        alert(result.message || '이 조합은 저장하거나 캡처할 수 없습니다.');
+                        return false;
+                    }
+                    return true;
+                } catch (error) {
+                    alert('편성 제한을 확인하지 못했습니다. 잠시 후 다시 시도해주세요.');
+                    return false;
+                }
+            }
 
             function updateGenderBadge(badge, group) {
                 if (!badge) return;
@@ -257,6 +294,7 @@
             }
 
             async function saveGroups(groups) {
+                if (!(await validateGroups(groups))) return;
                 if (!confirm("이 조 편성 결과를 저장하시겠습니까?")) return;
                 const dataToSave = {
                     date: meetingDate || new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date()),
@@ -287,15 +325,18 @@
                 if (typeof html2canvas === 'undefined') {
                     alert('오류: 캡쳐 라이브러리(html2canvas)를 로드하지 못했습니다.'); return;
                 }
+                if (!(await validateGroups(groups))) return;
 
                 const captureContainer = document.createElement('div');
                 try {
                     Object.assign(captureContainer.style, {
-                        position: 'absolute', top: '-9999px', left: '0px',
-                        width: '720px', padding: '38px', backgroundColor: '#FAF6EC',
+                        position: 'fixed', top: '0px', left: '0px', zIndex: '-1',
+                        width: '900px', padding: '44px', backgroundColor: '#FAF6EC',
                         color: '#2A241B', fontFamily: "'Noto Sans KR', sans-serif",
-                        border: '1px solid #E5D7B8', borderRadius: '24px'
+                        border: '1px solid #E5D7B8', borderRadius: '24px',
+                        boxSizing: 'border-box', pointerEvents: 'none', lineHeight: '1.5'
                     });
+                    captureContainer.setAttribute('aria-hidden', 'true');
                     const escapeText = value => String(value).replace(/[&<>"']/g, char => ({
                         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
                     })[char]);
@@ -333,11 +374,27 @@
                     captureContainer.innerHTML = innerHTML;
                     document.body.appendChild(captureContainer);
 
-                    const canvas = await html2canvas(captureContainer, { scale: 2 });
+                    if (document.fonts && document.fonts.ready) {
+                        await document.fonts.ready;
+                    }
+
+                    const canvas = await html2canvas(captureContainer, {
+                        scale: 2,
+                        backgroundColor: '#FAF6EC',
+                        useCORS: true,
+                        logging: false,
+                        scrollX: 0,
+                        scrollY: 0,
+                        windowWidth: 900,
+                        windowHeight: captureContainer.scrollHeight,
+                    });
 
                     const modal = document.getElementById('image-modal');
                     const modalImg = document.getElementById('image-modal-content');
-                    modalImg.src = canvas.toDataURL("image/png");
+                    const download = document.getElementById('modal-download');
+                    const dataUrl = canvas.toDataURL("image/png");
+                    modalImg.src = dataUrl;
+                    download.href = dataUrl;
                     modal.style.display = 'flex';
 
                 } catch (err) {

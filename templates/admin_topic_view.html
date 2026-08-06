@@ -57,6 +57,17 @@
             transition: opacity 0.15s;
         }
         .btn-mini:hover { opacity: 0.8; }
+        .submission-summary { color: #5E5548; }
+        .submission-total {
+            display: inline-block;
+            min-width: 1.8rem;
+            padding: 0.1rem 0.45rem;
+            border-radius: 999px;
+            background: #E8EFDD;
+            color: #2F4A24;
+            text-align: center;
+            font-weight: 800;
+        }
     </style>
 </head>
 
@@ -67,7 +78,7 @@
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
             <div>
                 <h1 class="text-3xl font-bold text-eva-green">{{ event.book_title }}</h1>
-                <p class="text-gray-400 mt-2">모임 날짜: {{ event.meeting_date }} | 총 <strong class="text-white">{{
+                <p class="submission-summary mt-2">모임 날짜: {{ event.meeting_date }} | 총 <strong class="submission-total">{{
                         submissions|length }}</strong>명 제출</p>
             </div>
             <div class="flex gap-2">

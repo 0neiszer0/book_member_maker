@@ -262,9 +262,13 @@
         .member-row input { accent-color:var(--moss-deep,#3D5C2E); width:18px; height:18px; justify-self:center; }
         .member-meta { color:var(--ink-muted,#8A7E6A); font-size:.72rem; }
         .settings-panel label { display:block; font-size:.8rem; font-weight:700; margin-bottom:.9rem; }
-        .settings-panel input { width:100%; margin-top:.35rem; padding:.65rem; border:1px solid var(--line,#E5D7B8); border-radius:10px; background:#fff; color:var(--ink,#2F2A22); }
+        .settings-panel input,.settings-panel select { width:100%; margin-top:.35rem; padding:.65rem; border:1px solid var(--line,#E5D7B8); border-radius:10px; background:#fff; color:var(--ink,#2F2A22); }
         .bulk-tools { margin-top:.9rem; border-top:1px solid var(--line,#E5D7B8); padding-top:.9rem; }
         .bulk-tools summary { font-family:inherit; text-transform:none; letter-spacing:0; color:var(--moss-deep,#3D5C2E); cursor:pointer; font-weight:800; }
+        .restriction-panel { margin:.9rem 0; padding:.8rem; border:1px solid #DFC7B5; border-radius:12px; background:#FFF8F2; }
+        .restriction-panel summary { cursor:pointer; color:#873E2B; font-weight:800; }
+        .restriction-row { padding:.55rem 0; border-top:1px solid #E8D8C8; }
+        .restriction-row:first-child { border-top:0; }
         @media(max-width:900px){ .workspace{grid-template-columns:1fr}.settings-panel{position:static}.member-list{grid-template-columns:1fr;max-height:none}.member-toolbar{grid-template-columns:1fr}.work-header{margin:.75rem 1rem 0} }
     </style>
 </head>
@@ -332,6 +336,28 @@
             <h2 class="text-lg font-bold mb-4" style="color:var(--moss-deep,#3D5C2E)">편성 설정</h2>
             <label>그룹 수<input type="number" name="group_count" min="1" max="30" placeholder="자동 계산"></label>
             <label>그룹 이름<input type="text" name="group_names" placeholder="A팀, B팀, C팀"></label>
+            {% if can_manage_pair_restrictions %}
+            <details class="restriction-panel">
+                <summary>비공개 편성 제한 · {{ pair_restrictions|length }}쌍</summary>
+                <p class="text-xs mt-2" style="color:#6B6255">DB 역할이 <strong>admin</strong>인 계정만 이 목록을 확인·관리할 수 있습니다. 다른 운영진의 조 편성에는 목록을 보여주지 않고 제약만 적용합니다.</p>
+                <label class="mt-3">첫 번째 회원
+                    <select id="restriction-member-a"><option value="">선택</option>{% for m in all_members %}<option value="{{ m.id }}">{{ m.name }} · {{ m.student_id or '학번 없음' }}</option>{% endfor %}</select>
+                </label>
+                <label>두 번째 회원
+                    <select id="restriction-member-b"><option value="">선택</option>{% for m in all_members %}<option value="{{ m.id }}">{{ m.name }} · {{ m.student_id or '학번 없음' }}</option>{% endfor %}</select>
+                </label>
+                <label>관리 메모(선택)<input id="restriction-note" maxlength="200" placeholder="관리자만 확인"></label>
+                <button type="button" id="restriction-add" class="wood-chip on w-full justify-center">같은 조 금지로 저장</button>
+                <div class="mt-3 text-sm">
+                    {% for item in pair_restrictions %}
+                    <div class="restriction-row flex items-start justify-between gap-2">
+                        <span><strong>{{ item.member_a.name }} · {{ item.member_b.name }}</strong>{% if item.note %}<small class="block mt-1" style="color:#6B6255">{{ item.note }}</small>{% endif %}</span>
+                        <button type="button" class="restriction-delete text-xs font-bold" data-id="{{ item.id }}" style="color:#B14A2D">삭제</button>
+                    </div>
+                    {% else %}<p class="text-xs" style="color:#6B6255">등록된 제한이 없습니다.</p>{% endfor %}
+                </div>
+            </details>
+            {% endif %}
             <button type="button" id="generate-btn" class="btn-submit">조 편성 시작</button>
             <div class="mt-4 space-y-2 text-sm">
                 <a href="/records/seminars" class="block font-bold" style="color:var(--moss-deep,#3D5C2E)">세미나 기록으로 이동</a>
@@ -386,6 +412,45 @@
                 });
             });
             updateCounts();
+
+            // --- primary admin 전용 비공개 편성 제한 관리 ---
+            const restrictionAdd = document.getElementById('restriction-add');
+            if (restrictionAdd) {
+                restrictionAdd.addEventListener('click', async () => {
+                    const memberA = document.getElementById('restriction-member-a').value;
+                    const memberB = document.getElementById('restriction-member-b').value;
+                    const note = document.getElementById('restriction-note').value.trim();
+                    if (!memberA || !memberB || memberA === memberB) {
+                        alert('서로 다른 두 회원을 선택해주세요.');
+                        return;
+                    }
+                    const response = await fetch('/api/admin/group-pair-restrictions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ member_a_id: memberA, member_b_id: memberB, note })
+                    });
+                    const result = await response.json();
+                    if (!response.ok) {
+                        alert(result.error || '편성 제한을 저장하지 못했습니다.');
+                        return;
+                    }
+                    location.reload();
+                });
+            }
+            document.querySelectorAll('.restriction-delete').forEach(button => {
+                button.addEventListener('click', async () => {
+                    if (!confirm('이 비공개 편성 제한을 삭제할까요?')) return;
+                    const response = await fetch(`/api/admin/group-pair-restrictions/${button.dataset.id}`, {
+                        method: 'DELETE'
+                    });
+                    const result = await response.json();
+                    if (!response.ok) {
+                        alert(result.error || '편성 제한을 삭제하지 못했습니다.');
+                        return;
+                    }
+                    location.reload();
+                });
+            });
 
             // --- 검색 필터 ---
             document.querySelectorAll('.filter-input').forEach(input => {
