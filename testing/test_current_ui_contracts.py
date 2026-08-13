@@ -75,6 +75,14 @@ class CurrentUiContractsTest(unittest.TestCase):
         self.assertNotIn("genreFilter", seminars)
         self.assertNotIn("genreSelect", detail)
 
+    def test_seminar_detail_imports_its_shared_genre_script(self):
+        detail = self.read("templates/records_seminar_detail.html")
+        self.assertIn(
+            "{% from '_records_base.html' import records_nav, genre_script %}",
+            detail,
+        )
+        self.assertIn("{{ genre_script() }}", detail)
+
     def test_book_cards_have_a_clear_action(self):
         books = self.read("templates/book_suggestions.html")
         self.assertIn("eg-card-action", books)
