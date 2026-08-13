@@ -29,6 +29,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from collections import defaultdict
 from group_history import (
     canonical_pair_key as _canonical_pair_key,
+    meeting_details_from_history as _meeting_details_from_history,
     pair_keys_from_groups as _pair_keys_from_groups,
     matrix_rows_from_history as _matrix_rows_from_history,
 )
@@ -1506,9 +1507,8 @@ def start_group_generation():
             app.logger.info("[4] DB에서 전체 회원 및 히스토리 데이터 로드 시작")
             members_res = supabase.table("members").select("*").order("name").execute().data
             members_df = pd.DataFrame(members_res)
-            history_res = supabase.table("history").select("groups").execute().data
-            history_df = pd.DataFrame(history_res if history_res else [])
-            app.logger.info(f"[5] 데이터 로드 완료: 회원 {len(members_df)}명, 히스토리 {len(history_df)}건")
+            effective_history_rows = _effective_group_history_rows()
+            app.logger.info(f"[5] 데이터 로드 완료: 회원 {len(members_df)}명, 히스토리 {len(effective_history_rows)}건")
             restricted_pairs = _restricted_name_pairs(members_res)
             app.logger.info("[5.5] 비공개 편성 제한 %d건 적용", len(restricted_pairs))
 
@@ -1516,9 +1516,10 @@ def start_group_generation():
             if group_count_str and group_count_str.isdigit():
                 group_count_override = int(group_count_str)
 
-            # co_matrix 로드
-            co_matrix_res = supabase.table("bookclub_co_matrix").select("pair_key, count").execute()
-            co_matrix = {r['pair_key']: r['count'] for r in (co_matrix_res.data or [])}
+            # 저장된 계획표가 아니라 실제 참석 기준으로 즉시 계산한다.
+            # 회차에 등록된 미연락 불참자는 해당 날짜의 만남에서 자동 제외된다.
+            calculated_matrix = _matrix_rows_from_history(effective_history_rows)
+            co_matrix = {key: row['count'] for key, row in calculated_matrix.items()}
             app.logger.info(f"[6] co_matrix {len(co_matrix)}개 항목 로드 완료")
 
             yield f"event: progress\ndata: {json.dumps({'progress': 10})}\n\n"
@@ -1584,15 +1585,7 @@ def start_group_generation():
                 for row in members_df.to_dict(orient='records')
             }
 
-            meeting_history = {}
-            # co_matrix에서 last_met도 함께 가져와서 {count, last_met} 형태로 저장
-            matrix_res = supabase.table('bookclub_co_matrix').select('pair_key, count, last_met').execute()
-            for row in (matrix_res.data or []):
-                if row.get('count', 0) > 0:
-                    meeting_history[row['pair_key']] = {
-                        'count': row['count'],
-                        'last_met': row.get('last_met', '')
-                    }
+            meeting_history = _meeting_details_from_history(effective_history_rows)
 
             app.logger.info("[10] 최종 결과 페이지(HTML) 렌더링 시작")
             with app.app_context():
@@ -1909,13 +1902,64 @@ def _chunks(items, size=100):
         yield seq[idx:idx + size]
 
 
+def _effective_group_history_rows():
+    """Load grouping history with active no-shows excluded from their session.
+
+    A saved group is the planned seating chart.  Meeting statistics must use
+    actual attendance, so an active no-show record removes that member from
+    every group in the linked seminar history row.
+    """
+    history_rows = supabase.table('history').select(
+        'id, date, groups, seminar_session_id'
+    ).execute().data or []
+    session_ids = {
+        row.get('seminar_session_id') for row in history_rows
+        if row.get('seminar_session_id')
+    }
+    if not session_ids:
+        return history_rows
+
+    no_show_rows = supabase.table('seminar_no_shows').select('session_id, member_id') \
+        .in_('session_id', list(session_ids)).is_('cancelled_at', 'null').execute().data or []
+    if not no_show_rows:
+        return history_rows
+
+    member_ids = {row['member_id'] for row in no_show_rows}
+    member_rows = supabase.table('members').select('id, name').in_('id', list(member_ids)).execute().data or []
+    member_name_by_id = {row['id']: row.get('name') for row in member_rows}
+    excluded_by_session = defaultdict(set)
+    for row in no_show_rows:
+        name = member_name_by_id.get(row['member_id'])
+        if name:
+            excluded_by_session[row['session_id']].add(name)
+
+    return [
+        {
+            **row,
+            'excluded_names': sorted(excluded_by_session.get(row.get('seminar_session_id'), set())),
+        }
+        for row in history_rows
+    ]
+
+
+def _rebuild_matrix_for_session(session_id):
+    linked_rows = supabase.table('history').select('groups') \
+        .eq('seminar_session_id', session_id).execute().data or []
+    affected_keys = set()
+    for row in linked_rows:
+        affected_keys |= _pair_keys_from_groups(row.get('groups') or [])
+    if affected_keys:
+        return rebuild_co_matrix(affected_keys)
+    return {'history_count': 0, 'pair_count': 0, 'removed_count': 0, 'scope': 'affected'}
+
+
 def rebuild_co_matrix(pair_keys=None):
     """history를 원본으로 만남 매트릭스를 재계산한다.
 
     pair_keys가 주어지면 해당 쌍만 갱신하고, None이면 전체를 복구한다.
     """
     target_keys = set(pair_keys) if pair_keys is not None else None
-    history_rows = supabase.table('history').select('date, groups').execute().data or []
+    history_rows = _effective_group_history_rows()
     calculated = _matrix_rows_from_history(history_rows, target_keys)
 
     if target_keys is None:
@@ -5190,6 +5234,8 @@ def seminar_session_add_no_shows(session_id):
                 }
                 for member_id in new_member_ids
             ]).execute()
+        # 이미 저장된 계획표가 있더라도 미연락 불참자는 실제 만남으로 세지 않는다.
+        _rebuild_matrix_for_session(session_id)
         return jsonify({
             'status': 'success',
             'added_count': len(new_member_ids),
@@ -5213,6 +5259,8 @@ def seminar_session_cancel_no_show(session_id, member_id):
             'updated_at': stamp,
         }).eq('session_id', session_id).eq('member_id', member_id) \
             .is_('cancelled_at', 'null').execute()
+        # 취소된 경우에는 해당 회원의 만남을 원래 계획표 기준으로 다시 복구한다.
+        _rebuild_matrix_for_session(session_id)
         return jsonify({'status': 'success'})
     except Exception as e:
         app.logger.error(f"seminar_session_cancel_no_show error: {e}", exc_info=True)
