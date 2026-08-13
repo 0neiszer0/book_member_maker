@@ -5031,12 +5031,15 @@ def update_history_meta(history_id):
             update['book_title'] = (data.get('book_title') or '').strip() or None
         if 'genre' in data:
             update['genre'] = (data.get('genre') or '').strip() or None
+        linked_session_id = None
+        if 'book_title' in data or 'date' in data:
+            link_rows = supabase.table('history').select('seminar_session_id') \
+                .eq('id', history_id).execute().data or []
+            linked_session_id = (link_rows[0] if link_rows else {}).get('seminar_session_id')
         if 'date' in data:
             d = (data.get('date') or '').strip()
             if not d:
                 return jsonify({'status': 'error', 'message': '날짜는 비울 수 없습니다.'}), 400
-            link_rows = supabase.table('history').select('seminar_session_id').eq('id', history_id).execute().data or []
-            linked_session_id = (link_rows[0] if link_rows else {}).get('seminar_session_id')
             if linked_session_id:
                 linked_session = supabase.table('seminar_sessions').select('meeting_date') \
                     .eq('id', linked_session_id).single().execute().data
@@ -5069,6 +5072,35 @@ def update_history_meta(history_id):
             old_row = (old_res.data or [None])[0]
 
         supabase.table('history').update(update).eq('id', history_id).execute()
+
+        # 세미나 운영 화면에서 생성된 기록은 도서명이 주차·회차·발제문에도 공유된다.
+        # 기록 화면에서 고쳐도 원본 일정과 짝 회차가 즉시 같은 제목을 보도록 역동기화한다.
+        if 'book_title' in update and linked_session_id:
+            linked_session = supabase.table('seminar_sessions').select('seminar_week_id') \
+                .eq('id', linked_session_id).single().execute().data or {}
+            week_id = linked_session.get('seminar_week_id')
+            title_update = {'book_title': update['book_title']}
+            if week_id:
+                supabase.table('seminar_weeks').update({
+                    **title_update,
+                    'needs_review': False,
+                    'updated_at': datetime.now(timezone.utc).isoformat(),
+                }).eq('id', week_id).execute()
+                linked_sessions = supabase.table('seminar_sessions').select('id') \
+                    .eq('seminar_week_id', week_id).execute().data or []
+                linked_session_ids = [row['id'] for row in linked_sessions]
+                supabase.table('seminar_sessions').update(title_update) \
+                    .eq('seminar_week_id', week_id).execute()
+                supabase.table('topic_events').update(title_update) \
+                    .eq('seminar_week_id', week_id).execute()
+                if linked_session_ids:
+                    supabase.table('history').update(title_update) \
+                        .in_('seminar_session_id', linked_session_ids).execute()
+            else:
+                supabase.table('seminar_sessions').update(title_update) \
+                    .eq('id', linked_session_id).execute()
+                supabase.table('topic_events').update(title_update) \
+                    .eq('seminar_session_id', linked_session_id).execute()
 
         if old_row is not None and (groups_changed or date_changed):
             old_groups = old_row.get('groups') or []
