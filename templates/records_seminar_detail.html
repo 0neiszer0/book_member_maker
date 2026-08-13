@@ -4,6 +4,7 @@
 <head>
     <title>{{ row.date }} 세미나 - 기록 시스템</title>
     {% include '_records_base.html' %}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         .pill-x { cursor: pointer; padding: 0 0.4rem; opacity: 0.6; }
         .pill-x:hover { opacity: 1; color: #ff5050; }
@@ -14,6 +15,16 @@
         }
         .member-add-btn:hover { background: var(--moss-tint); color: var(--moss-deep); }
         .fac-marker { color: var(--eva-purple); margin-left: 2px; }
+        .member-pill.gender-male { background:#E5F1F4;color:#28596A;border:1px solid #B8D5DE; }
+        .member-pill.gender-female { background:#F6E7EC;color:#7A4053;border:1px solid #E2BBC9; }
+        .member-pill.gender-unknown { background:#EEE9E1;color:#5E5548;border:1px solid #DDD2C2; }
+        .gender-label { display:inline-flex;align-items:center;justify-content:center;margin-left:.2rem;padding:.02rem .26rem;border-radius:999px;font-size:.58rem;font-weight:900;vertical-align:.08rem; }
+        .gender-label.gender-male { color:#28596A;background:#DCECF1; }
+        .gender-label.gender-female { color:#7A4053;background:#F2DCE4; }
+        #record-image-modal { display:none;position:fixed;z-index:1100;inset:0;background:rgba(0,0,0,.88);padding:2rem 1rem;align-items:center;justify-content:center;flex-direction:column;gap:.8rem; }
+        #record-image-content { max-width:92%;max-height:76vh;border-radius:10px;background:#FAF6EC;object-fit:contain; }
+        #record-image-download { display:inline-flex;border-radius:10px;padding:.7rem 1rem;background:#5C7A4A;color:#fff;font-weight:800; }
+        #record-image-close { position:absolute;top:12px;right:24px;color:#fff;font-size:40px;line-height:1;cursor:pointer; }
     </style>
 </head>
 <body class="min-h-screen">
@@ -62,7 +73,7 @@
 
         <!-- 발제자 편집 -->
         <div class="eva-card p-5 rounded-lg mb-6">
-            <div class="flex justify-between items-center mb-3">
+            <div class="flex flex-wrap justify-between items-center gap-3 mb-3">
                 <h2 class="text-lg font-bold text-eva-purple"><i data-lucide="megaphone" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 발제자</h2>
                 <button onclick="saveFacilitators()"
                     class="text-xs bg-eva-purple text-white px-3 py-1.5 rounded hover:opacity-80">저장</button>
@@ -79,18 +90,28 @@
 
         <!-- 조 편성 편집 -->
         <div class="eva-card p-5 rounded-lg mb-6">
-            <div class="flex justify-between items-center mb-3">
+            <div class="flex flex-wrap justify-between items-center gap-3 mb-3">
                 <h2 class="text-lg font-bold text-eva-green"><i data-lucide="puzzle" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 조 편성</h2>
                 <div class="flex gap-2">
+                    <button onclick="captureSavedGroups()"
+                        class="text-xs bg-[#6B4B2D] text-white px-3 py-1.5 rounded">PNG 다시 만들기</button>
                     <button onclick="addGroup()"
                         class="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded">+ 조 추가</button>
                     <button onclick="saveGroups()"
                         class="text-xs bg-eva-green text-black font-bold px-3 py-1.5 rounded hover:opacity-80">저장</button>
                 </div>
             </div>
-            <p class="text-xs text-gray-500 mb-3">멤버 클릭으로 발제자 토글(★). 발제자 변경은 위에서 별도 저장.</p>
+            <p class="text-xs text-gray-500 mb-2">멤버 클릭으로 발제자 토글(★). 발제자 변경은 위에서 별도 저장. PNG는 현재 화면의 조 편성으로 다시 만들 수 있습니다.</p>
+            <div class="flex gap-3 flex-wrap text-xs mb-3 text-[#6B6255]"><strong>이름 색상</strong><span><span class="gender-label gender-female">여</span> 여성</span><span><span class="gender-label gender-male">남</span> 남성</span></div>
             <div id="groupsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
         </div>
+    </div>
+
+    <div id="record-image-modal" role="dialog" aria-modal="true" aria-label="조 편성 캡처 미리보기">
+        <button id="record-image-close" type="button" aria-label="닫기">&times;</button>
+        <img id="record-image-content" alt="조 편성 캡처 미리보기">
+        <div class="text-sm text-white">이미지를 길게 누르거나 아래 버튼으로 저장하세요.</div>
+        <a id="record-image-download" download="책먹는호반우-조편성-기록.png">PNG 이미지 다운로드</a>
     </div>
 
     {{ genre_script() }}
@@ -100,6 +121,7 @@
         let groups = {{ groups | tojson }};
         let facilitators = {{ (row.facilitators or []) | tojson }};
         const memberMap = {{ member_map | tojson }};
+        const MEMBER_GENDERS = {{ member_genders | tojson }};
 
         function escapeHtml(s) {
             return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -108,6 +130,16 @@
         function profileUrl(name) {
             const id = memberMap[name];
             return id ? `/records/members/${id}` : null;
+        }
+
+        function genderClass(name) {
+            return MEMBER_GENDERS[name] === 'M' ? 'gender-male' : (MEMBER_GENDERS[name] === 'W' ? 'gender-female' : 'gender-unknown');
+        }
+
+        function genderLabel(name) {
+            return MEMBER_GENDERS[name] === 'M'
+                ? '<small class="gender-label gender-male">남</small>'
+                : (MEMBER_GENDERS[name] === 'W' ? '<small class="gender-label gender-female">여</small>' : '');
         }
 
         // ---- 발제자 ----
@@ -159,17 +191,17 @@
                 cont.innerHTML = groups.map((g, gi) => {
                     const memberOptions = ALL_MEMBERS
                         .filter(m => !g.includes(m.name))
-                        .map(m => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`)
+                        .map(m => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}${m.gender_code === 'M' ? ' (남)' : (m.gender_code === 'W' ? ' (여)' : '')}</option>`)
                         .join('');
                     const pills = g.map(name => {
                         const url = profileUrl(name);
                         const isFac = facilitators.includes(name);
                         const facMark = isFac ? '<span class="fac-marker">★</span>' : '';
                         const tag = url
-                            ? `<a href="${url}" class="text-gray-200 hover:text-eva-green">${escapeHtml(name)}${facMark}</a>`
-                            : `<span class="text-gray-200">${escapeHtml(name)}${facMark}</span>`;
-                        return `<span class="member-pill bg-gray-700 px-3 py-1 rounded-full text-sm ${isFac ? 'border border-eva-purple' : ''}">
-                            ${tag}
+                            ? `<a href="${url}" class="font-bold hover:underline">${escapeHtml(name)}${facMark}</a>`
+                            : `<span class="font-bold">${escapeHtml(name)}${facMark}</span>`;
+                        return `<span class="member-pill ${genderClass(name)} px-3 py-1 rounded-full text-sm ${isFac ? 'ring-2 ring-[#7A5A3A]' : ''}">
+                            ${tag}${genderLabel(name)}
                             <span class="pill-x" onclick="toggleFac('${escapeHtml(name)}')" title="발제자 토글">★</span>
                             <span class="pill-x" onclick="removeMember(${gi}, '${escapeHtml(name)}')" title="조에서 제거">✕</span>
                         </span>`;
@@ -224,6 +256,90 @@
             if (ok) toast('조 편성 저장 완료');
         }
 
+        async function captureSavedGroups() {
+            if (typeof html2canvas === 'undefined') {
+                alert('캡처 기능을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+                return;
+            }
+            const nonEmptyGroups = groups.filter(group => Array.isArray(group) && group.length);
+            if (!nonEmptyGroups.length) {
+                alert('캡처할 조 편성이 없습니다.');
+                return;
+            }
+
+            const captureContainer = document.createElement('div');
+            try {
+                Object.assign(captureContainer.style, {
+                    position: 'fixed', top: '0px', left: '0px', zIndex: '-1',
+                    width: '900px', padding: '44px', backgroundColor: '#FAF6EC',
+                    color: '#2A241B', fontFamily: "'Noto Sans KR', sans-serif",
+                    border: '1px solid #E5D7B8', borderRadius: '24px',
+                    boxSizing: 'border-box', pointerEvents: 'none', lineHeight: '1.5'
+                });
+                captureContainer.setAttribute('aria-hidden', 'true');
+                const escapeText = value => String(value).replace(/[&<>"']/g, char => ({
+                    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+                })[char]);
+                const meetingDate = document.getElementById('dateInput').value;
+                const bookTitle = document.getElementById('bookTitle').value.trim();
+                const total = nonEmptyGroups.reduce((sum, group) => sum + group.length, 0);
+                const metaItems = [meetingDate, bookTitle, `총 ${total}명 · ${nonEmptyGroups.length}개 조`]
+                    .filter(Boolean)
+                    .map(value => `<span style="display:inline-block;padding:7px 12px;border-radius:999px;background:#E8EFDD;color:#3D5C2E;font-size:13px;font-weight:700;">${escapeText(value)}</span>`)
+                    .join(' ');
+                let innerHTML = `
+                    <div style="border-bottom:2px solid #3D5C2E;padding-bottom:22px;margin-bottom:24px;">
+                        <div style="font-size:13px;font-weight:800;letter-spacing:.12em;color:#7A5A3A;margin-bottom:8px;">책 먹는 호반우</div>
+                        <h3 style="font-size:30px;line-height:1.25;font-weight:800;color:#2A241B;margin:0 0 14px;letter-spacing:-.04em;">세미나 조 편성</h3>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">${metaItems}</div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr;gap:12px;">`;
+                nonEmptyGroups.forEach((group, index) => {
+                    const memberNames = group.map(name => {
+                        const safeName = escapeText(name);
+                        const gender = MEMBER_GENDERS[name];
+                        const color = gender === 'M' ? '#2E6275' : (gender === 'W' ? '#8A4F62' : '#40382E');
+                        const label = gender === 'M' ? '남' : (gender === 'W' ? '여' : '');
+                        const labelColor = gender === 'M' ? '#28596A' : '#7A4053';
+                        const labelBackground = gender === 'M' ? '#DCECF1' : '#F2DCE4';
+                        const labelHtml = label ? `<small style="display:inline-block;margin-left:3px;padding:1px 4px;border-radius:999px;color:${labelColor};background:${labelBackground};font-size:9px;font-weight:850;vertical-align:2px;">${label}</small>` : '';
+                        const nameHtml = facilitators.includes(name) ? `<strong style="font-weight:850;">${safeName}</strong>` : safeName;
+                        return `<span style="color:${color};white-space:nowrap;">${nameHtml}${labelHtml}</span>`;
+                    }).join(', ');
+                    innerHTML += `
+                        <section style="padding:18px;border:1px solid #E5D7B8;border-radius:16px;background:#FFFCF3;box-shadow:0 5px 14px rgba(74,57,35,.07);">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                                <strong style="font-size:17px;color:#3D5C2E;">조 ${index + 1}</strong>
+                                <span style="font-size:12px;color:#7D705E;">${group.length}명</span>
+                            </div>
+                            <div style="white-space:nowrap;overflow:hidden;color:#40382E;font-size:15px;line-height:1.5;">${memberNames}</div>
+                        </section>`;
+                });
+                innerHTML += `</div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:24px;padding-top:16px;border-top:1px solid #E5D7B8;color:#807361;font-size:11px;">
+                        <span>여성은 자주색, 남성은 청록색 · 진한 이름은 발제자</span><span>book-member-maker</span>
+                    </div>`;
+                captureContainer.innerHTML = innerHTML;
+                document.body.appendChild(captureContainer);
+                if (document.fonts && document.fonts.ready) await document.fonts.ready;
+
+                const canvas = await html2canvas(captureContainer, {
+                    scale: 2, backgroundColor: '#FAF6EC', useCORS: true, logging: false,
+                    scrollX: 0, scrollY: 0, windowWidth: 900,
+                    windowHeight: captureContainer.scrollHeight,
+                });
+                const dataUrl = canvas.toDataURL('image/png');
+                document.getElementById('record-image-content').src = dataUrl;
+                document.getElementById('record-image-download').href = dataUrl;
+                document.getElementById('record-image-modal').style.display = 'flex';
+            } catch (error) {
+                console.error('기록 캡처 실패:', error);
+                alert('PNG를 만드는 중 오류가 발생했습니다: ' + error.message);
+            } finally {
+                if (document.body.contains(captureContainer)) captureContainer.remove();
+            }
+        }
+
         // ---- 메타 공통 ----
         async function updateMeta(field, value) {
             await postMeta({ [field]: value });
@@ -268,6 +384,12 @@
         // 초기 렌더
         renderFacs();
         renderGroups();
+        const recordImageModal = document.getElementById('record-image-modal');
+        document.getElementById('record-image-close').onclick = () => { recordImageModal.style.display = 'none'; };
+        recordImageModal.onclick = event => { if (event.target === recordImageModal) recordImageModal.style.display = 'none'; };
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && recordImageModal.style.display === 'flex') recordImageModal.style.display = 'none';
+        });
     </script>
 </body>
 </html>

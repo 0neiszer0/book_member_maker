@@ -11,6 +11,7 @@ class GroupingHistoryUiContracts(unittest.TestCase):
         cls.app_source = (ROOT / 'app.py').read_text(encoding='utf-8')
         cls.index_source = (ROOT / 'templates' / 'bookclub_index.html').read_text(encoding='utf-8')
         cls.results_source = (ROOT / 'templates' / 'bookclub_ga_results.html').read_text(encoding='utf-8')
+        cls.record_source = (ROOT / 'templates' / 'records_seminar_detail.html').read_text(encoding='utf-8')
 
     def test_no_shows_are_removed_from_meeting_statistics(self):
         self.assertIn('def _effective_group_history_rows():', self.app_source)
@@ -39,6 +40,24 @@ class GroupingHistoryUiContracts(unittest.TestCase):
         self.assertIn("entry.dates", self.results_source)
         self.assertIn('수정 중 만남 기록', self.results_source)
         self.assertIn("card.querySelector('.result-total-count').textContent = total", self.results_source)
+
+    def test_grouping_names_have_accessible_gender_colors_and_labels(self):
+        self.assertIn('student_id, department, gender', self.app_source)
+        self.assertIn("member['gender_code'] = normalize_gender", self.app_source)
+        self.assertIn('class="gender-legend"', self.index_source)
+        self.assertIn('gender-tag gender-female', self.index_source)
+        self.assertIn('gender-tag gender-male', self.index_source)
+        self.assertIn('function renderMemberName(name)', self.results_source)
+        self.assertIn('.group-member-name.gender-male', self.results_source)
+        self.assertIn('.group-member-name.gender-female', self.results_source)
+
+    def test_saved_record_can_recreate_group_capture(self):
+        self.assertIn('html2canvas/1.4.1/html2canvas.min.js', self.record_source)
+        self.assertIn('PNG 다시 만들기', self.record_source)
+        self.assertIn('async function captureSavedGroups()', self.record_source)
+        self.assertIn("canvas.toDataURL('image/png')", self.record_source)
+        self.assertIn('id="record-image-download"', self.record_source)
+        self.assertIn('const MEMBER_GENDERS =', self.record_source)
 
 
 if __name__ == '__main__':

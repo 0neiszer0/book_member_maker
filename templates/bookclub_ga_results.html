@@ -55,6 +55,12 @@
         .group-row-main { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.65rem; align-items:center; }
         .group-content-view { display:flex; align-items:center; gap:.6rem; min-width:0; }
         .group-members-text { display:block; min-width:0; overflow-x:auto; white-space:nowrap; padding:.25rem 0; scrollbar-width:thin; }
+        .group-member-name.gender-male { color:#2E6275; }
+        .group-member-name.gender-female { color:#8A4F62; }
+        .gender-label { display:inline-flex;align-items:center;justify-content:center;margin-left:.18rem;padding:.02rem .25rem;border-radius:999px;font-size:.58rem;font-weight:900;vertical-align:.1rem; }
+        .gender-label.gender-male { color:#28596A;background:#DCECF1;border:1px solid #B8D5DE; }
+        .gender-label.gender-female { color:#7A4053;background:#F2DCE4;border:1px solid #E2BBC9; }
+        .result-gender-legend { display:flex;justify-content:center;align-items:center;gap:.8rem;flex-wrap:wrap;margin:-.8rem 0 1.2rem;color:#6B6255;font-size:.74rem; }
         .group-count-badge { white-space:nowrap; color:#6B6255; background:#F2EBD8; border:1px solid #E5D7B8; border-radius:999px; padding:.2rem .5rem; font-size:.72rem; font-weight:800; }
         .live-history-title { color:#3D5C2E; font-weight:800; margin-bottom:.35rem; }
         @media(min-width:1100px){ .solutions-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.result-card-combined{height:100%;} }
@@ -136,6 +142,7 @@
         <div class="max-w-7xl mx-auto flex flex-col items-center">
             <section class="w-full">
                 <h2 class="text-2xl font-semibold mb-6 text-center text-eva-green">최적화된 조 편성 추천안</h2>
+                <div class="result-gender-legend"><strong>이름 색상</strong><span><span class="gender-label gender-female">여</span> 여성</span><span><span class="gender-label gender-male">남</span> 남성</span><span>진한 이름은 발제자</span></div>
                 {% if combined_solutions %}
                 <div class="solutions-grid">
                 {% for result in combined_solutions %}
@@ -175,10 +182,8 @@
                                     {% set members_in_group = [] %}{% for name in group %}{% if name not in facilitators
                                     %}{% set _ = members_in_group.append(name) %}{% endif %}{% endfor %}
                                     <span class="group-members-text">
-                                        {% for name in facilitators_in_group %}<strong>{{ name }}</strong>{% if not
-                                        loop.last or members_in_group %}, {% endif %}{% endfor %}
-                                        {% for name in members_in_group %}{{ name }}{% if not loop.last %}, {% endif
-                                        %}{% endfor %}
+                                        {% for name in facilitators_in_group %}{% set gender = member_genders.get(name) %}<span class="group-member-name {% if gender == 'M' %}gender-male{% elif gender == 'W' %}gender-female{% endif %}"><strong>{{ name }}</strong>{% if gender == 'M' %}<small class="gender-label gender-male">남</small>{% elif gender == 'W' %}<small class="gender-label gender-female">여</small>{% endif %}</span>{% if not loop.last or members_in_group %}, {% endif %}{% endfor %}
+                                        {% for name in members_in_group %}{% set gender = member_genders.get(name) %}<span class="group-member-name {% if gender == 'M' %}gender-male{% elif gender == 'W' %}gender-female{% endif %}">{{ name }}{% if gender == 'M' %}<small class="gender-label gender-male">남</small>{% elif gender == 'W' %}<small class="gender-label gender-female">여</small>{% endif %}</span>{% if not loop.last %}, {% endif %}{% endfor %}
                                     </span>
                                     <span
                                         class="gender-balance-badge text-xs font-semibold px-2 py-0.5 rounded-full {% if m_count.value == f_count.value %}bg-blue-900 text-blue-200{% elif m_count.value > f_count.value + 1 or f_count.value > m_count.value + 1 %}bg-red-900 text-red-300{% else %}bg-gray-700 text-gray-300{% endif %}">남
@@ -307,6 +312,17 @@
                 '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
             })[char]);
 
+            function renderMemberName(name) {
+                const gender = memberGenders[name];
+                const genderClass = gender === 'M' ? 'gender-male' : (gender === 'W' ? 'gender-female' : '');
+                const genderLabel = gender === 'M'
+                    ? '<small class="gender-label gender-male">남</small>'
+                    : (gender === 'W' ? '<small class="gender-label gender-female">여</small>' : '');
+                const safeName = escapeHtml(name);
+                const nameHtml = facilitators.includes(name) ? `<strong>${safeName}</strong>` : safeName;
+                return `<span class="group-member-name ${genderClass}">${nameHtml}${genderLabel}</span>`;
+            }
+
             function parseEditedGroup(text) {
                 return text.split(/[,;\n]+/)
                     .map(name => name.trim())
@@ -413,9 +429,16 @@
                         const groupName = escapeText((group_names && group_names[index]) ? group_names[index] : `그룹 ${index + 1}`);
                         const memberNames = [...group].sort().map(name => {
                             const safeName = escapeText(name);
-                            return facilitators.includes(name)
-                                ? `<strong style="color:#6B4B2D;font-weight:850;">${safeName}</strong>`
+                            const gender = memberGenders[name];
+                            const color = gender === 'M' ? '#2E6275' : (gender === 'W' ? '#8A4F62' : '#40382E');
+                            const label = gender === 'M' ? '남' : (gender === 'W' ? '여' : '');
+                            const labelColor = gender === 'M' ? '#28596A' : '#7A4053';
+                            const labelBackground = gender === 'M' ? '#DCECF1' : '#F2DCE4';
+                            const labelHtml = label ? `<small style="display:inline-block;margin-left:3px;padding:1px 4px;border-radius:999px;color:${labelColor};background:${labelBackground};font-size:9px;font-weight:850;vertical-align:2px;">${label}</small>` : '';
+                            const text = facilitators.includes(name)
+                                ? `<strong style="font-weight:850;">${safeName}</strong>`
                                 : safeName;
+                            return `<span style="color:${color};white-space:nowrap;">${text}${labelHtml}</span>`;
                         }).join(', ');
                         innerHTML += `
                             <section style="padding:18px;border:1px solid #E5D7B8;border-radius:16px;background:#FFFCF3;box-shadow:0 5px 14px rgba(74,57,35,.07);">
@@ -428,7 +451,7 @@
                     });
                     innerHTML += `</div>
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:24px;padding-top:16px;border-top:1px solid #E5D7B8;color:#807361;font-size:11px;">
-                            <span>진한 이름은 발제자입니다.</span><span>book-member-maker</span>
+                            <span>여성은 자주색, 남성은 청록색 · 진한 이름은 발제자</span><span>book-member-maker</span>
                         </div>`;
                     captureContainer.innerHTML = innerHTML;
                     document.body.appendChild(captureContainer);
@@ -581,7 +604,7 @@
                     saveBtn.dataset.groups = JSON.stringify(newGroupsArray);
                     captureBtn.dataset.groups = JSON.stringify(newGroupsArray);
 
-                    // 화면 재생성 (단순화를 위해 성비 배지는 편집 시 즉각 업데이트하지 않고 서버 통신 전 명단만 보여줌)
+                    // 화면 재생성: 이름 색상·성별 표기와 성비를 즉시 갱신한다.
                     card.querySelectorAll('.group-render-area > div').forEach((row, idx) => {
                         const groupMembers = newGroupsArray[idx];
                         row.querySelector('.show-history-btn').dataset.group = JSON.stringify(groupMembers);
@@ -589,15 +612,8 @@
                         const facilitatorsInGroup = groupMembers.filter(n => facilitators.includes(n));
                         const normalsInGroup = groupMembers.filter(n => !facilitators.includes(n));
 
-                        let newHtml = '';
-                        facilitatorsInGroup.forEach((n, i) => {
-                            newHtml += `<strong>${escapeHtml(n)}</strong>`;
-                            if (i < facilitatorsInGroup.length - 1 || normalsInGroup.length > 0) newHtml += ', ';
-                        });
-                        normalsInGroup.forEach((n, i) => {
-                            newHtml += escapeHtml(n);
-                            if (i < normalsInGroup.length - 1) newHtml += ', ';
-                        });
+                        const newHtml = [...facilitatorsInGroup, ...normalsInGroup]
+                            .map(renderMemberName).join(', ');
 
                         row.querySelector('.group-members-text').innerHTML = newHtml;
                         row.querySelector('.group-count-badge').textContent = `${groupMembers.length}명`;

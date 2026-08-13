@@ -1335,9 +1335,11 @@ def bookclub_index():
     pair_restrictions = []
 
     try:
-        all_active_members_res = supabase.table("members").select("id, name, student_id, department") \
+        all_active_members_res = supabase.table("members").select("id, name, student_id, department, gender") \
             .eq('is_active', True).order("name").execute()
         all_active_members = all_active_members_res.data or []
+        for member in all_active_members:
+            member['gender_code'] = normalize_gender(member.get('gender'))
         active_member_ids = {member['id'] for member in all_active_members}
         app.logger.info(f"[2] DB에서 가져온 전체 활성 멤버 수: {len(all_active_members)}명")
 
@@ -5004,14 +5006,21 @@ def records_seminar_detail(history_id):
                 all_present.append(g)
         member_map = {}
         if all_present:
-            mres = supabase.table('members').select('id, name').in_('name', list(set(all_present))).execute().data or []
+            mres = supabase.table('members').select('id, name, gender').in_('name', list(set(all_present))).execute().data or []
             member_map = {m['name']: m['id'] for m in mres}
+        else:
+            mres = []
+        member_genders = {m['name']: normalize_gender(m.get('gender')) for m in mres}
         genres = _load_genres()
-        all_members = supabase.table('members').select('id, name').eq('is_active', True).order('name').execute().data or []
+        all_members = supabase.table('members').select('id, name, gender') \
+            .eq('is_active', True).order('name').execute().data or []
+        for member in all_members:
+            member['gender_code'] = normalize_gender(member.get('gender'))
+            member_genders.setdefault(member['name'], member['gender_code'])
         return render_template('records_seminar_detail.html',
                                row=row, groups=groups, member_map=member_map,
                                genres=genres, total_present=len(all_present),
-                               all_members=all_members)
+                               all_members=all_members, member_genders=member_genders)
     except Exception as e:
         app.logger.error(f"records_seminar_detail error: {e}", exc_info=True)
         flash(f"오류: {e}", 'danger')
