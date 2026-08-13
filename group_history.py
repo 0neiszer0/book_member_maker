@@ -25,10 +25,17 @@ def matrix_rows_from_history(history_rows, only_keys=None):
     stats = {}
     for row in history_rows or []:
         meeting_date = str(row.get('date') or '').strip()
+        excluded_names = {
+            str(name).strip() for name in (row.get('excluded_names') or [])
+            if str(name).strip()
+        }
         for group in row.get('groups') or []:
             if not isinstance(group, list):
                 continue
-            names = [str(name).strip() for name in group if str(name).strip()]
+            names = [
+                str(name).strip() for name in group
+                if str(name).strip() and str(name).strip() not in excluded_names
+            ]
             for a, b in itertools.combinations(names, 2):
                 if a == b:
                     continue
@@ -39,4 +46,40 @@ def matrix_rows_from_history(history_rows, only_keys=None):
                 item['count'] += 1
                 if meeting_date and (not item['last_met'] or meeting_date > item['last_met']):
                     item['last_met'] = meeting_date
+    return stats
+
+
+def meeting_details_from_history(history_rows):
+    """Return pair meeting counts and every recorded date for result previews."""
+    stats = {}
+    for row in history_rows or []:
+        meeting_date = str(row.get('date') or '').strip()
+        excluded_names = {
+            str(name).strip() for name in (row.get('excluded_names') or [])
+            if str(name).strip()
+        }
+        for group in row.get('groups') or []:
+            if not isinstance(group, list):
+                continue
+            names = [
+                str(name).strip() for name in group
+                if str(name).strip() and str(name).strip() not in excluded_names
+            ]
+            for a, b in itertools.combinations(names, 2):
+                if a == b:
+                    continue
+                key = canonical_pair_key(a, b)
+                item = stats.setdefault(key, {
+                    'count': 0,
+                    'last_met': None,
+                    'dates': [],
+                })
+                item['count'] += 1
+                if meeting_date:
+                    if meeting_date not in item['dates']:
+                        item['dates'].append(meeting_date)
+                    if not item['last_met'] or meeting_date > item['last_met']:
+                        item['last_met'] = meeting_date
+    for item in stats.values():
+        item['dates'].sort(reverse=True)
     return stats

@@ -283,7 +283,9 @@
                 <h1 class="work-header-title text-2xl font-bold">조 편성 작업</h1>
                 <p class="text-sm mt-1">{% if selected_session %}{{ selected_session.meeting_date }} · {% if selected_session.day_type == 'mon' %}월요일{% else %}목요일{% endif %} · {{ selected_session.book_title or '도서 미입력' }}{% else %}월요일 신청과 목요일 불참 기록을 기준으로 명단을 준비했습니다.{% endif %}</p>
             </div>
-            <div class="flex gap-2 flex-wrap">
+            <div class="flex gap-2 flex-wrap items-center">
+                <button type="button" id="manage-history-btn" class="work-chip" style="background:#E8EFDD;color:#304923">이전 세미나 기록</button>
+                <a href="/records/seminars" class="work-chip" style="background:#F2E8D8;color:#6B4B2D">전체 기록 관리</a>
                 <span class="work-chip">참석 <strong id="cnt-present">0</strong></span>
                 <span class="work-chip">발제 <strong id="cnt-facilitators">0</strong></span>
                 <span class="work-chip">투표 <strong id="cnt-voted">{{ pre_checked_attendee_ids|length }}</strong></span>
@@ -335,6 +337,7 @@
         <aside class="settings-panel">
             <h2 class="text-lg font-bold mb-4" style="color:var(--moss-deep,#3D5C2E)">편성 설정</h2>
             <label>그룹 수<input type="number" name="group_count" min="1" max="30" placeholder="자동 계산"></label>
+            <p id="group-size-preview" class="text-xs -mt-2 mb-3" style="color:#6B6255"></p>
             <label>그룹 이름<input type="text" name="group_names" placeholder="A팀, B팀, C팀"></label>
             {% if can_manage_pair_restrictions %}
             <details class="restriction-panel">
@@ -359,10 +362,6 @@
             </details>
             {% endif %}
             <button type="button" id="generate-btn" class="btn-submit">조 편성 시작</button>
-            <div class="mt-4 space-y-2 text-sm">
-                <a href="/records/seminars" class="block font-bold" style="color:var(--moss-deep,#3D5C2E)">세미나 기록으로 이동</a>
-                <button type="button" id="manage-history-btn" class="font-bold">이전 모임 빠른 보기</button>
-            </div>
         </aside>
     </form>
 
@@ -397,9 +396,20 @@
             // --- 라이브 카운터 ---
             const cntPresent = document.getElementById('cnt-present');
             const cntFacilitators = document.getElementById('cnt-facilitators');
+            const groupCountInput = document.querySelector('input[name="group_count"]');
+            const groupSizePreview = document.getElementById('group-size-preview');
             function updateCounts() {
-                cntPresent.textContent = document.querySelectorAll('input[name="present"]:checked').length;
+                const selectedCount = document.querySelectorAll('input[name="present"]:checked').length;
+                cntPresent.textContent = selectedCount;
                 cntFacilitators.textContent = document.querySelectorAll('input[name="facilitators"]:checked').length;
+                if (!selectedCount) {
+                    groupSizePreview.textContent = '참석자를 선택하면 예상 조 수와 인원이 표시됩니다.';
+                    return;
+                }
+                const requested = Number(groupCountInput.value) || Math.ceil(selectedCount / 4);
+                const groupCount = Math.max(1, Math.min(requested, Math.max(1, Math.floor(selectedCount / 4))));
+                const maxSize = Math.ceil(selectedCount / groupCount);
+                groupSizePreview.textContent = `현재 ${selectedCount}명 · 예상 ${groupCount}개 조 · 조당 ${groupCount === 1 ? selectedCount : `4~${maxSize}`}명`;
             }
             document.querySelectorAll('input[name="present"], input[name="facilitators"]').forEach(cb => {
                 cb.addEventListener('change', () => {
@@ -411,6 +421,7 @@
                     updateCounts();
                 });
             });
+            groupCountInput.addEventListener('input', updateCounts);
             updateCounts();
 
             // --- primary admin 전용 비공개 편성 제한 관리 ---

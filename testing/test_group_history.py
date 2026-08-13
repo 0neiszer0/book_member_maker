@@ -1,6 +1,11 @@
 import unittest
 
-from group_history import canonical_pair_key, matrix_rows_from_history, pair_keys_from_groups
+from group_history import (
+    canonical_pair_key,
+    matrix_rows_from_history,
+    meeting_details_from_history,
+    pair_keys_from_groups,
+)
 
 
 class GroupHistoryTests(unittest.TestCase):
@@ -33,6 +38,26 @@ class GroupHistoryTests(unittest.TestCase):
         result = matrix_rows_from_history(rows, {'가-나'})
         self.assertEqual(set(result), {'가-나'})
         self.assertEqual(pair_keys_from_groups([['가', '나']]), {'가-나'})
+
+    def test_no_show_is_excluded_from_linked_meeting(self):
+        rows = [{
+            'date': '2026-07-23',
+            'groups': [['가', '나', '다']],
+            'excluded_names': ['나'],
+        }]
+        result = matrix_rows_from_history(rows)
+        self.assertEqual(set(result), {'가-다'})
+
+    def test_meeting_details_include_all_dates(self):
+        rows = [
+            {'date': '2026-01-01', 'groups': [['가', '나']]},
+            {'date': '2026-03-01', 'groups': [['나', '가']]},
+        ]
+        self.assertEqual(meeting_details_from_history(rows)['가-나'], {
+            'count': 2,
+            'last_met': '2026-03-01',
+            'dates': ['2026-03-01', '2026-01-01'],
+        })
 
 
 if __name__ == '__main__':

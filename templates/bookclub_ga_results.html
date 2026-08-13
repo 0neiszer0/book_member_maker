@@ -52,7 +52,17 @@
 
         .solutions-grid { display:grid; grid-template-columns:1fr; gap:1rem; width:100%; align-items:start; }
         .result-card-combined { margin-bottom:0 !important; }
+        .group-row-main { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.65rem; align-items:center; }
+        .group-content-view { display:flex; align-items:center; gap:.6rem; min-width:0; }
+        .group-members-text { display:block; min-width:0; overflow-x:auto; white-space:nowrap; padding:.25rem 0; scrollbar-width:thin; }
+        .group-count-badge { white-space:nowrap; color:#6B6255; background:#F2EBD8; border:1px solid #E5D7B8; border-radius:999px; padding:.2rem .5rem; font-size:.72rem; font-weight:800; }
+        .live-history-title { color:#3D5C2E; font-weight:800; margin-bottom:.35rem; }
         @media(min-width:1100px){ .solutions-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.result-card-combined{height:100%;} }
+        @media(max-width:640px){
+            .group-row-main{grid-template-columns:minmax(0,1fr)}
+            .group-row-main .show-history-btn{margin-left:0!important;justify-self:start}
+            .gender-balance-badge{display:none}
+        }
 
         #image-modal {
             display: none;
@@ -131,8 +141,8 @@
                 {% for result in combined_solutions %}
                 <div class="eva-card p-6 mb-6 rounded-lg result-card-combined" {% if loop.index> 6 %}style="display:
                     none;"{% endif %}>
-                    <div class="flex justify-between items-center mb-3">
-                        <h3 class="text-lg font-bold text-eva-green">추천안 {{ loop.index }}</h3>
+                    <div class="flex justify-between items-center mb-3 gap-2">
+                        <h3 class="text-lg font-bold text-eva-green">추천안 {{ loop.index }} <span class="text-sm text-gray-500">· 총 <span class="result-total-count">{{ present|length }}</span>명 / {{ result.groups|length }}개 조</span></h3>
                         <span class="text-sm font-semibold bg-green-900 text-green-200 px-3 py-1 rounded-full">총점: {{
                             result.score }}</span>
                     </div>
@@ -142,12 +152,13 @@
                     <div class="space-y-2 group-render-area">
                         {% for group in result.groups %}
                         <div class="p-3 bg-bg-dark rounded border border-gray-700 group-row">
-                            <div class="flex justify-between items-center relative gap-2">
-                                <div class="flex-grow group-content-view">
+                            <div class="group-row-main relative">
+                                <div class="group-content-view">
                                     <strong class="text-gray-300 mr-2 group-label" data-idx="{{ loop.index0 }}">
                                         {% if group_names and group_names[loop.index0] %}{{ group_names[loop.index0]
                                         }}{% else %}그룹 {{ loop.index }}{% endif %}:
                                     </strong>
+                                    <span class="group-count-badge">{{ group|length }}명</span>
                                     {% set m_count = namespace(value=0) %}
                                     {% set f_count = namespace(value=0) %}
                                     {% for name in group %}
@@ -158,10 +169,6 @@
                                     {% set f_count.value = f_count.value + 1 %}
                                     {% endif %}
                                     {% endfor %}
-                                    <span
-                                        class="gender-balance-badge text-xs font-semibold px-2 py-0.5 rounded-full mr-3 {% if m_count.value == f_count.value %}bg-blue-900 text-blue-200{% elif m_count.value > f_count.value + 1 or f_count.value > m_count.value + 1 %}bg-red-900 text-red-300{% else %}bg-gray-700 text-gray-300{% endif %}">남
-                                        {{ m_count.value }}명 / 여 {{ f_count.value }}명</span>
-
                                     {% set facilitators_in_group = [] %}{% for name in group %}{% if name in
                                     facilitators %}{% set _ = facilitators_in_group.append(name) %}{% endif %}{% endfor
                                     %}
@@ -173,9 +180,12 @@
                                         {% for name in members_in_group %}{{ name }}{% if not loop.last %}, {% endif
                                         %}{% endfor %}
                                     </span>
+                                    <span
+                                        class="gender-balance-badge text-xs font-semibold px-2 py-0.5 rounded-full {% if m_count.value == f_count.value %}bg-blue-900 text-blue-200{% elif m_count.value > f_count.value + 1 or f_count.value > m_count.value + 1 %}bg-red-900 text-red-300{% else %}bg-gray-700 text-gray-300{% endif %}">남
+                                        {{ m_count.value }} / 여 {{ f_count.value }}</span>
                                 </div>
                                 <textarea
-                                    class="group-content-edit hidden w-full bg-gray-800 text-white rounded p-2 text-sm border-gray-600 focus:border-eva-green focus:outline-none"
+                                    class="group-content-edit hidden col-span-full w-full bg-gray-800 text-white rounded p-2 text-sm border-gray-600 focus:border-eva-green focus:outline-none"
                                     rows="2"></textarea>
                                 <button
                                     class="show-history-btn text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded-md ml-2 flex-shrink-0"
@@ -293,6 +303,55 @@
                 }
             }
 
+            const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[char]);
+
+            function parseEditedGroup(text) {
+                return text.split(/[,;\n]+/)
+                    .map(name => name.trim())
+                    .filter(Boolean)
+                    .map(name => name.endsWith('*') ? name.slice(0, -1).trim() : name)
+                    .filter(Boolean);
+            }
+
+            function renderMeetingHistory(group, detailsDiv, live = false) {
+                const pairs = [];
+                for (let i = 0; i < group.length; i++) {
+                    for (let j = i + 1; j < group.length; j++) pairs.push([group[i], group[j]]);
+                }
+                const metPairs = pairs.map(pair => {
+                    const key = [...pair].sort().join('-');
+                    return { pair, entry: meetingHistory[key] };
+                }).filter(item => item.entry && item.entry.count > 0);
+                metPairs.sort((a, b) => {
+                    if (b.entry.count !== a.entry.count) return b.entry.count - a.entry.count;
+                    return (b.entry.last_met || '').localeCompare(a.entry.last_met || '');
+                });
+
+                const title = live ? '<div class="live-history-title">수정 중 만남 기록</div>' : '';
+                if (pairs.length < 1) {
+                    detailsDiv.innerHTML = title + '<span class="text-gray-400">두 명 이상 입력하면 만남 기록이 실시간으로 표시됩니다.</span>';
+                } else if (metPairs.length === 0) {
+                    detailsDiv.innerHTML = title + `<div class="text-eva-green font-semibold">모두 새로운 만남! (${pairs.length}쌍 전부 처음)</div>`;
+                } else {
+                    let html = title + `<div class="mb-2">전체 ${pairs.length}쌍 중 ` +
+                        `<span class="text-red-400 font-bold">${metPairs.length}쌍 재회</span> · ` +
+                        `<span class="text-eva-green font-bold">${pairs.length - metPairs.length}쌍 첫 만남</span></div>`;
+                    html += '<ul class="list-none space-y-1">';
+                    metPairs.forEach(({ pair, entry }) => {
+                        const dates = (entry.dates || (entry.last_met ? [entry.last_met] : []))
+                            .map(date => escapeHtml(String(date).slice(0, 10))).join(', ');
+                        html += `<li><strong class="text-red-400">${escapeHtml(pair[0])} &amp; ${escapeHtml(pair[1])}</strong>: ` +
+                            `<span class="text-red-500 font-bold">${entry.count}회</span>` +
+                            (dates ? ` <span class="text-gray-500">· ${dates}</span>` : '') + '</li>';
+                    });
+                    html += '</ul>';
+                    detailsDiv.innerHTML = html;
+                }
+                detailsDiv.style.display = 'block';
+            }
+
             async function saveGroups(groups) {
                 if (!(await validateGroups(groups))) return;
                 if (!confirm("이 조 편성 결과를 저장하시겠습니까?")) return;
@@ -340,7 +399,7 @@
                     const escapeText = value => String(value).replace(/[&<>"']/g, char => ({
                         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
                     })[char]);
-                    const metaItems = [meetingDate, bookTitle].filter(Boolean).map(value =>
+                    const metaItems = [meetingDate, bookTitle, `총 ${present.length}명 · ${groups.length}개 조`].filter(Boolean).map(value =>
                         `<span style="display:inline-block;padding:7px 12px;border-radius:999px;background:#E8EFDD;color:#3D5C2E;font-size:13px;font-weight:700;">${escapeText(value)}</span>`
                     ).join(' ');
                     let innerHTML = `
@@ -349,22 +408,22 @@
                             <h3 style="font-size:30px;line-height:1.25;font-weight:800;color:#2A241B;margin:0 0 14px;letter-spacing:-.04em;">세미나 조 편성</h3>
                             <div style="display:flex;gap:8px;flex-wrap:wrap;">${metaItems}</div>
                         </div>
-                        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;">`;
+                        <div style="display:grid;grid-template-columns:1fr;gap:12px;">`;
                     groups.forEach((group, index) => {
                         const groupName = escapeText((group_names && group_names[index]) ? group_names[index] : `그룹 ${index + 1}`);
                         const memberNames = [...group].sort().map(name => {
                             const safeName = escapeText(name);
                             return facilitators.includes(name)
-                                ? `<span style="display:inline-flex;align-items:center;gap:5px;padding:6px 9px;border-radius:9px;background:#F2E8D8;color:#6B4B2D;font-size:14px;font-weight:800;">${safeName}<small style="font-size:10px;">발제</small></span>`
-                                : `<span style="display:inline-block;padding:6px 9px;border-radius:9px;background:#F2EBD8;color:#40382E;font-size:14px;font-weight:650;">${safeName}</span>`;
-                        }).join('');
+                                ? `<strong style="color:#6B4B2D;font-weight:850;">${safeName}</strong>`
+                                : safeName;
+                        }).join(', ');
                         innerHTML += `
-                            <section style="min-height:132px;padding:18px;border:1px solid #E5D7B8;border-radius:16px;background:#FFFCF3;box-shadow:0 5px 14px rgba(74,57,35,.07);">
-                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                            <section style="padding:18px;border:1px solid #E5D7B8;border-radius:16px;background:#FFFCF3;box-shadow:0 5px 14px rgba(74,57,35,.07);">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
                                     <strong style="font-size:17px;color:#3D5C2E;">${groupName}</strong>
                                     <span style="font-size:12px;color:#7D705E;">${group.length}명</span>
                                 </div>
-                                <div style="display:flex;flex-wrap:wrap;gap:7px;">${memberNames}</div>
+                                <div style="white-space:nowrap;overflow:hidden;text-overflow:clip;color:#40382E;font-size:15px;line-height:1.5;">${memberNames}</div>
                             </section>`;
                     });
                     innerHTML += `</div>
@@ -407,8 +466,22 @@
                 }
             }
 
+            // 수정 입력과 동시에 해당 조의 모든 페어 만남 날짜를 갱신한다.
+            const resultContainer = document.querySelector('.container');
+            resultContainer.addEventListener('input', (e) => {
+                if (!e.target.matches('.group-content-edit')) return;
+                const row = e.target.closest('.group-row');
+                const group = parseEditedGroup(e.target.value);
+                row.querySelector('.group-count-badge').textContent = `${group.length}명`;
+                const card = row.closest('.result-card-combined');
+                const total = [...card.querySelectorAll('.group-content-edit')]
+                    .reduce((sum, input) => sum + parseEditedGroup(input.value).length, 0);
+                card.querySelector('.result-total-count').textContent = total;
+                renderMeetingHistory(group, row.querySelector('.history-details'), true);
+            });
+
             // Event Delegation for all buttons within the container
-            document.querySelector('.container').addEventListener('click', (e) => {
+            resultContainer.addEventListener('click', (e) => {
 
                 // --- 1. Save Groups ---
                 if (e.target.matches('.save-groups-btn')) {
@@ -452,6 +525,7 @@
                         ).join(', ');
 
                         contentEdit.value = editableText;
+                        renderMeetingHistory(groupMembers, row.querySelector('.history-details'), true);
                     });
                     return;
                 }
@@ -465,11 +539,15 @@
                     viewGroup.classList.remove('hidden');
                     editGroup.classList.add('hidden');
 
-                    card.querySelectorAll('.group-render-area > div').forEach(row => {
+                    const originalGroups = JSON.parse(card.querySelector('.save-groups-btn').dataset.groups);
+                    card.querySelectorAll('.group-render-area > div').forEach((row, idx) => {
                         row.querySelector('.group-content-view').classList.remove('hidden');
                         row.querySelector('.show-history-btn').classList.remove('hidden');
                         row.querySelector('.group-content-edit').classList.add('hidden');
+                        row.querySelector('.history-details').style.display = 'none';
+                        row.querySelector('.group-count-badge').textContent = `${originalGroups[idx].length}명`;
                     });
+                    card.querySelector('.result-total-count').textContent = originalGroups.reduce((sum, group) => sum + group.length, 0);
                     return;
                 }
 
@@ -494,8 +572,7 @@
                             return;
                         }
 
-                        const membersRaw = text.split(/[,;\s\n]+/).map(n => n.trim()).filter(Boolean);
-                        const cleanMembers = membersRaw.map(n => n.endsWith('*') ? n.slice(0, -1) : n);
+                        const cleanMembers = parseEditedGroup(text);
                         newGroupsArray.push(cleanMembers);
                     });
 
@@ -514,20 +591,22 @@
 
                         let newHtml = '';
                         facilitatorsInGroup.forEach((n, i) => {
-                            newHtml += `<strong>${n}</strong>`;
+                            newHtml += `<strong>${escapeHtml(n)}</strong>`;
                             if (i < facilitatorsInGroup.length - 1 || normalsInGroup.length > 0) newHtml += ', ';
                         });
                         normalsInGroup.forEach((n, i) => {
-                            newHtml += n;
+                            newHtml += escapeHtml(n);
                             if (i < normalsInGroup.length - 1) newHtml += ', ';
                         });
 
                         row.querySelector('.group-members-text').innerHTML = newHtml;
+                        row.querySelector('.group-count-badge').textContent = `${groupMembers.length}명`;
                         updateGenderBadge(row.querySelector('.gender-balance-badge'), groupMembers);
 
                         row.querySelector('.group-content-view').classList.remove('hidden');
                         row.querySelector('.show-history-btn').classList.remove('hidden');
                         row.querySelector('.group-content-edit').classList.add('hidden');
+                        row.querySelector('.history-details').style.display = 'none';
                     });
 
                     viewGroup.classList.remove('hidden');
@@ -554,55 +633,7 @@
                         return;
                     }
 
-                    const pairs = [];
-                    for (let i = 0; i < group.length; i++) {
-                        for (let j = i + 1; j < group.length; j++) {
-                            pairs.push([group[i], group[j]]);
-                        }
-                    }
-
-                    // 만난 적 있는 페어만 추출 → (count 내림차순, last_met 최근순) 정렬
-                    const metPairs = [];
-                    pairs.forEach(pair => {
-                        const key = [...pair].sort().join('-');
-                        const entry = meetingHistory[key];
-                        if (entry && entry.count > 0) {
-                            metPairs.push({ pair, entry });
-                        }
-                    });
-                    metPairs.sort((a, b) => {
-                        if (b.entry.count !== a.entry.count) return b.entry.count - a.entry.count;
-                        return (b.entry.last_met || '').localeCompare(a.entry.last_met || '');
-                    });
-
-                    const totalPairs = pairs.length;
-                    const metCount = metPairs.length;
-                    const newCount = totalPairs - metCount;
-
-                    if (totalPairs < 1) {
-                        detailsDiv.innerHTML = '<span class="text-gray-400">비교할 기록이 없습니다.</span>';
-                    } else if (metCount === 0) {
-                        detailsDiv.innerHTML =
-                            `<div class="text-eva-green font-semibold"> 모두 새로운 만남! (${totalPairs}쌍 전부 처음)</div>`;
-                    } else {
-                        let html = `<div class="mb-2 text-xs">` +
-                            `전체 ${totalPairs}쌍 중 ` +
-                            `<span class="text-red-400 font-bold">${metCount}쌍 재회</span> · ` +
-                            `<span class="text-eva-green font-bold">${newCount}쌍 첫 만남</span>` +
-                            `</div>`;
-                        html += '<ul class="list-none space-y-1">';
-                        metPairs.forEach(({ pair, entry }) => {
-                            const dateStr = entry.last_met
-                                ? `<span class="text-gray-400">(${entry.last_met.slice(0, 10)})</span>`
-                                : '';
-                            html += `<li class="text-red-400 font-bold"> ${pair[0]} &amp; ${pair[1]}: `+
-                                `<span class="text-red-500">${entry.count}회</span> 만남 ${dateStr}</li>`;
-                        });
-                        html += '</ul>';
-                        detailsDiv.innerHTML = html;
-                    }
-
-                    detailsDiv.style.display = 'block';
+                    renderMeetingHistory(group, detailsDiv);
                     button.textContent = '기록 닫기';
                     return;
                 }
