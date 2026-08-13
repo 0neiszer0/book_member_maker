@@ -258,9 +258,17 @@
         .member-table-head { padding:.4rem .75rem; color:var(--ink-soft,#5E5548); font-size:.75rem; font-weight:800; }
         .member-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.45rem; max-height:62vh; overflow:auto; padding:.15rem; }
         .member-row { background:var(--paper,#FAF6EC); border:1px solid var(--line,#E5D7B8); border-radius:10px; padding:.55rem .7rem; }
+        .member-row.gender-male { background:#F0F7F9; }
+        .member-row.gender-female { background:#FAF1F4; }
         .member-row.is-prechecked { border-left:4px solid var(--moss,#5C7A4A); }
         .member-row input { accent-color:var(--moss-deep,#3D5C2E); width:18px; height:18px; justify-self:center; }
         .member-meta { color:var(--ink-muted,#8A7E6A); font-size:.72rem; }
+        .member-name.gender-male { color:#2E6275; }
+        .member-name.gender-female { color:#8A4F62; }
+        .gender-tag { display:inline-flex;align-items:center;justify-content:center;margin-left:.35rem;padding:.05rem .32rem;border-radius:999px;font-size:.62rem;font-weight:900;vertical-align:.08rem; }
+        .gender-tag.gender-male { color:#28596A;background:#DCECF1;border:1px solid #B8D5DE; }
+        .gender-tag.gender-female { color:#7A4053;background:#F2DCE4;border:1px solid #E2BBC9; }
+        .gender-legend { display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin:.15rem .75rem .55rem;color:var(--ink-soft,#6B6255);font-size:.72rem; }
         .settings-panel label { display:block; font-size:.8rem; font-weight:700; margin-bottom:.9rem; }
         .settings-panel input,.settings-panel select { width:100%; margin-top:.35rem; padding:.65rem; border:1px solid var(--line,#E5D7B8); border-radius:10px; background:#fff; color:var(--ink,#2F2A22); }
         .bulk-tools { margin-top:.9rem; border-top:1px solid var(--line,#E5D7B8); padding-top:.9rem; }
@@ -316,11 +324,12 @@
                     <button type="button" id="deselect-all-facilitators" class="wood-chip">발제 해제</button>
                 </div>
             </div>
+            <div class="gender-legend"><strong>성별 표시</strong><span><span class="gender-tag gender-female">여</span> 여성</span><span><span class="gender-tag gender-male">남</span> 남성</span></div>
             <div class="member-table-head"><span>멤버</span><span class="text-center">참석</span><span class="text-center">발제</span></div>
             <div class="member-list content">
                 {% for m in all_members %}
-                <label class="member-row form-check {% if m.id in pre_checked_attendee_ids %}is-prechecked{% endif %}" data-name="{{ m.name }} {{ m.student_id or '' }} {{ m.department or '' }}">
-                    <span><strong>{{ m.name }}</strong><span class="member-meta block">{{ m.student_id or '학번 없음' }}{% if m.department %} · {{ m.department }}{% endif %}</span></span>
+                <label class="member-row form-check {% if m.gender_code == 'M' %}gender-male{% elif m.gender_code == 'W' %}gender-female{% endif %} {% if m.id in pre_checked_attendee_ids %}is-prechecked{% endif %}" data-name="{{ m.name }} {{ m.student_id or '' }} {{ m.department or '' }}" data-gender="{{ m.gender_code or '' }}">
+                    <span><strong class="member-name {% if m.gender_code == 'M' %}gender-male{% elif m.gender_code == 'W' %}gender-female{% endif %}">{{ m.name }}</strong>{% if m.gender_code == 'M' %}<span class="gender-tag gender-male">남</span>{% elif m.gender_code == 'W' %}<span class="gender-tag gender-female">여</span>{% endif %}<span class="member-meta block">{{ m.student_id or '학번 없음' }}{% if m.department %} · {{ m.department }}{% endif %}</span></span>
                     <input type="checkbox" name="present" value="{{ m.name }}" {% if m.id in pre_checked_attendee_ids %}checked{% endif %} aria-label="{{ m.name }} 참석">
                     <input type="checkbox" name="facilitators" value="{{ m.name }}" {% if m.name in pre_checked_facilitator_names %}checked{% endif %} aria-label="{{ m.name }} 발제">
                 </label>
