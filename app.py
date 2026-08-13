@@ -4409,13 +4409,13 @@ def remove_special_event_attendee(event_id, member_id):
 
 # ============================================================================
 # 출석 매트릭스 (관리자 도구)
-# 가로축: 세미나 주차(월/목 묶어서 1주차로 표시), 세로축: 회원, 셀: O/X
+# 가로축: 확정된 세미나 회차 날짜, 세로축: 회원, 셀: O/X
 # 데이터 소스: history (확정된 세미나 진행 기록의 present 명단)
 # ============================================================================
 
 def _build_attendance_matrix(start_date=None, end_date=None):
-    """history의 present 명단 + members 명부로 출석 매트릭스를 생성.
-    Returns: (members_list, weeks_list, matrix_dict[member_id][week_key]=bool)
+    """history의 present 명단 + members 명부로 회차별 출석 매트릭스를 생성.
+    Returns: (members_list, sessions_list, matrix_dict[member_id][session_key]=bool)
     """
     # 1) 회원 명부 (활성 + 비활성 모두 — 과거 회원 기록 보존)
     members = supabase.table('members').select('id, name, student_id, department, is_active') \
@@ -4429,26 +4429,27 @@ def _build_attendance_matrix(start_date=None, end_date=None):
         q = q.lte('date', end_date)
     histories = q.order('date').execute().data or []
 
-    # 3) 주차 단위로 묶기 — 같은 주의 월/목 출석을 합쳐 OR 연산
+    # 3) 실제 세미나 회차별로 구성한다. 같은 주의 월/목 기록도 각각 보여야
+    #    관리자가 "언제 참석했는지"를 정확히 확인할 수 있다.
     from datetime import datetime as _dt
     name_to_id = {m['name']: m['id'] for m in members}
-    week_meta = {}        # week_key -> {label, dates:[date_str], titles:set}
-    matrix = {}           # member_id -> {week_key: True}
+    sessions = []
+    matrix = {}           # member_id -> {session_key: True}
+    weekday_labels = ('월', '화', '수', '목', '금', '토', '일')
 
-    for h in histories:
+    for index, h in enumerate(histories):
         try:
             d = _dt.strptime(h['date'], '%Y-%m-%d').date()
         except Exception:
             continue
-        # ISO 주차로 묶기 (월요일 기준)
-        iso_year, iso_week, _ = d.isocalendar()
-        week_key = f"{iso_year}-W{iso_week:02d}"
-        meta = week_meta.setdefault(week_key, {'label': '', 'dates': [], 'titles': set(), 'sort': d})
-        meta['dates'].append(h['date'])
-        if h.get('book_title'):
-            meta['titles'].add(h['book_title'])
-        if d < meta['sort']:
-            meta['sort'] = d
+        session_key = str(h.get('id') or f"{h['date']}-{index}")
+        sessions.append({
+            'key': session_key,
+            'date': h['date'],
+            'label': f"{d.month}/{d.day}({weekday_labels[d.weekday()]})",
+            'title': h.get('book_title') or '(도서명 미정)',
+            'sort': d,
+        })
 
         # 출석자 처리 — present 는 이름 배열
         present_names = h.get('present') or []
@@ -4458,22 +4459,10 @@ def _build_attendance_matrix(start_date=None, end_date=None):
             mid = name_to_id.get(nm)
             if mid is None:
                 continue
-            matrix.setdefault(mid, {})[week_key] = True
+            matrix.setdefault(mid, {})[session_key] = True
 
-    # 4) 주차 정렬 + 라벨 만들기
-    weeks = []
-    for wk, meta in week_meta.items():
-        first_date = min(meta['dates'])
-        try:
-            d = _dt.strptime(first_date, '%Y-%m-%d').date()
-            label = f"{d.month}/{d.day}~"
-        except Exception:
-            label = first_date
-        title = ' / '.join(sorted(meta['titles'])) if meta['titles'] else '(미정)'
-        weeks.append({'key': wk, 'label': label, 'title': title, 'sort': meta['sort']})
-    weeks.sort(key=lambda w: w['sort'])
-
-    return members, weeks, matrix
+    sessions.sort(key=lambda session: (session['sort'], session['key']))
+    return members, sessions, matrix
 
 
 @app.route('/admin/attendance_matrix')
@@ -4532,7 +4521,7 @@ def admin_attendance_matrix_export():
 
     members, weeks, matrix = _build_attendance_matrix(start_date, end_date)
 
-    # DataFrame 구성: 행=회원, 열=주차
+    # DataFrame 구성: 행=회원, 열=세미나 회차
     columns = ['이름', '학번', '소속'] + [f"{w['label']} {w['title']}" for w in weeks] + ['출석횟수']
     rows = []
     for m in members:
@@ -5589,11 +5578,15 @@ def study_session_delete(session_id):
 def records_analytics():
     term_id = request.args.get('term_id') or ''
     try:
+        min_attendance = max(1, min(int(request.args.get('min_attendance', 3)), 50))
+    except (TypeError, ValueError):
+        min_attendance = 3
+    try:
         start, end, _ = _get_term_range(term_id)
-        hq = supabase.table('history').select('date, genre, groups')
+        hq = supabase.table('history').select('id, date, genre, present, book_title')
         if start and end:
             hq = hq.gte('date', start).lte('date', end)
-        history = hq.execute().data or []
+        history = hq.order('date').execute().data or []
         genre_counts, monthly_counts, member_attend = {}, {}, {}
         for row in history:
             g = row.get('genre') or '미분류'
@@ -5602,11 +5595,38 @@ def records_analytics():
             if d:
                 ym = str(d)[:7]
                 monthly_counts[ym] = monthly_counts.get(ym, 0) + 1
-            groups = row.get('groups') or []
-            for grp in groups:
-                for n in (grp if isinstance(grp, list) else [grp]):
-                    member_attend[n] = member_attend.get(n, 0) + 1
+            for name in (row.get('present') or []):
+                if name:
+                    member_attend[name] = member_attend.get(name, 0) + 1
         top_attendees = sorted(member_attend.items(), key=lambda x: x[1], reverse=True)[:15]
+
+        attendance_members, attendance_sessions, attendance_matrix = _build_attendance_matrix(start, end)
+        attendance_counts = {
+            member['id']: sum(
+                1 for session_item in attendance_sessions
+                if attendance_matrix.get(member['id'], {}).get(session_item['key'])
+            )
+            for member in attendance_members
+        }
+        visible_attendance_members = [
+            member for member in attendance_members
+            if member.get('is_active') or attendance_counts.get(member['id'], 0) > 0
+        ]
+        below_minimum = []
+        if attendance_sessions:
+            below_minimum = sorted(
+                [
+                    {
+                        **member,
+                        'attendance_count': attendance_counts.get(member['id'], 0),
+                        'shortage': min_attendance - attendance_counts.get(member['id'], 0),
+                    }
+                    for member in attendance_members
+                    if member.get('is_active')
+                    and attendance_counts.get(member['id'], 0) < min_attendance
+                ],
+                key=lambda member: (member['attendance_count'], member.get('name') or ''),
+            )
 
         # 벽돌책/소모임 월별 세션 카운트 (학기 필터 적용)
         bb_monthly, sg_monthly = {}, {}
@@ -5651,6 +5671,14 @@ def records_analytics():
                                bb_monthly=dict(sorted(bb_monthly.items())),
                                sg_monthly=dict(sorted(sg_monthly.items())),
                                top_attendees=top_attendees,
+                               attendance_members=visible_attendance_members,
+                               attendance_sessions=attendance_sessions,
+                               attendance_matrix=attendance_matrix,
+                               attendance_counts=attendance_counts,
+                               below_minimum=below_minimum,
+                               min_attendance=min_attendance,
+                               attendance_start_date=start or '',
+                               attendance_end_date=end or '',
                                terms=terms, selected_term_id=term_id)
     except Exception as e:
         app.logger.error(f"records_analytics error: {e}", exc_info=True)

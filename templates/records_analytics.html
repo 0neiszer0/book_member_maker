@@ -5,6 +5,19 @@
     <title>통계 - 기록 시스템</title>
     {% include '_records_base.html' %}
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+    <style>
+        .attendance-sheet { border-collapse: separate; border-spacing: 0; min-width: max-content; width: 100%; font-size: .78rem; }
+        .attendance-sheet th, .attendance-sheet td { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: .55rem .65rem; text-align: center; white-space: nowrap; }
+        .attendance-sheet th { position: sticky; top: 0; z-index: 2; background: var(--walnut-tint); color: var(--ink); }
+        .attendance-sheet .attendance-name { position: sticky; left: 0; z-index: 1; min-width: 8.5rem; text-align: left; background: var(--surface); }
+        .attendance-sheet th.attendance-name { z-index: 3; background: var(--walnut-tint); }
+        .attendance-sheet .attendance-present { color: var(--moss-deep); background: rgba(92, 122, 74, .10); font-weight: 900; }
+        .attendance-sheet .attendance-absent { color: var(--ink-faint); }
+        .attendance-sheet tr:last-child td { border-bottom: 0; }
+        .attendance-sheet th:last-child, .attendance-sheet td:last-child { border-right: 0; }
+        .attendance-scroll { overflow: auto; max-height: 65vh; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+        .minimum-member { border: 1px solid rgba(201, 122, 58, .30); background: rgba(201, 122, 58, .08); }
+    </style>
 </head>
 <body class="min-h-screen">
     {% include '_header.html' %}
@@ -13,7 +26,14 @@
         {{ records_nav('analytics') }}
         {{ term_filter(terms, selected_term_id, 'records_analytics') }}
 
-        <div class="flex justify-between items-center gap-3 mb-6"><h1 class="text-2xl font-bold text-eva-green"><i data-lucide="chart-column" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 통계</h1><button id="rebuild-matrix" class="wood-chip">만남 매트릭스 재계산</button></div>
+        <div class="flex justify-between items-center gap-3 mb-6 flex-wrap">
+            <h1 class="text-2xl font-bold text-eva-green"><i data-lucide="chart-column" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 통계</h1>
+            <div class="flex gap-2 flex-wrap">
+                <a href="{{ url_for('admin_attendance_matrix', term_id=selected_term_id) }}" class="wood-chip">출석표 크게 보기</a>
+                <a href="{{ url_for('admin_attendance_matrix_export', term_id=selected_term_id) }}" class="wood-chip"><i data-lucide="download" style="width:1em;height:1em;display:inline-block;vertical-align:-0.16em"></i> 엑셀 내려받기</a>
+                <button id="rebuild-matrix" class="wood-chip">만남 매트릭스 재계산</button>
+            </div>
+        </div>
 
         <!-- 요약 -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
@@ -30,6 +50,85 @@
                 <div class="text-3xl font-bold text-blue-400">{{ total_study_groups }}</div>
             </div>
         </div>
+
+        <!-- 날짜별 출석표와 최소 참석 기준 -->
+        <section class="eva-card p-4 sm:p-5 rounded-lg mb-8" aria-labelledby="attendance-heading">
+            <div class="flex items-start justify-between gap-4 flex-wrap mb-4">
+                <div>
+                    <h2 id="attendance-heading" class="text-lg font-bold text-eva-green"><i data-lucide="calendar-check" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 날짜별 세미나 출석표</h2>
+                    <p class="text-xs text-gray-500 mt-1">각 날짜의 O를 보면 누가 언제 참석했는지 확인할 수 있습니다. 현재 화면의 학기 필터가 그대로 적용됩니다.</p>
+                </div>
+                <form method="get" action="{{ url_for('records_analytics') }}" class="flex items-end gap-2 flex-wrap">
+                    {% if selected_term_id %}<input type="hidden" name="term_id" value="{{ selected_term_id }}">{% endif %}
+                    <label class="text-xs font-bold text-gray-500">
+                        최소 참석 횟수
+                        <input type="number" name="min_attendance" value="{{ min_attendance }}" min="1" max="50" inputmode="numeric"
+                            class="block mt-1 w-24 rounded-lg border border-border-dark bg-white px-3 py-2 text-sm text-gray-800">
+                    </label>
+                    <button type="submit" class="wood-chip">기준 적용</button>
+                </form>
+            </div>
+
+            {% if attendance_sessions %}
+            <div class="rounded-xl border border-orange-200 bg-orange-50/60 p-4 mb-4">
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                        <h3 class="font-bold text-gray-800">최소 {{ min_attendance }}회 미달 · 활성 회원 {{ below_minimum|length }}명</h3>
+                        <p class="text-xs text-gray-500 mt-1">활성 상태인 회원만 집계합니다. 위 숫자를 바꾸면 바로 다시 계산됩니다.</p>
+                    </div>
+                    <span class="text-xs text-gray-500">선택 기간 총 {{ attendance_sessions|length }}회</span>
+                </div>
+                {% if below_minimum %}
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-3">
+                    {% for member in below_minimum %}
+                    <div class="minimum-member rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+                        <span class="font-bold text-gray-800">{{ member.name }}</span>
+                        <span class="text-xs text-gray-600">{{ member.attendance_count }}회 참석 · {{ member.shortage }}회 부족</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="mt-3 text-sm font-bold text-eva-green">기준을 못 채운 활성 회원이 없습니다.</p>
+                {% endif %}
+            </div>
+
+            <div class="attendance-scroll" role="region" aria-label="날짜별 세미나 출석표" tabindex="0">
+                <table class="attendance-sheet">
+                    <thead>
+                        <tr>
+                            <th class="attendance-name">회원</th>
+                            {% for session_item in attendance_sessions %}
+                            <th title="{{ session_item.date }} · {{ session_item.title }}">
+                                <div>{{ session_item.label }}</div>
+                                <div class="max-w-24 truncate text-[10px] font-normal text-gray-500">{{ session_item.title }}</div>
+                            </th>
+                            {% endfor %}
+                            <th>합계</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for member in attendance_members %}
+                        <tr>
+                            <td class="attendance-name">
+                                <div class="font-bold">{{ member.name }}</div>
+                                <div class="text-[10px] text-gray-500">{{ member.student_id or '학번 없음' }}{% if not member.is_active %} · 비활성{% endif %}</div>
+                            </td>
+                            {% for session_item in attendance_sessions %}
+                            {% set attended = attendance_matrix.get(member.id, {}).get(session_item.key) %}
+                            <td class="{{ 'attendance-present' if attended else 'attendance-absent' }}" aria-label="{{ member.name }} {{ session_item.date }} {{ '참석' if attended else '불참' }}">
+                                {{ 'O' if attended else '—' }}
+                            </td>
+                            {% endfor %}
+                            <td class="font-bold text-eva-green">{{ attendance_counts.get(member.id, 0) }}회</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">선택한 기간에 확정된 세미나 기록이 없습니다.</div>
+            {% endif %}
+        </section>
 
         <!-- 차트 그리드 -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
