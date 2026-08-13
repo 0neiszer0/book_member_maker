@@ -46,13 +46,12 @@
     .border-eva-green { border-color: var(--eva-green); }
     .border-border-dark { border-color: var(--border-dark); }
 
-    /* 기록 시스템 서브탭 — _header.html 바로 아래에 자연스럽게 붙도록 */
+    /* 기록 시스템 서브탭 — 운영 메뉴 다음 줄에서 문서 흐름대로 표시한다.
+       두 메뉴를 모두 sticky로 두면 중간 폭 화면에서 서로 겹친다. */
     .records-subbar {
         background-color: var(--card-dark);
         border-bottom: 1px solid var(--border-dark);
-        position: sticky;
-        top: 0; /* _header.html 이 sticky 일 때 그 아래로 자동 이동 */
-        z-index: 40;
+        position: static;
     }
     .records-subbar-inner {
         display: flex;
@@ -165,8 +164,8 @@ async function addNewGenre(btn) {
 
 {% macro records_nav(active) %}
 {% include '_admin_sidebar.html' %}
-{# 페이지 container 안에 들어가도 자연스럽게 보이는 sticky 서브바 #}
-<div class="records-subbar -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 mb-6 -mt-4 sm:-mt-6 lg:-mt-8">
+{# 페이지 container 안에서 운영 메뉴 다음 줄에 표시되는 기록 서브바 #}
+<div class="records-subbar -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 mb-6">
     <div class="records-subbar-inner">
         <a href="{{ url_for('records_hub') }}" class="records-tab {% if active == 'hub' %}active{% endif %}"><i data-lucide="book" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 홈</a>
         <a href="{{ url_for('records_members') }}" class="records-tab {% if active == 'members' %}active{% endif %}"><i data-lucide="users" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 회원</a>
