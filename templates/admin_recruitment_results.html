@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>면접 지원자 결과 관리</title><script src="https://cdn.tailwindcss.com"></script><link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <style>body{background:var(--paper);color:var(--ink);font-family:Pretendard,-apple-system,BlinkMacSystemFont,sans-serif}.panel{background:var(--surface);border:1px solid var(--line);border-radius:18px}.muted{color:var(--ink-soft)}.field{width:100%;border:1px solid var(--line);border-radius:12px;background:#fff;padding:.75rem;font:inherit}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:42px;border:0;border-radius:12px;padding:.65rem 1rem;background:var(--moss-deep);color:#fff;font-weight:850;cursor:pointer;text-decoration:none}.pill{display:inline-block;border-radius:999px;padding:.2rem .6rem;background:var(--paper-2);font-size:.72rem;font-weight:800}</style>
+</head>
+<body>{% include '_header.html' %}{% include '_admin_sidebar.html' %}
+<main class="max-w-6xl mx-auto px-4 lg:px-8 py-7">
+  <div class="mb-7"><p class="text-sm font-bold muted">운영 관리</p><h1 class="text-3xl font-extrabold tracking-tight">면접 지원자 결과</h1><p class="muted mt-2">차수별 명단과 결과 안내문을 관리하고, 지원자 단톡방에 전용 링크를 공유합니다.</p></div>
+  {% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<div class="panel p-4 mb-4 {% if category != 'success' %}text-red-700{% endif %}">{{ message }}</div>{% endfor %}{% endwith %}
+  <section class="panel p-5 mb-6"><h2 class="text-lg font-extrabold">새 모집 차수 만들기</h2><form class="flex gap-2 mt-3 flex-wrap" method="post" action="{{ url_for('admin_recruitment_results_create') }}"><input class="field flex-1 min-w-64" name="title" maxlength="120" required placeholder="예: 2026년 하반기 신입 회원 모집"><button class="btn" type="submit">관리 페이지 만들기</button></form></section>
+  <section><h2 class="text-lg font-extrabold mb-3">모집 차수</h2><div class="grid md:grid-cols-2 gap-3">
+    {% for campaign in campaigns %}<a class="panel p-5 block hover:border-green-700" href="{{ url_for('admin_recruitment_result_detail', campaign_id=campaign.id) }}"><div class="flex justify-between gap-3"><div><h3 class="font-extrabold text-lg">{{ campaign.title }}</h3><p class="muted text-sm mt-1">지원자 {{ campaign.applicant_count }}명 · 합격 {{ campaign.status_counts.get('accepted', 0) }}명</p></div><div class="text-right"><span class="pill">{{ '발표 중' if campaign.is_published else '발표 전' }}</span><br><span class="pill mt-2">{{ '링크 열림' if campaign.is_active else '링크 닫힘' }}</span></div></div></a>{% else %}<div class="panel p-8 muted text-center md:col-span-2">아직 만든 모집 차수가 없습니다.</div>{% endfor %}
+  </div></section>
+</main></body></html>

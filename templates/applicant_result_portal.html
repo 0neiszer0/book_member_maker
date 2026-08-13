@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta property="og:title" content="면접 지원 결과 확인">
+  <title>{% if campaign %}{{ campaign.title }}{% else %}지원 결과 확인{% endif %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <style>
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:var(--paper,#faf6ec);color:var(--ink,#2a241b);font-family:Pretendard,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    .portal{width:min(100% - 28px,620px);margin:0 auto;padding:42px 0 72px}.brand{display:flex;align-items:center;gap:10px;margin-bottom:26px;font-weight:900;letter-spacing:-.03em}.mark{display:grid;place-items:center;width:40px;height:40px;border-radius:14px;background:var(--moss-deep,#3d5c2e);color:white}
+    .card{background:var(--surface,#fffdf8);border:1px solid var(--line,#e5d7b8);border-radius:24px;padding:clamp(22px,5vw,38px);box-shadow:0 24px 60px -42px rgba(48,32,10,.45)}.eyebrow{margin:0 0 8px;color:var(--moss-deep,#3d5c2e);font-size:.78rem;font-weight:900;letter-spacing:.08em}.title{margin:0;font-size:clamp(1.8rem,7vw,2.7rem);line-height:1.12;letter-spacing:-.05em}.lead{margin:14px 0 0;color:var(--ink-soft,#655b4e);line-height:1.7;white-space:pre-wrap}
+    .form{display:grid;gap:15px;margin-top:28px}.label{display:grid;gap:7px;font-size:.9rem;font-weight:850}.input{width:100%;border:1px solid var(--line,#d9ccb1);border-radius:13px;background:#fff;padding:.9rem;font:inherit;color:inherit;outline:0}.input:focus{border-color:var(--moss,#5c7a4a);box-shadow:0 0 0 3px rgba(92,122,74,.14)}.button{min-height:52px;border:0;border-radius:14px;padding:.9rem 1rem;background:var(--moss-deep,#3d5c2e);color:#fff;font:inherit;font-weight:900;cursor:pointer}
+    .notice,.result{margin-top:24px;border-radius:18px;padding:20px;line-height:1.7}.notice{background:var(--paper-2,#f2ebd8);border:1px solid var(--line,#e5d7b8)}.notice.error{background:#f8e6df;border-color:#edc9bc;color:#833e2d}.result{border:1px solid #cad9bc;background:var(--moss-tint,#e8efdd)}.result.rejected{background:#f3eee5;border-color:#dfd2bf}.result.waitlisted{background:#f8edcf;border-color:#ead59c}.result.pending{background:#f2ebd8;border-color:#ded0b7}.result-label{display:inline-block;border-radius:999px;padding:.25rem .7rem;background:#fff;font-size:.78rem;font-weight:900}.result h2{margin:12px 0 8px;font-size:1.55rem}.message{margin:0;white-space:pre-wrap}.personal{margin-top:15px;padding-top:15px;border-top:1px solid rgba(61,92,46,.2)}.help{margin:22px 0 0;color:var(--ink-faint,#8a7d69);font-size:.82rem;line-height:1.65;text-align:center}.contact{margin-top:18px;border-top:1px solid var(--line,#e5d7b8);padding-top:16px;color:var(--ink-soft,#655b4e);font-size:.88rem;white-space:pre-wrap}
+    @media(max-width:560px){.portal{padding-top:22px}.card{border-radius:20px}}
+  </style>
+</head>
+<body>
+  <main class="portal">
+    <div class="brand"><span class="mark">책</span><span>책 먹는 호반우</span></div>
+    <section class="card">
+      <p class="eyebrow">INTERVIEW RESULT</p>
+      <h1 class="title">{% if campaign %}{{ campaign.title }}{% else %}지원 결과 확인{% endif %}</h1>
+
+      {% if portal_state == 'unavailable' %}
+        <div class="notice"><strong>사용할 수 없는 링크입니다.</strong><br>운영진이 공유한 최신 링크를 확인해주세요.</div>
+      {% elif portal_state == 'closed' %}
+        <div class="notice"><strong>결과 조회가 종료되었습니다.</strong>{% if campaign.contact_text %}<div class="contact">{{ campaign.contact_text }}</div>{% endif %}</div>
+      {% elif portal_state == 'pending' %}
+        <p class="lead">{{ campaign.intro_text }}</p>
+        <div class="notice">{{ campaign.pending_message }}</div>
+        {% if campaign.contact_text %}<div class="contact">{{ campaign.contact_text }}</div>{% endif %}
+      {% else %}
+        <p class="lead">{{ campaign.intro_text }}</p>
+        {% if result %}
+          <div class="result {{ result.status }}" aria-live="polite">
+            <span class="result-label">{{ result.status_label }}</span>
+            <h2>{{ result.name }}님의 결과</h2>
+            <p class="message">{{ result.common_message }}</p>
+            {% if result.personal_message %}<p class="message personal">{{ result.personal_message }}</p>{% endif %}
+          </div>
+        {% endif %}
+        {% if error_message %}<div class="notice error" role="alert">{{ error_message }}</div>{% endif %}
+        <form class="form" method="post" autocomplete="off">
+          <label class="label">이름<input class="input" type="text" name="name" maxlength="80" required autocomplete="off" placeholder="지원서에 작성한 이름"></label>
+          <label class="label">학번<input class="input" type="text" name="student_id" inputmode="numeric" pattern="[0-9]{4,20}" maxlength="20" required autocomplete="off" placeholder="숫자만 입력"></label>
+          <button class="button" type="submit">내 결과 확인하기</button>
+        </form>
+        {% if campaign.contact_text %}<div class="contact">{{ campaign.contact_text }}</div>{% endif %}
+      {% endif %}
+    </section>
+    <p class="help">개인정보 보호를 위해 이름과 학번이 모두 일치할 때만 결과가 표시됩니다.<br>이 링크에서는 로그인·회원가입 및 동아리의 다른 메뉴를 이용할 수 없습니다.</p>
+  </main>
+</body>
+</html>
