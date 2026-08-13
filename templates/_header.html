@@ -304,11 +304,17 @@
     border-top:1px solid var(--line,#E5D7B8);
     box-shadow:0 -4px 16px -8px rgba(45,30,10,.12);
     padding:6px 0 calc(6px + env(safe-area-inset-bottom));
+    pointer-events:auto;
+    touch-action:manipulation;
+    isolation:isolate;
+    transition:transform .18s ease,opacity .18s ease,visibility .18s ease;
   }
   .wd-tb{
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
     text-decoration:none;color:var(--ink-faint,#9C8E78);
     font-size:10.5px;font-weight:500;padding:6px 0;position:relative;
+    min-height:48px;pointer-events:auto;touch-action:manipulation;
+    -webkit-tap-highlight-color:rgba(61,92,46,.12);
   }
   .wd-tb svg{color:currentColor}
   .wd-tb-on{color:var(--moss-deep,#3D5C2E);font-weight:700}
@@ -318,6 +324,10 @@
   }
   @media(max-width:768px){
     .wd-tabbar{display:grid}
+    .wd-tabbar.wd-tabbar-hidden{
+      transform:translateY(calc(100% + env(safe-area-inset-bottom)));
+      opacity:0;visibility:hidden;pointer-events:none;
+    }
     body{padding-bottom:72px}
     .wd-top-nav{display:none}
   }
@@ -402,6 +412,33 @@
     if (tabbar){
       var n = tabbar.querySelectorAll('a').length;
       tabbar.style.setProperty('--wd-tab-count', n);
+
+      // Keep the mobile navigation tappable while browsing, then move it out
+      // of the way only when a genuinely scrollable page reaches its end.
+      var tabbarScrollTicking = false;
+      function updateTabbarAtPageEnd(){
+        tabbarScrollTicking = false;
+        if (!window.matchMedia('(max-width: 768px)').matches){
+          tabbar.classList.remove('wd-tabbar-hidden');
+          tabbar.removeAttribute('aria-hidden');
+          return;
+        }
+        var root = document.documentElement;
+        var scrollable = root.scrollHeight > window.innerHeight + 24;
+        var atEnd = scrollable && window.scrollY + window.innerHeight >= root.scrollHeight - 12;
+        tabbar.classList.toggle('wd-tabbar-hidden', atEnd);
+        if (atEnd) tabbar.setAttribute('aria-hidden', 'true');
+        else tabbar.removeAttribute('aria-hidden');
+      }
+      function queueTabbarUpdate(){
+        if (tabbarScrollTicking) return;
+        tabbarScrollTicking = true;
+        window.requestAnimationFrame(updateTabbarAtPageEnd);
+      }
+      window.addEventListener('scroll', queueTabbarUpdate, {passive:true});
+      window.addEventListener('resize', queueTabbarUpdate, {passive:true});
+      window.addEventListener('pageshow', queueTabbarUpdate);
+      queueTabbarUpdate();
     }
 
     /* ----- 알림 로직 (기존 API 호환) ----- */
