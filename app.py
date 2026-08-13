@@ -2,6 +2,7 @@
 import os
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 import html
+import hashlib
 import itertools
 import random
 import math
@@ -38,6 +39,13 @@ from topic_document import topic_submitter_identity
 from seminar_absence import normalize_member_ids
 from seminar_cycle import cycle_monday, is_member_signup_session, next_seminar_cycle
 from group_restrictions import find_restriction_conflicts, restricted_pairs_from_rows
+from recruitment_results import (
+    RESULT_STATUS_LABELS,
+    VALID_RESULT_STATUSES,
+    normalize_applicant_name,
+    normalize_student_id,
+    parse_applicant_rows,
+)
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
@@ -123,6 +131,40 @@ def add_default_social_preview(response):
 """
     response.set_data(page.replace("</head>", f"{tags}</head>", 1))
     return response
+
+
+@app.after_request
+def protect_applicant_result_responses(response):
+    """Applicant results contain personal decisions and must never be cached/indexed."""
+    if request.endpoint == "applicant_result_portal" or session.get("applicant_portal_token"):
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Content-Security-Policy"] = "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    return response
+
+
+@app.before_request
+def enforce_applicant_portal_boundary():
+    """Keep a visitor who entered through a result link inside that portal.
+
+    Static files are allowed, but login, signup, member pages, public tabs and
+    unrelated APIs are blocked for the lifetime of the browser session.
+    """
+    portal_token = session.get("applicant_portal_token")
+    if not portal_token:
+        return None
+    if request.endpoint == "static":
+        return None
+    # A newly issued result link must be able to replace an expired token in
+    # the same Kakao in-app browser. The route clears and rebinds the session.
+    if request.endpoint == "applicant_result_portal":
+        return None
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "지원자 결과 조회 링크에서는 다른 기능을 사용할 수 없습니다."}), 403
+    return redirect(url_for("applicant_result_portal", token=portal_token), code=303)
 
 
 # ==============================================================================
@@ -916,6 +958,279 @@ def admin_dashboard():
         seminar_terms=seminar_terms,
         latest_history=latest_history,
     )
+
+
+def _recruitment_campaign(campaign_id):
+    rows = supabase.table("recruitment_campaigns").select("*") \
+        .eq("id", str(campaign_id)).limit(1).execute().data or []
+    return rows[0] if rows else None
+
+
+def _applicant_request_hash():
+    forwarded = (request.headers.get("X-Forwarded-For") or "").split(",", 1)[0].strip()
+    address = forwarded or request.remote_addr or "unknown"
+    secret = str(app.secret_key or "")
+    return hashlib.sha256(f"{secret}|{address}".encode("utf-8")).hexdigest()
+
+
+@app.route('/applicant-result/<uuid:token>', methods=['GET', 'POST'])
+def applicant_result_portal(token):
+    """Isolated, no-login result lookup by exact name and student ID."""
+    token_text = str(token)
+    is_staff_preview = session.get("user_role") in ("admin", "officer")
+    if not is_staff_preview and session.get("applicant_portal_token") != token_text:
+        session.clear()
+        session["applicant_portal_token"] = token_text
+
+    campaigns = supabase.table("recruitment_campaigns").select("*") \
+        .eq("share_token", token_text).limit(1).execute().data or []
+    campaign = campaigns[0] if campaigns else None
+    if not campaign:
+        return render_template(
+            "applicant_result_portal.html",
+            campaign=None,
+            portal_state="unavailable",
+            result=None,
+            error_message=None,
+        ), 404
+
+    if not campaign.get("is_active"):
+        portal_state = "closed"
+    elif not campaign.get("is_published"):
+        portal_state = "pending"
+    else:
+        portal_state = "lookup"
+
+    result = None
+    error_message = None
+    response_status = 200
+    if request.method == 'POST' and portal_state == "lookup":
+        name = (request.form.get("name") or "").strip()
+        student_id = normalize_student_id(request.form.get("student_id"))
+        name_key = normalize_applicant_name(name)
+        if not name_key or not re.fullmatch(r"[0-9]{4,20}", student_id):
+            error_message = "이름과 학번을 정확히 입력해주세요."
+        else:
+            ip_hash = _applicant_request_hash()
+            rate_start = (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat()
+            attempts = supabase.table("recruitment_lookup_attempts").select("id", count="exact") \
+                .eq("campaign_id", campaign["id"]).eq("ip_hash", ip_hash) \
+                .gte("created_at", rate_start).execute()
+            if (attempts.count or 0) >= 10:
+                error_message = "조회가 잠시 제한되었습니다. 15분 후 다시 시도해주세요."
+                response_status = 429
+            else:
+                matches = supabase.table("recruitment_applicants").select(
+                    "id, name, result_status, personal_message"
+                ).eq("campaign_id", campaign["id"]).eq("student_id", student_id) \
+                    .eq("name_key", name_key).limit(1).execute().data or []
+                matched = matches[0] if matches else None
+                try:
+                    supabase.table("recruitment_lookup_attempts").insert({
+                        "campaign_id": campaign["id"],
+                        "ip_hash": ip_hash,
+                        "succeeded": bool(matched),
+                    }).execute()
+                except Exception as exc:
+                    app.logger.warning("recruitment lookup audit failed: %s", exc)
+                if not matched:
+                    error_message = "입력한 정보와 일치하는 결과를 찾지 못했습니다. 이름과 학번을 다시 확인해주세요."
+                else:
+                    status = matched.get("result_status") or "pending"
+                    result = {
+                        "name": matched.get("name") or name,
+                        "status": status,
+                        "status_label": RESULT_STATUS_LABELS.get(status, "발표 전"),
+                        "common_message": campaign.get(f"{status}_message") or campaign.get("pending_message") or "",
+                        "personal_message": matched.get("personal_message") or "",
+                    }
+
+    return render_template(
+        "applicant_result_portal.html",
+        campaign=campaign,
+        portal_state=portal_state,
+        result=result,
+        error_message=error_message,
+    ), response_status
+
+
+@app.route('/admin/recruitment-results')
+@login_required(role="admin")
+def admin_recruitment_results():
+    campaigns = supabase.table("recruitment_campaigns").select("*") \
+        .order("created_at", desc=True).execute().data or []
+    applicant_rows = supabase.table("recruitment_applicants").select("campaign_id, result_status").execute().data or []
+    campaign_counts = defaultdict(lambda: defaultdict(int))
+    for row in applicant_rows:
+        campaign_counts[row.get("campaign_id")][row.get("result_status") or "pending"] += 1
+    for campaign in campaigns:
+        counts = campaign_counts[campaign["id"]]
+        campaign["applicant_count"] = sum(counts.values())
+        campaign["status_counts"] = dict(counts)
+        campaign["share_url"] = f"{PUBLIC_BASE_URL}{url_for('applicant_result_portal', token=campaign['share_token'])}"
+    return render_template("admin_recruitment_results.html", campaigns=campaigns)
+
+
+@app.route('/admin/recruitment-results/create', methods=['POST'])
+@login_required(role="admin")
+def admin_recruitment_results_create():
+    title = (request.form.get("title") or "").strip()
+    if not title:
+        flash("모집 차수 이름을 입력해주세요.", "danger")
+        return redirect(url_for("admin_recruitment_results"))
+    try:
+        created = supabase.table("recruitment_campaigns").insert({
+            "title": title,
+            "created_by": session.get("user_id"),
+        }).execute().data or []
+        flash("지원자 결과 페이지를 만들었습니다. 명단을 넣고 발표 상태를 확인해주세요.", "success")
+        return redirect(url_for("admin_recruitment_result_detail", campaign_id=created[0]["id"]))
+    except Exception as exc:
+        app.logger.error("recruitment campaign create failed: %s", exc, exc_info=True)
+        flash("모집 차수를 만들지 못했습니다.", "danger")
+        return redirect(url_for("admin_recruitment_results"))
+
+
+@app.route('/admin/recruitment-results/<uuid:campaign_id>')
+@login_required(role="admin")
+def admin_recruitment_result_detail(campaign_id):
+    campaign = _recruitment_campaign(campaign_id)
+    if not campaign:
+        flash("모집 차수를 찾을 수 없습니다.", "danger")
+        return redirect(url_for("admin_recruitment_results"))
+    applicants = supabase.table("recruitment_applicants").select("*") \
+        .eq("campaign_id", str(campaign_id)).order("name").execute().data or []
+    counts = {status: 0 for status in VALID_RESULT_STATUSES}
+    for applicant in applicants:
+        counts[applicant.get("result_status") or "pending"] += 1
+    campaign["share_url"] = f"{PUBLIC_BASE_URL}{url_for('applicant_result_portal', token=campaign['share_token'])}"
+    return render_template(
+        "admin_recruitment_result_detail.html",
+        campaign=campaign,
+        applicants=applicants,
+        status_counts=counts,
+        status_labels=RESULT_STATUS_LABELS,
+    )
+
+
+@app.route('/admin/recruitment-results/<uuid:campaign_id>/settings', methods=['POST'])
+@login_required(role="admin")
+def admin_recruitment_result_settings(campaign_id):
+    if not _recruitment_campaign(campaign_id):
+        return redirect(url_for("admin_recruitment_results"))
+    title = (request.form.get("title") or "").strip()
+    if not title:
+        flash("모집 차수 이름은 비워둘 수 없습니다.", "danger")
+        return redirect(url_for("admin_recruitment_result_detail", campaign_id=campaign_id))
+    update = {
+        "title": title,
+        "intro_text": (request.form.get("intro_text") or "").strip(),
+        "pending_message": (request.form.get("pending_message") or "").strip(),
+        "accepted_message": (request.form.get("accepted_message") or "").strip(),
+        "waitlisted_message": (request.form.get("waitlisted_message") or "").strip(),
+        "rejected_message": (request.form.get("rejected_message") or "").strip(),
+        "contact_text": (request.form.get("contact_text") or "").strip() or None,
+        "is_active": request.form.get("is_active") == "on",
+        "is_published": request.form.get("is_published") == "on",
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if any(not update[key] for key in ("intro_text", "pending_message", "accepted_message", "waitlisted_message", "rejected_message")):
+        flash("공통 안내문은 비워둘 수 없습니다.", "danger")
+        return redirect(url_for("admin_recruitment_result_detail", campaign_id=campaign_id))
+    try:
+        supabase.table("recruitment_campaigns").update(update).eq("id", str(campaign_id)).execute()
+        flash("공개 설정과 안내문을 저장했습니다.", "success")
+    except Exception as exc:
+        app.logger.error("recruitment settings update failed: %s", exc, exc_info=True)
+        flash("설정을 저장하지 못했습니다. 글자 수를 확인해주세요.", "danger")
+    return redirect(url_for("admin_recruitment_result_detail", campaign_id=campaign_id))
+
+
+@app.route('/admin/recruitment-results/<uuid:campaign_id>/rotate-link', methods=['POST'])
+@login_required(role="admin")
+def admin_recruitment_result_rotate_link(campaign_id):
+    if _recruitment_campaign(campaign_id):
+        supabase.table("recruitment_campaigns").update({
+            "share_token": str(uuid.uuid4()),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", str(campaign_id)).execute()
+        flash("공유 링크를 새로 발급했습니다. 이전 링크는 즉시 사용할 수 없습니다.", "success")
+    return redirect(url_for("admin_recruitment_result_detail", campaign_id=campaign_id))
+
+
+@app.route('/admin/recruitment-results/<uuid:campaign_id>/bulk-import', methods=['POST'])
+@login_required(role="admin")
+def admin_recruitment_result_bulk_import(campaign_id):
+    if not _recruitment_campaign(campaign_id):
+        return redirect(url_for("admin_recruitment_results"))
+    parsed, errors = parse_applicant_rows(request.form.get("applicant_rows"))
+    if errors:
+        flash(" / ".join(errors[:8]), "danger")
+        return redirect(url_for("admin_recruitment_result_detail", campaign_id=campaign_id))
+    if not parsed:
+        flash("추가할 지원자 명단을 붙여넣어 주세요.", "danger")
+        return redirect(url_for("admin_recruitment_result_detail", campaign_id=campaign_id))
+    student_ids = [row["student_id"] for row in parsed]
+    existing_rows = supabase.table("recruitment_applicants").select(
+        "student_id, result_status, personal_message"
+    ).eq("campaign_id", str(campaign_id)).in_("student_id", student_ids).execute().data or []
+    existing_by_id = {row["student_id"]: row for row in existing_rows}
+    payload = []
+    for row in parsed:
+        existing = existing_by_id.get(row["student_id"], {})
+        status_provided = row.pop("_status_provided")
+        message_provided = row.pop("_message_provided")
+        if existing and not status_provided:
+            row["result_status"] = existing.get("result_status") or "pending"
+        if existing and not message_provided:
+            row["personal_message"] = existing.get("personal_message")
+        row["campaign_id"] = str(campaign_id)
+        row["updated_at"] = datetime.now(timezone.utc).isoformat()
+        payload.append(row)
+    try:
+        supabase.table("recruitment_applicants").upsert(
+            payload, on_conflict="campaign_id,student_id"
+        ).execute()
+        flash(f"지원자 {len(payload)}명의 명단을 반영했습니다.", "success")
+    except Exception as exc:
+        app.logger.error("recruitment bulk import failed: %s", exc, exc_info=True)
+        flash("명단을 반영하지 못했습니다. 중복 학번과 입력 형식을 확인해주세요.", "danger")
+    return redirect(url_for("admin_recruitment_result_detail", campaign_id=campaign_id))
+
+
+@app.route('/admin/recruitment-results/<uuid:campaign_id>/applicants/<uuid:applicant_id>', methods=['POST'])
+@login_required(role="admin")
+def admin_recruitment_result_update_applicant(campaign_id, applicant_id):
+    name = (request.form.get("name") or "").strip()
+    student_id = normalize_student_id(request.form.get("student_id"))
+    result_status = (request.form.get("result_status") or "").strip()
+    personal_message = (request.form.get("personal_message") or "").strip() or None
+    if not normalize_applicant_name(name) or not re.fullmatch(r"[0-9]{4,20}", student_id) or result_status not in VALID_RESULT_STATUSES:
+        flash("지원자 이름·학번·결과를 확인해주세요.", "danger")
+    else:
+        try:
+            supabase.table("recruitment_applicants").update({
+                "name": name,
+                "name_key": normalize_applicant_name(name),
+                "student_id": student_id,
+                "result_status": result_status,
+                "personal_message": personal_message,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("id", str(applicant_id)).eq("campaign_id", str(campaign_id)).execute()
+            flash(f"{name} 지원자의 결과를 저장했습니다.", "success")
+        except Exception as exc:
+            app.logger.error("recruitment applicant update failed: %s", exc, exc_info=True)
+            flash("지원자 정보를 저장하지 못했습니다. 학번 중복을 확인해주세요.", "danger")
+    return redirect(url_for("admin_recruitment_result_detail", campaign_id=campaign_id))
+
+
+@app.route('/admin/recruitment-results/<uuid:campaign_id>/applicants/<uuid:applicant_id>/delete', methods=['POST'])
+@login_required(role="admin")
+def admin_recruitment_result_delete_applicant(campaign_id, applicant_id):
+    supabase.table("recruitment_applicants").delete().eq("id", str(applicant_id)) \
+        .eq("campaign_id", str(campaign_id)).execute()
+    flash("지원자를 명단에서 삭제했습니다.", "success")
+    return redirect(url_for("admin_recruitment_result_detail", campaign_id=campaign_id))
 
 
 
