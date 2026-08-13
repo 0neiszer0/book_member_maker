@@ -950,9 +950,14 @@ def create_member():
         name = data.get('name', '').strip()
         if not name:
             return jsonify({"status": "error", "message": "이름은 필수입니다."}), 400
+        requested_role = data.get('role', 'member')
+        if requested_role not in ('member', 'officer', 'admin'):
+            return jsonify({"status": "error", "message": "유효하지 않은 권한입니다."}), 400
+        if requested_role == 'admin' and not _current_user_is_primary_admin():
+            return jsonify({"status": "error", "message": "관리자 권한은 관리자만 지정할 수 있습니다."}), 403
         insert_fields = {
             'name': name,
-            'role': data.get('role', 'member'),
+            'role': requested_role,
             'member_status': 'active',
             'is_active': True,
             'account_status': 'active'
@@ -976,6 +981,23 @@ def edit_member(member_id):
     """관리자가 멤버 정보를 편집합니다."""
     data = request.json
     try:
+        if 'role' in data:
+            requested_role = data.get('role')
+            if requested_role not in ('member', 'officer', 'admin'):
+                return jsonify({"status": "error", "message": "유효하지 않은 권한입니다."}), 400
+            current_rows = supabase.table('members').select('role').eq('id', member_id).limit(1).execute().data or []
+            if not current_rows:
+                return jsonify({"status": "error", "message": "회원을 찾을 수 없습니다."}), 404
+            current_role = current_rows[0].get('role') or 'member'
+            if requested_role != current_role and not _current_user_is_primary_admin():
+                return jsonify({"status": "error", "message": "회원 권한은 관리자만 변경할 수 있습니다."}), 403
+            if member_id == session.get('user_id') and current_role == 'admin' and requested_role != 'admin':
+                return jsonify({"status": "error", "message": "자신의 관리자 권한은 직접 해제할 수 없습니다."}), 403
+            if current_role == 'admin' and requested_role != 'admin':
+                active_admins = supabase.table('members').select('id', count='exact') \
+                    .eq('role', 'admin').eq('is_active', True).execute()
+                if (active_admins.count or 0) <= 1:
+                    return jsonify({"status": "error", "message": "최소 한 명의 활성 관리자가 필요합니다."}), 409
         update_fields = {}
         for field in ('name', 'email', 'gender', 'role', 'department', 'student_id', 'recruiting_class'):
             if field in data:
@@ -4841,7 +4863,11 @@ def records_members():
         app.logger.error(f"records_members error: {e}", exc_info=True)
         flash(f"멤버 로딩 오류: {e}", 'danger')
         members = []
-    return render_template('records_members.html', members=members)
+    return render_template(
+        'records_members.html',
+        members=members,
+        can_manage_roles=_current_user_is_primary_admin(),
+    )
 
 
 @app.route('/records/members')
