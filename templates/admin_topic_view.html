@@ -103,11 +103,11 @@
                     </h2>
                     <div class="flex items-center gap-2">
                         <span class="text-xs text-gray-500">{{ sub.created_at | datetime('%Y-%m-%d %H:%M') }}</span>
-                        <label class="text-xs text-gray-400 flex items-center gap-1" title="이 제출자가 작성할 수 있는 발제문 개수 (기본 1개)">
+                        <label class="text-xs text-gray-400 flex items-center gap-1" title="이 제출자가 작성할 수 있는 발제문 개수 (기본 2개)">
                             한도
                             <select class="limit-select eva-input rounded text-xs py-1 px-1">
                                 {% for n in range(1, 11) %}
-                                <option value="{{ n }}" {% if (sub.topic_limit or 1) == n %}selected{% endif %}>{{ n }}개</option>
+                                <option value="{{ n }}" {% if (sub.topic_limit or 2) == n %}selected{% endif %}>{{ n }}개</option>
                                 {% endfor %}
                             </select>
                         </label>
@@ -120,6 +120,7 @@
                 <div class="view-mode space-y-4">
                     {% for t in sub.topics %}
                     <div class="bg-bg-dark p-4 rounded border-l-4 border-eva-green">
+                        <p class="text-xs text-eva-green font-bold mb-2">발제 {{ t.number }}</p>
                         <p class="font-bold text-text-light whitespace-pre-wrap">{{ t.topic }}</p>
                         <div class="mt-3 text-sm flex gap-4 bg-gray-800 p-2 rounded">
                             {% if t.page %}<span class="text-gray-400"><i data-lucide="map-pin" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 페이지: <span class="text-gray-200 font-bold">{{

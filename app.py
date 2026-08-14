@@ -35,7 +35,7 @@ from group_history import (
     matrix_rows_from_history as _matrix_rows_from_history,
 )
 from topic_preview import anonymous_topic_previews
-from topic_document import topic_submitter_identity
+from topic_document import number_topic_submissions, topic_submitter_identity
 from seminar_absence import normalize_member_ids
 from seminar_cycle import cycle_monday, is_member_signup_session, next_seminar_cycle
 from group_restrictions import find_restriction_conflicts, restricted_pairs_from_rows
@@ -3141,8 +3141,9 @@ def submit_topics():
         if len(sid) >= 4 and sid[2:4].isdigit():
             admission_year = sid[2:4]
 
-        # 발제문 개수 제한: 기본 1개, 회장이 개별적으로 상향한 경우 그 한도까지
-        topic_limit = (existing_record or {}).get('topic_limit') or 1
+        # 발제문 개수 제한: 1개는 필수, 기본 한도는 선택 제출 1개를 더한 2개.
+        # 회장이 개별적으로 바꾼 기존 한도는 그대로 따른다.
+        topic_limit = (existing_record or {}).get('topic_limit') or 2
         if len(topics) > topic_limit:
             return jsonify({"error": f"발제문은 {topic_limit}개까지 작성할 수 있습니다. 더 쓰고 싶다면 회장에게 문의해주세요."}), 400
 
@@ -3236,7 +3237,7 @@ def load_topics():
             return jsonify({
                 "status": "success",
                 "topics": existing_record['topics'],
-                "topic_limit": existing_record.get('topic_limit') or 1,
+                "topic_limit": existing_record.get('topic_limit') or 2,
             })
         else:
             return jsonify({"error": "작성된 발제문 내역이 없습니다. 처음 작성하는 것이 맞나요?"}), 404
@@ -3284,7 +3285,7 @@ def admin_update_topic_submission(submission_id):
 def admin_set_topic_limit(submission_id):
     """회장이 특정 제출자의 발제문 한도를 개별적으로 조정합니다."""
     try:
-        limit = int((request.json or {}).get('topic_limit', 1))
+        limit = int((request.json or {}).get('topic_limit', 2))
         if not (1 <= limit <= 10):
             return jsonify({"error": "한도는 1~10 사이여야 합니다."}), 400
         supabase.table('topic_submissions').update({'topic_limit': limit}).eq('id', submission_id).execute()
@@ -3304,6 +3305,7 @@ def view_admin_topics(event_id):
         event = supabase.table('topic_events').select('*').eq('id', event_id).single().execute().data
         submissions = supabase.table('topic_submissions').select('*').eq('event_id', event_id).order(
             'created_at').execute().data
+        submissions = number_topic_submissions(submissions)
         
         return render_template('admin_topic_view.html', event=event, submissions=submissions)
     except Exception as e:
@@ -3329,6 +3331,7 @@ def download_topics_word(event_id):
         event = supabase.table('topic_events').select('*').eq('id', event_id).single().execute().data
         submissions = supabase.table('topic_submissions').select('*') \
             .eq('event_id', event_id).order('created_at').execute().data or []
+        submissions = number_topic_submissions(submissions)
         app.logger.info(f"download_topics_word: 제출 {len(submissions)}건")
 
         template_path = os.path.join(app.root_path, 'templates', 'template.docx')
@@ -3363,6 +3366,7 @@ def download_topics_word(event_id):
                         'topic': _safe(t.get('topic', '')),
                         'page': _safe(t.get('page', '')),
                         'reference': _safe(t.get('reference', '')),
+                        'number': t.get('number'),
                     }
                     for t in (sub.get('topics') or [])
                 ],
@@ -3419,12 +3423,12 @@ def download_topics_word(event_id):
                 r2.bold = True
                 r2.font.size = Pt(13)
                 # 발제 내용
-                for ti, t in enumerate(sub.get('topics') or [], 1):
+                for t in sub.get('topics') or []:
                     topic_text = (t.get('topic') or '').strip()
                     page = (t.get('page') or '').strip()
                     reference = (t.get('reference') or '').strip()
                     p = doc2.add_paragraph()
-                    rn = p.add_run(f"{ti}. "); rn.bold = True; rn.font.size = Pt(11)
+                    rn = p.add_run(f"{t.get('number')}. "); rn.bold = True; rn.font.size = Pt(11)
                     first = True
                     for line in topic_text.split('\n'):
                         if not first:

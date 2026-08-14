@@ -1,4 +1,4 @@
-"""발제문 Word 출력에 쓰는 작성자 표시값 생성."""
+"""발제문 화면과 Word 출력에 쓰는 표시값 생성."""
 
 
 def _text(value):
@@ -29,3 +29,22 @@ def topic_submitter_identity(submission):
         'author_name': author_name,
         'full_label': full_label,
     }
+
+
+def number_topic_submissions(submissions):
+    """작성자가 바뀌어도 발제 번호가 전체 질문 순서대로 이어지게 한다."""
+    numbered = []
+    next_number = 1
+    for submission in submissions or []:
+        item = dict(submission or {})
+        topics = []
+        for topic in item.get('topics') or []:
+            if not isinstance(topic, dict):
+                continue
+            numbered_topic = dict(topic)
+            numbered_topic['number'] = next_number
+            next_number += 1
+            topics.append(numbered_topic)
+        item['topics'] = topics
+        numbered.append(item)
+    return numbered
