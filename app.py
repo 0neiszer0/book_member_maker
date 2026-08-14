@@ -44,8 +44,10 @@ from recruitment_results import (
     VALID_RESULT_STATUSES,
     normalize_applicant_name,
     normalize_student_id,
+    parse_applicant_file,
     parse_applicant_rows,
 )
+from topic_lifecycle import topic_event_is_expired
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
@@ -920,7 +922,7 @@ def admin_dashboard():
 
         # 생성된 발제문 취합 이벤트 목록 불러오기
         topic_events_res = supabase.table('topic_events').select('*').order('created_at', desc=True).execute()
-        topic_events = topic_events_res.data
+        topic_events = _auto_close_topic_events(topic_events_res.data or [])
 
         # 최근 조 편성 기록 (바로 수정하러 갈 수 있게 대시보드에 노출)
         latest_history_res = supabase.table('history').select('id, date, book_title') \
@@ -1163,7 +1165,16 @@ def admin_recruitment_result_rotate_link(campaign_id):
 def admin_recruitment_result_bulk_import(campaign_id):
     if not _recruitment_campaign(campaign_id):
         return redirect(url_for("admin_recruitment_results"))
-    parsed, errors = parse_applicant_rows(request.form.get("applicant_rows"))
+    raw_rows = request.form.get("applicant_rows") or ""
+    uploaded = request.files.get("applicant_file")
+    has_file = bool(uploaded and uploaded.filename)
+    if has_file and raw_rows.strip():
+        flash("Excel 파일 업로드와 명단 붙여넣기 중 한 가지만 사용해주세요.", "danger")
+        return redirect(url_for("admin_recruitment_result_detail", campaign_id=campaign_id))
+    if has_file:
+        parsed, errors = parse_applicant_file(uploaded.filename, uploaded.read(2 * 1024 * 1024 + 1))
+    else:
+        parsed, errors = parse_applicant_rows(raw_rows)
     if errors:
         flash(" / ".join(errors[:8]), "danger")
         return redirect(url_for("admin_recruitment_result_detail", campaign_id=campaign_id))
@@ -1195,6 +1206,38 @@ def admin_recruitment_result_bulk_import(campaign_id):
     except Exception as exc:
         app.logger.error("recruitment bulk import failed: %s", exc, exc_info=True)
         flash("명단을 반영하지 못했습니다. 중복 학번과 입력 형식을 확인해주세요.", "danger")
+    return redirect(url_for("admin_recruitment_result_detail", campaign_id=campaign_id))
+
+
+@app.route('/admin/recruitment-results/<uuid:campaign_id>/applicants/create', methods=['POST'])
+@login_required(role="admin")
+def admin_recruitment_result_create_applicant(campaign_id):
+    if not _recruitment_campaign(campaign_id):
+        return redirect(url_for("admin_recruitment_results"))
+    name = (request.form.get("name") or "").strip()
+    student_id = normalize_student_id(request.form.get("student_id"))
+    result_status = (request.form.get("result_status") or "pending").strip()
+    personal_message = (request.form.get("personal_message") or "").strip() or None
+    if not normalize_applicant_name(name) or not re.fullmatch(r"[0-9]{4,20}", student_id):
+        flash("지원자 이름과 4~20자리 숫자 학번을 확인해주세요.", "danger")
+    elif result_status not in VALID_RESULT_STATUSES:
+        flash("지원자 결과를 확인해주세요.", "danger")
+    elif personal_message and len(personal_message) > 3000:
+        flash("개인 안내는 3,000자 이하로 입력해주세요.", "danger")
+    else:
+        try:
+            supabase.table("recruitment_applicants").insert({
+                "campaign_id": str(campaign_id),
+                "name": name,
+                "name_key": normalize_applicant_name(name),
+                "student_id": student_id,
+                "result_status": result_status,
+                "personal_message": personal_message,
+            }).execute()
+            flash(f"{name} 지원자를 명단에 추가했습니다.", "success")
+        except Exception as exc:
+            app.logger.error("recruitment applicant create failed: %s", exc, exc_info=True)
+            flash("지원자를 추가하지 못했습니다. 같은 학번이 이미 있는지 확인해주세요.", "danger")
     return redirect(url_for("admin_recruitment_result_detail", campaign_id=campaign_id))
 
 
@@ -2792,7 +2835,10 @@ def my_page():
         active_topic_events = []
         try:
             topic_res = supabase.table('topic_events').select('*').eq('is_active', True).order('meeting_date', desc=True).execute()
-            active_topic_events = topic_res.data or []
+            active_topic_events = [
+                event for event in _auto_close_topic_events(topic_res.data or [])
+                if event.get('is_active')
+            ]
         except Exception:
             pass
 
@@ -2919,6 +2965,24 @@ def request_absence():
 # --- [신규] 주간 발제문 수집 및 문서화 시스템 ---
 # ==============================================================================
 
+
+def _auto_close_topic_events(events):
+    """모임일부터 7일이 지난 활성 발제문을 즉시 마감 상태로 동기화한다."""
+    rows = list(events or [])
+    today_kst = datetime.now(timezone(timedelta(hours=9))).date()
+    expired = [row for row in rows if row.get('is_active') and topic_event_is_expired(row, today=today_kst)]
+    expired_ids = [row.get('id') for row in expired if row.get('id')]
+    if expired_ids:
+        try:
+            supabase.table('topic_events').update({'is_active': False}).in_('id', expired_ids).execute()
+        except Exception as exc:
+            app.logger.warning("topic event auto-close sync failed: %s", exc)
+        for row in expired:
+            row['is_active'] = False
+            row['auto_closed'] = True
+    return rows
+
+
 # 1. 관리자: 발제문 이벤트 생성 API
 def _open_topic_event_for_session(session_id):
     seminar_session = supabase.table('seminar_sessions').select(
@@ -2933,7 +2997,7 @@ def _open_topic_event_for_session(session_id):
                       else existing_query.eq('seminar_session_id', session_id))
     existing = existing_query.execute().data or []
     if existing:
-        return existing[0], False
+        return _auto_close_topic_events(existing)[0], False
 
     week = None
     if week_id:
@@ -3043,10 +3107,13 @@ def delete_topic_event(event_id):
 @login_required(role="admin")
 def toggle_topic_event(event_id):
     try:
-        cur = supabase.table('topic_events').select('is_active').eq('id', event_id).single().execute().data
+        cur = supabase.table('topic_events').select('id, is_active, meeting_date').eq('id', event_id).single().execute().data
         if not cur:
             return jsonify({"error": "이벤트를 찾을 수 없습니다."}), 404
         new_state = not bool(cur.get('is_active'))
+        today_kst = datetime.now(timezone(timedelta(hours=9))).date()
+        if new_state and topic_event_is_expired(cur, today=today_kst):
+            return jsonify({"error": "모임일부터 7일이 지난 발제문은 자동 마감되어 다시 열 수 없습니다."}), 400
         supabase.table('topic_events').update({'is_active': new_state}).eq('id', event_id).execute()
         return jsonify({"status": "success", "is_active": new_state})
     except Exception as e:
@@ -3065,6 +3132,8 @@ def view_shared_topics():
     try:
         event_res = supabase.table('topic_events').select('*').eq('share_token', token).single().execute()
         event_data = event_res.data
+        if event_data:
+            event_data = _auto_close_topic_events([event_data])[0]
         if not event_data or not event_data.get('is_active'):
             flash("마감되었거나 유효하지 않은 링크입니다.", "warning")
             return redirect(url_for('main_index'))
@@ -3131,6 +3200,12 @@ def submit_topics():
         return jsonify({"error": "비회원은 4자리 PIN 번호를 입력해야 합니다."}), 400
 
     try:
+        event_rows = supabase.table('topic_events').select('id, is_active, meeting_date') \
+            .eq('id', event_id).limit(1).execute().data or []
+        event_data = _auto_close_topic_events(event_rows)[0] if event_rows else None
+        if not event_data or not event_data.get('is_active'):
+            return jsonify({"error": "모임일부터 7일이 지나 발제문 제출이 마감되었습니다."}), 400
+
         # 기존 제출 내역 확인 (학번 우선 매칭 — 학과 표기만 바꿔 여러 건 제출하는 것 방지)
         existing_record = _find_topic_submission(event_id, author_name, department, student_id)
 
@@ -3228,6 +3303,12 @@ def load_topics():
         return jsonify({"error": "비회원은 4자리 PIN 번호를 입력해야 합니다."}), 400
 
     try:
+        event_rows = supabase.table('topic_events').select('id, is_active, meeting_date') \
+            .eq('id', event_id).limit(1).execute().data or []
+        event_data = _auto_close_topic_events(event_rows)[0] if event_rows else None
+        if not event_data or not event_data.get('is_active'):
+            return jsonify({"error": "모임일부터 7일이 지나 발제문 제출이 마감되었습니다."}), 400
+
         existing_record = _find_topic_submission(event_id, author_name, department, student_id)
 
         if existing_record:
@@ -3753,6 +3834,7 @@ def admin_seminar_term(term_id):
         if session_ids:
             topic_rows = supabase.table('topic_events').select('*') \
                 .in_('seminar_session_id', session_ids).execute().data or []
+            topic_rows = _auto_close_topic_events(topic_rows)
             topic_ids = [row['id'] for row in topic_rows]
             submission_counts = {}
             if topic_ids:
@@ -3836,6 +3918,7 @@ def _load_weekly_seminar_view(term_id=None):
         sessions = supabase.table('seminar_sessions').select('*').in_('seminar_week_id', week_ids) \
             .order('meeting_date').execute().data or []
         topics = supabase.table('topic_events').select('*').in_('seminar_week_id', week_ids).execute().data or []
+        topics = _auto_close_topic_events(topics)
 
     session_ids = [row['id'] for row in sessions]
     topic_ids = [row['id'] for row in topics]

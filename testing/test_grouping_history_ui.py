@@ -51,6 +51,12 @@ class GroupingHistoryUiContracts(unittest.TestCase):
         self.assertIn('.group-member-name.gender-male', self.results_source)
         self.assertIn('.group-member-name.gender-female', self.results_source)
 
+    def test_gender_member_cards_stay_inside_one_aligned_table_column(self):
+        self.assertIn('.member-list { display:grid; grid-template-columns:minmax(0,1fr)', self.index_source)
+        self.assertIn('.member-row { width:100%; max-width:100%; box-sizing:border-box;', self.index_source)
+        self.assertIn('.member-row > span { min-width:0; overflow-wrap:anywhere; }', self.index_source)
+        self.assertNotIn('grid-template-columns:repeat(2,minmax(0,1fr))', self.index_source)
+
     def test_saved_record_can_recreate_group_capture(self):
         self.assertIn('html2canvas/1.4.1/html2canvas.min.js', self.record_source)
         self.assertIn('PNG 다시 만들기', self.record_source)

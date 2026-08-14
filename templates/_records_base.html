@@ -168,7 +168,6 @@ async function addNewGenre(btn) {
 <div class="records-subbar -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 mb-6">
     <div class="records-subbar-inner">
         <a href="{{ url_for('records_hub') }}" class="records-tab {% if active == 'hub' %}active{% endif %}"><i data-lucide="book" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 홈</a>
-        <a href="{{ url_for('records_members') }}" class="records-tab {% if active == 'members' %}active{% endif %}"><i data-lucide="users" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 회원</a>
         <a href="{{ url_for('records_seminars') }}" class="records-tab {% if active == 'seminars' %}active{% endif %}"><i data-lucide="book-open" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 세미나</a>
         <a href="{{ url_for('records_brick_books') }}" class="records-tab {% if active == 'brick' %}active{% endif %}"><i data-lucide="blocks" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 벽돌책</a>
         <a href="{{ url_for('records_study_groups') }}" class="records-tab {% if active == 'study' %}active{% endif %}"><i data-lucide="handshake" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 소모임</a>
