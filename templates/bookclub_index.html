@@ -254,10 +254,11 @@
         .member-panel { padding:1rem; }
         .settings-panel { padding:1rem; position:sticky; top:84px; }
         .member-toolbar { display:grid; grid-template-columns:minmax(180px,1fr) auto; gap:.75rem; align-items:center; margin-bottom:.75rem; }
-        .member-table-head,.member-row { display:grid; grid-template-columns:minmax(130px,1fr) 72px 72px; gap:.5rem; align-items:center; }
+        .member-table-head,.member-row { display:grid; grid-template-columns:minmax(0,1fr) 64px 64px; gap:.5rem; align-items:center; min-width:0; }
         .member-table-head { padding:.4rem .75rem; color:var(--ink-soft,#5E5548); font-size:.75rem; font-weight:800; }
-        .member-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.45rem; max-height:62vh; overflow:auto; padding:.15rem; }
-        .member-row { background:var(--paper,#FAF6EC); border:1px solid var(--line,#E5D7B8); border-radius:10px; padding:.55rem .7rem; }
+        .member-list { display:grid; grid-template-columns:minmax(0,1fr); gap:.45rem; max-height:62vh; overflow:auto; padding:.15rem; }
+        .member-row { width:100%; max-width:100%; box-sizing:border-box; background:var(--paper,#FAF6EC); border:1px solid var(--line,#E5D7B8); border-radius:10px; padding:.55rem .7rem; }
+        .member-row > span { min-width:0; overflow-wrap:anywhere; }
         .member-row.gender-male { background:#F0F7F9; }
         .member-row.gender-female { background:#FAF1F4; }
         .member-row.is-prechecked { border-left:4px solid var(--moss,#5C7A4A); }
@@ -277,7 +278,7 @@
         .restriction-panel summary { cursor:pointer; color:#873E2B; font-weight:800; }
         .restriction-row { padding:.55rem 0; border-top:1px solid #E8D8C8; }
         .restriction-row:first-child { border-top:0; }
-        @media(max-width:900px){ .workspace{grid-template-columns:1fr}.settings-panel{position:static}.member-list{grid-template-columns:1fr;max-height:none}.member-toolbar{grid-template-columns:1fr}.work-header{margin:.75rem 1rem 0} }
+        @media(max-width:900px){ .workspace{grid-template-columns:1fr}.settings-panel{position:static}.member-list{max-height:none}.member-toolbar{grid-template-columns:1fr}.work-header{margin:.75rem 1rem 0}.member-table-head,.member-row{grid-template-columns:minmax(0,1fr) 52px 52px} }
     </style>
 </head>
 

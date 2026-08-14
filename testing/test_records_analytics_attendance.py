@@ -18,6 +18,14 @@ class RecordsAnalyticsAttendanceTest(unittest.TestCase):
         self.assertIn("position: static;", self.records_base)
         self.assertNotIn("mb-6 -mt-4 sm:-mt-6 lg:-mt-8", self.records_base)
 
+    def test_records_subbar_does_not_duplicate_member_management_navigation(self):
+        nav = self.records_base[
+            self.records_base.index("{% macro records_nav(active) %}"):
+            self.records_base.index("{% endmacro %}", self.records_base.index("{% macro records_nav(active) %}"))
+        ]
+        self.assertNotIn("url_for('records_members')", nav)
+        self.assertNotIn('> 회원</a>', nav)
+
     def test_attendance_matrix_keeps_each_seminar_date_separate(self):
         helper = self.app_source[
             self.app_source.index("def _build_attendance_matrix"):

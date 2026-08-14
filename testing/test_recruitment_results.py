@@ -1,8 +1,12 @@
 import unittest
+from io import BytesIO
 from pathlib import Path
+
+from openpyxl import Workbook
 
 from recruitment_results import (
     normalize_applicant_name,
+    parse_applicant_file,
     parse_applicant_rows,
 )
 
@@ -32,6 +36,20 @@ class RecruitmentResultsTest(unittest.TestCase):
         )
         self.assertEqual(rows, [])
         self.assertEqual(len(errors), 3)
+
+    def test_xlsx_file_is_accepted_with_numeric_student_ids(self):
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(["이름", "학번", "결과", "개인 안내"])
+        sheet.append(["홍길동", 2026000000, "합격", "안내"])
+        output = BytesIO()
+        workbook.save(output)
+
+        rows, errors = parse_applicant_file("지원자.xlsx", output.getvalue())
+
+        self.assertEqual(errors, [])
+        self.assertEqual(rows[0]["student_id"], "2026000000")
+        self.assertEqual(rows[0]["result_status"], "accepted")
 
     def test_public_portal_has_no_site_navigation_or_login_link(self):
         portal = self.read("templates/applicant_result_portal.html")
@@ -78,7 +96,10 @@ class RecruitmentResultsTest(unittest.TestCase):
         ):
             self.assertIn(f"alter table public.{table} enable row level security", migration)
         self.assertIn("from public, anon, authenticated", migration)
-        self.assertIn("엑셀 명단 붙여넣기", detail)
+        self.assertIn("Excel 명단 일괄 등록", detail)
+        self.assertIn('name="applicant_file"', detail)
+        self.assertIn("지원자 한 명 추가", detail)
+        self.assertIn("admin_recruitment_result_create_applicant", detail)
         self.assertIn("결과 발표하기", detail)
         self.assertIn("기존 링크 폐기하고 새로 발급", detail)
         self.assertIn("면접 지원자", sidebar)
