@@ -1,4 +1,7 @@
 import re
+from io import BytesIO
+from pathlib import Path
+from zipfile import BadZipFile, ZipFile
 
 
 VALID_RESULT_STATUSES = ("pending", "accepted", "waitlisted", "rejected")
@@ -88,3 +91,54 @@ def parse_applicant_rows(raw_text, max_rows=500):
                 "_message_provided": message_provided,
             })
     return parsed, errors
+
+
+def _excel_cell_text(value):
+    if value is None:
+        return ""
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()
+
+
+def parse_applicant_file(filename, content, max_rows=500, max_bytes=2 * 1024 * 1024):
+    """Parse a small .xlsx or .csv applicant list without writing it to disk."""
+    suffix = Path(str(filename or "")).suffix.lower()
+    raw = bytes(content or b"")
+    if not raw:
+        return [], ["업로드한 파일이 비어 있습니다."]
+    if len(raw) > max_bytes:
+        return [], ["명단 파일은 2MB 이하만 업로드할 수 있습니다."]
+    if suffix == ".csv":
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            try:
+                text = raw.decode("cp949")
+            except UnicodeDecodeError:
+                return [], ["CSV 파일은 UTF-8 또는 한글 Excel 형식으로 저장해주세요."]
+        return parse_applicant_rows(text, max_rows=max_rows)
+    if suffix != ".xlsx":
+        return [], ["Excel(.xlsx) 또는 CSV(.csv) 파일만 업로드할 수 있습니다."]
+
+    try:
+        with ZipFile(BytesIO(raw)) as archive:
+            if sum(item.file_size for item in archive.infolist()) > 20 * 1024 * 1024:
+                return [], ["압축을 푼 명단 파일이 너무 큽니다."]
+        from openpyxl import load_workbook
+        workbook = load_workbook(BytesIO(raw), read_only=True, data_only=True)
+        sheet = workbook.active
+        lines = []
+        for values in sheet.iter_rows(values_only=True):
+            cells = [_excel_cell_text(value) for value in values[:4]]
+            if any(cells):
+                lines.append("\t".join(cells))
+                if len(lines) > max_rows + 1:
+                    workbook.close()
+                    return [], [f"한 번에 최대 {max_rows}명까지 입력할 수 있습니다."]
+        workbook.close()
+    except (BadZipFile, OSError, ValueError):
+        return [], ["Excel 파일을 읽을 수 없습니다. 손상되지 않은 .xlsx 파일인지 확인해주세요."]
+    except Exception:
+        return [], ["Excel 파일 형식을 확인해주세요."]
+    return parse_applicant_rows("\n".join(lines), max_rows=max_rows)
