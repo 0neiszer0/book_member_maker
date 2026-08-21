@@ -4980,6 +4980,11 @@ def admin_seminar_rooms():
     next_first = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
     last_day = next_first - timedelta(days=1)
 
+    from seminar_rooms import (
+        compute_available_dates, extract_club_name, get_room_from_title,
+        load_settings, parse_dates_from_title, WRITE_URL,
+    )
+
     try:
         posts_res = supabase.table('seminar_room_posts').select('*').execute()
         posts = posts_res.data or []
@@ -4987,6 +4992,27 @@ def admin_seminar_rooms():
         app.logger.error(f"seminar_room_posts 조회 실패: {e}")
         posts = []
         flash(f"세미나실 캐시 조회 오류: {e}", "danger")
+
+    # 예전 파서로 캐시된 글도 화면에서는 최신 규칙으로 즉시 보정한다.
+    # 연도 없는 제목은 기존 캐시 날짜의 연도를 우선 사용해 해가 바뀌어도 안전하다.
+    for post in posts:
+        cached_dates = post.get('dates') or []
+        parse_year = today.year
+        if cached_dates:
+            try:
+                parse_year = date.fromisoformat(str(cached_dates[0])[:10]).year
+            except (TypeError, ValueError):
+                pass
+
+        reparsed_dates = parse_dates_from_title(post.get('title') or '', parse_year)
+        if reparsed_dates:
+            post['dates'] = [item.isoformat() for item in reparsed_dates]
+        reparsed_room = get_room_from_title(post.get('title') or '')
+        if reparsed_room:
+            post['room'] = reparsed_room
+        reparsed_club = extract_club_name(post.get('title') or '')
+        if reparsed_club:
+            post['club_name'] = reparsed_club
 
     # 날짜 → 예약 목록 매핑 (월 한정 + 전체)
     by_date = defaultdict(list)        # 달력에 표시할 월 내 데이터
@@ -5044,9 +5070,6 @@ def admin_seminar_rooms():
         counts[p.get('status', 'pending')] = counts.get(p.get('status', 'pending'), 0) + 1
 
     # 설정 로드 (DB) + 예약 가능 날짜 계산
-    from seminar_rooms import (
-        compute_available_dates, load_settings, WRITE_URL,
-    )
     settings = load_settings(supabase)
 
     def _to_date(s):
