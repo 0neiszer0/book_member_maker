@@ -611,6 +611,7 @@
                     let msg = `갱신 완료!\n` +
                         `· 신규 발견: ${data.new}건\n` +
                         `· 재확인(대기): ${data.rechecked}건\n` +
+                        `· 기존 날짜 표기 복구: ${data.reparsed_terminal ?? 0}건\n` +
                         `· 종착 스킵: ${data.skipped_terminal}건\n` +
                         `· 페이지 ${data.pages_scanned}개 스캔\n` +
                         `· 목록 총 ${data.total_listed ?? '?'}건 / 세미나실 매칭 ${data.seminar_matched ?? '?'}건`;
@@ -629,7 +630,7 @@
                         console.log('[seminar refresh diagnostics]', data.diagnostics);
                     }
                     alert(msg);
-                    if (data.new > 0 || data.rechecked > 0) location.reload();
+                    if (data.new > 0 || data.rechecked > 0 || data.reparsed_terminal > 0) location.reload();
                 } else {
                     alert('오류: ' + (data.message || '알 수 없음'));
                 }
