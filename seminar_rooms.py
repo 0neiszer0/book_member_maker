@@ -50,58 +50,168 @@ DAYS_AHEAD_MAX = 28        # 최대 28일 후까지 예약 가능
 # ─────────────────────────────────────────────
 # 파싱 유틸
 # ─────────────────────────────────────────────
+_DATE_TOKEN_RE = re.compile(
+    r'''(?<!\d)(?:
+        (?P<ymd_kr>(?P<y_kr>\d{4})\s*년?\s*(?P<ym_kr>\d{1,2})\s*월\s*(?P<yd_kr>\d{1,2})\s*일?)
+      | (?P<ymd_num>(?P<y_num>\d{4})\s*[./-]\s*(?P<ym_num>\d{1,2})\s*[./-]\s*(?P<yd_num>\d{1,2}))
+      | (?P<md_kr>(?P<m_kr>\d{1,2})\s*월\s*(?P<d_kr>\d{1,2})\s*일?)
+      | (?P<md_num>(?P<m_num>\d{1,2})\s*[./-]\s*(?P<d_num>\d{1,2}))
+      | (?P<bare_day>(?P<d_only>\d{1,2})\s*일)
+      | (?P<compact_day>(?P<d_compact>\d{1,2})(?=\s*[,，·]))
+    )(?!\d)''',
+    re.VERBOSE,
+)
+
+
+def _date_scope_from_title(title: str) -> str:
+    """동아리명·대여 문구를 제외하고 제목의 날짜 표현 부분만 반환한다."""
+    text = str(title or '').strip()
+    text = re.sub(r'^\s*[\[［【][^\]］】]+[\]］】]\s*', '', text, count=1)
+    room_marker = re.search(r'세미나\s*실', text)
+    if room_marker:
+        text = text[:room_marker.start()]
+
+    # 요일은 날짜 구분자가 아니므로 먼저 제거한다. "(금,토)"도 지원한다.
+    text = re.sub(
+        r'[\(（]\s*[월화수목금토일](?:\s*,\s*[월화수목금토일])*\s*(?:요일)?\s*[\)）]',
+        ' ',
+        text,
+    )
+    return (text.replace('／', '/').replace('．', '.')
+            .replace('～', '~').replace('〜', '~')
+            .replace('–', '-').replace('—', '-').replace('−', '-'))
+
+
+def _is_date_range_connector(text: str) -> bool:
+    compact = re.sub(r'\s+', '', text or '')
+    return ('~' in compact or '부터' in compact or '까지' in compact
+            or (bool(compact) and set(compact) <= {'-'}))
+
+
 def parse_dates_from_title(title: str, fallback_year: int) -> list:
-    """게시글 제목에서 날짜를 모두 추출한다.
+    """게시글 제목에서 예약 날짜를 유연하게 추출한다.
 
-    지원 형식:
-      - "2026년 5월 14일"          (연도 포함)
-      - "5월 14일"                  (연도 생략 → 제목 내 첫 연도 또는 fallback_year)
-      - "2026년 5월 25일, 5월 28일" (혼합 — 모두 같은 base_year 로 해석)
-      - "5.14" / "5/14"            (점/슬래시 구분)
+    월·연도 반복 생략(`8월 26일, 27일, 28일`), 숫자 표기(`9/13`),
+    연속 범위(`9월 11일~13일`)와 혼합 월 표기를 모두 지원한다.
+    범위는 시작일부터 종료일까지의 모든 날짜로 펼친다.
     """
-    dates: list = []
-    year_match = re.search(r'(\d{4})\s*년', title)
-    base_year = int(year_match.group(1)) if year_match else fallback_year
+    scope = _date_scope_from_title(title)
+    year_match = re.search(
+        r'(?<!\d)(\d{4})\s*(?:년)?(?=\s*\d{1,2}\s*(?:월|[./-]))',
+        scope,
+    )
+    base_year = int(year_match.group(1)) if year_match else int(fallback_year)
 
-    for m in re.finditer(r'(\d{1,2})월\s*(\d{1,2})일', title):
-        try:
-            dates.append(date(base_year, int(m.group(1)), int(m.group(2))))
-        except ValueError:
-            pass
-    if dates:
-        return sorted(set(dates))
+    parsed: list[date] = []
+    current_year = base_year
+    current_month = None
+    previous_date = None
+    previous_end = 0
 
-    for m in re.finditer(r'(\d{1,2})[./](\d{1,2})(?!\d)', title):
+    for match in _DATE_TOKEN_RE.finditer(scope):
+        explicit_year = False
+        explicit_month = False
+
+        if match.group('ymd_kr'):
+            current_year = int(match.group('y_kr'))
+            current_month = int(match.group('ym_kr'))
+            day = int(match.group('yd_kr'))
+            explicit_year = explicit_month = True
+        elif match.group('ymd_num'):
+            current_year = int(match.group('y_num'))
+            current_month = int(match.group('ym_num'))
+            day = int(match.group('yd_num'))
+            explicit_year = explicit_month = True
+        elif match.group('md_kr'):
+            current_month = int(match.group('m_kr'))
+            day = int(match.group('d_kr'))
+            explicit_month = True
+        elif match.group('md_num'):
+            current_month = int(match.group('m_num'))
+            day = int(match.group('d_num'))
+            explicit_month = True
+        else:
+            if current_month is None:
+                continue
+            day = int(match.group('d_only') or match.group('d_compact'))
+
+        connector = scope[previous_end:match.start()] if previous_date else ''
+        is_range = previous_date is not None and _is_date_range_connector(connector)
+
         try:
-            month, day = int(m.group(1)), int(m.group(2))
-            if 1 <= month <= 12 and 1 <= day <= 31:
-                dates.append(date(fallback_year, month, day))
-        except ValueError:
-            pass
-    return sorted(set(dates))
+            candidate = date(current_year, current_month, day)
+        except (TypeError, ValueError):
+            previous_end = match.end()
+            continue
+
+        # "12월 30일~1월 2일"처럼 연도만 생략된 연말 범위도 처리한다.
+        if (is_range and candidate < previous_date and not explicit_year
+                and explicit_month and current_month < previous_date.month):
+            try:
+                current_year = previous_date.year + 1
+                candidate = date(current_year, current_month, day)
+            except ValueError:
+                previous_end = match.end()
+                continue
+
+        if is_range:
+            gap = (candidate - previous_date).days
+            if 0 <= gap <= 62:
+                parsed.extend(previous_date + timedelta(days=offset)
+                              for offset in range(gap + 1))
+            else:
+                parsed.append(candidate)
+        else:
+            parsed.append(candidate)
+
+        previous_date = candidate
+        previous_end = match.end()
+
+    return sorted(set(parsed))
 
 
 def is_seminar_post(title: str) -> bool:
     """진짜 세미나실 예약 글인지 판정.
 
-    실제 예약 글은 항상 '[클럽명] ... 세미나실(민주/통일/백호) ...' 패턴이며
-    공지(예: '공용&활동공간 사용법 안내 ... 백호관 세미나실 ...') 는 '[' 로
-    시작하지 않는다. 그래서 '[' 선두 + 세미나실 + 방이름 3가지를 모두 요구.
+    대괄호류 동아리명 + 세미나실 + 방 이름을 모두 요구해 일반 안내 공지를
+    예약 글로 잘못 인식하지 않도록 한다.
     """
-    if not title.startswith('['):
-        return False
-    return '세미나실' in title and any(r in title for r in SEMINAR_ROOMS)
+    return bool(
+        extract_club_name(title)
+        and re.search(r'세미나\s*실', str(title or ''))
+        and get_room_from_title(title)
+    )
 
 
 def get_room_from_title(title: str):
-    for r in SEMINAR_ROOMS:
-        if r in title:
-            return r
+    text = str(title or '')
+    marker = re.search(r'세미나\s*실', text)
+    if marker:
+        after = text[marker.end():]
+        found = re.match(
+            r'\s*(?:[:：=\-]|[\(（\[［【{])*\s*(민주|통일|백호)',
+            after,
+        )
+        if found:
+            return found.group(1)
+
+        before = text[:marker.start()]
+        found = re.search(r'(민주|통일|백호)\s*(?:방|실)?\s*$', before)
+        if found:
+            return found.group(1)
+
+    # 건물명(예: 백호관)이나 동아리명 때문에 방을 잘못 고르지 않도록
+    # 대괄호 동아리명과 "백호관"을 제외한 뒤 하나로 확정될 때만 사용한다.
+    body = re.sub(r'^\s*[\[［【][^\]］】]+[\]］】]\s*', '', text, count=1)
+    body = re.sub(r'(민주|통일|백호)\s*관', '', body)
+    candidates = {room for room in SEMINAR_ROOMS if room in body}
+    if len(candidates) == 1:
+        return next(iter(candidates))
     return None
 
 
 def extract_club_name(title: str):
-    m = re.match(r'\[([^\]]+)\]', title)
+    m = re.match(r'^\s*[\[［【]([^\]］】]+)[\]］】]', str(title or ''))
     return m.group(1).strip() if m else None
 
 
@@ -168,9 +278,10 @@ def is_truncated_listing_title(title: str) -> bool:
     gnuboard 게시판은 긴 제목을 '…' 또는 '...' 으로 잘라 노출한다.
     [동아리명] 으로 시작하는 잘린 글은 세미나실 신청글 후보로 본다.
     """
-    if not title.startswith('['):
+    if not extract_club_name(title):
         return False
-    return title.endswith('…') or title.endswith('...')
+    cleaned = str(title or '').rstrip()
+    return cleaned.endswith('…') or cleaned.endswith('...')
 
 
 # ─────────────────────────────────────────────
@@ -435,14 +546,16 @@ def crawl(supabase, *, max_pages: int = 3, recheck_pending: bool = True,
     log = logger or logging.getLogger(__name__)
     session = make_session()
 
-    # 기존 캐시 로드: wr_id -> status
+    # 기존 캐시 로드. 종착 상태 글도 상세 페이지를 다시 받지 않고 저장된 제목을
+    # 최신 파서로 재해석할 수 있도록 파싱 관련 필드를 함께 가져온다.
     try:
         existing = supabase.table('seminar_room_posts') \
-            .select('wr_id, status').execute().data or []
+            .select('wr_id, title, club_name, room, dates, status, post_url') \
+            .execute().data or []
     except Exception as e:
         log.warning(f"기존 캐시 조회 실패(빈 캐시로 진행): {e}")
         existing = []
-    known = {row['wr_id']: row['status'] for row in existing}
+    known = {row['wr_id']: row for row in existing}
 
     now_iso = datetime.now(timezone.utc).isoformat()
     fallback_year = datetime.now().year
@@ -451,6 +564,7 @@ def crawl(supabase, *, max_pages: int = 3, recheck_pending: bool = True,
     new_count = 0
     rechecked_count = 0
     skipped_terminal = 0
+    reparsed_terminal = 0
     pages_scanned = 0
     diagnostics: list = []   # 페이지별 응답 진단(디버그용)
     total_listed = 0
@@ -491,14 +605,49 @@ def crawl(supabase, *, max_pages: int = 3, recheck_pending: bool = True,
             if not listing_match and not truncated:
                 continue
 
-            prev_status = known.get(wr_id)
-            is_new = prev_status is None
+            cached = known.get(wr_id) or {}
+            prev_status = cached.get('status')
+            is_new = not cached
             is_terminal = prev_status in ('approved', 'rejected')
 
-            # 종착 상태 글은 잘렸어도 다시 fetch 하지 않는다 (캐시된 결과 그대로).
+            # 종착 상태 글은 상세 페이지를 다시 fetch 하지 않되, 저장된 풀 제목은
+            # 최신 파서로 다시 읽어 과거의 누락 날짜도 다음 새로고침 때 복구한다.
             if is_terminal:
                 if listing_match:
                     seminar_matched += 1
+                cached_title = cached.get('title') or title
+                cached_fallback_year = fallback_year
+                for cached_date in (cached.get('dates') or []):
+                    try:
+                        cached_fallback_year = date.fromisoformat(
+                            str(cached_date)[:10]
+                        ).year
+                        break
+                    except (TypeError, ValueError):
+                        continue
+                parsed_dates = [
+                    item.isoformat()
+                    for item in parse_dates_from_title(
+                        cached_title, cached_fallback_year
+                    )
+                ]
+                parsed_room = get_room_from_title(cached_title)
+                parsed_club = extract_club_name(cached_title) or cached.get('club_name')
+                old_dates = sorted(str(item)[:10] for item in (cached.get('dates') or []))
+                if (parsed_dates and parsed_dates != old_dates) or (
+                        parsed_room and parsed_room != cached.get('room')) or (
+                        parsed_club and parsed_club != cached.get('club_name')):
+                    upserts.append({
+                        'wr_id': wr_id,
+                        'title': cached_title[:500],
+                        'club_name': parsed_club or '알 수 없음',
+                        'room': parsed_room,
+                        'dates': parsed_dates or old_dates,
+                        'status': prev_status,
+                        'post_url': cached.get('post_url') or post_url,
+                        'last_checked_at': now_iso,
+                    })
+                    reparsed_terminal += 1
                 skipped_terminal += 1
                 continue
             if not is_new and not recheck_pending:
@@ -574,6 +723,7 @@ def crawl(supabase, *, max_pages: int = 3, recheck_pending: bool = True,
         'new': new_count,
         'rechecked': rechecked_count,
         'skipped_terminal': skipped_terminal,
+        'reparsed_terminal': reparsed_terminal,
         'pages_scanned': pages_scanned,
         'total_listed': total_listed,
         'seminar_matched': seminar_matched,
