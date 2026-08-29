@@ -135,7 +135,8 @@
                 const result = await response.json();
                 renderPreview(result);
             } catch (error) {
-                previewContent.innerHTML = `<p class="text-red-400">미리보기 생성 실패: ${error.message}</p>`;
+                previewContent.textContent = '미리보기 생성에 실패했습니다.';
+                previewContent.className = 'text-red-400';
             }
         });
         previewCloseBtn.addEventListener('click', () => previewDialog.close());

@@ -127,6 +127,10 @@
             return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
         }
 
+        function inlineJsString(s) {
+            return escapeHtml(JSON.stringify(String(s)));
+        }
+
         function profileUrl(name) {
             const id = memberMap[name];
             return id ? `/records/members/${id}` : null;
@@ -151,7 +155,7 @@
                 list.innerHTML = facilitators.map(name => `
                     <span class="member-pill bg-eva-purple text-white px-3 py-1 rounded-full text-sm">
                         ${escapeHtml(name)}
-                        <span class="pill-x" onclick="removeFac('${escapeHtml(name)}')" title="제거">✕</span>
+                        <span class="pill-x" onclick="removeFac(${inlineJsString(name)})" title="제거">✕</span>
                     </span>
                 `).join('');
             }
@@ -202,8 +206,8 @@
                             : `<span class="font-bold">${escapeHtml(name)}${facMark}</span>`;
                         return `<span class="member-pill ${genderClass(name)} px-3 py-1 rounded-full text-sm ${isFac ? 'ring-2 ring-[#7A5A3A]' : ''}">
                             ${tag}${genderLabel(name)}
-                            <span class="pill-x" onclick="toggleFac('${escapeHtml(name)}')" title="발제자 토글">★</span>
-                            <span class="pill-x" onclick="removeMember(${gi}, '${escapeHtml(name)}')" title="조에서 제거">✕</span>
+                            <span class="pill-x" onclick="toggleFac(${inlineJsString(name)})" title="발제자 토글">★</span>
+                            <span class="pill-x" onclick="removeMember(${gi}, ${inlineJsString(name)})" title="조에서 제거">✕</span>
                         </span>`;
                     }).join('');
                     return `

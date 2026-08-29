@@ -1,0 +1,17 @@
+.env
+.env.*
+.git
+.github
+.gitignore
+.venv
+venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.coverage
+htmlcov
+.idea
+.claude
+data
+testing
+*.csv

@@ -459,24 +459,41 @@
       notifs.forEach(function(n){
         var d = document.createElement('div');
         d.className = 'wd-notif-item';
+        var details = n.details || {};
         var title='', meta='';
         if (n.type === 'new_user_request'){
-          title = n.details.name + ' 님 신규 가입 요청';
-          meta  = n.details.email;
+          title = (details.name || '') + ' 님 신규 가입 요청';
+          meta  = details.email || '';
         } else if (n.type === 'account_link_request'){
-          title = n.details.original_name + ' 님 계정 연결 요청';
-          meta  = '소셜: ' + n.details.social_name + ' (' + n.details.social_email + ')';
+          title = (details.original_name || '') + ' 님 계정 연결 요청';
+          meta  = '소셜: ' + (details.social_name || '') + ' (' + (details.social_email || '') + ')';
         } else if (n.type === 'absence_request'){
-          title = n.details.name + ' 님 불참 요청';
-          meta  = '사유: ' + (n.details.reason || '미입력');
+          title = (details.name || '') + ' 님 불참 요청';
+          meta  = '사유: ' + (details.reason || '미입력');
         }
-        d.innerHTML =
-          '<div class="wd-notif-title">'+title+'</div>'+
-          '<div class="wd-notif-meta">'+meta+'</div>'+
-          '<div class="wd-notif-actions">'+
-            '<button class="wd-notif-btn wd-notif-deny"   data-id="'+n.id+'" data-action="deny">거절</button>'+
-            '<button class="wd-notif-btn wd-notif-approve" data-id="'+n.id+'" data-action="approve">승인</button>'+
-          '</div>';
+
+        var titleNode = document.createElement('div');
+        titleNode.className = 'wd-notif-title';
+        titleNode.textContent = title;
+        var metaNode = document.createElement('div');
+        metaNode.className = 'wd-notif-meta';
+        metaNode.textContent = meta;
+        var actionsNode = document.createElement('div');
+        actionsNode.className = 'wd-notif-actions';
+
+        [['deny', '거절'], ['approve', '승인']].forEach(function(action){
+          var button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'wd-notif-btn wd-notif-' + action[0];
+          button.dataset.id = String(n.id);
+          button.dataset.action = action[0];
+          button.textContent = action[1];
+          actionsNode.appendChild(button);
+        });
+
+        d.appendChild(titleNode);
+        d.appendChild(metaNode);
+        d.appendChild(actionsNode);
         notifList.appendChild(d);
       });
     }

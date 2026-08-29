@@ -603,11 +603,14 @@
                             byDate[rec.date].push(rec);
                         });
 
+                        const escapeHistoryHtml = value => String(value).replace(/[&<>"']/g, char => ({
+                            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+                        }[char]));
                         let html = '<div class="space-y-4">';
                         Object.entries(byDate).sort(([a], [b]) => b.localeCompare(a)).forEach(([date, recs]) => {
                             html += `<div class="border border-gray-600 rounded-lg overflow-hidden">
                         <div class="bg-gray-700 px-4 py-2 font-bold text-eva-green flex justify-between items-center">
-                            <span> ${date}</span>
+                            <span> ${escapeHistoryHtml(date)}</span>
                             <span class="text-xs text-gray-300">${recs.length}개 기록</span>
                         </div>`;
 
@@ -621,14 +624,15 @@
                                     <div class="mt-1 space-y-1">`;
 
                                 groups.forEach((g, gi) => {
+                                    const safeNames = g.map(escapeHistoryHtml).join(', ');
                                     html += `<div class="text-xs text-gray-300">
-                                        <span class="font-semibold text-gray-100">${gi + 1}조:</span> ${g.join(', ')}
+                                        <span class="font-semibold text-gray-100">${gi + 1}조:</span> ${safeNames}
                                     </div>`;
                                 });
 
                                 html += `</div>
                                 </div>
-                                <button data-id="${rec.id}" class="del-btn ml-4 flex-shrink-0 text-red-500 hover:text-red-400 text-xs font-bold px-2 py-1 border border-red-700 rounded">삭제</button>
+                                <button data-id="${escapeHistoryHtml(rec.id)}" class="del-btn ml-4 flex-shrink-0 text-red-500 hover:text-red-400 text-xs font-bold px-2 py-1 border border-red-700 rounded">삭제</button>
                             </div>
                         </div>`;
                             });

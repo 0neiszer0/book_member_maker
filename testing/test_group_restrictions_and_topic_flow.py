@@ -40,7 +40,8 @@ class GroupRestrictionIntegrationContracts(unittest.TestCase):
 
     def test_only_primary_admin_can_manage_restrictions(self):
         self.assertIn('def primary_admin_required', self.app_source)
-        self.assertIn("rows[0].get(\"role\") == \"admin\"", self.app_source)
+        self.assertIn('member.get("role") == "admin"', self.app_source)
+        self.assertIn('member.get("account_status") == "active"', self.app_source)
         self.assertIn("@app.route('/api/admin/group-pair-restrictions'", self.app_source)
         self.assertIn('@primary_admin_required', self.app_source)
         self.assertIn('{% if can_manage_pair_restrictions %}', self.index_source)

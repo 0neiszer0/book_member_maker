@@ -1,0 +1,27 @@
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  unittest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHON_DOTENV_DISABLED: "1"
+      FLASK_SECRET_KEY: ci-test-only
+      SUPABASE_URL: http://127.0.0.1:9
+      SUPABASE_SERVICE_KEY: ci-test-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - run: python -m unittest discover -s testing -p "test_*.py" -v

@@ -294,7 +294,7 @@
         const voteBox = document.getElementById('voteBox');
         const verifyMsg = document.getElementById('verifyMsg');
         const memberNameEl = document.getElementById('memberName');
-        let verified = null; // {student_id, name}
+        let verified = null; // {student_id, name, viewer_token}
 
         function showError(msg) {
             verifyMsg.textContent = msg;
@@ -314,7 +314,7 @@
                 });
                 const data = await res.json();
                 if (data.status !== 'success') { showError(data.message || '확인 실패'); return; }
-                verified = {student_id: sid, name: nm};
+                verified = {student_id: sid, name: nm, viewer_token: data.viewer_token};
                 memberNameEl.textContent = data.member_name;
                 verifyBox.classList.add('hidden');
                 voteBox.classList.remove('hidden');
@@ -345,13 +345,7 @@
                 Object.entries(yesAttendees).forEach(([sessId, names]) => {
                     const section = document.querySelector(`.attendee-section[data-session-id="${sessId}"]`);
                     if (!section) return;
-                    const safe = (names || []).map(n => String(n).replace(/</g, '&lt;').replace(/>/g, '&gt;'));
-                    section.innerHTML = `
-                        <div class="text-xs text-gray-400 mb-1.5 attendee-title"> 신청자 명단 (${safe.length}명)<span class="ml-1 text-eva-green">· 내가 신청한 회차</span></div>
-                        <div class="flex flex-wrap gap-1.5 attendee-list">
-                            ${safe.map(n => `<span class="text-xs bg-gray-800 border border-gray-700 rounded px-2 py-0.5">${n}</span>`).join('')}
-                        </div>
-                    `;
+                    renderAttendeeSection(section, names, true);
                 });
             } catch (err) { showError('네트워크 오류: ' + err.message); }
         });
@@ -387,9 +381,8 @@
         async function refreshCounts() {
             try {
                 let url = '/api/seminar_vote/counts?token=' + encodeURIComponent(TOKEN);
-                if (verified) {
-                    url += '&student_id=' + encodeURIComponent(verified.student_id)
-                         + '&name=' + encodeURIComponent(verified.name);
+                if (verified && verified.viewer_token) {
+                    url += '&viewer_token=' + encodeURIComponent(verified.viewer_token);
                 }
                 const res = await fetch(url);
                 const data = await res.json();
@@ -451,7 +444,14 @@
                     box.scrollIntoView({behavior: 'smooth'});
                     refreshCounts();
                 } else {
-                    box.innerHTML = `<p class="text-red-400 font-bold">제출 실패</p><p class="text-sm mt-2">${data.message || '오류'}</p>`;
+                    box.replaceChildren();
+                    const title = document.createElement('p');
+                    title.className = 'text-red-400 font-bold';
+                    title.textContent = '제출 실패';
+                    const message = document.createElement('p');
+                    message.className = 'text-sm mt-2';
+                    message.textContent = data.message || '오류';
+                    box.append(title, message);
                 }
             } catch (err) { alert('오류: ' + err.message); }
         });

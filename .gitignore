@@ -1,2 +1,10 @@
-.env__pycache__/
+.env
+.venv/
+__pycache__/
 *.pyc
+
+# Local exports can contain member names, preferences, and activity history.
+data/*.json
+data/*.csv
+.claude/
+.idea/
