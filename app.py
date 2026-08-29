@@ -1,15 +1,16 @@
 # --- 1. 기본 라이브러리 및 설정 ---
 import os
-os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 import html
 import hashlib
+import secrets
+from urllib.parse import urlencode, urlsplit
 import itertools
 import random
 import math
 from dotenv import load_dotenv
 from flask import (
     Flask, render_template, request, jsonify, session, redirect, url_for,
-    flash, Response, send_file, stream_with_context,
+    flash, Response, send_file, stream_with_context, abort,
 )
 import json
 from supabase import create_client, Client
@@ -48,6 +49,7 @@ from recruitment_results import (
     parse_applicant_rows,
 )
 from topic_lifecycle import topic_event_is_expired
+from security_utils import forwarded_client_address, safe_internal_next_url
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
@@ -68,6 +70,19 @@ NOTION_PUBLIC_WIKI_URL = os.environ.get(
 PUBLIC_BASE_URL = os.environ.get(
     "PUBLIC_BASE_URL", "https://book-member-maker.onrender.com"
 ).rstrip("/")
+_cookie_secure_setting = os.environ.get("SESSION_COOKIE_SECURE")
+_cookie_secure = (
+    _cookie_secure_setting.lower() in {"1", "true", "yes", "on"}
+    if _cookie_secure_setting is not None
+    else os.environ.get("PUBLIC_BASE_URL", "").startswith("https://")
+)
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=_cookie_secure,
+    SESSION_COOKIE_SAMESITE="Lax",
+    MAX_CONTENT_LENGTH=60 * 1024 * 1024,
+)
+EXTERNAL_HTTP_TIMEOUT = (5, 15)
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("Supabase URL과 Key가 .env 파일에 설정되지 않았습니다.")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -76,6 +91,23 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 @app.context_processor
 def public_navigation_context():
     return {"notion_public_wiki_url": NOTION_PUBLIC_WIKI_URL}
+
+
+@app.after_request
+def add_security_headers(response):
+    """Apply low-risk browser protections without breaking existing inline UI scripts."""
+    defaults = {
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    }
+    if app.config.get("SESSION_COOKIE_SECURE"):
+        defaults["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    for name, value in defaults.items():
+        if name not in response.headers:
+            response.headers[name] = value
+    return response
 
 
 @app.after_request
@@ -146,6 +178,21 @@ def protect_applicant_result_responses(response):
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Content-Security-Policy"] = "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
     return response
+
+
+@app.before_request
+def reject_cross_site_state_changes():
+    """Reject explicit cross-site writes while preserving older same-site webviews."""
+    if request.method not in {"POST", "PUT", "PATCH", "DELETE"} or not session:
+        return None
+    fetch_site = (request.headers.get("Sec-Fetch-Site") or "").lower()
+    origin = request.headers.get("Origin")
+    origin_mismatch = bool(origin and urlsplit(origin).netloc != request.host)
+    if fetch_site == "cross-site" or origin_mismatch:
+        if request.path.startswith("/api/"):
+            return jsonify({"error": "허용되지 않은 요청 출처입니다."}), 403
+        abort(403)
+    return None
 
 
 @app.before_request
@@ -266,21 +313,47 @@ app.jinja_env.filters['datetime'] = format_datetime_filter
 
 
 # 로그인 여부 및 역할 확인을 위한 데코레이터 (문지기 함수)
+def _access_denied(message, status=403):
+    if request.path.startswith("/api/"):
+        return jsonify({"error": message}), status
+    flash(message, "warning" if status == 401 else "danger")
+    target = "login" if status == 401 else "main_index"
+    return redirect(url_for(target))
+
+
 def login_required(role="ANY"):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
             if "user_role" not in session:
-                flash("로그인이 필요합니다.", "warning")
-                return redirect(url_for('login'))
-            # admin과 officer 역할은 모든 admin 전용 경로에 접근 가능
+                return _access_denied("로그인이 필요합니다.", 401)
+
             user_role = session["user_role"]
-            if role == "admin" and user_role not in ("admin", "officer"):
-                flash("이 페이지에 접근할 권한이 없습니다.", "danger")
-                return redirect(url_for('main_index'))
-            elif role != "ANY" and role != "admin" and user_role != role:
-                flash("이 페이지에 접근할 권한이 없습니다.", "danger")
-                return redirect(url_for('main_index'))
+            if role == "admin":
+                user_id = session.get("user_id")
+                try:
+                    rows = supabase.table("members").select(
+                        "role, is_active, member_status, account_status"
+                    ).eq("id", user_id).limit(1).execute().data or []
+                except Exception as exc:
+                    app.logger.error("Admin authorization refresh failed: %s", exc)
+                    return _access_denied("권한을 확인하지 못했습니다. 잠시 후 다시 시도해주세요.", 503)
+
+                if not rows:
+                    session.clear()
+                    return _access_denied("로그인이 필요합니다.", 401)
+
+                member = rows[0]
+                user_role = member.get("role") or "member"
+                session["user_role"] = user_role
+                if member.get("account_status") != "active" or member.get("member_status") == "inactive":
+                    session.clear()
+                    return _access_denied("비활성화된 계정입니다.", 403)
+                if member.get("is_active") is False or user_role not in ("admin", "officer"):
+                    return _access_denied("이 페이지에 접근할 권한이 없습니다.", 403)
+            elif role != "ANY" and user_role != role:
+                return _access_denied("이 페이지에 접근할 권한이 없습니다.", 403)
+
             return f(*args, **kwargs)
 
         return decorated_function
@@ -299,9 +372,18 @@ def _current_user_is_primary_admin():
     if not user_id or session.get("user_role") != "admin":
         return False
     try:
-        rows = supabase.table("members").select("role, is_active") \
-            .eq("id", user_id).limit(1).execute().data or []
-        return bool(rows and rows[0].get("role") == "admin" and rows[0].get("is_active"))
+        rows = supabase.table("members").select(
+            "role, is_active, member_status, account_status"
+        ).eq("id", user_id).limit(1).execute().data or []
+        if not rows:
+            return False
+        member = rows[0]
+        return bool(
+            member.get("role") == "admin"
+            and member.get("is_active")
+            and member.get("member_status") != "inactive"
+            and member.get("account_status") == "active"
+        )
     except Exception as exc:
         app.logger.error("Primary admin role check failed: %s", exc)
         return False
@@ -348,7 +430,7 @@ def send_telegram_notification(message):
             'parse_mode': 'Markdown'
         }
         try:
-            response = requests.get(url, params=params)
+            response = requests.get(url, params=params, timeout=EXTERNAL_HTTP_TIMEOUT)
             response.raise_for_status()  # 오류 발생 시 예외 발생
             app.logger.info(f"{chat_id}로 텔레그램 알림이 성공적으로 발송되었습니다.")
         except Exception as e:
@@ -376,22 +458,22 @@ def get_next_seminar_dates():
 # [신규] 가장 기본이 되는 메인 페이지 라우트를 추가합니다.
 @app.route('/keep-alive')
 def keep_alive_endpoint():
-    """
-    Render 인스턴스와 Supabase를 동시에 깨우는 헬스체크 엔드포인트.
-    외부 cron(GitHub Actions, cron-job.org 등)이 주기적으로 호출하면
-    - Render: HTTP 요청을 받음 → 잠들지 않음
-    - Supabase: 가장 가벼운 SELECT를 실행 → 비활성으로 인한 일시 정지 방지
-    """
+    """Render liveness stays healthy even when the database is temporarily degraded."""
+    checked_at = datetime.now(timezone.utc).isoformat()
     try:
         supabase.table('members').select('id').limit(1).execute()
         return jsonify({
             "status": "ok",
-            "checked_at": datetime.now(timezone.utc).isoformat(),
-            "supabase": "alive"
+            "checked_at": checked_at,
+            "supabase": "alive",
         }), 200
-    except Exception as e:
-        app.logger.error(f"keep-alive failed: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception as exc:
+        app.logger.error("keep-alive dependency check failed: %s", exc)
+        return jsonify({
+            "status": "degraded",
+            "checked_at": checked_at,
+            "supabase": "unavailable",
+        }), 200
 
 
 @app.route('/')
@@ -437,14 +519,14 @@ class KakaoOauth:
         if os.environ.get("KAKAO_OAUTH_CLIENT_SECRET"):
             data["client_secret"] = os.environ.get("KAKAO_OAUTH_CLIENT_SECRET")
 
-        response = requests.post(self.token_url, data=data)
+        response = requests.post(self.token_url, data=data, timeout=EXTERNAL_HTTP_TIMEOUT)
         response.raise_for_status()  # 오류 발생 시 예외 발생
         return response.json()
 
     def get_user_info(self, access_token):
         """Access Token으로 사용자 정보를 요청합니다."""
         headers = {"Authorization": f"Bearer {access_token}"}
-        response = requests.post(self.user_info_url, headers=headers)
+        response = requests.post(self.user_info_url, headers=headers, timeout=EXTERNAL_HTTP_TIMEOUT)
         response.raise_for_status()
         return response.json()
 
@@ -457,43 +539,49 @@ def login():
     return render_template('login.html')
 
 
-# 1. 로그인 시작 라우트
+def _kakao_authorize_url(kakao_oauth, prompt=None):
+    state = secrets.token_urlsafe(32)
+    session["oauth_state"] = state
+    params = {
+        "client_id": kakao_oauth.client_id,
+        "redirect_uri": kakao_oauth.redirect_uri,
+        "response_type": "code",
+        "state": state,
+    }
+    if prompt:
+        params["prompt"] = prompt
+    return "https://kauth.kakao.com/oauth/authorize?" + urlencode(params)
+
+
 @app.route('/login/kakao')
 def kakao_login():
     kakao_oauth = KakaoOauth()
-    # 사용자를 카카오 인증 페이지로 리디렉션합니다.
-    login_url = f"https://kauth.kakao.com/oauth/authorize?client_id={kakao_oauth.client_id}&redirect_uri={kakao_oauth.redirect_uri}&response_type=code"
-
-    # [수정] 로그인 후 돌아올 목적지를 세션에 저장합니다.
-    session['next_url'] = request.args.get('next')
-    # [신규] 사용자가 누른 버튼이 '로그인'인지 '회원가입'인지 기억
+    session['next_url'] = safe_internal_next_url(request.args.get('next'))
     mode = request.args.get('mode', 'login')
     session['auth_mode'] = mode if mode in ('login', 'signup') else 'login'
-
-    return redirect(login_url)
+    return redirect(_kakao_authorize_url(kakao_oauth))
 
 
 @app.route('/login/kakao/re-consent')
 @login_required(role="ANY")
 def kakao_reconsent_login():
-    """
-    사용자가 카카오 정보 제공에 다시 동의하도록 요청하는 라우트.
-    """
     kakao_oauth = KakaoOauth()
-
-    # [핵심] &prompt=consent 파라미터를 추가하여 재동의 화면을 강제로 표시
-    login_url = f"https://kauth.kakao.com/oauth/authorize?client_id={kakao_oauth.client_id}&redirect_uri={kakao_oauth.redirect_uri}&response_type=code&prompt=consent"
-
-    # 재동의 후 돌아올 페이지를 '마이페이지'로 설정
     session['next_url'] = url_for('my_page')
-
-    return redirect(login_url)
+    return redirect(_kakao_authorize_url(kakao_oauth, prompt="consent"))
 
 
 # 2. 로그인 후 콜백을 처리할 라우트
 @app.route('/login/kakao/callback')
 def kakao_callback():
     try:
+        expected_state = session.pop("oauth_state", None)
+        received_state = request.args.get("state")
+        if not expected_state or not received_state or not secrets.compare_digest(expected_state, received_state):
+            session.pop("next_url", None)
+            session.pop("auth_mode", None)
+            flash("로그인 요청을 확인할 수 없습니다. 다시 시도해주세요.", "danger")
+            return redirect(url_for("login"))
+
         code = request.args.get("code")
         if not code:
             flash("인증 코드를 받는데 실패했습니다.", "danger")
@@ -552,7 +640,7 @@ def kakao_callback():
         session["user_name"] = member["name"]  # 항상 DB 최신값으로 갱신
         session.pop("member_preview", None)
 
-        next_url = session.pop('next_url', None)
+        next_url = safe_internal_next_url(session.pop('next_url', None))
         if next_url:
             return redirect(next_url)
         if member["role"] in ("admin", "officer"):
@@ -969,8 +1057,9 @@ def _recruitment_campaign(campaign_id):
 
 
 def _applicant_request_hash():
-    forwarded = (request.headers.get("X-Forwarded-For") or "").split(",", 1)[0].strip()
-    address = forwarded or request.remote_addr or "unknown"
+    address = forwarded_client_address(
+        request.headers.get("X-Forwarded-For"), request.remote_addr
+    )
     secret = str(app.secret_key or "")
     return hashlib.sha256(f"{secret}|{address}".encode("utf-8")).hexdigest()
 
@@ -4323,29 +4412,31 @@ def seminar_vote_verify():
                 # 이름순 정렬
                 for sid in voted_yes_attendees:
                     voted_yes_attendees[sid] = sorted(voted_yes_attendees[sid])
+        viewer_token = secrets.token_urlsafe(24)
+        session["seminar_vote_identity"] = {
+            "term_id": str(term["id"]),
+            "member_id": member["id"],
+            "viewer_token": viewer_token,
+            "expires_at": int(datetime.now(timezone.utc).timestamp()) + 2 * 60 * 60,
+        }
         return jsonify({
             'status': 'success',
             'member_name': member['name'],
             'existing_votes': existing,
             'voted_yes_attendees': voted_yes_attendees,
+            'viewer_token': viewer_token,
         })
     except Exception as e:
         app.logger.error(f"seminar_vote_verify error: {e}", exc_info=True)
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'status': 'error', 'message': '본인 확인 중 오류가 발생했습니다.'}), 500
 
 
 @app.route('/api/seminar_vote/counts')
 def seminar_vote_counts():
-    """현재 회차별 참석 인원 수 + 명단 (실시간 새로고침용).
-
-    공개 규칙:
-      - count >= 4 인 회차: 명단 공개
-      - 본인 확인(student_id+name) 시 본인이 yes 투표한 회차도 명단 공개
-    """
+    """Return public counts and, with a short-lived same-session token, the viewer's lists."""
     try:
         token = (request.args.get('token') or '').strip()
-        student_id = (request.args.get('student_id') or '').strip()
-        name = (request.args.get('name') or '').strip()
+        viewer_token = (request.args.get('viewer_token') or '').strip()
         if not token:
             return jsonify({'status': 'error', 'message': 'token 필요'}), 400
         term = supabase.table('seminar_terms').select('id, max_capacity') \
@@ -4363,33 +4454,40 @@ def seminar_vote_counts():
             votes = supabase.table('seminar_votes') \
                 .select('session_id, members(name)') \
                 .in_('session_id', sess_ids).eq('attending', True).execute().data or []
-            for v in votes:
-                sid = v.get('session_id')
+            for vote in votes:
+                sid = vote.get('session_id')
                 if not sid:
                     continue
                 counts[sid] = counts.get(sid, 0) + 1
-                nm = (v.get('members') or {}).get('name')
-                if nm:
-                    attendees_by_session.setdefault(sid, []).append(nm)
+                member_name = (vote.get('members') or {}).get('name')
+                if member_name:
+                    attendees_by_session.setdefault(sid, []).append(member_name)
             for sid in attendees_by_session:
                 attendees_by_session[sid] = sorted(attendees_by_session[sid])
 
-        # 공개 가능 명단: count >= 4 인 회차만
-        public_attendees = {sid: nms for sid, nms in attendees_by_session.items() if counts.get(sid, 0) >= 4}
+        public_attendees = {
+            sid: names for sid, names in attendees_by_session.items()
+            if counts.get(sid, 0) >= 4
+        }
 
-        # 본인 확인된 경우: 본인이 yes 투표한 회차 명단도 함께 제공 (count 무관)
         voted_yes_attendees = {}
-        if student_id and name:
-            mres = supabase.table('members').select('id, name').eq('student_id', student_id).execute().data or []
-            cand = [m for m in mres if (m.get('name') or '').strip() == name]
-            if cand and sess_ids:
-                mid = cand[0]['id']
-                myv = supabase.table('seminar_votes').select('session_id') \
-                    .in_('session_id', sess_ids).eq('member_id', mid).eq('attending', True).execute().data or []
-                for x in myv:
-                    sid = x.get('session_id')
-                    if sid and sid in attendees_by_session:
-                        voted_yes_attendees[sid] = attendees_by_session[sid]
+        identity = session.get("seminar_vote_identity") or {}
+        now_timestamp = int(datetime.now(timezone.utc).timestamp())
+        identity_is_valid = (
+            viewer_token
+            and identity.get("viewer_token")
+            and secrets.compare_digest(viewer_token, identity["viewer_token"])
+            and identity.get("term_id") == str(term["id"])
+            and int(identity.get("expires_at") or 0) >= now_timestamp
+        )
+        if identity_is_valid and sess_ids:
+            member_id = identity.get("member_id")
+            my_votes = supabase.table('seminar_votes').select('session_id') \
+                .in_('session_id', sess_ids).eq('member_id', member_id).eq('attending', True).execute().data or []
+            for vote in my_votes:
+                sid = vote.get('session_id')
+                if sid and sid in attendees_by_session:
+                    voted_yes_attendees[sid] = attendees_by_session[sid]
 
         return jsonify({
             'status': 'success',
@@ -4399,8 +4497,9 @@ def seminar_vote_counts():
             'public_attendees': public_attendees,
             'voted_yes_attendees': voted_yes_attendees,
         })
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+    except Exception as exc:
+        app.logger.error("seminar_vote_counts error: %s", exc, exc_info=True)
+        return jsonify({'status': 'error', 'message': '신청 현황을 불러오지 못했습니다.'}), 500
 
 
 @app.route('/api/seminar_vote/submit', methods=['POST'])
@@ -4500,7 +4599,7 @@ def seminar_vote_submit():
         })
     except Exception as e:
         app.logger.error(f"seminar_vote_submit error: {e}", exc_info=True)
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'status': 'error', 'message': '신청 처리 중 오류가 발생했습니다.'}), 500
 
 
 # ==============================================================================

@@ -216,14 +216,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const escapeLogHtml = value => String(value).replace(/[&<>"']/g, char => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[char]));
             let logHtml = '<ul class="space-y-4">';
             logs.forEach(log => {
                 const date = new Date(log.created_at).toLocaleString('ko-KR');
                 const editor = log.members ? log.members.name : '알 수 없음';
                 logHtml += `<li class="border-b border-border-dark pb-2">
                                 <p class="text-sm font-semibold">
-                                    <span class="text-eva-green">${date}</span>
-                                    by <span class="text-yellow-400">${editor}</span>
+                                    <span class="text-eva-green">${escapeLogHtml(date)}</span>
+                                    by <span class="text-yellow-400">${escapeLogHtml(editor)}</span>
                                 </p>
                             </li>`;
             });
@@ -231,7 +234,8 @@ document.addEventListener('DOMContentLoaded', () => {
             historyList.innerHTML = logHtml;
 
         } catch (error) {
-            historyList.innerHTML = `<p class="text-red-500">오류: ${error.message}</p>`;
+            historyList.textContent = '수정 기록을 불러오지 못했습니다.';
+            historyList.className = 'text-red-500';
         }
     });
 
