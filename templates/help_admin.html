@@ -1,7 +1,9 @@
 <!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>관리자 운영 가이드</title><script src="https://cdn.tailwindcss.com"></script><link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}"><style>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>관리자 운영 가이드</title>{% include '_tailwind_head.html' %}
+<style>
 body{background:var(--paper,#faf6ec);color:var(--ink,#2a241b);font-family:Pretendard,-apple-system,BlinkMacSystemFont,sans-serif}.panel{background:var(--surface,#fffdf8);border:1px solid var(--line,#e5d7b8);border-radius:18px}.muted{color:var(--ink-soft,#6b6255)}.btn{border-radius:10px;padding:.68rem .9rem;font-size:.84rem;font-weight:800;display:inline-flex;align-items:center;justify-content:center}.primary{background:#3d5c2e;color:#fff}.soft{background:#e8efdd;color:#304923}.guide-nav a{display:block;padding:.65rem .75rem;border-radius:9px;font-size:.875rem;font-weight:800}.guide-nav a:hover{background:#e8efdd;color:#304923}.step{display:grid;grid-template-columns:1.8rem 1fr;gap:.7rem;align-items:start}.step b:first-child{display:grid;place-items:center;width:1.8rem;height:1.8rem;border-radius:999px;background:#e8efdd;color:#304923}.note{border-left:4px solid #71875e;background:#f1f5e9;padding:.85rem 1rem;border-radius:10px}.warn{border-left:4px solid #b67b2a;background:#fbf0d6;padding:.85rem 1rem;border-radius:10px}section{scroll-margin-top:6rem}.checklist li{position:relative;padding-left:1.7rem}.checklist li:before{content:'□';position:absolute;left:0;font-weight:900;color:#3d5c2e}
-</style></head>
+</style>    {% include '_app_theme_head.html' %}
+</head>
 <body>{% include '_header.html' %}{% include '_admin_sidebar.html' %}
 <main class="max-w-7xl mx-auto px-4 lg:px-8 py-7">
  <header class="mb-7 flex flex-wrap items-end justify-between gap-4"><div><p class="text-sm font-bold muted">운영진 전용</p><h1 class="text-3xl font-extrabold">관리자 운영 가이드</h1><p class="muted mt-2">처음 맡은 사람도 오늘 할 일부터 학기 마감까지 순서대로 처리할 수 있게 정리했습니다.</p></div><a class="btn soft" href="{{ url_for('help_member') }}">회원에게 보이는 이용 안내</a></header>

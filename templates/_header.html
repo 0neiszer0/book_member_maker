@@ -1,30 +1,9 @@
 {# =============================================================
    책 먹는 호반우 — 우드 톤 헤더 + 하단 탭바
-   - theme.css 자동 주입(한 번만)
+   - 테마·폰트는 각 문서 head의 _app_theme_head.html에서 정적 로드
    - 라우트·session·notification API 변경 없음
    - 마지막 부분에 기존 scroll-x-host(가로 스크롤 힌트) JS 보존
    ============================================================= #}
-
-{# --- 테마 CSS 자동 주입 (한 번만) --- #}
-<script>
-(function(){
-  if (!document.querySelector('link[data-wood-theme]')) {
-    var l = document.createElement('link');
-    l.rel = 'stylesheet';
-    l.href = '/static/theme.css';
-    l.setAttribute('data-wood-theme','1');
-    document.head.appendChild(l);
-  }
-  // Pretendard 폰트 자동 주입
-  if (!document.querySelector('link[data-wood-font]')) {
-    var f1 = document.createElement('link');
-    f1.rel = 'stylesheet';
-    f1.href = 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css';
-    f1.setAttribute('data-wood-font','1');
-    document.head.appendChild(f1);
-  }
-})();
-</script>
 
 <header class="wd-topbar">
   <div class="wd-topbar-inner">
@@ -49,26 +28,26 @@
     <div class="wd-top-actions">
       {% if session.user_role in ['admin', 'officer'] %}
         <div id="notification-dropdown" class="wd-dropdown">
-          <button id="notification-btn" type="button" class="wd-icon-btn" aria-label="알림">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          <button id="notification-btn" type="button" class="wd-icon-btn" aria-label="알림" aria-haspopup="true" aria-controls="notification-list" aria-expanded="false">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
               <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
             </svg>
             <span id="notification-dot" class="wd-dot hidden"></span>
           </button>
-          <div id="notification-list" class="wd-dropdown-panel"></div>
+          <div id="notification-list" class="wd-dropdown-panel" aria-labelledby="notification-btn"></div>
         </div>
       {% endif %}
 
       {% if session.user_role %}
         <div class="wd-dropdown" id="profile-dropdown">
-          <button id="profile-btn" type="button" class="wd-profile-btn" aria-label="프로필 메뉴">
+          <button id="profile-btn" type="button" class="wd-profile-btn" aria-label="프로필 메뉴" aria-haspopup="true" aria-controls="profile-list" aria-expanded="false">
             <span class="wd-avatar">{{ (session.user_name or '나')[0] }}</span>
             <span class="wd-profile-name">{{ session.user_name or '내 프로필' }}</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
-          <div id="profile-list" class="wd-dropdown-panel wd-dropdown-panel-sm">
+          <div id="profile-list" class="wd-dropdown-panel wd-dropdown-panel-sm" aria-labelledby="profile-btn">
             <a href="{{ url_for('my_page') }}" class="wd-menu-item">
               <span class="wd-menu-ico"><i data-lucide="user" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>마이페이지
             </a>
@@ -136,16 +115,16 @@
   <a href="{{ url_for('seminars') }}" class="wd-tb {% if request.endpoint == 'seminars' %}wd-tb-on{% endif %}">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 9h18"/><rect x="3" y="4" width="18" height="17" rx="2"/></svg><span>세미나</span>
   </a>
-  <a href="{{ url_for('engagement_now') }}" class="wd-tb {% if request.endpoint and (request.endpoint.startswith('book_suggestion') or request.endpoint == 'engagement_now') %}wd-tb-on{% endif %}">
+  <a href="{{ url_for('engagement_now') }}" class="wd-tb {% if request.endpoint and (request.endpoint.startswith('book_suggest') or request.endpoint in ['engagement_now', 'seminar_review_form', 'brick_application_form', 'brick_review_form']) %}wd-tb-on{% endif %}">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg><span>참여</span>
   </a>
   <a href="{{ url_for('my_page') }}" class="wd-tb {% if request.endpoint == 'my_page' %}wd-tb-on{% endif %}">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg><span>내 활동</span>
   </a>
-  <a href="#" class="wd-tb wd-tb-more" onclick="document.getElementById('profile-btn')?.click();return false">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
-    <span>더보기</span>
-  </a>
+  <button type="button" id="mobile-more-btn" class="wd-tb wd-tb-more" aria-labelledby="mobile-more-label" aria-haspopup="true" aria-controls="profile-list" aria-expanded="false">
+    <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+    <span id="mobile-more-label">더보기</span>
+  </button>
 </nav>
 {% endif %}
 
@@ -312,6 +291,7 @@
   .wd-tb{
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
     text-decoration:none;color:var(--ink-faint,#9C8E78);
+    border:0;background:transparent;font-family:inherit;cursor:pointer;
     font-size:10.5px;font-weight:500;padding:6px 0;position:relative;
     min-height:48px;pointer-events:auto;touch-action:manipulation;
     -webkit-tap-highlight-color:rgba(61,92,46,.12);
@@ -383,34 +363,92 @@
 (function(){
   document.addEventListener('DOMContentLoaded', function(){
     /* ----- 드롭다운 토글 ----- */
+    function dropdownButton(panel){
+      return document.getElementById(panel.id === 'profile-list' ? 'profile-btn' : 'notification-btn');
+    }
+    function firstDropdownItem(panel){
+      return panel.querySelector('a, button:not([disabled]), [tabindex]:not([tabindex="-1"])');
+    }
+    function setDropdown(btn, panel, open, focusFirst){
+      panel.classList.toggle('show', open);
+      btn.setAttribute('aria-expanded', String(open));
+      if (panel.id === 'profile-list'){
+        var more = document.getElementById('mobile-more-btn');
+        if (more) more.setAttribute('aria-expanded', String(open));
+      }
+      if (open && focusFirst){
+        var first = firstDropdownItem(panel);
+        if (first) first.focus();
+      }
+    }
+    function closeOtherDropdowns(except){
+      document.querySelectorAll('.wd-dropdown-panel.show').forEach(function(panel){
+        if (panel !== except){
+          var owner = dropdownButton(panel);
+          if (owner) setDropdown(owner, panel, false, false);
+        }
+      });
+    }
     function bindDropdown(btnId, panelId){
       var btn = document.getElementById(btnId);
       var panel = document.getElementById(panelId);
       if (!btn || !panel) return;
       btn.addEventListener('click', function(e){
         e.stopPropagation();
-        // close others
-        document.querySelectorAll('.wd-dropdown-panel.show').forEach(function(p){
-          if (p !== panel) p.classList.remove('show');
-        });
-        panel.classList.toggle('show');
-        if (panel.classList.contains('show') && btnId === 'notification-btn'){
+        var open = !panel.classList.contains('show');
+        closeOtherDropdowns(panel);
+        setDropdown(btn, panel, open, false);
+        if (open && btnId === 'notification-btn'){
           window.__fetchWoodNotifications && window.__fetchWoodNotifications();
+        }
+      });
+      btn.addEventListener('keydown', function(e){
+        if (e.key === 'ArrowDown'){
+          e.preventDefault(); closeOtherDropdowns(panel); setDropdown(btn, panel, true, true);
+        } else if (e.key === 'Escape'){
+          setDropdown(btn, panel, false, false);
+        }
+      });
+      panel.addEventListener('keydown', function(e){
+        if (e.key === 'Escape'){
+          e.preventDefault(); setDropdown(btn, panel, false, false); btn.focus();
         }
       });
     }
     bindDropdown('notification-btn','notification-list');
     bindDropdown('profile-btn','profile-list');
-    document.addEventListener('click', function(e){
-      document.querySelectorAll('.wd-dropdown-panel.show').forEach(function(p){
-        if (!p.parentElement.contains(e.target)) p.classList.remove('show');
+    var mobileMore = document.getElementById('mobile-more-btn');
+    if (mobileMore){
+      mobileMore.addEventListener('click', function(e){
+        e.stopPropagation();
+        var btn = document.getElementById('profile-btn');
+        var panel = document.getElementById('profile-list');
+        if (!btn || !panel) return;
+        var open = !panel.classList.contains('show');
+        closeOtherDropdowns(panel); setDropdown(btn, panel, open, open);
       });
+    }
+    document.addEventListener('click', function(e){
+      document.querySelectorAll('.wd-dropdown-panel.show').forEach(function(panel){
+        if (!panel.parentElement.contains(e.target)){
+          var owner = dropdownButton(panel);
+          if (owner) setDropdown(owner, panel, false, false);
+        }
+      });
+    });
+    document.addEventListener('keydown', function(e){
+      if (e.key !== 'Escape') return;
+      var panel = document.querySelector('.wd-dropdown-panel.show');
+      if (!panel) return;
+      var owner = dropdownButton(panel);
+      if (owner){ setDropdown(owner, panel, false, false); owner.focus(); }
     });
 
     /* ----- 탭바 칸 수 자동 계산 ----- */
     var tabbar = document.querySelector('.wd-tabbar');
     if (tabbar){
-      var n = tabbar.querySelectorAll('a').length;
+      var n = tabbar.querySelectorAll('.wd-tb').length;
+      tabbar.querySelectorAll('.wd-tb-on').forEach(function(item){ item.setAttribute('aria-current', 'page'); });
       tabbar.style.setProperty('--wd-tab-count', n);
 
       // Keep the mobile navigation tappable while browsing, then move it out
@@ -525,7 +563,8 @@
         }
       })
       .catch(function(err){
-        alert('처리 실패: ' + err.message);
+        if (window.wdToast) window.wdToast('처리 실패: ' + err.message, 'error');
+        else alert('처리 실패: ' + err.message);
         b.disabled = false; b.textContent = (act === 'approve' ? '승인' : '거절');
       });
     });
@@ -575,5 +614,6 @@
     });
 })();
 </script>
+{% include '_app_feedback.html' %}
 {% include '_bug_report_widget.html' %}
 {% include '_icons.html' %}

@@ -15,3 +15,5 @@ htmlcov
 data
 testing
 *.csv
+
+node_modules

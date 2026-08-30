@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ member.name }}님의 프로필</title>
-    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    {% include '_tailwind_head.html' %}
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root { --eva-purple: #7A5A3A; --eva-green: #3D5C2E; --bg-dark: #FAF6EC; --card-dark: #FFFCF3; --text-light: #2A241B; --border-dark: #C9B38A; }
@@ -18,6 +18,7 @@
         .profile-content a { color: #3D5C2E; text-decoration: underline; }
         .profile-content strong { color: white; }
     </style>
+    {% include '_app_theme_head.html' %}
 </head>
 <body class="p-4 md:p-8">
     <div class="container mx-auto max-w-4xl">
@@ -29,7 +30,7 @@
         <div class="eva-card p-6 md:p-8 rounded-lg">
             <div class="flex justify-between items-start mb-6">
                 <div class="flex items-center">
-                    <img src="{{ member.profile_pic or 'https://via.placeholder.com/150' }}" alt="{{ member.name }}" class="w-20 h-20 rounded-full mr-5 border-4 border-eva-purple">
+                    {% if member.profile_pic %}<img src="{{ member.profile_pic }}" alt="{{ member.name }}" decoding="async" class="w-20 h-20 rounded-full mr-5 border-4 border-eva-purple object-cover">{% else %}<div class="w-20 h-20 rounded-full mr-5 border-4 border-eva-purple bg-[#f2ebd8] text-[#3d5c2e] flex items-center justify-center text-2xl font-extrabold" aria-hidden="true">{{ (member.name or '회')[0] }}</div>{% endif %}
                     <div>
                         <h2 class="text-2xl font-bold">{{ member.name }}</h2>
                     </div>

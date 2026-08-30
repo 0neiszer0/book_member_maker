@@ -1,0 +1,33 @@
+<div id="wd-toast-region" class="wd-toast-region" role="status" aria-live="polite" aria-atomic="true"></div>
+<style>
+  .wd-toast-region{position:fixed;right:18px;bottom:76px;z-index:1100;display:grid;gap:8px;pointer-events:none;max-width:min(92vw,420px)}
+  .wd-toast{padding:12px 15px;border:1px solid #c9b38a;border-radius:12px;background:#fffdf8;color:#2a241b;font:700 14px/1.45 Pretendard,-apple-system,sans-serif;box-shadow:0 12px 34px rgba(45,30,10,.2);opacity:0;transform:translateY(8px);transition:opacity .16s ease,transform .16s ease}
+  .wd-toast.show{opacity:1;transform:none}.wd-toast.error{border-color:#d7a28f;color:#8f3b27}.wd-toast.success{border-color:#a9bd91;color:#304923}
+  @media(max-width:768px){.wd-toast-region{right:12px;left:12px;bottom:140px;max-width:none}}
+</style>
+<script>
+(function(){
+  window.wdToast = function(message, kind, duration){
+    var region = document.getElementById('wd-toast-region');
+    if (!region || !message) return;
+    var toast = document.createElement('div');
+    toast.className = 'wd-toast ' + (kind || 'success');
+    toast.textContent = String(message);
+    region.appendChild(toast);
+    requestAnimationFrame(function(){ toast.classList.add('show'); });
+    window.setTimeout(function(){
+      toast.classList.remove('show');
+      window.setTimeout(function(){ toast.remove(); }, 180);
+    }, duration || 2600);
+  };
+  window.wdReloadWithToast = function(message, kind){
+    try { sessionStorage.setItem('wd-pending-toast', JSON.stringify({message:String(message),kind:kind || 'success'})); } catch (_) {}
+    window.location.reload();
+  };
+  try {
+    var pending = JSON.parse(sessionStorage.getItem('wd-pending-toast') || 'null');
+    sessionStorage.removeItem('wd-pending-toast');
+    if (pending && pending.message) window.setTimeout(function(){ window.wdToast(pending.message, pending.kind); }, 80);
+  } catch (_) {}
+})();
+</script>

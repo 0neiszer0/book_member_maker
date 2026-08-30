@@ -19,6 +19,13 @@ jobs:
       SUPABASE_SERVICE_KEY: ci-test-only
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run build:css
+      - run: git diff --exit-code -- static/tailwind.css
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

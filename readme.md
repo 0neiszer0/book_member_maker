@@ -57,7 +57,17 @@
     pip install -r requirements.txt
     ```
 
-3.  **.env 파일 설정**
+3.  **프론트 정적 자산 빌드**
+
+    Tailwind 클래스나 템플릿 스타일을 변경했다면 고정된 Node 개발 의존성으로
+    CSS를 다시 생성합니다. 생성된 `static/tailwind.css`도 함께 커밋합니다.
+
+    ```bash
+    npm ci
+    npm run build:css
+    ```
+
+4.  **.env 파일 설정**
     프로젝트 루트에 `.env` 파일을 생성하고 Supabase 및 카카오 로그인 관련 환경 변수를 입력합니다.
 
     ```env
@@ -69,7 +79,7 @@
     # ... 기타 필요한 환경 변수
     ```
 
-4.  **애플리케이션 실행**
+5.  **애플리케이션 실행**
 
     ```bash
     flask run

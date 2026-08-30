@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>처음 이용하는 분을 위한 안내 - 책 먹는 호반우</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
-  <style>
+  {% include '_tailwind_head.html' %}
+<style>
     body{background:var(--paper,#faf6ec);color:var(--ink,#2a241b);font-family:Pretendard,-apple-system,BlinkMacSystemFont,sans-serif}.panel{background:var(--surface,#fffdf8);border:1px solid var(--line,#e5d7b8);border-radius:18px}.muted{color:var(--ink-soft,#6b6255)}.btn{border-radius:10px;padding:.7rem 1rem;font-size:.875rem;font-weight:800;display:inline-flex;align-items:center;justify-content:center}.primary{background:#3d5c2e;color:#fff}.soft{background:#e8efdd;color:#304923}.step{display:grid;grid-template-columns:1.9rem 1fr;gap:.75rem;align-items:start}.step-num{display:grid;place-items:center;width:1.9rem;height:1.9rem;border-radius:999px;background:#e8efdd;color:#304923;font-weight:900}.note{border-left:4px solid #71875e;background:#f1f5e9;padding:.85rem 1rem;border-radius:10px}section{scroll-margin-top:5.5rem}details summary{cursor:pointer;font-weight:800}
   </style>
+    {% include '_app_theme_head.html' %}
 </head>
 <body>{% include '_header.html' %}
 <main class="max-w-5xl mx-auto px-4 sm:px-6 py-7">

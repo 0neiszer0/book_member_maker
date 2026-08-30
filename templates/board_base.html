@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}게시판{% endblock %} - 책 먹는 호반우</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    {% include '_tailwind_head.html' %}
+    {% include '_app_theme_head.html' %}
 </head>
 <body class="min-h-screen">
     {% include '_header.html' %}

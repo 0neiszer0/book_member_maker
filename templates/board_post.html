@@ -7,7 +7,7 @@
     <h1 class="text-2xl font-bold">{{ post.title }}</h1>
     <div class="text-sm text-gray-500 mt-2">{{ post.author.name }} · {{ post.created_at|datetime('%Y.%m.%d %H:%M') }}</div>
     <div class="mt-7 whitespace-pre-wrap leading-7">{{ post.content }}</div>
-    {% if attachments %}<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">{% for item in attachments %}{% if item.signed_url %}<a href="{{ item.signed_url }}" target="_blank"><img src="{{ item.signed_url }}" alt="{{ item.original_name }}" class="w-full max-h-96 object-contain rounded-xl border bg-white"></a>{% endif %}{% endfor %}</div>{% endif %}
+    {% if attachments %}<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">{% for item in attachments %}{% if item.signed_url %}<a href="{{ item.signed_url }}" target="_blank"><img src="{{ item.signed_url }}" alt="{{ item.original_name }}" loading="lazy" decoding="async" class="w-full max-h-96 object-contain rounded-xl border bg-white"></a>{% endif %}{% endfor %}</div>{% endif %}
     {% if can_edit %}<div class="flex gap-2 justify-end mt-6"><a href="{{ url_for('boards.edit', slug=board.slug, post_id=post.id) }}" class="wood-chip">수정</a><button onclick="deletePost()" class="wood-chip warn">삭제</button></div>{% endif %}
 </article>
 {% if board.allow_comments %}

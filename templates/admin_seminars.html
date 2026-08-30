@@ -61,9 +61,8 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>세미나 운영</title><script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
-  <style>
+  <title>세미나 운영</title>{% include '_tailwind_head.html' %}
+<style>
     body{background:var(--paper,#faf6ec);color:var(--ink,#2a241b);font-family:Pretendard,-apple-system,BlinkMacSystemFont,sans-serif}
     .panel{background:var(--surface,#fffdf8);border:1px solid var(--line,#e5d7b8);border-radius:18px}
     .field{width:100%;border:1px solid var(--line,#e5d7b8);border-radius:10px;background:#fff;padding:.65rem .75rem}
@@ -76,6 +75,7 @@
     .review-entry:first-child{border-top:0;padding-top:0}
     .review-content{white-space:pre-wrap;line-height:1.75;color:var(--ink,#2a241b)}
   </style>
+    {% include '_app_theme_head.html' %}
 </head>
 <body>{% include '_header.html' %}{% include '_admin_sidebar.html' %}
 <main class="max-w-[1500px] mx-auto px-4 lg:px-8 py-7">

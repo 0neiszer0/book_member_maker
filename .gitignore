@@ -8,3 +8,7 @@ data/*.json
 data/*.csv
 .claude/
 .idea/
+
+
+# Frontend build dependencies are reproducible from package-lock.json.
+node_modules/

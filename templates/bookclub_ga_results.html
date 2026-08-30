@@ -5,10 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>독서모임 조 편성 결과 (GA)</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    {% include '_tailwind_head.html' %}
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <link rel="stylesheet" href="/static/theme.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap"
@@ -119,6 +118,9 @@
             top: 15px;
             right: 35px;
             color: #f1f1f1;
+            border: 0;
+            background: transparent;
+            padding: 0;
             font-size: 40px;
             font-weight: bold;
             transition: 0.3s;
@@ -129,6 +131,7 @@
             color: #bbb;
         }
     </style>
+    {% include '_app_theme_head.html' %}
 </head>
 
 <body class="min-h-screen">
@@ -239,9 +242,9 @@
         </div>
     </div>
 
-    <div id="image-modal">
-        <span id="modal-close">&times;</span>
-        <img id="image-modal-content">
+    <div id="image-modal" role="dialog" aria-modal="true" aria-label="조 편성 결과 이미지">
+        <button type="button" id="modal-close" aria-label="이미지 닫기">&times;</button>
+        <img id="image-modal-content" alt="조 편성 결과 미리보기">
         <div id="modal-caption">이미지를 길게 누르거나 우클릭하여 저장/공유하세요.</div>
         <a id="modal-download" download="책먹는호반우-조편성.png">PNG 이미지 다운로드</a>
     </div>
