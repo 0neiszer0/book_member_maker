@@ -9,6 +9,7 @@
         .edit-field { width: 100%; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); padding: .65rem .75rem; }
         .edit-label { display: block; font-size: .78rem; font-weight: 800; color: var(--ink-soft); }
     </style>
+    {% include '_app_theme_head.html' %}
 </head>
 <body class="min-h-screen">
     {% include '_header.html' %}
@@ -18,13 +19,13 @@
         {{ term_filter(terms, selected_term_id, 'records_seminars') }}
 
         <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-3">
-            <h1 class="text-2xl font-bold text-eva-green">세미나 진행 현황 ({{ history|length }}회)</h1>
+            <h1 class="text-2xl font-bold text-eva-green">세미나 진행 현황 (총 {{ total_history }}회)</h1>
             <div class="flex gap-2 flex-wrap">
                 <a href="{{ url_for('manual_entry') }}"
                     class="bg-eva-purple text-white font-bold py-2 px-3 rounded text-sm hover:opacity-80">
                     + 과거 세미나 수동 추가
                 </a>
-                <input type="text" id="seminarSearch" placeholder="도서명·날짜 검색"
+                <input type="search" id="seminarSearch" aria-label="현재 페이지의 세미나 기록 검색" placeholder="현재 페이지 도서명·날짜 검색"
                     class="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm w-full md:w-64">
             </div>
         </div>
@@ -78,6 +79,14 @@
             </div>
         </details>
         {% endfor %}
+
+        {% if total_pages > 1 %}
+        <nav class="mt-5 flex items-center justify-center gap-3" aria-label="세미나 기록 페이지">
+            {% if page > 1 %}<a class="wood-chip" href="{{ url_for('records_seminars', term_id=selected_term_id, page=page-1) }}">← 이전 100개</a>{% endif %}
+            <span class="text-sm text-gray-500">{{ page }} / {{ total_pages }} 페이지</span>
+            {% if page < total_pages %}<a class="wood-chip" href="{{ url_for('records_seminars', term_id=selected_term_id, page=page+1) }}">다음 100개 →</a>{% endif %}
+        </nav>
+        {% endif %}
 
         <div class="mt-4 text-xs text-gray-500">‘한 번에 편집’에서 도서명·날짜·발제자·조 편성을 함께 확인하고 저장할 수 있습니다.</div>
     </div>

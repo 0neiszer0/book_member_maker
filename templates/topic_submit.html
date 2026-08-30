@@ -5,11 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ event.book_title }} - 발제문 제출</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    {% include '_tailwind_head.html' %}
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}" data-wood-theme="1">
-    <style>
+<style>
         :root {
             --eva-purple: #7A5A3A;
             --eva-green: #3D5C2E;
@@ -100,6 +99,7 @@
         }
         #writeCard { color: #2A241B; }
     </style>
+    {% include '_app_theme_head.html' %}
 </head>
 
 <body class="p-4 md:p-8">
@@ -182,19 +182,19 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                    <label class="text-xs text-gray-400 block mb-1">이름</label>
+                    <label for="authorName" class="text-xs text-gray-400 block mb-1">이름</label>
                     <input type="text" id="authorName" class="eva-input w-full rounded py-2 px-3 text-sm" required
                         placeholder="홍길동"
                         {% if user_name %}value="{{ user_name }}" readonly style="cursor:not-allowed"{% endif %}>
                 </div>
                 <div>
-                    <label class="text-xs text-gray-400 block mb-1">소속 (학과 등)</label>
+                    <label for="department" class="text-xs text-gray-400 block mb-1">소속 (학과 등)</label>
                     <input type="text" id="department" class="eva-input w-full rounded py-2 px-3 text-sm" required
                         placeholder="예: 경영학과"
                         {% if user_department %}value="{{ user_department }}"{% endif %}>
                 </div>
                 <div>
-                    <label class="text-xs text-gray-400 block mb-1">
+                    <label for="studentId" class="text-xs text-gray-400 block mb-1">
                         학번 <span class="text-eva-green">*</span>
                     </label>
                     <input type="text" id="studentId" class="eva-input w-full rounded py-2 px-3 text-sm"
@@ -204,7 +204,7 @@
                 </div>
                 {% if not user_name %}
                 <div>
-                    <label class="text-xs text-gray-400 block mb-1">
+                    <label for="pinCode" class="text-xs text-gray-400 block mb-1">
                         PIN 4자리 <span class="text-yellow-400">(비회원만 입력)</span>
                     </label>
                     <input type="password" id="pinCode" class="eva-input w-full rounded py-2 px-3 text-sm"

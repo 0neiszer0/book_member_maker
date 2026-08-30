@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>수동 조 편성 기록</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    {% include '_tailwind_head.html' %}
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
     <style>
@@ -20,9 +20,10 @@
         #image-modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.9); justify-content: center; align-items: center; }
         #image-modal-content { max-width: 90%; max-height: 80%; border-radius: 8px; }
         #modal-caption { text-align: center; color: #ccc; padding: 10px 0; font-size: 1rem;}
-        #modal-close { position: absolute; top: 15px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; transition: 0.3s; cursor: pointer; }
+        #modal-close { position: absolute; top: 15px; right: 35px; color: #f1f1f1; border: 0; background: transparent; padding: 0; font-size: 40px; font-weight: bold; transition: 0.3s; cursor: pointer; }
         #modal-close:hover { color: #bbb; }
     </style>
+    {% include '_app_theme_head.html' %}
 </head>
 <body class="p-4 md:p-8">
     <div class="container mx-auto max-w-7xl">
@@ -84,16 +85,16 @@
     <dialog id="preview-dialog" class="bg-card-dark text-text-light border border-border-dark rounded-lg p-0 w-full max-w-4xl">
         <header class="p-4 border-b border-border-dark flex justify-between items-center">
             <h2 class="text-xl font-bold text-eva-purple">편성 결과 미리보기</h2>
-            <button id="preview-close-btn" class="text-2xl hover:text-red-500">&times;</button>
+            <button type="button" id="preview-close-btn" class="text-2xl hover:text-red-500" aria-label="미리보기 닫기">&times;</button>
         </header>
         <div id="preview-content" class="p-6 max-h-[70vh] overflow-y-auto">
             <p>데이터를 분석 중입니다...</p>
         </div>
     </dialog>
 
-    <div id="image-modal">
-        <span id="modal-close">&times;</span>
-        <img id="image-modal-content">
+    <div id="image-modal" role="dialog" aria-modal="true" aria-label="수동 편성 결과 이미지">
+        <button type="button" id="modal-close" aria-label="이미지 닫기">&times;</button>
+        <img id="image-modal-content" alt="수동 조 편성 결과 미리보기">
         <div id="modal-caption">이미지를 길게 누르거나 우클릭하여 저장/공유하세요.</div>
     </div>
 

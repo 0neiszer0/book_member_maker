@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ doc.title }} - 책 먹는 호반우</title>
-    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    {% include '_tailwind_head.html' %}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Noto+Serif+KR:wght@400;700&display=swap" rel="stylesheet">
@@ -26,7 +26,7 @@
         .wiki-content a { color: var(--wiki-link-blue); text-decoration: underline; }
         .wiki-content ul { list-style-type: disc; margin-left: 1.5rem; }
         .wiki-content ol { list-style-type: decimal; margin-left: 1.5rem; }
-        .wiki-content strong { font-weight: 700; color: white; }
+        .wiki-content strong { font-weight: 700; color: var(--ink); }
 
         /* templates/doc_view.html 의 <style> 태그 안에 추가 */
 
@@ -80,6 +80,7 @@
             border-radius: 0 0.5rem 0.5rem 0;
         }
     </style>
+    {% include '_app_theme_head.html' %}
 </head>
 <body class="p-4 md:p-8">
     <div class="container mx-auto max-w-4xl">

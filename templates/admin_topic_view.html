@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ event.book_title }} - 발제문 모음</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    {% include '_tailwind_head.html' %}
     <link
         href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap"
         rel="stylesheet">
@@ -69,6 +69,7 @@
             font-weight: 800;
         }
     </style>
+    {% include '_app_theme_head.html' %}
 </head>
 
 <body class="p-4 md:p-8">

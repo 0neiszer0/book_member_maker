@@ -63,6 +63,16 @@ class BugReportTests(unittest.TestCase):
         self.assertIn('REVOKE ALL ON public.bug_reports FROM anon, authenticated', self.migration)
         self.assertIn('GRANT ALL ON public.bug_reports TO service_role', self.migration)
 
+
+    def test_widget_is_included_once_by_the_shared_header(self):
+        header = (ROOT / 'templates' / '_header.html').read_text(encoding='utf-8')
+        engagement_base = (ROOT / 'templates' / 'engagement_base.html').read_text(
+            encoding='utf-8'
+        )
+        include = "{% include '_bug_report_widget.html' %}"
+        self.assertEqual(header.count(include), 1)
+        self.assertNotIn(include, engagement_base)
+
     def test_widget_is_visible_and_does_not_send_path_tokens(self):
         self.assertIn('버그 제보', self.widget)
         self.assertIn("fetch('/api/bug-reports'", self.widget)

@@ -23,9 +23,9 @@
 </section>
 <script>
 async function sendForm(url, data){const r=await fetch(url,{method:'POST',body:data});const j=await r.json();if(!r.ok)throw new Error(j.error||'처리하지 못했습니다.');return j}
-document.querySelectorAll('.copy').forEach(b=>b.onclick=async()=>{await navigator.clipboard.writeText(b.dataset.url);b.textContent='복사됨'});
-document.querySelector('#brick-form')?.addEventListener('submit',async e=>{e.preventDefault();try{const j=await sendForm('/api/admin/brick-projects',new FormData(e.target));await navigator.clipboard.writeText(j.url);alert('모집 링크를 열고 복사했습니다.');location.reload()}catch(x){alert(x.message)}});
-document.querySelectorAll('.project-status').forEach(b=>b.onclick=async()=>{try{const f=new FormData();f.set('status',b.dataset.status);await sendForm(`/api/admin/brick-projects/${b.dataset.id}/status`,f);location.reload()}catch(x){alert(x.message)}});
-document.querySelectorAll('.application-status').forEach(b=>b.onclick=async()=>{try{const f=new FormData();f.set('status',b.dataset.status);await sendForm(`/api/admin/brick-applications/${b.dataset.id}/status`,f);location.reload()}catch(x){alert(x.message)}});
+document.querySelectorAll('.copy').forEach(b=>b.onclick=async()=>{try{await navigator.clipboard.writeText(b.dataset.url);b.textContent='복사됨';window.wdToast?.('링크를 복사했습니다.')}catch(x){window.wdToast?.('링크를 복사하지 못했습니다.','error')}});
+document.querySelector('#brick-form')?.addEventListener('submit',async e=>{e.preventDefault();try{const j=await sendForm('/api/admin/brick-projects',new FormData(e.target));await navigator.clipboard.writeText(j.url);window.wdReloadWithToast('모집을 열고 링크를 복사했습니다.')}catch(x){window.wdToast?.(x.message,'error')}});
+document.querySelectorAll('.project-status').forEach(b=>b.onclick=async()=>{try{const f=new FormData();f.set('status',b.dataset.status);await sendForm(`/api/admin/brick-projects/${b.dataset.id}/status`,f);window.wdReloadWithToast('프로젝트 상태를 변경했습니다.')}catch(x){window.wdToast?.(x.message,'error')}});
+document.querySelectorAll('.application-status').forEach(b=>b.onclick=async()=>{try{const f=new FormData();f.set('status',b.dataset.status);await sendForm(`/api/admin/brick-applications/${b.dataset.id}/status`,f);window.wdReloadWithToast('지원자 상태를 변경했습니다.')}catch(x){window.wdToast?.(x.message,'error')}});
 </script>
 {% endblock %}

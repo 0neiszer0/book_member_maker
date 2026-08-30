@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>멤버 프로필</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    {% include '_tailwind_head.html' %}
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root { --eva-purple: #7A5A3A; --eva-green: #3D5C2E; --bg-dark: #FAF6EC; --card-dark: #FFFCF3; --text-light: #2A241B; --border-dark: #C9B38A; }
@@ -13,6 +13,7 @@
         .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); transition: all 0.2s; }
         .eva-card:hover { transform: translateY(-4px); border-color: var(--eva-green); }
     </style>
+    {% include '_app_theme_head.html' %}
 </head>
 <body class="p-4 md:p-8">
     <div class="container mx-auto max-w-5xl">
@@ -26,7 +27,7 @@
             <a href="{{ url_for('profile_detail_page', member_id=member.id) }}" class="block">
                 <div class="eva-card p-6 rounded-lg h-full flex flex-col">
                     <div class="flex items-center mb-4">
-                        <img src="{{ member.profile_pic or 'https://via.placeholder.com/150' }}" alt="{{ member.name }}" class="w-16 h-16 rounded-full mr-4 border-2 border-eva-purple">
+                        {% if member.profile_pic %}<img src="{{ member.profile_pic }}" alt="{{ member.name }}" loading="lazy" decoding="async" class="w-16 h-16 rounded-full mr-4 border-2 border-eva-purple object-cover">{% else %}<div class="w-16 h-16 rounded-full mr-4 border-2 border-eva-purple bg-[#f2ebd8] text-[#3d5c2e] flex items-center justify-center text-xl font-extrabold" aria-hidden="true">{{ (member.name or '회')[0] }}</div>{% endif %}
                         <div>
                             <h2 class="text-xl font-bold">{{ member.name }}</h2>
                         </div>

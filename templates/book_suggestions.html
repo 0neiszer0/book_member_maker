@@ -5,7 +5,7 @@
 {% for item in suggestions %}
 <a class="eg-panel eg-card" href="{{ url_for('book_suggestion_detail', suggestion_id=item.id) }}">
   <div class="eg-book">
-    {% if item.book.cover_path %}<img class="eg-cover" src="{{ engagement_image_url(item.book.cover_path) }}" alt="{{ item.book.title }} 표지">{% else %}<div class="eg-cover"></div>{% endif %}
+    {% if item.book.cover_path %}<img class="eg-cover" src="{{ engagement_image_url(item.book.cover_path) }}" alt="{{ item.book.title }} 표지" loading="lazy" decoding="async">{% else %}<div class="eg-cover"></div>{% endif %}
     <div><span class="eg-chip">{% if 'brick_book' in item.targets %}벽돌책{% endif %}{% if 'curriculum' in item.targets %}{% if 'brick_book' in item.targets %} · {% endif %}커리큘럼{% endif %}</span><h2>{{ item.book.title }}</h2><div class="eg-muted">{{ item.book.author }}</div></div>
   </div>
   <p class="eg-muted">{{ item.note[:160] }}{% if item.note|length > 160 %}…{% endif %}</p>

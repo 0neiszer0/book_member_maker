@@ -2,9 +2,8 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>회원 관리</title><script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
-  <style>
+  <title>회원 관리</title>{% include '_tailwind_head.html' %}
+<style>
     body{background:var(--paper,#faf6ec);color:var(--ink,#2a241b);font-family:Pretendard,-apple-system,BlinkMacSystemFont,sans-serif}
     .panel{background:var(--surface,#fffdf8);border:1px solid var(--line,#e5d7b8);border-radius:18px}.muted{color:var(--ink-soft,#6b6255)}
     .field{width:100%;border:1px solid var(--line,#e5d7b8);border-radius:10px;background:#fff;padding:.65rem .75rem;color:#2a241b}
@@ -18,6 +17,7 @@
     .topic-count{color:#81551a;background:#f7e8c6;border:1px solid #ddbd7e;border-radius:8px;padding:.2rem .5rem;font-weight:850}
     dialog::backdrop{background:rgba(42,36,27,.48)}
   </style>
+    {% include '_app_theme_head.html' %}
 </head>
 <body>{% include '_header.html' %}{% include '_admin_sidebar.html' %}
 {% set ns=namespace(active=0,dormant=0,inactive=0,incomplete=0) %}{% for m in members %}{% set st=m.member_status or 'active' %}{% if st=='active' %}{% set ns.active=ns.active+1 %}{% elif st=='dormant' %}{% set ns.dormant=ns.dormant+1 %}{% else %}{% set ns.inactive=ns.inactive+1 %}{% endif %}{% if not m.student_id or not m.department or not m.recruiting_class %}{% set ns.incomplete=ns.incomplete+1 %}{% endif %}{% endfor %}
@@ -43,10 +43,11 @@
   <div class="panel p-4 mb-4 grid md:grid-cols-[1fr_auto] gap-3"><input id="member-search" class="field" placeholder="이름·학번·학과로 검색"><button class="btn soft" id="show-all">전체 상태 보기</button></div>
 
   <section class="panel overflow-hidden">
+    <p class="px-4 pt-3 text-xs muted">&#xC138;&#xBBF8;&#xB098;&#xB098; &#xBC1C;&#xC81C; &#xD69F;&#xC218;&#xB294; &#xACFC;&#xAC70; &#xAE30;&#xB85D;&#xC5D0; &#xC800;&#xC7A5;&#xB41C; &#xC774;&#xB984; &#xAE30;&#xC900;&#xC785;&#xB2C8;&#xB2E4;. &#xB3D9;&#xBA85;&#xC774;&#xC778;&#xC740; &#xC798;&#xBABB; &#xADC0;&#xC18D;&#xD558;&#xC9C0; &#xC54A;&#xACE0; &#x2018;&#x2014;&#x2019;&#xB85C; &#xD45C;&#xC2DC;&#xD569;&#xB2C8;&#xB2E4;.</p>
     <div class="overflow-x-auto"><table class="w-full text-sm min-w-[1160px]"><thead class="bg-[#f2ebd8] text-left"><tr><th class="p-3">회원</th><th class="p-3">학번·학과</th><th class="p-3 text-center">기수</th><th class="p-3 text-center">세미나</th><th class="p-3 text-center">발제</th><th class="p-3 text-center">벽돌책</th><th class="p-3 text-center">소모임</th><th class="p-3">활동 상태 <span class="block text-[11px] font-normal muted">버튼을 누르면 즉시 저장</span></th><th class="p-3 text-right">관리</th></tr></thead>
     <tbody id="member-list">{% for m in members %}{% set st=m.member_status or 'active' %}<tr class="member-row border-t border-[#eee3cc] hover:bg-[#fbf7ed]" data-status="{{ st }}" data-incomplete="{{ '1' if not m.student_id or not m.department or not m.recruiting_class else '0' }}" data-search="{{ ((m.name or '') ~ ' ' ~ (m.student_id or '') ~ ' ' ~ (m.department or ''))|lower }}">
       <td class="p-3"><div class="font-extrabold">{{ m.name }}</div><div class="text-xs muted mt-1">{% if m.role=='admin' %}관리자{% elif m.role=='officer' %}운영진{% else %}회원{% endif %}{% if not m.email %} · 이메일 없음{% endif %}</div></td>
-      <td class="p-3"><div>{{ m.student_id or '학번 미입력' }}</div><div class="text-xs muted">{{ m.department or '학과 미입력' }}</div></td><td class="p-3 text-center">{{ m.recruiting_class or '-' }}</td><td class="p-3 text-center font-extrabold text-[#3d5c2e]">{{ m.seminar_count or 0 }}</td><td class="p-3 text-center"><span class="topic-count">{{ m.facilitator_count or 0 }}</span></td><td class="p-3 text-center font-bold text-[#8a5c2a]">{{ m.brick_count or 0 }}</td><td class="p-3 text-center font-bold text-[#4d6572]">{{ m.study_count or 0 }}</td>
+      <td class="p-3"><div>{{ m.student_id or '학번 미입력' }}</div><div class="text-xs muted">{{ m.department or '학과 미입력' }}</div></td><td class="p-3 text-center">{{ m.recruiting_class or '-' }}</td><td class="p-3 text-center font-extrabold text-[#3d5c2e]">{% if m.activity_count_ambiguous %}<span title="동명이인이라 이름 기준 집계가 모호합니다">&mdash;</span>{% else %}{{ m.seminar_count or 0 }}{% endif %}</td><td class="p-3 text-center">{% if m.activity_count_ambiguous %}<span class="topic-count" title="동명이인이라 이름 기준 집계가 모호합니다">&mdash;</span>{% else %}<span class="topic-count">{{ m.facilitator_count or 0 }}</span>{% endif %}</td><td class="p-3 text-center font-bold text-[#8a5c2a]">{{ m.brick_count or 0 }}</td><td class="p-3 text-center font-bold text-[#4d6572]">{{ m.study_count or 0 }}</td>
       <td class="p-3"><div class="status-control" role="group" aria-label="{{ m.name }} 활동 상태"><button type="button" class="status-choice" data-member-id="{{ m.id }}" data-status="active" aria-pressed="{{ 'true' if st=='active' else 'false' }}">활성</button><button type="button" class="status-choice" data-member-id="{{ m.id }}" data-status="dormant" aria-pressed="{{ 'true' if st=='dormant' else 'false' }}">휴면</button><button type="button" class="status-choice" data-member-id="{{ m.id }}" data-status="inactive" aria-pressed="{{ 'true' if st=='inactive' else 'false' }}">비활성</button></div></td>
       <td class="p-3"><div class="flex justify-end gap-2"><a class="btn soft" href="{{ url_for('records_member_profile', member_id=m.id) }}">활동</a><button class="btn primary edit-member" data-id="{{ m.id }}" data-name="{{ m.name }}" data-email="{{ m.email or '' }}" data-department="{{ m.department or '' }}" data-gender="{{ m.gender or '' }}" data-student-id="{{ m.student_id or '' }}" data-recruiting-class="{{ m.recruiting_class or '' }}" data-role="{{ m.role or 'member' }}">편집</button></div></td>
     </tr>{% else %}<tr><td colspan="9" class="p-8 text-center muted">등록된 회원이 없습니다.</td></tr>{% endfor %}</tbody></table></div>

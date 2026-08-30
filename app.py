@@ -1952,6 +1952,7 @@ def start_group_generation():
     manual_entry_url = url_for('manual_entry')
 
     def generate_events(manual_url):
+        cancel_event = None
         try:
             app.logger.info("[4] DB에서 전체 회원 및 히스토리 데이터 로드 시작")
             members_res = supabase.table("members").select("*").order("name").execute().data
@@ -1978,6 +1979,7 @@ def start_group_generation():
             # 솔버를 별도 스레드에서 돌리고, 진행률을 큐를 통해 실시간 스트리밍
             import threading, queue
             progress_queue = queue.Queue()
+            cancel_event = threading.Event()
 
             def progress_callback(pct):
                 try:
@@ -1995,6 +1997,7 @@ def start_group_generation():
                         group_count_override=group_count_override,
                         progress_callback=progress_callback,
                         restricted_pairs=restricted_pairs,
+                        cancel_event=cancel_event,
                     )
                 except Exception as ex:
                     solver_result['error'] = ex
@@ -2008,7 +2011,7 @@ def start_group_generation():
             last_sent_pct = 10
             while True:
                 try:
-                    kind, payload = progress_queue.get(timeout=30)
+                    kind, payload = progress_queue.get(timeout=5)
                 except queue.Empty:
                     # heartbeat (SSE 연결 유지)
                     yield ": keep-alive\n\n"
@@ -2056,10 +2059,18 @@ def start_group_generation():
                 yield f"event: complete\ndata: {complete_data}\n\n"
             app.logger.info("[11] 성공적으로 최종 HTML을 브라우저로 전송 완료")
 
+        except GeneratorExit:
+            if cancel_event is not None:
+                cancel_event.set()
+            app.logger.info("Group generation stream closed by the client")
+            raise
         except Exception as e:
             app.logger.error(f"!!! 조 편성 중 심각한 오류 발생: {e}", exc_info=True)
             error_data = json.dumps({'error': str(e)})
             yield f"event: error\ndata: {error_data}\n\n"
+        finally:
+            if cancel_event is not None:
+                cancel_event.set()
 
     # Response가 generator를 순회하는 시점에는 원래 view 함수가 이미 반환된 뒤다.
     # 요청 컨텍스트를 스트림 수명 동안 유지해야 결과 템플릿의 header/sidebar가
@@ -2073,7 +2084,7 @@ def start_group_generation():
 
 def run_cp_grouping(members_df, co_matrix, attendee_names, presenter_names,
                     optimize_for='gender', top_n=10, group_count_override=None,
-                    progress_callback=None, restricted_pairs=None):
+                    progress_callback=None, restricted_pairs=None, cancel_event=None):
     """
     OR-Tools CP-SAT 기반 조 편성 알고리즘.
     optimize_for: 'gender' (성비우선) or 'new_face' (새만남우선)
@@ -2147,6 +2158,10 @@ def run_cp_grouping(members_df, co_matrix, attendee_names, presenter_names,
 
     for attempt in range(top_n * 2): # 최대 탐색 횟수 조정
         if len(results) >= top_n:
+            break
+
+        if cancel_event is not None and cancel_event.is_set():
+            app.logger.info("[CP-SAT] client cancellation requested")
             break
 
         model = cp_model.CpModel()
@@ -2238,6 +2253,9 @@ def run_cp_grouping(members_df, co_matrix, attendee_names, presenter_names,
 
         status = solver.Solve(model)
 
+        if cancel_event is not None and cancel_event.is_set():
+            app.logger.info("[CP-SAT] stopping after active solve due to cancellation")
+            break
         if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
             app.logger.warning(f"[CP-SAT] attempt {attempt}: 실패 status={status}")
             continue
@@ -4768,11 +4786,16 @@ def admin_special_events():
     try:
         events = supabase.table('special_events').select('*') \
             .order('event_date', desc=True).execute().data or []
-        # 각 이벤트별 참석자 수
+        event_ids = [evt['id'] for evt in events]
+        attendee_counts = {}
+        if event_ids:
+            attendee_rows = supabase.table('special_event_attendees') \
+                .select('event_id').in_('event_id', event_ids).execute().data or []
+            for attendee in attendee_rows:
+                event_id = attendee.get('event_id')
+                attendee_counts[event_id] = attendee_counts.get(event_id, 0) + 1
         for evt in events:
-            cnt_res = supabase.table('special_event_attendees') \
-                .select('id', count='exact').eq('event_id', evt['id']).execute()
-            evt['attendee_count'] = cnt_res.count or 0
+            evt['attendee_count'] = attendee_counts.get(evt['id'], 0)
         terms = supabase.table('seminar_terms').select('id, name, start_date, end_date') \
             .order('start_date', desc=True).execute().data or []
         return render_template('admin_special_events.html', events=events, terms=terms)
@@ -5413,9 +5436,16 @@ def records_members():
             bb_cnt, sg_cnt = {}, {}
             for r in bb_rows: bb_cnt[r['member_id']] = bb_cnt.get(r['member_id'], 0) + 1
             for r in sg_rows: sg_cnt[r['member_id']] = sg_cnt.get(r['member_id'], 0) + 1
+            name_counts = {}
+            for member in members:
+                member_name = member.get('name')
+                name_counts[member_name] = name_counts.get(member_name, 0) + 1
+            ambiguous_names = {name for name, count in name_counts.items() if name and count > 1}
             for m in members:
-                m['seminar_count'] = seminar_cnt.get(m['name'], 0)
-                m['facilitator_count'] = fac_cnt.get(m['name'], 0)
+                is_ambiguous = m.get('name') in ambiguous_names
+                m['activity_count_ambiguous'] = is_ambiguous
+                m['seminar_count'] = None if is_ambiguous else seminar_cnt.get(m['name'], 0)
+                m['facilitator_count'] = None if is_ambiguous else fac_cnt.get(m['name'], 0)
                 m['brick_count'] = bb_cnt.get(m['id'], 0)
                 m['study_count'] = sg_cnt.get(m['id'], 0)
     except Exception as e:
@@ -5461,12 +5491,17 @@ def records_member_profile(member_id):
 @login_required(role="admin")
 def records_seminars():
     term_id = request.args.get('term_id') or ''
+    page = max(1, request.args.get('page', 1, type=int))
+    page_size = 100
     try:
-        q = supabase.table('history').select('*').order('date', desc=True)
+        q = supabase.table('history').select('*', count='exact').order('date', desc=True)
         start, end, _ = _get_term_range(term_id)
         if start and end:
             q = q.gte('date', start).lte('date', end)
-        history = q.execute().data or []
+        history_response = q.range((page - 1) * page_size, page * page_size - 1).execute()
+        history = history_response.data or []
+        total_history = history_response.count if history_response.count is not None else len(history)
+        total_pages = max(1, math.ceil(total_history / page_size))
         for row in history:
             groups = row.get('groups') or []
             present = []
@@ -5501,8 +5536,10 @@ def records_seminars():
         app.logger.error(f"records_seminars error: {e}", exc_info=True)
         flash(f"오류: {e}", 'danger')
         history, genres, terms, buckets = [], [], [], []
+        total_history, total_pages = 0, 1
     return render_template('records_seminars.html', history=history, genres=genres,
-                           terms=terms, selected_term_id=term_id, buckets=buckets)
+                           terms=terms, selected_term_id=term_id, buckets=buckets,
+                           page=page, total_pages=total_pages, total_history=total_history)
 
 
 @app.route('/records/seminars/<history_id>')

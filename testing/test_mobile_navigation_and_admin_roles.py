@@ -30,6 +30,19 @@ class MobileNavigationAndAdminRoleContracts(unittest.TestCase):
         self.assertIn("최소 한 명의 활성 관리자가 필요합니다.", self.app_source)
         self.assertIn('session["user_role"] = member["role"]', self.app_source)
 
+    def test_dropdowns_and_mobile_more_are_keyboard_accessible(self):
+        self.assertIn('<button id="notification-btn"', self.header)
+        self.assertIn('<button id="profile-btn"', self.header)
+        self.assertIn('<button type="button" id="mobile-more-btn"', self.header)
+        self.assertNotIn('<a href="#" id="mobile-more-btn"', self.header)
+        self.assertGreaterEqual(self.header.count('aria-expanded="false"'), 3)
+        self.assertIn('aria-controls="notification-list"', self.header)
+        self.assertIn('aria-controls="profile-list"', self.header)
+        self.assertIn("e.key === 'ArrowDown'", self.header)
+        self.assertIn("e.key === 'Escape'", self.header)
+        self.assertIn("btn.focus();", self.header)
+        self.assertIn("setAttribute('aria-current', 'page')", self.header)
+
     def test_role_control_is_only_rendered_for_primary_admin(self):
         self.assertIn("{% if can_manage_roles %}", self.members)
         self.assertIn("다시 로그인한 뒤 관리자 기능을 사용할 수 있습니다.", self.members)

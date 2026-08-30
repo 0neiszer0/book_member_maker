@@ -6,7 +6,7 @@
     {% include '_records_base.html' %}
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
-        .pill-x { cursor: pointer; padding: 0 0.4rem; opacity: 0.6; }
+        .pill-x { cursor: pointer; padding: 0 0.4rem; opacity: 0.6; border: 0; background: transparent; color: inherit; font: inherit; }
         .pill-x:hover { opacity: 1; color: #ff5050; }
         .member-pill { display: inline-flex; align-items: center; gap: 0.25rem; }
         .member-add-btn {
@@ -26,6 +26,7 @@
         #record-image-download { display:inline-flex;border-radius:10px;padding:.7rem 1rem;background:#5C7A4A;color:#fff;font-weight:800; }
         #record-image-close { position:absolute;top:12px;right:24px;color:#fff;font-size:40px;line-height:1;cursor:pointer; }
     </style>
+    {% include '_app_theme_head.html' %}
 </head>
 <body class="min-h-screen">
     {% include '_header.html' %}
@@ -35,7 +36,7 @@
 
         <div class="flex justify-between items-center mb-4">
             <a href="{{ url_for('records_seminars') }}" class="text-sm text-gray-400 hover:text-eva-green">← 세미나 목록</a>
-            <button onclick="deleteHistory()"
+            <button type="button" onclick="deleteHistory()"
                 class="text-xs bg-red-700 hover:bg-red-600 text-white px-3 py-1.5 rounded">이 세미나 기록 삭제</button>
         </div>
 
@@ -75,7 +76,7 @@
         <div class="eva-card p-5 rounded-lg mb-6">
             <div class="flex flex-wrap justify-between items-center gap-3 mb-3">
                 <h2 class="text-lg font-bold text-eva-purple"><i data-lucide="megaphone" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 발제자</h2>
-                <button onclick="saveFacilitators()"
+                <button type="button" onclick="saveFacilitators()"
                     class="text-xs bg-eva-purple text-white px-3 py-1.5 rounded hover:opacity-80">저장</button>
             </div>
             <p class="text-xs text-gray-500 mb-2">참여자 클릭으로 발제자 토글. 또는 아래에서 직접 추가/제거.</p>
@@ -84,7 +85,7 @@
                 <select id="facAdd" class="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm flex-1">
                     <option value="">+ 발제자 추가 (참여자 또는 멤버 선택)</option>
                 </select>
-                <button onclick="addFac()" class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-3 py-1.5 rounded">추가</button>
+                <button type="button" onclick="addFac()" class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-3 py-1.5 rounded">추가</button>
             </div>
         </div>
 
@@ -93,11 +94,11 @@
             <div class="flex flex-wrap justify-between items-center gap-3 mb-3">
                 <h2 class="text-lg font-bold text-eva-green"><i data-lucide="puzzle" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 조 편성</h2>
                 <div class="flex gap-2">
-                    <button onclick="captureSavedGroups()"
+                    <button type="button" onclick="captureSavedGroups()"
                         class="text-xs bg-[#6B4B2D] text-white px-3 py-1.5 rounded">PNG 다시 만들기</button>
-                    <button onclick="addGroup()"
+                    <button type="button" onclick="addGroup()"
                         class="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded">+ 조 추가</button>
-                    <button onclick="saveGroups()"
+                    <button type="button" onclick="saveGroups()"
                         class="text-xs bg-eva-green text-black font-bold px-3 py-1.5 rounded hover:opacity-80">저장</button>
                 </div>
             </div>
@@ -155,7 +156,7 @@
                 list.innerHTML = facilitators.map(name => `
                     <span class="member-pill bg-eva-purple text-white px-3 py-1 rounded-full text-sm">
                         ${escapeHtml(name)}
-                        <span class="pill-x" onclick="removeFac(${inlineJsString(name)})" title="제거">✕</span>
+                        <button type="button" class="pill-x" onclick="removeFac(${inlineJsString(name)})" aria-label="제거">✕</button>
                     </span>
                 `).join('');
             }
@@ -206,15 +207,15 @@
                             : `<span class="font-bold">${escapeHtml(name)}${facMark}</span>`;
                         return `<span class="member-pill ${genderClass(name)} px-3 py-1 rounded-full text-sm ${isFac ? 'ring-2 ring-[#7A5A3A]' : ''}">
                             ${tag}${genderLabel(name)}
-                            <span class="pill-x" onclick="toggleFac(${inlineJsString(name)})" title="발제자 토글">★</span>
-                            <span class="pill-x" onclick="removeMember(${gi}, ${inlineJsString(name)})" title="조에서 제거">✕</span>
+                            <button type="button" class="pill-x" onclick="toggleFac(${inlineJsString(name)})" aria-label="발제자 토글">★</button>
+                            <button type="button" class="pill-x" onclick="removeMember(${gi}, ${inlineJsString(name)})" aria-label="조에서 제거">✕</button>
                         </span>`;
                     }).join('');
                     return `
                     <div class="bg-gray-800/40 border border-border-dark p-4 rounded-lg">
                         <div class="flex justify-between items-center mb-2">
                             <h3 class="font-bold text-eva-green">조 ${gi + 1} (${g.length}명)</h3>
-                            <button onclick="removeGroup(${gi})" class="text-xs text-red-400 hover:text-red-300">조 삭제</button>
+                            <button type="button" onclick="removeGroup(${gi})" class="text-xs text-red-400 hover:text-red-300">조 삭제</button>
                         </div>
                         <div class="flex flex-wrap gap-2 mb-3">${pills || '<span class="text-gray-500 text-xs">멤버 없음</span>'}</div>
                         <div class="flex gap-2">
@@ -222,7 +223,7 @@
                                 <option value="">+ 멤버 추가</option>
                                 ${memberOptions}
                             </select>
-                            <button onclick="addMember(${gi})" class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-2 py-1 rounded">추가</button>
+                            <button type="button" onclick="addMember(${gi})" class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-2 py-1 rounded">추가</button>
                         </div>
                     </div>`;
                 }).join('');

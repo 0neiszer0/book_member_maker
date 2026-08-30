@@ -2,8 +2,9 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>면접 지원자 결과 관리</title><script src="https://cdn.tailwindcss.com"></script><link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
-  <style>body{background:var(--paper);color:var(--ink);font-family:Pretendard,-apple-system,BlinkMacSystemFont,sans-serif}.panel{background:var(--surface);border:1px solid var(--line);border-radius:18px}.muted{color:var(--ink-soft)}.field{width:100%;border:1px solid var(--line);border-radius:12px;background:#fff;padding:.75rem;font:inherit}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:42px;border:0;border-radius:12px;padding:.65rem 1rem;background:var(--moss-deep);color:#fff;font-weight:850;cursor:pointer;text-decoration:none}.pill{display:inline-block;border-radius:999px;padding:.2rem .6rem;background:var(--paper-2);font-size:.72rem;font-weight:800}</style>
+  <title>면접 지원자 결과 관리</title>{% include '_tailwind_head.html' %}
+<style>body{background:var(--paper);color:var(--ink);font-family:Pretendard,-apple-system,BlinkMacSystemFont,sans-serif}.panel{background:var(--surface);border:1px solid var(--line);border-radius:18px}.muted{color:var(--ink-soft)}.field{width:100%;border:1px solid var(--line);border-radius:12px;background:#fff;padding:.75rem;font:inherit}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:42px;border:0;border-radius:12px;padding:.65rem 1rem;background:var(--moss-deep);color:#fff;font-weight:850;cursor:pointer;text-decoration:none}.pill{display:inline-block;border-radius:999px;padding:.2rem .6rem;background:var(--paper-2);font-size:.72rem;font-weight:800}</style>
+    {% include '_app_theme_head.html' %}
 </head>
 <body>{% include '_header.html' %}{% include '_admin_sidebar.html' %}
 <main class="max-w-6xl mx-auto px-4 lg:px-8 py-7">

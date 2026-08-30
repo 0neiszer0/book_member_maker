@@ -5,26 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ term.name }} 추가 세미나 신청</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        // Tailwind CDN: 커스텀 색상을 클래스로 사용할 수 있도록 등록
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'eva-green': '#5C7A4A',
-                        'eva-purple': '#7A5A3A',
-                    }
-                }
-            }
-        };
-    </script>
+    {% include '_tailwind_head.html' %}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
-        rel="stylesheet">
-    <style>
+<style>
         :root {
             --eva-green: #5C7A4A;
             --eva-purple: #7A5A3A;
@@ -94,6 +78,7 @@
         .border-gray-600,.border-gray-700{border-color:#D8C8A9!important}
         input{color:#2A241B!important}
     </style>
+    {% include '_app_theme_head.html' %}
 </head>
 
 <body class="min-h-screen">

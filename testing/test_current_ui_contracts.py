@@ -44,11 +44,30 @@ class CurrentUiContractsTest(unittest.TestCase):
 
     def test_topic_submission_has_readable_current_theme(self):
         topic = self.read("templates/topic_submit.html")
-        self.assertIn('data-wood-theme="1"', topic)
+        theme_head = self.read("templates/_app_theme_head.html")
+        self.assertIn("{% include '_app_theme_head.html' %}", topic)
+        self.assertIn('data-wood-theme="1"', theme_head)
         self.assertIn("topic-hero", topic)
         self.assertIn(".topic-author { color: #5C5142", topic)
         self.assertIn("label { color: #2A241B", topic)
         self.assertNotIn("opacity:0.7", topic)
+
+    def test_full_documents_load_theme_in_head_without_tailwind_cdn(self):
+        templates = list((ROOT / "templates").glob("*.html"))
+        for template in templates:
+            source = template.read_text(encoding="utf-8")
+            self.assertNotIn("cdn.tailwindcss.com", source, template.name)
+            self.assertNotIn("tailwind.config =", source, template.name)
+            if "<html" in source.lower() and "</head>" in source.lower():
+                self.assertIn(
+                    "{% include '_app_theme_head.html' %}",
+                    source,
+                    f"theme head missing from {template.name}",
+                )
+
+        tailwind_head = self.read("templates/_tailwind_head.html")
+        self.assertIn("filename='tailwind.css'", tailwind_head)
+        self.assertIn('data-tailwind-build="3.4.17"', tailwind_head)
 
     def test_legacy_neon_theme_is_gone_from_templates(self):
         legacy_tokens = (

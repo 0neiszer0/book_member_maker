@@ -173,15 +173,27 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
                     .execute().data or []
                 )
                 now_kst = datetime.now(timezone(timedelta(hours=9)))
+                open_sessions = []
                 for row in monday_sessions:
                     open_at, close_at = voting_window_for(row)
-                    if not (open_at <= now_kst <= close_at):
-                        continue
-                    term = term_map[row["term_id"]]
-                    seats = (
-                        supabase.table("seminar_votes").select("id", count="exact")
-                        .eq("session_id", row["id"]).eq("attending", True).execute().count or 0
+                    if open_at <= now_kst <= close_at:
+                        open_sessions.append((row, close_at))
+                vote_counts = {}
+                session_ids = [row["id"] for row, _ in open_sessions]
+                if session_ids:
+                    vote_rows = (
+                        supabase.table("seminar_votes")
+                        .select("session_id")
+                        .in_("session_id", session_ids)
+                        .eq("attending", True)
+                        .execute().data or []
                     )
+                    for vote in vote_rows:
+                        sid = vote.get("session_id")
+                        vote_counts[sid] = vote_counts.get(sid, 0) + 1
+                for row, close_at in open_sessions:
+                    term = term_map[row["term_id"]]
+                    seats = vote_counts.get(row["id"], 0)
                     capacity = row.get("capacity") or 10
                     cards.append({
                         "kind": "추가 세미나 신청",
@@ -190,14 +202,13 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
                         "url": url_for("seminar_vote_page", token=term["share_token"]),
                         "close_at": close_at.astimezone(timezone.utc).isoformat(),
                     })
+
         topic_rows = (
             supabase.table("topic_events")
             .select("id,meeting_date,book_title,book_author,share_token,created_at")
             .eq("is_active", True)
             .order("meeting_date")
-            .execute()
-            .data
-            or []
+            .execute().data or []
         )
         for row in topic_rows:
             cards.append({
@@ -208,89 +219,74 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
                 "close_at": None,
             })
 
-        seminar_forms = (
-            supabase.table("seminar_review_forms")
-            .select("*")
-            .eq("status", "open")
-            .order("close_at")
-            .execute()
-            .data
-            or []
-        )
-        for form in seminar_forms:
-            if not _form_is_open(form):
-                continue
-            seminar = (
+        seminar_forms = [
+            form for form in (
+                supabase.table("seminar_review_forms")
+                .select("*").eq("status", "open").order("close_at")
+                .execute().data or []
+            ) if _form_is_open(form)
+        ]
+        seminar_map = {}
+        seminar_ids = list({form["seminar_session_id"] for form in seminar_forms})
+        if seminar_ids:
+            seminar_map = {
+                row["id"]: row for row in
                 supabase.table("seminar_sessions")
-                .select("meeting_date,book_title,book_author")
-                .eq("id", form["seminar_session_id"])
-                .single()
-                .execute()
-                .data
-            )
+                .select("id,meeting_date,book_title,book_author")
+                .in_("id", seminar_ids).execute().data or []
+            }
+        for form in seminar_forms:
+            seminar = seminar_map.get(form["seminar_session_id"], {})
             cards.append({
                 "kind": "세미나 후기",
-                "title": (seminar or {}).get("book_title") or "세미나 후기",
-                "description": f"{(seminar or {}).get('meeting_date', '')} 세미나에서 기억에 남은 내용을 남겨주세요.",
+                "title": seminar.get("book_title") or "세미나 후기",
+                "description": f"{seminar.get('meeting_date', '')} 세미나에서 기억에 남은 내용을 남겨주세요.",
                 "url": url_for("seminar_review_form", token=form["share_token"]),
                 "close_at": form.get("close_at"),
             })
 
-        recruitments = (
-            supabase.table("brick_recruitments")
-            .select("*")
-            .eq("status", "open")
-            .order("close_at")
-            .execute()
-            .data
-            or []
-        )
-        for form in recruitments:
-            if not _form_is_open(form):
-                continue
-            project = (
+        recruitments = [
+            form for form in (
+                supabase.table("brick_recruitments")
+                .select("*").eq("status", "open").order("close_at")
+                .execute().data or []
+            ) if _form_is_open(form)
+        ]
+        review_forms = [
+            form for form in (
+                supabase.table("brick_review_forms")
+                .select("*").eq("status", "open").order("close_at")
+                .execute().data or []
+            ) if _form_is_open(form)
+        ]
+        project_ids = list({form["project_id"] for form in recruitments + review_forms})
+        project_map = {}
+        if project_ids:
+            project_map = {
+                row["id"]: row for row in
                 supabase.table("brick_projects")
-                .select("title,description")
-                .eq("id", form["project_id"])
-                .single()
-                .execute()
-                .data
-            )
+                .select("id,title,description").in_("id", project_ids)
+                .execute().data or []
+            }
+        for form in recruitments:
+            project = project_map.get(form["project_id"], {})
             cards.append({
                 "kind": "벽돌책 모집",
-                "title": (project or {}).get("title") or "벽돌책 모집",
-                "description": _clean_text((project or {}).get("description"), 120),
+                "title": project.get("title") or "벽돌책 모집",
+                "description": _clean_text(project.get("description"), 120),
                 "url": url_for("brick_application_form", token=form["share_token"]),
                 "close_at": form.get("close_at"),
             })
-
-        review_forms = (
-            supabase.table("brick_review_forms")
-            .select("*")
-            .eq("status", "open")
-            .order("close_at")
-            .execute()
-            .data
-            or []
-        )
         for form in review_forms:
-            if not _form_is_open(form):
-                continue
-            project = (
-                supabase.table("brick_projects")
-                .select("title")
-                .eq("id", form["project_id"])
-                .single()
-                .execute()
-                .data
-            )
+            project = project_map.get(form["project_id"], {})
             cards.append({
                 "kind": "벽돌책 후기",
-                "title": (project or {}).get("title") or "벽돌책 후기",
+                "title": project.get("title") or "벽돌책 후기",
                 "description": "완독 경험과 기억에 남은 내용을 기록해주세요.",
                 "url": url_for("brick_review_form", token=form["share_token"]),
                 "close_at": form.get("close_at"),
             })
+
         cards.sort(key=lambda row: row.get("close_at") or "9999")
         return render_template(
             "engagement_now.html",
@@ -413,37 +409,44 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
             .select("*")
             .neq("status", "archived")
             .order("created_at", desc=True)
-            .execute()
-            .data
-            or []
+            .execute().data or []
         )
         books = {}
+        support_counts = {}
+        targets_by_suggestion = {}
         if rows:
-            ids = list({row["book_id"] for row in rows})
-            books = {row["id"]: row for row in supabase.table("book_catalog").select("*").in_("id", ids).execute().data or []}
-        suggestions = []
-        for row in rows:
-            supporters = (
+            book_ids = list({row["book_id"] for row in rows})
+            suggestion_ids = [row["id"] for row in rows]
+            books = {
+                row["id"]: row for row in
+                supabase.table("book_catalog").select("*").in_("id", book_ids)
+                .execute().data or []
+            }
+            supporter_rows = (
                 supabase.table("book_suggestion_supporters")
-                .select("member_id", count="exact")
-                .eq("suggestion_id", row["id"])
+                .select("suggestion_id")
+                .in_("suggestion_id", suggestion_ids)
                 .is_("withdrawn_at", "null")
-                .execute()
+                .execute().data or []
             )
-            targets = (
+            for supporter in supporter_rows:
+                sid = supporter.get("suggestion_id")
+                support_counts[sid] = support_counts.get(sid, 0) + 1
+            target_rows = (
                 supabase.table("book_suggestion_targets")
-                .select("target_type")
-                .eq("suggestion_id", row["id"])
-                .execute()
-                .data
-                or []
+                .select("suggestion_id,target_type")
+                .in_("suggestion_id", suggestion_ids)
+                .execute().data or []
             )
-            suggestions.append({
-                **row,
-                "book": books.get(row["book_id"], {}),
-                "support_count": supporters.count or 0,
-                "targets": [item["target_type"] for item in targets],
-            })
+            for target in target_rows:
+                targets_by_suggestion.setdefault(target.get("suggestion_id"), []).append(target.get("target_type"))
+
+        suggestions = [{
+            **row,
+            "book": books.get(row["book_id"], {}),
+            "support_count": support_counts.get(row["id"], 0),
+            "targets": [value for value in targets_by_suggestion.get(row["id"], []) if value],
+        } for row in rows]
         return render_template(
             "book_suggestions.html",
             suggestions=suggestions,
@@ -765,7 +768,7 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
             row["applications"] = applications_by_project.get(row["id"], [])
             if row["recruitment"]:
                 row["recruitment"]["share_url"] = f"{_public_base()}/brick/apply/{row['recruitment']['share_token']}"
-                row["application_count"] = supabase.table("brick_applications").select("id", count="exact").eq("project_id", row["id"]).execute().count or 0
+                row["application_count"] = len(row["applications"])
             if row["review_form"]:
                 row["review_form"]["share_url"] = f"{_public_base()}/brick/review/{row['review_form']['share_token']}"
         return render_template(
