@@ -50,6 +50,13 @@ from recruitment_results import (
 )
 from topic_lifecycle import topic_event_is_expired
 from security_utils import forwarded_client_address, safe_internal_next_url
+from topic_credentials import (
+    generate_topic_edit_token,
+    legacy_pin_matches,
+    topic_edit_token_digest,
+    topic_edit_token_matches,
+    topic_request_fingerprint,
+)
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
@@ -177,6 +184,16 @@ def protect_applicant_result_responses(response):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Content-Security-Policy"] = "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    return response
+
+
+@app.after_request
+def protect_topic_edit_responses(response):
+    """Do not cache pages or API responses that may contain a one-time edit token."""
+    if request.endpoint in {'view_shared_topics', 'submit_topics', 'load_topics'}:
+        response.headers['Cache-Control'] = 'no-store, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Referrer-Policy'] = 'no-referrer'
     return response
 
 
@@ -3262,6 +3279,72 @@ def _authenticated_topic_member():
     return member
 
 
+TOPIC_EDIT_FAILURE_LIMIT = 10
+TOPIC_EDIT_FAILURE_WINDOW_MINUTES = 15
+
+
+def _topic_edit_request_hash(event_id):
+    address = forwarded_client_address(
+        request.headers.get('X-Forwarded-For'), request.remote_addr
+    )
+    return topic_request_fingerprint(address, event_id, app.secret_key)
+
+
+def _topic_edit_is_rate_limited(event_id):
+    request_hash = _topic_edit_request_hash(event_id)
+    rate_start = (
+        datetime.now(timezone.utc) - timedelta(minutes=TOPIC_EDIT_FAILURE_WINDOW_MINUTES)
+    ).isoformat()
+    try:
+        attempts = supabase.table('topic_edit_attempts').select('id', count='exact') \
+            .eq('event_id', event_id).eq('request_hash', request_hash) \
+            .eq('succeeded', False).gte('created_at', rate_start).execute()
+        return (attempts.count or 0) >= TOPIC_EDIT_FAILURE_LIMIT
+    except Exception as exc:
+        app.logger.warning("topic edit rate-limit lookup failed: %s", exc)
+        return False
+
+
+def _record_topic_edit_attempt(event_id, succeeded):
+    try:
+        supabase.table('topic_edit_attempts').insert({
+            'event_id': event_id,
+            'request_hash': _topic_edit_request_hash(event_id),
+            'succeeded': bool(succeeded),
+        }).execute()
+    except Exception as exc:
+        app.logger.warning("topic edit attempt audit failed: %s", exc)
+
+
+def _guest_topic_credential_matches(existing_record, credential):
+    identity_kind = existing_record.get('identity_kind')
+    if not identity_kind:
+        identity_kind = (
+            'legacy_member'
+            if existing_record.get('pin_code') == 'MEMBER'
+            else 'legacy_pin'
+        )
+    if identity_kind == 'guest':
+        return topic_edit_token_matches(
+            existing_record.get('edit_token_hash'), credential, app.secret_key
+        )
+    if identity_kind == 'legacy_pin':
+        return legacy_pin_matches(existing_record.get('pin_code'), credential)
+    return False
+
+
+def _registered_topic_student_id(student_id):
+    sid = str(student_id or '').strip()
+    if not sid:
+        return False
+    try:
+        rows = supabase.table('members').select('id').eq('student_id', sid).limit(1).execute().data or []
+        return bool(rows)
+    except Exception as exc:
+        app.logger.error("topic member student-id check failed: %s", exc)
+        return None
+
+
 # 2. 사용자: 공유 링크를 통한 발제문 작성 페이지
 @app.route('/shared_topics')
 def view_shared_topics():
@@ -3306,7 +3389,7 @@ def submit_topics():
     event_id = data.get('event_id')
     author_name = (data.get('author_name') or '').strip()
     department = (data.get('department') or '').strip()
-    pin_code = data.get('pin_code')
+    edit_credential = str(data.get('edit_credential') or data.get('pin_code') or '').strip()
     student_id = (data.get('student_id') or '').strip()
     topics = data.get('topics')  # JSON Array
 
@@ -3317,14 +3400,9 @@ def submit_topics():
         author_name = (member.get('name') or '').strip()
         department = (member.get('department') or department).strip()
         student_id = str(member.get('student_id') or student_id).strip()
-    else:
-        pin_code = str(pin_code or '').strip()
 
     if not all([event_id, author_name, department, topics]):
         return jsonify({"error": "필수 정보를 모두 입력해주세요."}), 400
-
-    if not is_logged_in_member and not re.fullmatch(r'[0-9]{4}', pin_code):
-        return jsonify({"error": "비회원은 4자리 숫자 PIN을 입력해야 합니다."}), 400
 
     try:
         event_rows = supabase.table('topic_events').select('id, is_active, meeting_date') \
@@ -3334,7 +3412,13 @@ def submit_topics():
             return jsonify({"error": "모임일부터 7일이 지나 발제문 제출이 마감되었습니다."}), 400
 
         # 기존 제출 내역 확인 (학번 우선 매칭 — 학과 표기만 바꿔 여러 건 제출하는 것 방지)
-        existing_record = _find_topic_submission(event_id, author_name, department, student_id)
+        existing_record = _find_topic_submission(
+            event_id,
+            author_name,
+            department,
+            student_id,
+            member_id=member.get('id') if member else None,
+        )
 
         # 학번에서 입학년도 2자리 추출 (예: "2022123456" → "22")
         # student_id 가 4자 이상이면 3-4번째 문자 사용
@@ -3350,9 +3434,18 @@ def submit_topics():
             return jsonify({"error": f"발제문은 {topic_limit}개까지 작성할 수 있습니다. 더 쓰고 싶다면 회장에게 문의해주세요."}), 400
 
         if existing_record:
-            # 수정 모드: 로그인한 본인이거나 PIN 번호가 일치해야 함
-            if not is_logged_in_member and existing_record['pin_code'] != pin_code:
-                return jsonify({"error": "PIN 번호가 일치하지 않습니다. (동명이인일 경우 학과를 다르게 입력해주세요)"}), 403
+            issued_edit_token = None
+            if is_logged_in_member:
+                owner_id = existing_record.get('member_id')
+                if owner_id is not None and str(owner_id) != str(member.get('id')):
+                    return jsonify({"error": "수정 권한을 확인할 수 없습니다."}), 403
+            else:
+                if _topic_edit_is_rate_limited(event_id):
+                    return jsonify({"error": "수정 확인이 잠시 제한되었습니다. 15분 후 다시 시도해주세요."}), 429
+                credential_ok = _guest_topic_credential_matches(existing_record, edit_credential)
+                _record_topic_edit_attempt(event_id, credential_ok)
+                if not credential_ok:
+                    return jsonify({"error": "수정 정보를 확인할 수 없습니다."}), 403
 
             # 업데이트 실행
             update_payload = {'topics': topics, 'updated_at': 'now()', 'department': department}
@@ -3360,40 +3453,115 @@ def submit_topics():
                 update_payload['admission_year'] = admission_year
             if sid:
                 update_payload['student_id'] = sid
+            if is_logged_in_member:
+                update_payload.update({
+                    'member_id': member.get('id'),
+                    'identity_kind': 'member',
+                    'credential_version': 2,
+                    'pin_code': 'MEMBER',
+                    'edit_token_hash': None,
+                })
+            elif existing_record.get('identity_kind') in (None, 'legacy_pin'):
+                issued_edit_token = generate_topic_edit_token()
+                update_payload.update({
+                    'identity_kind': 'guest',
+                    'credential_version': 2,
+                    'pin_code': 'TOKEN',
+                    'edit_token_hash': topic_edit_token_digest(
+                        issued_edit_token, app.secret_key
+                    ),
+                })
             supabase.table('topic_submissions').update(update_payload) \
                 .eq('id', existing_record['id']).execute()
-            return jsonify({"status": "success", "message": "발제문이 성공적으로 수정되었습니다."})
+            response = {"status": "success", "message": "발제문이 성공적으로 수정되었습니다."}
+            if issued_edit_token:
+                response['edit_token'] = issued_edit_token
+                response['message'] = "발제문이 수정되었고, 안전한 새 수정 코드가 발급되었습니다."
+            return jsonify(response)
         else:
             # 신규 생성 모드
-            supabase.table('topic_submissions').insert({
+            if not is_logged_in_member:
+                registered_student_id = _registered_topic_student_id(sid)
+                if registered_student_id is None:
+                    return jsonify({"error": "회원 정보를 확인하지 못했습니다. 잠시 후 다시 시도해주세요."}), 503
+                if registered_student_id:
+                    return jsonify({"error": "등록된 회원 학번은 로그인 후 제출해주세요."}), 403
+            issued_edit_token = None
+            insert_payload = {
                 'event_id': event_id,
                 'author_name': author_name,
                 'department': department,
                 'admission_year': admission_year or None,
                 'student_id': sid or None,
-                'pin_code': pin_code if not is_logged_in_member else 'MEMBER',
                 'topics': topics
-            }).execute()
-            return jsonify({"status": "success", "message": "발제문이 성공적으로 제출되었습니다."})
+            }
+            if is_logged_in_member:
+                insert_payload.update({
+                    'member_id': member.get('id'),
+                    'identity_kind': 'member',
+                    'credential_version': 2,
+                    'pin_code': 'MEMBER',
+                    'edit_token_hash': None,
+                })
+            else:
+                issued_edit_token = generate_topic_edit_token()
+                insert_payload.update({
+                    'member_id': None,
+                    'identity_kind': 'guest',
+                    'credential_version': 2,
+                    'pin_code': 'TOKEN',
+                    'edit_token_hash': topic_edit_token_digest(
+                        issued_edit_token, app.secret_key
+                    ),
+                })
+            supabase.table('topic_submissions').insert(insert_payload).execute()
+            response = {"status": "success", "message": "발제문이 성공적으로 제출되었습니다."}
+            if issued_edit_token:
+                response['edit_token'] = issued_edit_token
+                response['message'] = "발제문이 제출되었습니다. 아래 수정 코드를 꼭 보관해주세요."
+            return jsonify(response)
 
     except Exception as e:
         app.logger.error(f"Error submitting topics: {e}")
         return jsonify({"error": "제출 중 서버 오류가 발생했습니다."}), 500
 
 
-def _find_topic_submission(event_id, author_name, department, student_id):
+def _find_topic_submission(event_id, author_name, department, student_id, member_id=None):
     """같은 이벤트에서 같은 사람의 기존 제출물을 찾는다.
     학번이 있으면 (event_id, student_id)로 우선 매칭하고,
     없거나 매칭 실패 시 과거 데이터 호환을 위해 (event_id, author_name, department)로 폴백한다."""
+    if member_id is not None:
+        member_res = supabase.table('topic_submissions').select('*') \
+            .eq('event_id', event_id).eq('member_id', member_id).execute()
+        if member_res.data:
+            return member_res.data[0]
+
     sid = (student_id or '').strip()
     if sid:
         res = supabase.table('topic_submissions').select('*') \
             .eq('event_id', event_id).eq('student_id', sid).execute()
         if res.data:
-            return res.data[0]
+            candidate = res.data[0]
+            if member_id is None:
+                return candidate
+            if (
+                candidate.get('member_id') is None
+                and candidate.get('pin_code') == 'MEMBER'
+            ):
+                return candidate
     res = supabase.table('topic_submissions').select('*') \
         .eq('event_id', event_id).eq('author_name', author_name).eq('department', department).execute()
-    return res.data[0] if res.data else None
+    if not res.data:
+        return None
+    candidate = res.data[0]
+    if member_id is None:
+        return candidate
+    if (
+        candidate.get('member_id') is None
+        and candidate.get('pin_code') == 'MEMBER'
+    ):
+        return candidate
+    return None
 
 
 # 3.5. 사용자: 발제문 불러오기 API
@@ -3403,7 +3571,7 @@ def load_topics():
     event_id = data.get('event_id')
     author_name = (data.get('author_name') or '').strip()
     department = (data.get('department') or '').strip()
-    pin_code = data.get('pin_code')
+    edit_credential = str(data.get('edit_credential') or data.get('pin_code') or '').strip()
     student_id = (data.get('student_id') or '').strip()
 
     # 회원 권한은 입력한 이름/학번이 아니라 서버 세션의 member id로만 확인한다.
@@ -3413,14 +3581,9 @@ def load_topics():
         author_name = (member.get('name') or '').strip()
         department = (member.get('department') or department).strip()
         student_id = str(member.get('student_id') or student_id).strip()
-    else:
-        pin_code = str(pin_code or '').strip()
 
     if not all([event_id, author_name, department]):
         return jsonify({"error": "이름과 소속을 모두 입력해주세요."}), 400
-
-    if not is_logged_in_member and not re.fullmatch(r'[0-9]{4}', pin_code):
-        return jsonify({"error": "비회원은 4자리 숫자 PIN을 입력해야 합니다."}), 400
 
     try:
         event_rows = supabase.table('topic_events').select('id, is_active, meeting_date') \
@@ -3429,11 +3592,26 @@ def load_topics():
         if not event_data or not event_data.get('is_active'):
             return jsonify({"error": "모임일부터 7일이 지나 발제문 제출이 마감되었습니다."}), 400
 
-        existing_record = _find_topic_submission(event_id, author_name, department, student_id)
+        existing_record = _find_topic_submission(
+            event_id,
+            author_name,
+            department,
+            student_id,
+            member_id=member.get('id') if member else None,
+        )
 
         if existing_record:
-            if not is_logged_in_member and str(existing_record['pin_code']) != str(pin_code):
-                return jsonify({"error": "PIN 번호가 일치하지 않습니다. (동명이인일 경우 학과를 다르게 입력해주세요)"}), 403
+            if is_logged_in_member:
+                owner_id = existing_record.get('member_id')
+                if owner_id is not None and str(owner_id) != str(member.get('id')):
+                    return jsonify({"error": "수정 권한을 확인할 수 없습니다."}), 403
+            else:
+                if _topic_edit_is_rate_limited(event_id):
+                    return jsonify({"error": "수정 확인이 잠시 제한되었습니다. 15분 후 다시 시도해주세요."}), 429
+                credential_ok = _guest_topic_credential_matches(existing_record, edit_credential)
+                _record_topic_edit_attempt(event_id, credential_ok)
+                if not credential_ok:
+                    return jsonify({"error": "수정 정보를 확인할 수 없습니다."}), 403
 
             return jsonify({
                 "status": "success",

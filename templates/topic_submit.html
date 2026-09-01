@@ -120,7 +120,7 @@
                 <i data-lucide="lightbulb" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 처음이신가요? 작성 방법 보기
             </summary>
             <div class="p-4 text-sm text-gray-300 space-y-2">
-                <p><strong class="text-eva-green">1단계.</strong> 로그인한 회원은 계정 정보로 바로 확인됩니다. 비회원은 아래 <strong>본인 확인</strong> 폼에 이름·소속·학번과 수정용 PIN 4자리를 입력하고 <strong>확인하기</strong>를 누르세요.</p>
+                <p><strong class="text-eva-green">1단계.</strong> 로그인한 회원은 계정 정보로 바로 확인됩니다. 비회원은 이름·소속·학번을 입력하세요. 처음 제출할 때는 수정 코드가 필요 없고, 기존 글을 수정할 때만 발급받은 코드를 입력합니다.</p>
                 <p><strong class="text-eva-green">2단계.</strong> 인증되면 <strong>발제문 작성 폼</strong>이 나타납니다. 토론하고 싶은 주제·해당 페이지·참조 사항을 입력하세요. 발제문 1개는 필수이며, 원하면 1개를 더 추가할 수 있습니다.</p>
                 <p><strong class="text-eva-green">3단계.</strong> <strong>제출</strong> 버튼을 누르면 끝! 같은 정보로 다시 들어오면 작성한 내용을 수정할 수 있습니다.</p>
                 <div class="mt-3 p-3 bg-gray-900/50 rounded text-xs">
@@ -129,7 +129,7 @@
                     <p>• 페이지: p.123~125</p>
                     <p>• 인용: "그 순간 그는 모든 것을 내려놓기로 했다. 더 이상 잃을 것이 없었기 때문이다." — 책에서 발제와 관련된 원문을 그대로 적어주세요.</p>
                 </div>
-                <p class="text-xs text-gray-500 mt-2">※ 회원 여부는 로그인 계정으로만 확인합니다. 비회원은 학번(2022XXXXXX 형식)과 본인이 정한 4자리 PIN을 입력해야 하며, 다음 수정 때도 같은 PIN이 필요합니다.</p>
+                <p class="text-xs text-gray-500 mt-2">※ 회원 여부는 로그인 계정으로만 확인합니다. 비회원의 수정 코드는 최초 제출 후 한 번 표시되며 DB에는 원문이 저장되지 않습니다. 현재 브라우저에 자동 보관되지만 다른 기기에서 수정하려면 코드를 따로 복사해 두세요.</p>
             </div>
         </details>
 
@@ -205,10 +205,11 @@
                 {% if not user_name %}
                 <div>
                     <label for="pinCode" class="text-xs text-gray-400 block mb-1">
-                        PIN 4자리 <span class="text-yellow-400">(비회원만 입력)</span>
+                        수정 코드 <span class="text-yellow-400">(기존 글을 수정할 때만)</span>
                     </label>
-                    <input type="password" id="pinCode" class="eva-input w-full rounded py-2 px-3 text-sm"
-                        pattern="[0-9]{4}" maxlength="4" placeholder="숫자 4자리" inputmode="numeric">
+                    <input type="text" id="pinCode" class="eva-input w-full rounded py-2 px-3 text-sm"
+                        maxlength="80" placeholder="처음 제출이라면 비워두세요" autocomplete="off">
+                    <p class="text-[10px] text-gray-500 mt-1">기존 4자리 PIN도 첫 수정까지 사용할 수 있으며, 수정 후 안전한 새 코드로 교체됩니다.</p>
                 </div>
                 {% else %}
                 <input type="hidden" id="pinCode" value="">
@@ -253,6 +254,16 @@
                     제출 / 수정 완료
                 </button>
             </form>
+
+            <div id="credentialCard" class="hidden eva-card rounded-lg p-5 mt-5 border-2 border-green-600" role="status">
+                <h2 class="text-lg font-bold text-eva-green">비회원 수정 코드를 보관해주세요</h2>
+                <p class="text-sm text-gray-300 mt-2">이 코드는 다시 표시할 수 없습니다. 현재 브라우저에는 자동 저장했습니다.</p>
+                <div class="flex gap-2 mt-3 flex-wrap">
+                    <code id="issuedCredential" class="eva-input rounded py-2 px-3 text-sm break-all flex-1 min-w-0"></code>
+                    <button type="button" id="copyCredentialBtn" class="bg-eva-green text-black font-bold rounded px-4 py-2">복사</button>
+                </div>
+                <p id="copyCredentialMsg" class="text-xs text-eva-green mt-2 hidden">복사했습니다.</p>
+            </div>
         </div>
     </div>
 
@@ -260,7 +271,7 @@
         const IS_LOGGED_IN = {{ 'true' if user_name else 'false' }};
         let topicCount = 0;
         let topicLimit = 2; // 1개는 필수, 기본 2개. 회장이 바꾼 개인 한도는 API 응답으로 갱신됨
-        let verified = null; // {author, dept, sid, pin, isMember}
+        let verified = null; // {author, dept, sid, credential, isMember}
         const container = document.createElement('div'); // placeholder until verified
 
         function getContainer() { return document.getElementById('topicsContainer'); }
@@ -324,17 +335,42 @@
             el.textContent = msg; el.classList.remove('hidden');
         }
 
+        function credentialStorageKey(sid) {
+            return `topic-edit:${document.getElementById('eventId').value}:${sid}`;
+        }
+
+        function readStoredCredential(sid) {
+            try {
+                return localStorage.getItem(credentialStorageKey(sid)) || '';
+            } catch (error) {
+                return '';
+            }
+        }
+
+        function storeCredential(sid, credential) {
+            try {
+                localStorage.setItem(credentialStorageKey(sid), credential);
+                return true;
+            } catch (error) {
+                return false;
+            }
+        }
+
         async function tryVerify() {
             document.getElementById('verifyMsg').classList.add('hidden');
             const author = document.getElementById('authorName').value.trim();
             const dept = document.getElementById('department').value.trim();
             const sid = (document.getElementById('studentId') || {}).value?.trim() || '';
-            const pin = (document.getElementById('pinCode') || {}).value?.trim() || '';
+            const credentialInput = document.getElementById('pinCode');
+            let credential = credentialInput?.value?.trim() || '';
 
             if (!author || !dept) { showVerifyError('이름과 소속을 입력해주세요.'); return; }
             if (!sid) { showVerifyError('학번을 입력해주세요. (예: 2022XXXXXX)'); return; }
             if (!/^[0-9]{8,10}$/.test(sid)) { showVerifyError('학번은 숫자 8~10자리여야 합니다. (예: 2022123456)'); return; }
-            if (!IS_LOGGED_IN && pin && !/^[0-9]{4}$/.test(pin)) { showVerifyError('PIN은 숫자 4자리여야 합니다.'); return; }
+            if (!IS_LOGGED_IN && !credential) {
+                credential = readStoredCredential(sid);
+                if (credentialInput && credential) credentialInput.value = credential;
+            }
 
             // 시도: 기존 발제문 로드
             const isMember = IS_LOGGED_IN;
@@ -346,7 +382,7 @@
                     body: JSON.stringify({
                         event_id: document.getElementById('eventId').value,
                         author_name: author, department: dept,
-                        student_id: sid, pin_code: pin,
+                        student_id: sid, edit_credential: credential,
                     }),
                 });
                 const data = await res.json();
@@ -357,7 +393,7 @@
                     // 신규 작성: PIN/학번이 맞는지 더 검증할 방법은 없으나, submit 시 검증됨
                     topicLimit = 2;
                 } else if (res.status === 403) {
-                    showVerifyError(data.error || 'PIN이 일치하지 않습니다.');
+                    showVerifyError(data.error || '수정 정보를 확인할 수 없습니다.');
                     return;
                 } else {
                     showVerifyError(data.error || '확인 중 오류가 발생했습니다.');
@@ -368,7 +404,10 @@
                 return;
             }
 
-            verified = { author, dept, sid, pin, isMember };
+            if (!IS_LOGGED_IN && credential && topics.length) {
+                storeCredential(sid, credential);
+            }
+            verified = { author, dept, sid, credential, isMember };
             document.getElementById('verifyCard').classList.add('hidden');
             const wc = document.getElementById('writeCard');
             wc.classList.remove('hidden');
@@ -428,14 +467,25 @@
                     body: JSON.stringify({
                         event_id: document.getElementById('eventId').value,
                         author_name: verified.author, department: verified.dept,
-                        student_id: verified.sid, pin_code: verified.pin,
+                        student_id: verified.sid, edit_credential: verified.credential,
                         topics,
                     }),
                 });
                 const result = await res.json();
                 if (!res.ok) throw new Error(result.error || '제출 실패');
-                alert(result.message || '제출되었습니다.');
-                if (!IS_LOGGED_IN) window.location.href = '/';
+                if (result.edit_token && !IS_LOGGED_IN) {
+                    verified.credential = result.edit_token;
+                    storeCredential(verified.sid, result.edit_token);
+                    document.getElementById('issuedCredential').textContent = result.edit_token;
+                    const card = document.getElementById('credentialCard');
+                    card.classList.remove('hidden');
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else {
+                    if (!IS_LOGGED_IN && verified.credential) {
+                        storeCredential(verified.sid, verified.credential);
+                    }
+                    alert(result.message || '제출되었습니다.');
+                }
             } catch (err) {
                 alert('오류: ' + err.message);
             } finally {
@@ -447,6 +497,16 @@
         ['authorName', 'department', 'studentId', 'pinCode'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); tryVerify(); }});
+        });
+
+        document.getElementById('copyCredentialBtn').addEventListener('click', async () => {
+            const token = document.getElementById('issuedCredential').textContent;
+            try {
+                await navigator.clipboard.writeText(token);
+                document.getElementById('copyCredentialMsg').classList.remove('hidden');
+            } catch (error) {
+                window.prompt('수정 코드를 복사하세요.', token);
+            }
         });
     </script>
 {% include '_icons.html' %}
