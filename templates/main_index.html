@@ -5,43 +5,85 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>책 먹는 호반우</title>
     {% include '_tailwind_head.html' %}
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --eva-purple: #7A5A3A;
-            --eva-green: #3D5C2E;
-            --bg-dark: #FAF6EC;
-            --card-dark: #FFFCF3;
-            --text-light: #2A241B;
-            --border-dark: #C9B38A;
-        }
-        body {
-            font-family: 'Noto Sans KR', sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-light);
-        }
-        h1, h2 {
-            font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
-
-
-        }
-    </style>
     {% include '_app_theme_head.html' %}
 </head>
-<body class="w-full min-h-screen flex flex-col">
+<body class="min-h-screen flex flex-col">
 {% include '_header.html' %}
 
-    <main class="flex-1 flex items-center justify-center px-4">
-        <div class="text-center">
-            <h1 class="text-5xl md:text-7xl font-bold text-eva-green mb-4">책 먹는 호반우</h1>
-            <p class="text-base md:text-lg text-gray-400 tracking-widest">KNU Book Club</p>
+<main class="home-shell flex-1">
+    {% if session.user_role == 'admin' %}
+    <section class="home-hero" aria-labelledby="home-title">
+        <p class="home-eyebrow">운영자 홈</p>
+        <h1 id="home-title">{{ session.user_name or '관리자' }}님, 이번 주 운영을 시작하세요.</h1>
+        <p>이번 주 세미나 준비, 조 편성, 기록 확인 순서로 바로 이동할 수 있습니다.</p>
+        <div class="home-actions">
+            <a class="home-btn home-btn-primary" href="{{ url_for('admin_dashboard') }}">운영 개요 열기</a>
+            <a class="home-btn home-btn-secondary" href="{{ url_for('my_page') }}">회원 화면 보기</a>
         </div>
-    </main>
+    </section>
 
-    <footer class="text-center p-6 text-xs text-gray-600">
-        &copy; 2025 책 먹는 호반우
-    </footer>
+    <section class="home-section" aria-labelledby="admin-shortcuts">
+        <div class="home-section-head">
+            <div><p class="home-kicker">빠른 시작</p><h2 id="admin-shortcuts">자주 쓰는 운영 화면</h2></div>
+            <span class="home-count">3개</span>
+        </div>
+        <div class="home-card-grid home-card-grid-3">
+            <a class="home-card home-card-priority" href="{{ url_for('admin_dashboard') }}">
+                <span class="home-card-num">1</span><strong>현재 상태 확인</strong>
+                <p>완료된 단계와 아직 확인할 항목을 먼저 봅니다.</p><span class="home-card-link">운영 개요 →</span>
+            </a>
+            <a class="home-card" href="{{ url_for('admin_seminars') }}">
+                <span class="home-card-num">2</span><strong>도서·발제문·참석</strong>
+                <p>이번 주 도서와 발제문, 목·월 참석자를 정리합니다.</p><span class="home-card-link">세미나 운영 →</span>
+            </a>
+            <a class="home-card" href="{{ url_for('bookclub_index') }}">
+                <span class="home-card-num">3</span><strong>조 편성</strong>
+                <p>참석자와 발제자를 확인한 뒤 추천안을 생성합니다.</p><span class="home-card-link">조 편성 시작 →</span>
+            </a>
+        </div>
+    </section>
+    {% elif session.user_role %}
+    <section class="home-hero" aria-labelledby="home-title">
+        <p class="home-eyebrow">회원 홈</p>
+        <h1 id="home-title">{{ session.user_name or '회원' }}님, 지금 할 일을 확인하세요.</h1>
+        <p>열린 신청과 발제문을 먼저 처리하고, 일정과 내 기록을 이어서 확인할 수 있습니다.</p>
+        <div class="home-actions">
+            <a class="home-btn home-btn-primary" href="{{ url_for('engagement_now') }}">지금 참여하기</a>
+            <a class="home-btn home-btn-secondary" href="{{ url_for('seminars') }}">세미나 일정 보기</a>
+        </div>
+    </section>
+
+    <section class="home-section" aria-labelledby="member-shortcuts">
+        <div class="home-section-head">
+            <div><p class="home-kicker">자주 찾는 메뉴</p><h2 id="member-shortcuts">무엇을 하러 왔나요?</h2></div>
+        </div>
+        <div class="home-card-grid home-card-grid-3">
+            <a class="home-card home-card-priority" href="{{ url_for('engagement_now') }}">
+                <span class="home-card-icon" aria-hidden="true">✓</span><strong>신청·발제문·후기</strong>
+                <p>현재 열려 있는 활동만 모아서 확인합니다.</p><span class="home-card-link">열린 활동 보기 →</span>
+            </a>
+            <a class="home-card" href="{{ url_for('seminars') }}">
+                <span class="home-card-icon" aria-hidden="true">책</span><strong>다음 세미나</strong>
+                <p>이번 책과 목요일·월요일 일정을 확인합니다.</p><span class="home-card-link">일정 확인 →</span>
+            </a>
+            <a class="home-card" href="{{ url_for('my_page') }}">
+                <span class="home-card-icon" aria-hidden="true">나</span><strong>내 활동 기록</strong>
+                <p>참석, 발제, 벽돌책과 소모임 기록을 봅니다.</p><span class="home-card-link">내 활동 보기 →</span>
+            </a>
+        </div>
+    </section>
+    {% else %}
+    <section class="home-hero home-hero-public" aria-labelledby="home-title">
+        <p class="home-eyebrow">KNU Book Club</p>
+        <h1 id="home-title">책을 읽고, 질문을 나누고, 기록을 남깁니다.</h1>
+        <p>책 먹는 호반우의 세미나 일정과 독서 활동을 한곳에서 관리하는 공간입니다.</p>
+        <div class="home-actions">
+            <a class="home-btn home-btn-primary" href="{{ url_for('login') }}">로그인</a>
+        </div>
+    </section>
+    {% endif %}
+</main>
+
+<footer class="home-footer">&copy; 2026 책 먹는 호반우</footer>
 </body>
 </html>
