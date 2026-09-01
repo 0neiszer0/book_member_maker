@@ -1,0 +1,3 @@
+-- Remote migration history contains a second migration named 005_special_events.
+-- The schema-changing SQL is preserved in 20260508013131_005_special_events.sql.
+-- This marker keeps the canonical local timestamp list aligned without replaying it twice.

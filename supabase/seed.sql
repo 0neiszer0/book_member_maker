@@ -1,0 +1,3 @@
+-- Deliberately empty.
+-- Never copy production members, submissions, attendance, or recruitment data
+-- into the repository. Add synthetic, non-identifying fixtures only.
