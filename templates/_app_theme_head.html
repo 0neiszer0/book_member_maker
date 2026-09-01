@@ -1,3 +1,6 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}" data-wood-theme="1">
+<meta name="app-user-role" content="{{ session.get('user_role', '') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='app_ui.css') }}" data-app-ui-style="1">
+<script defer src="{{ url_for('static', filename='app_ui.js') }}" data-app-ui-script="1"></script>

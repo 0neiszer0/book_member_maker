@@ -1,9 +1,94 @@
+{% macro seminar_card(week, featured=false) -%}
+  {% set mon=week.sessions_by_day.get('mon') %}
+  {% set thu=week.sessions_by_day.get('thu') %}
+  <article class="seminar-card {% if featured %}seminar-card-featured{% endif %}">
+    <div class="seminar-card-top">
+      <div>
+        {% if featured %}<p class="seminar-kicker">가장 가까운 세미나</p>{% endif %}
+        <div class="seminar-chips">
+          {% if thu %}<span class="seminar-chip">본 세미나 · {{ thu.meeting_date }} (목)</span>{% endif %}
+          {% if mon %}<span class="seminar-chip">추가 세미나 · {{ mon.meeting_date }} (월)</span>{% endif %}
+          {% if week.topic_event %}<span class="seminar-chip {% if week.topic_event.is_active %}seminar-chip-open{% endif %}">발제문 {{ '접수 중' if week.topic_event.is_active else '마감' }}</span>{% endif %}
+        </div>
+        <h2>{{ week.book_title or '도서 미정' }}</h2>
+        {% if week.book_author %}<p class="seminar-author">{{ week.book_author }}</p>{% endif %}
+      </div>
+      {% if week.is_past %}<span class="seminar-state">지난 세미나</span>{% else %}<span class="seminar-state seminar-state-upcoming">예정</span>{% endif %}
+    </div>
+
+    {% if week.note %}<p class="seminar-note">{{ week.note }}</p>{% endif %}
+
+    <div class="seminar-session-grid">
+      <section>
+        <p class="seminar-session-label">목요일 본 세미나</p>
+        {% if thu %}
+          <strong>{{ thu.meeting_date }}</strong>
+          <p>활성 회원은 기본 참석 대상입니다. 참석이 어렵다면 운영진에게 미리 알려주세요.</p>
+        {% else %}<p>이 주차에는 목요일 회차가 없습니다.</p>{% endif %}
+      </section>
+      <section>
+        <p class="seminar-session-label">다음 월요일 추가 세미나</p>
+        {% if mon %}
+          <strong>{{ mon.meeting_date }}</strong>
+          <p>선착순 {{ mon.capacity or 10 }}명 · 현재 {{ mon.yes_count }}명 · 남은 자리 {{ [0,(mon.capacity or 10)-mon.yes_count]|max }}석</p>
+        {% else %}<p>이 주차에는 월요일 회차가 없습니다.</p>{% endif %}
+      </section>
+    </div>
+
+    {% if not week.is_past %}
+    <div class="seminar-actions">
+      {% if week.topic_event and week.topic_event.is_active %}
+        {% if week.topic_event.share_url %}
+          <a class="seminar-btn seminar-btn-primary" href="{{ week.topic_event.share_url }}">발제문 작성하기</a>
+        {% elif week.topic_event.share_token %}
+          <a class="seminar-btn seminar-btn-primary" href="{{ url_for('view_shared_topics', token=week.topic_event.share_token) }}">발제문 작성하기</a>
+        {% endif %}
+      {% endif %}
+      {% if mon and vote_url %}<a class="seminar-btn seminar-btn-secondary" href="{{ vote_url }}">월요일 신청 확인</a>{% endif %}
+    </div>
+    {% endif %}
+  </article>
+{%- endmacro %}
 <!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>세미나</title>{% include '_tailwind_head.html' %}
-<style>body{background:var(--paper,#faf6ec);color:var(--ink,#2a241b);font-family:Pretendard,-apple-system,sans-serif}.panel{background:var(--surface,#fffdf8);border:1px solid var(--line,#e5d7b8);border-radius:18px}.chip{border-radius:999px;padding:.25rem .65rem;font-size:.75rem;font-weight:700;background:var(--paper-2,#f2ebd8)}.btn{background:var(--moss-deep,#3d5c2e);color:#fff;border-radius:10px;padding:.65rem 1rem;font-weight:700}.muted{color:var(--ink-soft,#6b6255)}</style>    {% include '_app_theme_head.html' %}
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>세미나</title>
+  {% include '_tailwind_head.html' %}
+  {% include '_app_theme_head.html' %}
 </head>
-<body>{% include '_header.html' %}<main class="max-w-5xl mx-auto px-4 py-7"><div class="flex flex-wrap items-end justify-between gap-4 mb-6"><div><h1 class="text-3xl font-extrabold">세미나</h1><p class="muted mt-2">목요일 본 세미나와 다음 월요일 추가 세미나의 책과 운영 현황을 확인하세요.</p></div>{% if vote_url %}<a class="btn" href="{{ vote_url }}">월요일 참석 신청</a>{% endif %}</div>
-{% if not term %}<div class="panel p-8 text-center muted">현재 등록된 세미나 일정이 없습니다.</div>{% endif %}
-<div class="space-y-4">{% for week in weeks %}{% set mon=week.sessions_by_day.get('mon') %}{% set thu=week.sessions_by_day.get('thu') %}<article class="panel p-5 {% if week.is_past %}opacity-75{% endif %}"><div class="flex flex-wrap justify-between gap-3"><div><div class="flex flex-wrap gap-2"><span class="chip">{% if thu %}본 세미나 · {{ thu.meeting_date }} (목){% else %}목요일 본 세미나 없음{% endif %}</span>{% if mon %}<span class="chip">추가 세미나 · {{ mon.meeting_date }} (월)</span>{% endif %}</div><h2 class="text-xl font-extrabold mt-3">{{ week.book_title or '도서 미정' }}</h2>{% if week.book_author %}<p class="muted mt-1">{{ week.book_author }}</p>{% endif %}</div><div class="flex flex-wrap content-start gap-2">{% if week.is_past %}<span class="chip">지난 세미나</span>{% else %}<span class="chip !bg-[#e8efdd] !text-[#3d5c2e]">예정</span>{% endif %}{% if week.topic_event %}<span class="chip">발제문 {% if week.topic_event.is_active %}접수 중{% else %}마감{% endif %}</span>{% else %}<span class="chip">발제문 미개설</span>{% endif %}</div></div>
-{% if week.note %}<p class="text-sm mt-3 p-3 rounded-xl bg-[#f7f1e4]">{{ week.note }}</p>{% endif %}
-<div class="grid sm:grid-cols-2 gap-3 mt-4"><div class="rounded-xl border border-[#eadac5] p-4"><p class="text-xs font-bold muted">목요일 본 세미나</p>{% if thu %}<p class="font-bold mt-1">{{ thu.meeting_date }}</p><p class="text-sm muted mt-1">불참할 때만 운영진에게 알려주세요. 별도 신청은 없습니다.</p>{% else %}<p class="text-sm muted mt-2">회차 없음</p>{% endif %}</div><div class="rounded-xl border border-[#dce6d2] p-4"><p class="text-xs font-bold muted">다음 월요일 추가 세미나</p>{% if mon %}<p class="font-bold mt-1">{{ mon.meeting_date }}</p><p class="text-sm muted mt-1">선착순 {{ mon.capacity or 10 }}명 · 현재 {{ mon.yes_count }}명 · 남은 자리 {{ [0,(mon.capacity or 10)-mon.yes_count]|max }}석</p>{% else %}<p class="text-sm muted mt-2">회차 없음</p>{% endif %}</div></div></article>{% endfor %}</div></main></body></html>
+<body>
+{% include '_header.html' %}
+{% set counts=namespace(upcoming=0,past=0) %}
+{% for week in weeks %}{% if week.is_past %}{% set counts.past=counts.past+1 %}{% else %}{% set counts.upcoming=counts.upcoming+1 %}{% endif %}{% endfor %}
+<main class="seminar-shell">
+  <header class="seminar-page-head">
+    <div><p class="seminar-kicker">일정</p><h1>세미나</h1><p>가장 가까운 세미나와 지금 가능한 신청·발제문을 먼저 확인하세요.</p></div>
+    {% if vote_url %}<a class="seminar-btn seminar-btn-primary" href="{{ vote_url }}">월요일 참석 신청</a>{% endif %}
+  </header>
+
+  {% if not term %}
+    <div class="seminar-empty"><strong>현재 등록된 세미나 일정이 없습니다.</strong><p>새 일정이 등록되면 이 화면에 표시됩니다.</p></div>
+  {% else %}
+    <section class="seminar-upcoming" aria-labelledby="upcoming-title">
+      <div class="seminar-section-head"><h2 id="upcoming-title">예정된 세미나</h2><span>{{ counts.upcoming }}개</span></div>
+      <div class="seminar-stack">
+        {% set upcoming=namespace(index=0) %}
+        {% for week in weeks %}{% if not week.is_past %}{% set upcoming.index=upcoming.index+1 %}{{ seminar_card(week, upcoming.index == 1) }}{% endif %}{% endfor %}
+        {% if counts.upcoming == 0 %}<div class="seminar-empty"><strong>예정된 세미나가 없습니다.</strong><p>지난 세미나는 아래에서 확인할 수 있습니다.</p></div>{% endif %}
+      </div>
+    </section>
+
+    {% if counts.past %}
+    <details class="seminar-past">
+      <summary><span>지난 세미나</span><span>{{ counts.past }}개 보기</span></summary>
+      <div class="seminar-stack">
+        {% for week in weeks %}{% if week.is_past %}{{ seminar_card(week) }}{% endif %}{% endfor %}
+      </div>
+    </details>
+    {% endif %}
+  {% endif %}
+</main>
+</body>
+</html>
