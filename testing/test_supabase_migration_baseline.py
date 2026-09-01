@@ -52,6 +52,7 @@ class SupabaseMigrationBaselineTests(unittest.TestCase):
         expected = set(REMOTE_MIGRATION_FILES) | {
             "20260501000000_legacy_schema_baseline.sql",
             "20260508020003_005_special_events.sql",
+            "20260901134512_secure_topic_edit_identity.sql",
         }
         self.assertEqual(actual, expected)
         self.assertTrue(all(re.fullmatch(r"[0-9]{14}_[a-z0-9_]+\.sql", name) for name in actual))
