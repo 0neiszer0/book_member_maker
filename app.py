@@ -3228,6 +3228,40 @@ def toggle_topic_event(event_id):
         return jsonify({"error": "상태 변경 중 오류가 발생했습니다."}), 500
 
 
+def _authenticated_topic_member():
+    """Return the active member tied to the authenticated session.
+
+    Topic submission links are public, so client-provided names and student IDs
+    must never be treated as proof of membership.  Refresh the member from the
+    database using the server-side session ID and fail closed when the account is
+    missing or no longer active.
+    """
+    user_id = session.get('user_id')
+    if not user_id:
+        return None
+
+    try:
+        rows = supabase.table('members').select(
+            'id, name, department, student_id, account_status, member_status, is_active'
+        ).eq('id', user_id).limit(1).execute().data or []
+    except Exception as exc:
+        app.logger.error("Topic member authorization refresh failed: %s", exc)
+        return None
+
+    if not rows:
+        return None
+
+    member = rows[0]
+    if (
+        member.get('account_status') != 'active'
+        or member.get('member_status') == 'inactive'
+        or member.get('is_active') is False
+        or not (member.get('name') or '').strip()
+    ):
+        return None
+    return member
+
+
 # 2. 사용자: 공유 링크를 통한 발제문 작성 페이지
 @app.route('/shared_topics')
 def view_shared_topics():
@@ -3250,17 +3284,10 @@ def view_shared_topics():
             .eq('event_id', event_data['id']).order('created_at').execute().data or []
         existing_topic_previews = anonymous_topic_previews(preview_rows)
 
-        user_name = session.get('user_name')
-        user_department = None
-        user_student_id = None
-        if user_name:
-            try:
-                member_res = supabase.table('members').select('department, student_id').eq('name', user_name).single().execute()
-                if member_res.data:
-                    user_department = member_res.data.get('department')
-                    user_student_id = member_res.data.get('student_id')
-            except Exception:
-                pass
+        member = _authenticated_topic_member()
+        user_name = member.get('name') if member else None
+        user_department = member.get('department') if member else None
+        user_student_id = member.get('student_id') if member else None
         return render_template('topic_submit.html',
                                event=event_data,
                                user_name=user_name,
@@ -3275,36 +3302,29 @@ def view_shared_topics():
 # 3. 사용자: 발제문 제출/수정 API (PIN 검증 포함)
 @app.route('/api/topics/submit', methods=['POST'])
 def submit_topics():
-    data = request.json
+    data = request.get_json(silent=True) or {}
     event_id = data.get('event_id')
-    author_name = data.get('author_name')
-    department = data.get('department')
+    author_name = (data.get('author_name') or '').strip()
+    department = (data.get('department') or '').strip()
     pin_code = data.get('pin_code')
     student_id = (data.get('student_id') or '').strip()
     topics = data.get('topics')  # JSON Array
 
-    # 로그인한 회원은 PIN 검증 패스 (세션 확인)
-    is_logged_in_member = session.get('user_name') == author_name
-
-    # 학번+이름 매칭으로도 회원 인증 가능
-    if not is_logged_in_member and student_id and author_name:
-        try:
-            mres = supabase.table('members').select('id, name, department, is_active') \
-                .eq('student_id', student_id).execute().data or []
-            for m in mres:
-                if (m.get('name') or '').strip() == author_name.strip() and m.get('is_active'):
-                    is_logged_in_member = True
-                    if not department:
-                        department = m.get('department') or ''
-                    break
-        except Exception as e:
-            app.logger.warning(f"student_id member lookup 실패: {e}")
+    # 회원 권한은 입력한 이름/학번이 아니라 서버 세션의 member id로만 확인한다.
+    member = _authenticated_topic_member()
+    is_logged_in_member = member is not None
+    if member:
+        author_name = (member.get('name') or '').strip()
+        department = (member.get('department') or department).strip()
+        student_id = str(member.get('student_id') or student_id).strip()
+    else:
+        pin_code = str(pin_code or '').strip()
 
     if not all([event_id, author_name, department, topics]):
         return jsonify({"error": "필수 정보를 모두 입력해주세요."}), 400
 
-    if not is_logged_in_member and not pin_code:
-        return jsonify({"error": "비회원은 4자리 PIN 번호를 입력해야 합니다."}), 400
+    if not is_logged_in_member and not re.fullmatch(r'[0-9]{4}', pin_code):
+        return jsonify({"error": "비회원은 4자리 숫자 PIN을 입력해야 합니다."}), 400
 
     try:
         event_rows = supabase.table('topic_events').select('id, is_active, meeting_date') \
@@ -3379,35 +3399,28 @@ def _find_topic_submission(event_id, author_name, department, student_id):
 # 3.5. 사용자: 발제문 불러오기 API
 @app.route('/api/topics/load', methods=['POST'])
 def load_topics():
-    data = request.json
+    data = request.get_json(silent=True) or {}
     event_id = data.get('event_id')
-    author_name = data.get('author_name')
-    department = data.get('department')
+    author_name = (data.get('author_name') or '').strip()
+    department = (data.get('department') or '').strip()
     pin_code = data.get('pin_code')
     student_id = (data.get('student_id') or '').strip()
 
-    # 로그인한 회원은 PIN 검증 패스
-    is_logged_in_member = session.get('user_name') == author_name
-
-    # 학번+이름 매칭으로도 회원 인증 가능
-    if not is_logged_in_member and student_id and author_name:
-        try:
-            mres = supabase.table('members').select('id, name, department, is_active') \
-                .eq('student_id', student_id).execute().data or []
-            for m in mres:
-                if (m.get('name') or '').strip() == author_name.strip() and m.get('is_active'):
-                    is_logged_in_member = True
-                    if not department:
-                        department = m.get('department') or ''
-                    break
-        except Exception as e:
-            app.logger.warning(f"student_id member lookup 실패: {e}")
+    # 회원 권한은 입력한 이름/학번이 아니라 서버 세션의 member id로만 확인한다.
+    member = _authenticated_topic_member()
+    is_logged_in_member = member is not None
+    if member:
+        author_name = (member.get('name') or '').strip()
+        department = (member.get('department') or department).strip()
+        student_id = str(member.get('student_id') or student_id).strip()
+    else:
+        pin_code = str(pin_code or '').strip()
 
     if not all([event_id, author_name, department]):
         return jsonify({"error": "이름과 소속을 모두 입력해주세요."}), 400
 
-    if not is_logged_in_member and not pin_code:
-        return jsonify({"error": "비회원은 4자리 PIN 번호를 입력해야 합니다."}), 400
+    if not is_logged_in_member and not re.fullmatch(r'[0-9]{4}', pin_code):
+        return jsonify({"error": "비회원은 4자리 숫자 PIN을 입력해야 합니다."}), 400
 
     try:
         event_rows = supabase.table('topic_events').select('id, is_active, meeting_date') \
