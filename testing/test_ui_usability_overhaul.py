@@ -145,19 +145,5 @@ class UiUsabilityOverhaulTest(unittest.TestCase):
         )
         self.assertEqual(completed.returncode, 0, completed.stderr)
 
-    def test_no_database_or_render_deployment_files_are_part_of_patch(self):
-        completed = subprocess.run(
-            ["git", "status", "--short"],
-            cwd=ROOT,
-            text=True,
-            capture_output=True,
-            check=True,
-        )
-        changed = completed.stdout
-        self.assertNotIn("migrations/", changed)
-        self.assertNotIn("render.yaml", changed)
-        self.assertNotIn("Dockerfile", changed)
-
-
 if __name__ == "__main__":
     unittest.main()

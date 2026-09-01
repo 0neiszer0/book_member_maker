@@ -1,4 +1,8 @@
-# Database migrations
+# Legacy database migrations
+
+> 새 마이그레이션은 `supabase/migrations/`에 Supabase CLI 타임스탬프 형식으로
+> 생성한다. 이 폴더의 `001`~`029` 파일은 운영 이력 대조와 감사용으로 보존하며,
+> 신규 변경을 여기에 추가하지 않는다.
 
 이 디렉터리의 SQL은 운영 Supabase에 자동 적용되지 않는다. `001` 이전에 생성된
 `members`, `attendance`, `history`, `notifications`, `questions`, `documents`,
@@ -8,7 +12,8 @@
 ## 운영 적용 원칙
 
 1. 운영 스키마와 백업 상태를 먼저 확인한다.
-2. 새 파일은 기존 번호 다음의 연속 번호로 추가하고 `BEGIN`/`COMMIT`을 사용한다.
+2. 새 파일은 `npx supabase migration new <name>`으로 `supabase/migrations/`에 생성하고
+   `BEGIN`/`COMMIT`을 사용한다.
 3. 테이블·함수·스토리지 변경은 RLS, `anon`/`authenticated` 권한 회수,
    `service_role` 권한 및 필요한 인덱스를 함께 검토한다.
 4. SQL과 애플리케이션의 배포 순서를 정한다. 이전 앱과 호환되지 않는 변경은
@@ -16,11 +21,11 @@
 5. Supabase SQL Editor 또는 승인된 CLI에서 사람이 검토한 SQL만 실행한다.
 6. 적용 후 테이블/함수 존재, RLS, 인덱스와 핵심 읽기·쓰기 흐름을 검증한다.
 
-## Baseline TODO
+## Canonical baseline
 
-운영 스키마에서 개인정보와 데이터를 제외한 **schema-only** baseline을 별도로
-내보내 검토해야 한다. 검토 전 산출물에는 운영 데이터나 비밀값을 포함하지 않는다.
-Baseline이 승인되기 전에는 기존 `001`~마이그레이션을 빈 DB에 적용하지 않는다.
+개인정보와 운영 데이터를 포함하지 않는 schema-only 기준선과 원격 타임스탬프
+대응 파일은 `supabase/migrations/`에 있다. 상세 대응 관계와 아직 필요한 원격 이력
+정렬 절차는 `docs/SUPABASE_MIGRATION_BASELINE.md`를 따른다.
 
 
 ## 회원 병합 트랜잭션 준비
