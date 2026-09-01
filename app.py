@@ -57,6 +57,12 @@ from topic_credentials import (
     topic_edit_token_matches,
     topic_request_fingerprint,
 )
+from member_identity import (
+    duplicate_student_id_values,
+    member_student_id_conflicts,
+    normalize_member_student_id,
+    valid_member_student_id,
+)
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
@@ -1406,6 +1412,11 @@ def set_member_status(member_id):
         return jsonify({"status": "error", "message": "상태 변경 중 오류 발생"}), 500
 
 
+def _member_student_id_conflict(student_id, exclude_member_id=None):
+    rows = supabase.table('members').select('id, student_id').execute().data or []
+    return member_student_id_conflicts(rows, student_id, exclude_member_id)
+
+
 @app.route('/api/admin/members/create', methods=['POST'])
 @login_required(role="admin")
 def create_member():
@@ -1420,6 +1431,11 @@ def create_member():
             return jsonify({"status": "error", "message": "유효하지 않은 권한입니다."}), 400
         if requested_role == 'admin' and not _current_user_is_primary_admin():
             return jsonify({"status": "error", "message": "관리자 권한은 관리자만 지정할 수 있습니다."}), 403
+        student_id = normalize_member_student_id(data.get('student_id'))
+        if not valid_member_student_id(student_id):
+            return jsonify({"status": "error", "message": "학번은 숫자 4~20자리로 입력해주세요."}), 400
+        if student_id and _member_student_id_conflict(student_id):
+            return jsonify({"status": "error", "message": "이미 다른 회원에게 등록된 학번입니다. 중복 학번 표시를 확인해주세요."}), 409
         insert_fields = {
             'name': name,
             'role': requested_role,
@@ -1430,6 +1446,8 @@ def create_member():
         # 빈 문자열은 NULL로 (email은 UNIQUE 제약이 있어 ''가 중복되면 insert가 실패함)
         for field in ('email', 'gender', 'department', 'student_id', 'recruiting_class'):
             val = data.get(field)
+            if field == 'student_id':
+                val = student_id
             if isinstance(val, str) and val.strip() == '':
                 val = None
             insert_fields[field] = val
@@ -1446,14 +1464,14 @@ def edit_member(member_id):
     """관리자가 멤버 정보를 편집합니다."""
     data = request.json
     try:
+        current_rows = supabase.table('members').select('role, student_id').eq('id', member_id).limit(1).execute().data or []
+        if not current_rows:
+            return jsonify({"status": "error", "message": "회원을 찾을 수 없습니다."}), 404
+        current_role = current_rows[0].get('role') or 'member'
         if 'role' in data:
             requested_role = data.get('role')
             if requested_role not in ('member', 'officer', 'admin'):
                 return jsonify({"status": "error", "message": "유효하지 않은 권한입니다."}), 400
-            current_rows = supabase.table('members').select('role').eq('id', member_id).limit(1).execute().data or []
-            if not current_rows:
-                return jsonify({"status": "error", "message": "회원을 찾을 수 없습니다."}), 404
-            current_role = current_rows[0].get('role') or 'member'
             if requested_role != current_role and not _current_user_is_primary_admin():
                 return jsonify({"status": "error", "message": "회원 권한은 관리자만 변경할 수 있습니다."}), 403
             if member_id == session.get('user_id') and current_role == 'admin' and requested_role != 'admin':
@@ -1471,6 +1489,15 @@ def edit_member(member_id):
                     update_fields[field] = None  # 빈 문자열은 NULL로
                 else:
                     update_fields[field] = val
+        if 'student_id' in update_fields:
+            student_id = normalize_member_student_id(update_fields.get('student_id'))
+            if not valid_member_student_id(student_id):
+                return jsonify({"status": "error", "message": "학번은 숫자 4~20자리로 입력해주세요."}), 400
+            current_student_id = normalize_member_student_id(current_rows[0].get('student_id'))
+            if student_id and student_id != current_student_id \
+                    and _member_student_id_conflict(student_id, exclude_member_id=member_id):
+                return jsonify({"status": "error", "message": "이미 다른 회원에게 등록된 학번입니다. 중복 학번 표시를 확인해주세요."}), 409
+            update_fields['student_id'] = student_id or None
         if not update_fields:
             return jsonify({"status": "error", "message": "변경할 내용이 없습니다."}), 400
         supabase.table('members').update(update_fields).eq('id', member_id).execute()
@@ -5604,6 +5631,11 @@ def records_members():
         members = supabase.table('members').select(
             'id, name, gender, department, student_id, recruiting_class, member_status, role, email'
         ).order('name').execute().data or []
+        duplicate_student_ids = duplicate_student_id_values(members)
+        for member in members:
+            member['student_id_duplicate'] = (
+                normalize_member_student_id(member.get('student_id')) in duplicate_student_ids
+            )
         # 회원명부 클릭 시 미리 활동 요약을 보여주기 위해 각 멤버의 활동 카운트 집계
         if members:
             # 1) 세미나/발제 카운트 (history.groups 이름 매칭)
@@ -5643,9 +5675,11 @@ def records_members():
         app.logger.error(f"records_members error: {e}", exc_info=True)
         flash(f"멤버 로딩 오류: {e}", 'danger')
         members = []
+        duplicate_student_ids = set()
     return render_template(
         'records_members.html',
         members=members,
+        duplicate_student_id_count=len(duplicate_student_ids),
         can_manage_roles=_current_user_is_primary_admin(),
     )
 
