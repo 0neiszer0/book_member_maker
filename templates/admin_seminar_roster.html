@@ -1,0 +1,22 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>카카오톡 명단 반영 · 실제 출석</title>{% include '_tailwind_head.html' %}{% include '_app_theme_head.html' %}<link rel="stylesheet" href="{{ url_for('static', filename='attendance.css') }}"></head><body>{% include '_header.html' %}{% include '_admin_sidebar.html' %}
+<main class="attendance-shell" data-session-id="{{ seminar.id }}" data-csrf="{{ csrf_token }}">
+ <a href="{{ url_for('admin_seminars', term_id=seminar.term_id) }}">← 세미나 운영</a>
+ <h1>{{ seminar.meeting_date }} · {{ '목요일 불참' if mode == 'absence' else '월요일 참석' }} 명단</h1>
+ <p>카카오톡 투표 결과를 옮겨 주세요. {{ '기본 대상에서 불참 투표자를 제외합니다.' if mode == 'absence' else '참석 투표자만 조 편성 대상에 포함합니다. 정원·선착순 제한은 없습니다.' }}</p>
+ <p class="attendance-notice">참석 예정 명단은 실제 출석이 아닙니다. 세미나 후 아래에서 실제 출석을 별도로 확정해야 학기 참석 횟수에 반영됩니다.</p>
+ <section class="attendance-panel"><h2>1. 투표 결과 명단 반영</h2><p>현재 참석 예정 {{ planned_ids|length }}명 · 마지막 반영 {{ seminar.roster_updated_label }} (한국시간)</p>
+ <div class="attendance-tabs" role="group" aria-label="명단 입력 방식"><button type="button" data-method="text" aria-pressed="true">붙여넣기</button><button type="button" data-method="file" aria-pressed="false">엑셀</button><button type="button" data-method="selected" aria-pressed="false">직접 선택</button></div>
+ <div data-input-panel="text"><label for="roster-text">{{ '불참' if mode == 'absence' else '참석' }} 투표자 이름 또는 이름·학번</label><textarea id="roster-text" rows="6" placeholder="김독서 202612345&#10;이호반 202654321"></textarea><p>한 줄에 한 명씩 입력하세요. 이름만 입력할 수 있지만 동명이인은 학번이 필요합니다. 빈 명단도 미리보기 후 반영할 수 있습니다.</p></div>
+ <div data-input-panel="file" hidden><label for="roster-file">.xlsx 파일 (2MB 이하)</label><input id="roster-file" type="file" accept=".xlsx"><p>첫 번째 시트에 이름·학번을 넣어주세요. 예: 이름 | 학번. 업로드한 파일은 서버에 보관하지 않습니다.</p></div>
+ <div data-input-panel="selected" hidden><label for="roster-search">회원 검색</label><input id="roster-search" type="search" placeholder="이름·학번·학과"><div class="attendance-people">{% for member in members %}{% if member.id in eligible_ids %}<label data-roster-search="{{ member.name }} {{ member.student_id or '' }} {{ member.department or '' }}"><input class="roster-choice" type="checkbox" value="{{ member.id }}" {% if member.id in input_ids %}checked{% endif %}><span><strong>{{ member.name }}</strong><small>{{ member.student_id or '학번 없음' }} · {{ member.department or '소속 없음' }}</small></span></label>{% endif %}{% endfor %}</div></div>
+ <div class="attendance-actions"><button type="button" id="preview-roster">반영 전 미리보기</button>{% if audit %}<button type="button" id="undo-roster">직전 반영 되돌리기</button>{% endif %}</div>
+ <div id="roster-preview" class="attendance-notice" hidden aria-live="polite"></div><button type="button" id="apply-roster" hidden>확인한 명단으로 반영</button>
+ {% if audit %}<details><summary>최근 명단 반영 내역</summary>{% for item in audit %}<p>{{ item.created_label }} · {{ '불참' if item.mode == 'absence' else '참석' }} 명단 {{ item.member_ids|length }}명 → 참석 예정 {{ item.expected_member_ids|length }}명</p>{% endfor %}</details>{% endif %}
+ </section>
+ <section class="attendance-panel"><h2>2. 실제 출석 확정</h2><p>{{ '출석 확정됨 · 다시 저장하면 실제 참석 기록을 수정합니다.' if seminar.attendance_confirmed_at else '조 편성 저장과 별개입니다. 실제로 참석한 사람만 선택해주세요.' }}</p>
+ <label for="actual-search">회원 검색</label><input id="actual-search" type="search" placeholder="이름·학번·학과"><div class="attendance-people">{% for member in members %}<label data-actual-search="{{ member.name }} {{ member.student_id or '' }} {{ member.department or '' }}"><input class="actual-choice" type="checkbox" value="{{ member.id }}" {% if member.id in actual_ids %}checked{% endif %}><span><strong>{{ member.name }}</strong><small>{{ member.student_id or '학번 없음' }} · {{ member.department or '소속 없음' }}</small></span></label>{% endfor %}</div>
+ <p id="actual-count" aria-live="polite"></p><button type="button" id="confirm-attendance" {% if seminar.meeting_date > today %}disabled{% endif %}>실제 출석 확정</button>{% if seminar.meeting_date > today %}<p>세미나 날짜가 되어야 확정할 수 있습니다.</p>{% endif %}
+ </section>
+ <div class="attendance-actions"><a href="{{ url_for('bookclub_index', session_id=seminar.id) }}">이 회차 조 편성</a><a href="{{ url_for('admin_term_attendance', term_id=seminar.term_id) }}">학기 참석 현황</a></div>
+ <p id="attendance-status" role="status"></p>
+</main><script src="{{ url_for('static', filename='attendance_roster.js') }}" defer></script></body></html>

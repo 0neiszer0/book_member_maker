@@ -10,31 +10,37 @@ class ResultEditingTests(unittest.TestCase):
         cls.source = (ROOT / 'templates' / 'bookclub_ga_results.html').read_text(
             encoding='utf-8'
         )
+        cls.editor = (ROOT / 'static' / 'group_editor.js').read_text(encoding='utf-8')
 
     def test_inline_edit_recalculates_gender_badge(self):
-        self.assertIn('const memberGenders = JSON.parse', self.source)
-        self.assertIn('function updateGenderBadge', self.source)
-        self.assertIn(
-            "updateGenderBadge(row.querySelector('.gender-balance-badge'), groupMembers)",
-            self.source,
-        )
+        self.assertIn("genders[name] === 'M'", self.editor)
+        self.assertIn("genders[name] === 'W'", self.editor)
+        self.assertIn('class="ge-balance"', self.editor)
+        self.assertIn('onChange(state)', self.source)
 
     def test_capture_uses_current_wood_theme(self):
-        self.assertIn("backgroundColor: '#FAF6EC'", self.source)
-        self.assertIn('책 먹는 호반우', self.source)
-        self.assertIn('세미나 조 편성', self.source)
+        self.assertIn("backgroundColor: '#FAF6EC'", self.editor)
+        self.assertIn('책 먹는 호반우', self.editor)
+        self.assertIn('세미나 조 편성', self.editor)
         self.assertNotIn("color: #00FF7F", self.source)
 
     def test_capture_is_rendered_on_canvas_without_offscreen_cropping(self):
-        self.assertIn("position: 'fixed', top: '0px', left: '0px'", self.source)
-        self.assertNotIn("top: '-9999px'", self.source)
-        self.assertIn('await document.fonts.ready', self.source)
-        self.assertIn("backgroundColor: '#FAF6EC'", self.source)
+        self.assertIn("position: 'fixed', top: '0px', left: '0px'", self.editor)
+        self.assertNotIn("top: '-9999px'", self.editor)
+        self.assertIn('await document.fonts.ready', self.editor)
+        self.assertIn('node.scrollWidth - node.clientWidth', self.editor)
+        self.assertIn("backgroundColor: '#FAF6EC'", self.editor)
         self.assertIn('PNG 이미지 다운로드', self.source)
 
     def test_capture_checks_confidential_group_restrictions(self):
-        self.assertIn("fetch('/api/bookclub/validate-groups'", self.source)
-        self.assertIn('if (!(await validateGroups(groups))) return;', self.source)
+        self.assertIn("fetch('/api/bookclub/validate-groups'", self.editor)
+        self.assertIn('GroupEditor.validate(payload.groups)', self.source)
+
+    def test_capture_locks_before_validation_and_uses_validated_snapshot(self):
+        handler = self.source[self.source.index("card.querySelector('.capture-groups-btn').addEventListener"):]
+        self.assertLess(handler.index('busy = true'), handler.index('await GroupEditor.validate'))
+        self.assertLess(handler.index('const payload = editor.state.payload()'), handler.index('await GroupEditor.validate'))
+        self.assertIn('GroupEditor.capture({...data, ...payload})', handler)
 
 
 class BugReportTests(unittest.TestCase):

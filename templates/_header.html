@@ -162,7 +162,7 @@
   .wd-top-nav{
     display:flex;gap:4px;align-items:center;margin-left:8px;
   }
-  @media(max-width:900px){ .wd-top-nav{display:none} }
+  @media(max-width:1100px){ .wd-top-nav{display:none} }
   .wd-link{
     text-decoration:none;color:var(--ink-soft,#5C5142);
     font-size:14px;font-weight:600;padding:6px 12px;border-radius:8px;
@@ -302,13 +302,13 @@
     content:'';position:absolute;top:-6px;left:50%;transform:translateX(-50%);
     width:30px;height:3px;background:var(--moss-deep,#3D5C2E);border-radius:0 0 4px 4px;
   }
-  @media(max-width:768px){
+  @media(max-width:1100px){
     .wd-tabbar{display:grid}
     .wd-tabbar.wd-tabbar-hidden{
       transform:translateY(calc(100% + env(safe-area-inset-bottom)));
       opacity:0;visibility:hidden;pointer-events:none;
     }
-    body{padding-bottom:72px}
+    body{padding-bottom:calc(84px + env(safe-area-inset-bottom))}
     .wd-top-nav{display:none}
   }
 
@@ -456,7 +456,7 @@
       var tabbarScrollTicking = false;
       function updateTabbarAtPageEnd(){
         tabbarScrollTicking = false;
-        if (!window.matchMedia('(max-width: 768px)').matches){
+        if (!window.matchMedia('(max-width: 1100px)').matches){
           tabbar.classList.remove('wd-tabbar-hidden');
           tabbar.removeAttribute('aria-hidden');
           return;
@@ -476,6 +476,8 @@
       window.addEventListener('scroll', queueTabbarUpdate, {passive:true});
       window.addEventListener('resize', queueTabbarUpdate, {passive:true});
       window.addEventListener('pageshow', queueTabbarUpdate);
+      if (window.ResizeObserver) new ResizeObserver(queueTabbarUpdate).observe(document.body);
+      if (window.visualViewport) window.visualViewport.addEventListener('resize', queueTabbarUpdate, {passive:true});
       queueTabbarUpdate();
     }
 

@@ -47,7 +47,8 @@ class UiUsabilityOverhaulTest(unittest.TestCase):
         self.assertIn("가장 가까운 세미나", seminars)
         self.assertIn('class="seminar-past"', seminars)
         self.assertIn("발제문 작성하기", seminars)
-        self.assertIn("월요일 신청 확인", seminars)
+        self.assertIn("월요일 참석 투표는 카카오톡에서", seminars)
+        self.assertIn("내 학기 참석 현황", seminars)
 
     def test_engagement_page_has_priority_and_empty_states(self):
         engagement = self.read("templates/engagement_now.html")
@@ -74,7 +75,7 @@ class UiUsabilityOverhaulTest(unittest.TestCase):
         ):
             self.assertIn(f"function {function_name}", script)
         self.assertIn("window.wdToastUndo", script)
-        self.assertIn("신청자 명단 적용", script)
+        self.assertIn("투표 반영 명단 적용", script)
         self.assertIn("조 편성 추천안 만들기", script)
         self.assertIn("이 추천안으로 확정", script)
         self.assertIn("공지 이미지 만들기", script)

@@ -1,9 +1,11 @@
 """발제문 수집 이벤트의 자동 마감 기준."""
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
+
+from seminar_cycle import cycle_monday
 
 
-TOPIC_OPEN_DAYS = 7
+KST = timezone(timedelta(hours=9))
 
 
 def _meeting_date(value):
@@ -18,14 +20,26 @@ def _meeting_date(value):
 
 
 def topic_event_deadline(event):
-    meeting_date = _meeting_date((event or {}).get("meeting_date"))
-    return meeting_date + timedelta(days=TOPIC_OPEN_DAYS) if meeting_date else None
+    """공유 질문은 마지막 회차, 회차 지정 링크는 그 회차 다음 날 마감한다."""
+    event = event or {}
+    meeting_date = _meeting_date(event.get("submission_meeting_date"))
+    if not meeting_date:
+        session_dates = [_meeting_date(value) for value in event.get("session_dates", [])]
+        session_dates = [value for value in session_dates if value]
+        meeting_date = max(session_dates) if session_dates else _meeting_date(event.get("meeting_date"))
+        # 연결 회차가 없는 과거 주차도 목→월 공유 발제문으로 해석한다.
+        if not session_dates and meeting_date and event.get("seminar_week_id"):
+            meeting_date = cycle_monday(meeting_date)
+    return meeting_date + timedelta(days=1) if meeting_date else None
 
 
 def topic_event_is_expired(event, today=None):
-    """모임일부터 7일째 되는 날 00시부터 마감으로 본다."""
+    """한국시간 기준 해당 회차 다음 날 00시부터 마감으로 본다."""
     deadline = topic_event_deadline(event)
-    return bool(deadline and (today or date.today()) >= deadline)
+    current = today if today is not None else datetime.now(KST)
+    if isinstance(current, datetime):
+        current = current.astimezone(KST).date() if current.tzinfo else current.date()
+    return bool(deadline and current >= deadline)
 
 
 def topic_event_is_open(event, today=None):

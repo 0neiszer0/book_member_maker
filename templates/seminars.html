@@ -23,14 +23,14 @@
         <p class="seminar-session-label">목요일 본 세미나</p>
         {% if thu %}
           <strong>{{ thu.meeting_date }}</strong>
-          <p>활성 회원은 기본 참석 대상입니다. 참석이 어렵다면 운영진에게 미리 알려주세요.</p>
+          <p>활성 회원은 기본 참석 대상입니다. 참석이 어렵다면 카카오톡 단톡방의 목요일 불참 투표에 참여해주세요.</p>
         {% else %}<p>이 주차에는 목요일 회차가 없습니다.</p>{% endif %}
       </section>
       <section>
         <p class="seminar-session-label">다음 월요일 추가 세미나</p>
         {% if mon %}
           <strong>{{ mon.meeting_date }}</strong>
-          <p>선착순 {{ mon.capacity or 10 }}명 · 현재 {{ mon.yes_count }}명 · 남은 자리 {{ [0,(mon.capacity or 10)-mon.yes_count]|max }}석</p>
+          <p>카카오톡 단톡방의 월요일 참석 투표에 참여해주세요. 정원·선착순 제한은 없습니다. 사이트 반영 {{ mon.expected_count }}명.</p>
         {% else %}<p>이 주차에는 월요일 회차가 없습니다.</p>{% endif %}
       </section>
     </div>
@@ -44,7 +44,7 @@
           <a class="seminar-btn seminar-btn-primary" href="{{ url_for('view_shared_topics', token=week.topic_event.share_token) }}">발제문 작성하기</a>
         {% endif %}
       {% endif %}
-      {% if mon and vote_url %}<a class="seminar-btn seminar-btn-secondary" href="{{ vote_url }}">월요일 신청 확인</a>{% endif %}
+      {% if mon %}<span class="seminar-chip">월요일 참석 투표는 카카오톡에서</span>{% endif %}
     </div>
     {% endif %}
   </article>
@@ -65,7 +65,7 @@
 <main class="seminar-shell">
   <header class="seminar-page-head">
     <div><p class="seminar-kicker">일정</p><h1>세미나</h1><p>가장 가까운 세미나와 지금 가능한 신청·발제문을 먼저 확인하세요.</p></div>
-    {% if vote_url %}<a class="seminar-btn seminar-btn-primary" href="{{ vote_url }}">월요일 참석 신청</a>{% endif %}
+    <a class="seminar-btn seminar-btn-primary" href="{{ url_for('my_term_attendance') }}">내 학기 참석 현황</a>
   </header>
 
   {% if not term %}

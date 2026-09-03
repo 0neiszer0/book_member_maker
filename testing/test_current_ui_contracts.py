@@ -81,10 +81,11 @@ class CurrentUiContractsTest(unittest.TestCase):
             for token in legacy_tokens:
                 self.assertNotIn(token, source, f"{token} remains in {template.name}")
 
-    def test_now_uses_the_registered_monday_vote_endpoint(self):
+    def test_now_no_longer_offers_retired_site_vote(self):
         engagement = self.read("engagement.py")
-        self.assertIn('url_for("seminar_vote_page", token=', engagement)
+        self.assertNotIn('url_for("seminar_vote_page", token=', engagement)
         self.assertNotIn('url_for("seminar_vote", token=', engagement)
+        self.assertIn('카카오톡에서 진행합니다', engagement)
 
     def test_legacy_genres_are_not_shown_in_seminar_activity(self):
         member = self.read("templates/records_member_profile.html")

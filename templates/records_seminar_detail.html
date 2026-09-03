@@ -3,398 +3,131 @@
 <html lang="ko">
 <head>
     <title>{{ row.date }} 세미나 - 기록 시스템</title>
-    {% include '_records_base.html' %}
+    {% include '_records_base.html' %}{% include '_app_theme_head.html' %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='group_editor.css') }}">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="{{ url_for('static', filename='group_editor.js') }}"></script>
     <style>
-        .pill-x { cursor: pointer; padding: 0 0.4rem; opacity: 0.6; border: 0; background: transparent; color: inherit; font: inherit; }
-        .pill-x:hover { opacity: 1; color: #ff5050; }
-        .member-pill { display: inline-flex; align-items: center; gap: 0.25rem; }
-        .member-add-btn {
-            background: var(--paper-2); color: var(--ink-soft); border: 1px dashed var(--line);
-            border-radius: 999px; padding: 0.2rem 0.7rem; font-size: 0.75rem;
-        }
-        .member-add-btn:hover { background: var(--moss-tint); color: var(--moss-deep); }
-        .fac-marker { color: var(--eva-purple); margin-left: 2px; }
-        .member-pill.gender-male { background:#E5F1F4;color:#28596A;border:1px solid #B8D5DE; }
-        .member-pill.gender-female { background:#F6E7EC;color:#7A4053;border:1px solid #E2BBC9; }
-        .member-pill.gender-unknown { background:#EEE9E1;color:#5E5548;border:1px solid #DDD2C2; }
-        .gender-label { display:inline-flex;align-items:center;justify-content:center;margin-left:.2rem;padding:.02rem .26rem;border-radius:999px;font-size:.58rem;font-weight:900;vertical-align:.08rem; }
-        .gender-label.gender-male { color:#28596A;background:#DCECF1; }
-        .gender-label.gender-female { color:#7A4053;background:#F2DCE4; }
-        #record-image-modal { display:none;position:fixed;z-index:1100;inset:0;background:rgba(0,0,0,.88);padding:2rem 1rem;align-items:center;justify-content:center;flex-direction:column;gap:.8rem; }
-        #record-image-content { max-width:92%;max-height:76vh;border-radius:10px;background:#FAF6EC;object-fit:contain; }
-        #record-image-download { display:inline-flex;border-radius:10px;padding:.7rem 1rem;background:#5C7A4A;color:#fff;font-weight:800; }
-        #record-image-close { position:absolute;top:12px;right:24px;color:#fff;font-size:40px;line-height:1;cursor:pointer; }
+        #record-image-modal { display:none;position:fixed;z-index:1100;inset:0;background:rgba(0,0,0,.88);padding:1rem;align-items:center;justify-content:center;flex-direction:column;gap:.8rem;overflow:auto; }
+        #record-image-content { max-width:100%;max-height:76vh;background:#FAF6EC;object-fit:contain; }
+        #record-image-download { border-radius:10px;padding:.8rem 1rem;background:#5C7A4A;color:#fff;font-weight:800; }
+        #record-image-close { position:absolute;top:8px;right:16px;color:#fff;background:#242424;border:0;border-radius:8px;min-width:44px;min-height:44px;font-size:30px; }
     </style>
-    {% include '_app_theme_head.html' %}
 </head>
 <body class="min-h-screen">
     {% include '_header.html' %}
-
     <div class="container mx-auto p-4 sm:p-6 lg:p-8">
         {{ records_nav('seminars') }}
-
-        <div class="flex justify-between items-center mb-4">
-            <a href="{{ url_for('records_seminars') }}" class="text-sm text-gray-400 hover:text-eva-green">← 세미나 목록</a>
-            <button type="button" onclick="deleteHistory()"
-                class="text-xs bg-red-700 hover:bg-red-600 text-white px-3 py-1.5 rounded">이 세미나 기록 삭제</button>
-        </div>
-
-        <!-- 메타 정보 -->
-        <div class="eva-card p-6 rounded-lg mb-6">
+        <div class="group-result-heading mb-4"><a href="{{ url_for('records_seminars') }}" class="text-sm text-gray-500">← 세미나 목록</a><button type="button" id="delete-history" class="bg-red-700 text-white px-3 py-2 rounded">이 세미나 기록 삭제</button></div>
+        <section class="eva-card p-4 sm:p-6 rounded-lg mb-6">
+            <h1 class="text-2xl font-bold text-eva-green mb-4">세미나 기록 편집</h1>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1">날짜</label>
-                    <input type="date" id="dateInput" value="{{ row.date }}"
-                        onchange="updateMeta('date', this.value)"
-                        class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm font-mono">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1">도서명</label>
-                    <input type="text" id="bookTitle" value="{{ row.book_title or '' }}" placeholder="도서명을 입력하세요"
-                        onblur="updateMeta('book_title', this.value)"
-                        class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm font-bold text-eva-green">
-                </div>
+                <label class="block">날짜<input type="date" id="dateInput" value="{{ row.date }}" class="w-full border rounded px-3 py-2" {% if row.seminar_session_id %}readonly{% endif %}></label>
+                <label class="block">도서명<input type="text" id="bookTitle" value="{{ row.book_title or '' }}" placeholder="도서명을 입력하세요" class="w-full border rounded px-3 py-2"></label>
             </div>
-            <div class="grid grid-cols-3 gap-4 text-center pt-3 border-t border-border-dark">
-                <div>
-                    <div class="text-xs text-gray-400">총 참여</div>
-                    <div class="text-2xl font-bold text-eva-green" id="statTotal">{{ total_present }}</div>
-                </div>
-                <div>
-                    <div class="text-xs text-gray-400">조 수</div>
-                    <div class="text-2xl font-bold" id="statGroups">{{ groups|length }}</div>
-                </div>
-                <div>
-                    <div class="text-xs text-gray-400">발제자</div>
-                    <div class="text-2xl font-bold text-eva-purple" id="statFacs">{{ (row.facilitators or [])|length }}</div>
-                </div>
+            <div class="grid grid-cols-3 gap-3 text-center pt-3 border-t">
+                <div><p class="text-sm text-gray-500">배정 인원</p><strong class="text-2xl" id="statTotal">{{ total_present }}</strong></div>
+                <div><p class="text-sm text-gray-500">조 수</p><strong class="text-2xl" id="statGroups">{{ groups|length }}</strong></div>
+                <div><p class="text-sm text-gray-500">발제자</p><strong class="text-2xl" id="statFacs">{{ (row.facilitators or [])|length }}</strong></div>
             </div>
-        </div>
-
-        <!-- 발제자 편집 -->
-        <div class="eva-card p-5 rounded-lg mb-6">
-            <div class="flex flex-wrap justify-between items-center gap-3 mb-3">
-                <h2 class="text-lg font-bold text-eva-purple"><i data-lucide="megaphone" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 발제자</h2>
-                <button type="button" onclick="saveFacilitators()"
-                    class="text-xs bg-eva-purple text-white px-3 py-1.5 rounded hover:opacity-80">저장</button>
-            </div>
-            <p class="text-xs text-gray-500 mb-2">참여자 클릭으로 발제자 토글. 또는 아래에서 직접 추가/제거.</p>
-            <div id="facList" class="flex flex-wrap gap-2 mb-3"></div>
-            <div class="flex gap-2 items-center">
-                <select id="facAdd" class="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm flex-1">
-                    <option value="">+ 발제자 추가 (참여자 또는 멤버 선택)</option>
-                </select>
-                <button type="button" onclick="addFac()" class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-3 py-1.5 rounded">추가</button>
-            </div>
-        </div>
-
-        <!-- 조 편성 편집 -->
-        <div class="eva-card p-5 rounded-lg mb-6">
-            <div class="flex flex-wrap justify-between items-center gap-3 mb-3">
-                <h2 class="text-lg font-bold text-eva-green"><i data-lucide="puzzle" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 조 편성</h2>
-                <div class="flex gap-2">
-                    <button type="button" onclick="captureSavedGroups()"
-                        class="text-xs bg-[#6B4B2D] text-white px-3 py-1.5 rounded">PNG 다시 만들기</button>
-                    <button type="button" onclick="addGroup()"
-                        class="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded">+ 조 추가</button>
-                    <button type="button" onclick="saveGroups()"
-                        class="text-xs bg-eva-green text-black font-bold px-3 py-1.5 rounded hover:opacity-80">저장</button>
-                </div>
-            </div>
-            <p class="text-xs text-gray-500 mb-2">멤버 클릭으로 발제자 토글(★). 발제자 변경은 위에서 별도 저장. PNG는 현재 화면의 조 편성으로 다시 만들 수 있습니다.</p>
-            <div class="flex gap-3 flex-wrap text-xs mb-3 text-[#6B6255]"><strong>이름 색상</strong><span><span class="gender-label gender-female">여</span> 여성</span><span><span class="gender-label gender-male">남</span> 남성</span></div>
-            <div id="groupsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
-        </div>
+            <p class="text-sm text-gray-500 mt-3">편성 수정과 실제 출석 확정은 별개입니다. 발제자는 이름을 누른 뒤 지정·해제할 수 있습니다. 날짜·도서명·발제자·편성은 아래 저장 버튼으로 함께 저장합니다.</p>
+            {% if not row.seminar_session_id %}
+            <label class="flex items-center gap-3 mt-4"><input type="checkbox" id="confirm-attendance" class="w-5 h-5">현재 배정 인원을 실제 참석 기록으로 확정</label>
+            <p class="text-sm text-gray-500 mt-2">과거 또는 오늘 진행한 세미나만 확정할 수 있습니다. 체크하지 않으면 기존 실제 출석은 유지되고 편성만 저장됩니다.{% if row.attendance_confirmed_at %} 이 기록은 실제 출석이 확정되어 있습니다.{% else %} 아직 실제 출석이 확정되지 않았습니다.{% endif %}</p>
+            {% else %}
+            <a href="{{ url_for('admin_seminar_roster', session_id=row.seminar_session_id) }}" class="inline-block mt-3 underline">이 회차 실제 출석 확인·확정하기</a>
+            {% endif %}
+        </section>
+        <section class="eva-card p-4 sm:p-6 rounded-lg mb-6">
+            <h2 class="text-xl font-bold text-eva-green mb-3">조 편성</h2>
+            <div id="groupsContainer"></div>
+            <div class="group-editor-actions"><button type="button" id="save-groups" class="bg-eva-green text-white rounded">변경사항 저장</button><button type="button" id="capture-groups" class="bg-gray-700 text-white rounded">PNG 다시 만들기</button></div>
+            <p id="save-status" role="status" aria-live="polite" class="text-sm mt-3"></p>
+        </section>
     </div>
-
-    <div id="record-image-modal" role="dialog" aria-modal="true" aria-label="조 편성 캡처 미리보기">
-        <button id="record-image-close" type="button" aria-label="닫기">&times;</button>
-        <img id="record-image-content" alt="조 편성 캡처 미리보기">
-        <div class="text-sm text-white">이미지를 길게 누르거나 아래 버튼으로 저장하세요.</div>
-        <a id="record-image-download" download="책먹는호반우-조편성-기록.png">PNG 이미지 다운로드</a>
-    </div>
-
+    <div id="record-image-modal" role="dialog" aria-modal="true" aria-label="조 편성 캡처 미리보기"><button id="record-image-close" type="button" aria-label="닫기">×</button><img id="record-image-content" alt="조 편성 캡처 미리보기"><p class="text-white">이미지를 길게 누르거나 아래 버튼으로 저장하세요.</p><a id="record-image-download" download="책먹는호반우-조편성-기록.png">PNG 이미지 다운로드</a></div>
     {{ genre_script() }}
+    <script id="record-editor-data" type="application/json">{{ {'historyId': row.id, 'groups': groups, 'groupNames': ((row.group_editor_state or {}).get('group_names') or []), 'participants': ((row.group_editor_state or {}).get('participants') or row.present or []), 'excluded': ((row.group_editor_state or {}).get('excluded') or []), 'facilitators': (row.facilitators or []), 'members': all_members, 'genders': member_genders, 'meetingHistory': meeting_history}|tojson }}</script>
     <script>
-        const HISTORY_ID = {{ row.id | tojson }};
-        const ALL_MEMBERS = {{ all_members | tojson }};
-        let groups = {{ groups | tojson }};
-        let facilitators = {{ (row.facilitators or []) | tojson }};
-        const memberMap = {{ member_map | tojson }};
-        const MEMBER_GENDERS = {{ member_genders | tojson }};
-
-        function escapeHtml(s) {
-            return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-        }
-
-        function inlineJsString(s) {
-            return escapeHtml(JSON.stringify(String(s)));
-        }
-
-        function profileUrl(name) {
-            const id = memberMap[name];
-            return id ? `/records/members/${id}` : null;
-        }
-
-        function genderClass(name) {
-            return MEMBER_GENDERS[name] === 'M' ? 'gender-male' : (MEMBER_GENDERS[name] === 'W' ? 'gender-female' : 'gender-unknown');
-        }
-
-        function genderLabel(name) {
-            return MEMBER_GENDERS[name] === 'M'
-                ? '<small class="gender-label gender-male">남</small>'
-                : (MEMBER_GENDERS[name] === 'W' ? '<small class="gender-label gender-female">여</small>' : '');
-        }
-
-        // ---- 발제자 ----
-        function renderFacs() {
-            const list = document.getElementById('facList');
-            if (facilitators.length === 0) {
-                list.innerHTML = '<span class="text-gray-500 text-sm">발제자가 없습니다.</span>';
-            } else {
-                list.innerHTML = facilitators.map(name => `
-                    <span class="member-pill bg-eva-purple text-white px-3 py-1 rounded-full text-sm">
-                        ${escapeHtml(name)}
-                        <button type="button" class="pill-x" onclick="removeFac(${inlineJsString(name)})" aria-label="제거">✕</button>
-                    </span>
-                `).join('');
+        const data = JSON.parse(document.getElementById('record-editor-data').textContent);
+        const editor = GroupEditor.mount(document.getElementById('groupsContainer'), {...data,
+            onChange(state) {
+                document.getElementById('statTotal').textContent = state.groups.flat().length;
+                document.getElementById('statGroups').textContent = state.groups.length;
+                document.getElementById('statFacs').textContent = state.payload().facilitators.length;
             }
-            // 후보 셀렉터 업데이트: 현재 참여자 + 전체 멤버 union, 이미 발제자인 사람 제외
-            const present = new Set();
-            groups.forEach(g => g.forEach(n => present.add(n)));
-            const candidates = new Set([...present, ...ALL_MEMBERS.map(m => m.name)]);
-            facilitators.forEach(f => candidates.delete(f));
-            const sel = document.getElementById('facAdd');
-            sel.innerHTML = '<option value="">+ 발제자 추가</option>' +
-                Array.from(candidates).sort().map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
-            document.getElementById('statFacs').textContent = facilitators.length;
-        }
-        function removeFac(name) {
-            facilitators = facilitators.filter(f => f !== name);
-            renderFacs();
-            renderGroups();
-        }
-        function addFac() {
-            const v = document.getElementById('facAdd').value;
-            if (!v) return;
-            if (!facilitators.includes(v)) facilitators.push(v);
-            renderFacs();
-            renderGroups();
-        }
-        async function saveFacilitators() {
-            const ok = await postMeta({ facilitators });
-            if (ok) toast('발제자 저장 완료');
-        }
-
-        // ---- 조 편성 ----
-        function renderGroups() {
-            const cont = document.getElementById('groupsContainer');
-            if (groups.length === 0) {
-                cont.innerHTML = '<p class="text-gray-500 text-sm col-span-full">조가 없습니다. + 조 추가를 누르세요.</p>';
-            } else {
-                cont.innerHTML = groups.map((g, gi) => {
-                    const memberOptions = ALL_MEMBERS
-                        .filter(m => !g.includes(m.name))
-                        .map(m => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}${m.gender_code === 'M' ? ' (남)' : (m.gender_code === 'W' ? ' (여)' : '')}</option>`)
-                        .join('');
-                    const pills = g.map(name => {
-                        const url = profileUrl(name);
-                        const isFac = facilitators.includes(name);
-                        const facMark = isFac ? '<span class="fac-marker">★</span>' : '';
-                        const tag = url
-                            ? `<a href="${url}" class="font-bold hover:underline">${escapeHtml(name)}${facMark}</a>`
-                            : `<span class="font-bold">${escapeHtml(name)}${facMark}</span>`;
-                        return `<span class="member-pill ${genderClass(name)} px-3 py-1 rounded-full text-sm ${isFac ? 'ring-2 ring-[#7A5A3A]' : ''}">
-                            ${tag}${genderLabel(name)}
-                            <button type="button" class="pill-x" onclick="toggleFac(${inlineJsString(name)})" aria-label="발제자 토글">★</button>
-                            <button type="button" class="pill-x" onclick="removeMember(${gi}, ${inlineJsString(name)})" aria-label="조에서 제거">✕</button>
-                        </span>`;
-                    }).join('');
-                    return `
-                    <div class="bg-gray-800/40 border border-border-dark p-4 rounded-lg">
-                        <div class="flex justify-between items-center mb-2">
-                            <h3 class="font-bold text-eva-green">조 ${gi + 1} (${g.length}명)</h3>
-                            <button type="button" onclick="removeGroup(${gi})" class="text-xs text-red-400 hover:text-red-300">조 삭제</button>
-                        </div>
-                        <div class="flex flex-wrap gap-2 mb-3">${pills || '<span class="text-gray-500 text-xs">멤버 없음</span>'}</div>
-                        <div class="flex gap-2">
-                            <select class="add-mem-sel flex-1 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs" data-gi="${gi}">
-                                <option value="">+ 멤버 추가</option>
-                                ${memberOptions}
-                            </select>
-                            <button type="button" onclick="addMember(${gi})" class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-2 py-1 rounded">추가</button>
-                        </div>
-                    </div>`;
-                }).join('');
+        });
+        let savedMeta = JSON.stringify([document.getElementById('dateInput').value, document.getElementById('bookTitle').value]);
+        let historyDeleted = false;
+        let editorBusy = false;
+        window.addEventListener('beforeunload', event => {
+            const current = JSON.stringify([document.getElementById('dateInput').value, document.getElementById('bookTitle').value]);
+            if (!historyDeleted && savedMeta !== current) { event.preventDefault(); event.returnValue = ''; }
+        });
+        document.getElementById('save-groups').addEventListener('click', async event => {
+            if (editorBusy || !editor.ready()) return;
+            editorBusy = true;
+            const button = event.currentTarget;
+            button.disabled = true;
+            document.getElementById('groupsContainer').inert = true;
+            document.getElementById('dateInput').disabled = true;
+            document.getElementById('bookTitle').disabled = true;
+            const confirmAttendance = document.getElementById('confirm-attendance');
+            const shouldConfirm = !!confirmAttendance?.checked;
+            if (confirmAttendance) confirmAttendance.disabled = true;
+            try {
+                const payload = {...editor.state.payload(), date:document.getElementById('dateInput').value, book_title:document.getElementById('bookTitle').value.trim(), confirm_attendance:shouldConfirm};
+                const response = await fetch('/api/admin/history/' + data.historyId + '/update_meta', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+                const result = await response.json();
+                if (!response.ok || result.status !== 'success') throw new Error(result.message || '저장하지 못했습니다.');
+                editor.markSaved();
+                savedMeta = JSON.stringify([document.getElementById('dateInput').value, document.getElementById('bookTitle').value]);
+                if (confirmAttendance) confirmAttendance.checked = false;
+                document.getElementById('save-status').textContent = shouldConfirm ? '편성을 저장하고 현재 배정 인원을 실제 참석으로 확정했습니다.' : '날짜·도서명·발제자·조 편성을 저장했습니다. 실제 출석 상태는 변경하지 않았습니다.';
+            } catch (error) { alert(error.message); }
+            finally {
+                button.disabled = false;
+                document.getElementById('groupsContainer').inert = false;
+                document.getElementById('dateInput').disabled = false;
+                document.getElementById('bookTitle').disabled = false;
+                if (confirmAttendance) confirmAttendance.disabled = false;
+                editorBusy = false;
             }
-            // 통계 업데이트
-            const total = groups.reduce((acc, g) => acc + g.length, 0);
-            document.getElementById('statTotal').textContent = total;
-            document.getElementById('statGroups').textContent = groups.length;
-        }
-        function addGroup() { groups.push([]); renderGroups(); }
-        function removeGroup(gi) {
-            if (!confirm(`조 ${gi + 1}을 삭제하시겠습니까?`)) return;
-            groups.splice(gi, 1); renderGroups();
-        }
-        function addMember(gi) {
-            const sel = document.querySelector(`.add-mem-sel[data-gi="${gi}"]`);
-            const name = sel?.value;
-            if (!name) return;
-            if (groups[gi].includes(name)) return;
-            groups[gi].push(name);
-            renderGroups();
-        }
-        function removeMember(gi, name) {
-            groups[gi] = groups[gi].filter(n => n !== name);
-            renderGroups();
-        }
-        function toggleFac(name) {
-            if (facilitators.includes(name)) facilitators = facilitators.filter(f => f !== name);
-            else facilitators.push(name);
-            renderFacs();
-            renderGroups();
-        }
-        async function saveGroups() {
-            const ok = await postMeta({ groups });
-            if (ok) toast('조 편성 저장 완료');
-        }
-
+        });
         async function captureSavedGroups() {
-            if (typeof html2canvas === 'undefined') {
-                alert('캡처 기능을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
-                return;
-            }
-            const nonEmptyGroups = groups.filter(group => Array.isArray(group) && group.length);
-            if (!nonEmptyGroups.length) {
-                alert('캡처할 조 편성이 없습니다.');
-                return;
-            }
-
-            const captureContainer = document.createElement('div');
+            if (editorBusy || !editor.ready()) return;
+            editorBusy = true;
+            const button = document.getElementById('capture-groups');
+            button.disabled = true;
+            document.getElementById('groupsContainer').inert = true;
+            const payload = {...data, ...editor.state.payload(), date:document.getElementById('dateInput').value, bookTitle:document.getElementById('bookTitle').value.trim()};
             try {
-                Object.assign(captureContainer.style, {
-                    position: 'fixed', top: '0px', left: '0px', zIndex: '-1',
-                    width: '900px', padding: '44px', backgroundColor: '#FAF6EC',
-                    color: '#2A241B', fontFamily: "'Noto Sans KR', sans-serif",
-                    border: '1px solid #E5D7B8', borderRadius: '24px',
-                    boxSizing: 'border-box', pointerEvents: 'none', lineHeight: '1.5'
-                });
-                captureContainer.setAttribute('aria-hidden', 'true');
-                const escapeText = value => String(value).replace(/[&<>"']/g, char => ({
-                    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-                })[char]);
-                const meetingDate = document.getElementById('dateInput').value;
-                const bookTitle = document.getElementById('bookTitle').value.trim();
-                const total = nonEmptyGroups.reduce((sum, group) => sum + group.length, 0);
-                const metaItems = [meetingDate, bookTitle, `총 ${total}명 · ${nonEmptyGroups.length}개 조`]
-                    .filter(Boolean)
-                    .map(value => `<span style="display:inline-block;padding:7px 12px;border-radius:999px;background:#E8EFDD;color:#3D5C2E;font-size:13px;font-weight:700;">${escapeText(value)}</span>`)
-                    .join(' ');
-                let innerHTML = `
-                    <div style="border-bottom:2px solid #3D5C2E;padding-bottom:22px;margin-bottom:24px;">
-                        <div style="font-size:13px;font-weight:800;letter-spacing:.12em;color:#7A5A3A;margin-bottom:8px;">책 먹는 호반우</div>
-                        <h3 style="font-size:30px;line-height:1.25;font-weight:800;color:#2A241B;margin:0 0 14px;letter-spacing:-.04em;">세미나 조 편성</h3>
-                        <div style="display:flex;gap:8px;flex-wrap:wrap;">${metaItems}</div>
-                    </div>
-                    <div style="display:grid;grid-template-columns:1fr;gap:12px;">`;
-                nonEmptyGroups.forEach((group, index) => {
-                    const memberNames = group.map(name => {
-                        const safeName = escapeText(name);
-                        const gender = MEMBER_GENDERS[name];
-                        const color = gender === 'M' ? '#2E6275' : (gender === 'W' ? '#8A4F62' : '#40382E');
-                        const label = gender === 'M' ? '남' : (gender === 'W' ? '여' : '');
-                        const labelColor = gender === 'M' ? '#28596A' : '#7A4053';
-                        const labelBackground = gender === 'M' ? '#DCECF1' : '#F2DCE4';
-                        const labelHtml = label ? `<small style="display:inline-block;margin-left:3px;padding:1px 4px;border-radius:999px;color:${labelColor};background:${labelBackground};font-size:9px;font-weight:850;vertical-align:2px;">${label}</small>` : '';
-                        const nameHtml = facilitators.includes(name) ? `<strong style="font-weight:850;">${safeName}</strong>` : safeName;
-                        return `<span style="color:${color};white-space:nowrap;">${nameHtml}${labelHtml}</span>`;
-                    }).join(', ');
-                    innerHTML += `
-                        <section style="padding:18px;border:1px solid #E5D7B8;border-radius:16px;background:#FFFCF3;box-shadow:0 5px 14px rgba(74,57,35,.07);">
-                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                                <strong style="font-size:17px;color:#3D5C2E;">조 ${index + 1}</strong>
-                                <span style="font-size:12px;color:#7D705E;">${group.length}명</span>
-                            </div>
-                            <div style="white-space:nowrap;overflow:hidden;color:#40382E;font-size:15px;line-height:1.5;">${memberNames}</div>
-                        </section>`;
-                });
-                innerHTML += `</div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:24px;padding-top:16px;border-top:1px solid #E5D7B8;color:#807361;font-size:11px;">
-                        <span>여성은 자주색, 남성은 청록색 · 진한 이름은 발제자</span><span>book-member-maker</span>
-                    </div>`;
-                captureContainer.innerHTML = innerHTML;
-                document.body.appendChild(captureContainer);
-                if (document.fonts && document.fonts.ready) await document.fonts.ready;
-
-                const canvas = await html2canvas(captureContainer, {
-                    scale: 2, backgroundColor: '#FAF6EC', useCORS: true, logging: false,
-                    scrollX: 0, scrollY: 0, windowWidth: 900,
-                    windowHeight: captureContainer.scrollHeight,
-                });
-                const dataUrl = canvas.toDataURL('image/png');
-                document.getElementById('record-image-content').src = dataUrl;
-                document.getElementById('record-image-download').href = dataUrl;
+                if (!(await GroupEditor.validate(payload.groups))) return;
+                const image = await GroupEditor.capture(payload);
+                document.getElementById('record-image-content').src = image;
+                document.getElementById('record-image-download').href = image;
                 document.getElementById('record-image-modal').style.display = 'flex';
-            } catch (error) {
-                console.error('기록 캡처 실패:', error);
-                alert('PNG를 만드는 중 오류가 발생했습니다: ' + error.message);
-            } finally {
-                if (document.body.contains(captureContainer)) captureContainer.remove();
-            }
+                document.getElementById('record-image-close').focus();
+            } catch (error) { alert(error.message); }
+            finally { button.disabled = false; document.getElementById('groupsContainer').inert = false; editorBusy = false; }
         }
-
-        // ---- 메타 공통 ----
-        async function updateMeta(field, value) {
-            await postMeta({ [field]: value });
-        }
-        async function postMeta(payload) {
-            try {
-                const res = await fetch(`/api/admin/history/${HISTORY_ID}/update_meta`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                });
-                const data = await res.json();
-                if (data.status !== 'success') {
-                    alert('저장 실패: ' + (data.message || '오류'));
-                    return false;
-                }
-                return true;
-            } catch (err) {
-                alert('오류: ' + err.message);
-                return false;
-            }
-        }
-
-        async function deleteHistory() {
+        document.getElementById('capture-groups').addEventListener('click', captureSavedGroups);
+        document.getElementById('delete-history').addEventListener('click', async () => {
             if (!confirm('이 세미나 기록을 영구 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
             try {
-                const res = await fetch(`/api/admin/history/${HISTORY_ID}/delete`, { method: 'POST' });
-                const data = await res.json();
-                if (data.status === 'success') window.location.href = '{{ url_for("records_seminars") }}';
-                else alert('삭제 실패: ' + (data.message || '오류'));
-            } catch (err) { alert('오류: ' + err.message); }
-        }
-
-        function toast(msg) {
-            const el = document.createElement('div');
-            el.textContent = msg;
-            el.className = 'fixed bottom-6 right-6 bg-eva-green text-black font-bold px-4 py-2 rounded shadow-lg z-50';
-            document.body.appendChild(el);
-            setTimeout(() => el.remove(), 2000);
-        }
-
-        // 초기 렌더
-        renderFacs();
-        renderGroups();
-        const recordImageModal = document.getElementById('record-image-modal');
-        document.getElementById('record-image-close').onclick = () => { recordImageModal.style.display = 'none'; };
-        recordImageModal.onclick = event => { if (event.target === recordImageModal) recordImageModal.style.display = 'none'; };
-        document.addEventListener('keydown', event => {
-            if (event.key === 'Escape' && recordImageModal.style.display === 'flex') recordImageModal.style.display = 'none';
+                const response = await fetch('/api/admin/history/' + data.historyId + '/delete', {method:'POST'});
+                const result = await response.json();
+                if (!response.ok || result.status !== 'success') throw new Error(result.message || '삭제하지 못했습니다.');
+                historyDeleted = true;
+                editor.markSaved();
+                window.location.href = '{{ url_for("records_seminars") }}';
+            } catch (error) { alert(error.message); }
         });
+        const modal = document.getElementById('record-image-modal');
+        const closeModal = () => { modal.style.display = 'none'; };
+        document.getElementById('record-image-close').addEventListener('click', closeModal);
+        modal.addEventListener('click', event => { if (event.target === modal) closeModal(); });
+        document.addEventListener('keydown', event => { if (event.key === 'Escape') closeModal(); });
     </script>
 </body>
 </html>
