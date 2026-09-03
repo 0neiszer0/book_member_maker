@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>사회자 설정 · 책 먹는 호반우</title>
+  {% include '_tailwind_head.html' %}
+  {% include '_app_theme_head.html' %}
+  <style>
+    .moderator-page { max-width: 44rem; margin: 2rem auto; padding: 0 1rem; }
+    .moderator-panel { background: #fffdf7; border: 1px solid #c9b38a; border-radius: 1.25rem; padding: clamp(1rem, 4vw, 2rem); }
+    .moderator-panel label { display: block; font-weight: 700; margin-bottom: .5rem; }
+    .moderator-field { width: 100%; min-width: 0; min-height: 48px; font: inherit; padding: .7rem; border: 1px solid #b6a989; border-radius: .65rem; background: #fffdf8; }
+    .moderator-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.5rem; }
+    .moderator-actions > * { min-height: 44px; padding: .7rem 1rem; border-radius: .65rem; font: inherit; font-weight: 700; }
+    .moderator-primary { background: #3d5c2e; color: white; }
+    .moderator-secondary { background: #f2ebd8; color: #2a241b; }
+    .moderator-note { margin-top: .5rem; color: #5e5548; line-height: 1.6; }
+    .moderator-error { border: 1px solid #b43c3c; color: #8d2626; background: #fff0ee; padding: .8rem; border-radius: .65rem; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+  {% include '_header.html' %}
+  <main class="moderator-page">
+    <section class="moderator-panel">
+      <h1 class="text-2xl font-extrabold">{% if download %}발제문 다운로드 준비{% else %}이 회차 사회자 설정{% endif %}</h1>
+      <p class="moderator-note">{{ event.book_title or '세미나' }} · {% if download %}문서에 표시할 날짜와 사회자를 확인해주세요.{% else %}목요일·월요일 사회자를 각각 저장합니다.{% endif %}</p>
+      {% if seminar_sessions|length > 1 %}<p class="moderator-note">발제문 질문 목록은 공유하고, 날짜와 사회자만 선택한 회차에 맞춰 출력합니다.</p>{% endif %}
+      {% if error %}<p class="moderator-error" role="alert">{{ error }}</p>{% endif %}
+      <form method="post" class="mt-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="download" value="{{ '1' if download else '0' }}">
+        {% if seminar_sessions|length > 1 %}
+        <label for="document-session">세미나 날짜</label>
+        <select id="document-session" class="moderator-field" name="session_id" required>
+          <option value="">날짜를 선택해주세요</option>
+          {% for item in seminar_sessions %}<option value="{{ item.id }}" data-moderator="{{ item.moderator_name or '' }}" {% if selected_session and selected_session.id == item.id %}selected{% endif %}>{{ item.meeting_date }}{% if item.day_type == 'thu' %} (목){% elif item.day_type == 'mon' %} (월){% endif %}</option>{% endfor %}
+        </select>
+        {% else %}
+        {% if selected_session %}<input type="hidden" name="session_id" value="{{ selected_session.id }}">{% endif %}
+        <p class="font-bold">세미나 날짜: {{ selected_session.meeting_date if selected_session else event.meeting_date }}</p>
+        {% endif %}
+        <div class="mt-5">
+          <label for="moderator-member">회원 목록에서 이름 가져오기 <span class="font-normal">(선택)</span></label>
+          <select id="moderator-member" class="moderator-field">
+            <option value="">직접 입력하거나 회원을 선택하세요</option>
+            {% for member in members %}<option value="{{ member.name }}">{{ member.name }}{% if member.department %} · {{ member.department }}{% endif %}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="mt-5">
+          <label for="moderator-name">사회자 이름 <span aria-label="필수">*</span></label>
+          <input id="moderator-name" class="moderator-field" name="moderator_name" value="{{ moderator_name or '' }}" maxlength="100" required autocomplete="off" placeholder="이번 세미나의 사회자 이름">
+          <p class="moderator-note">조별 진행자와 별도로 저장합니다. 이름이 비어 있으면 다운로드할 수 없습니다.</p>
+        </div>
+        <div class="moderator-actions">
+          <button class="moderator-primary" type="submit">{% if download %}저장하고 Word 다운로드{% else %}사회자 저장{% endif %}</button>
+          <a class="moderator-secondary" href="{{ url_for('admin_seminars') }}">세미나 운영으로</a>
+        </div>
+      </form>
+    </section>
+  </main>
+  <script>
+    const moderatorName = document.getElementById('moderator-name');
+    document.getElementById('moderator-member').addEventListener('change', (event) => {
+      if (event.target.value) moderatorName.value = event.target.value;
+      moderatorName.focus();
+    });
+    document.getElementById('document-session')?.addEventListener('change', (event) => {
+      moderatorName.value = event.target.selectedOptions[0]?.dataset.moderator || '';
+      document.getElementById('moderator-member').value = '';
+    });
+  </script>
+</body>
+</html>

@@ -87,7 +87,7 @@
       <select class="field !w-auto" onchange="location.href='{{ url_for('admin_seminars') }}?term_id='+this.value">
         {% for item in terms %}<option value="{{ item.id }}" {% if term and item.id==term.id %}selected{% endif %}>{{ item.name }}{% if not item.is_active %} · 보관됨{% endif %}</option>{% endfor %}
       </select>
-      {% if share_url %}<button class="btn soft" data-copy="{{ share_url }}">월요일 신청 링크 복사</button>{% endif %}
+      <a class="btn soft" href="{{ url_for('admin_term_attendance', term_id=term.id if term else '') }}">학기 참석 현황</a>
     </div>
   </div>
 
@@ -98,7 +98,7 @@
         <input class="field sm:col-span-3" name="name" required placeholder="학기명 (예: 2026-2학기)">
         <input class="field" type="date" name="start_date" required><input class="field" type="date" name="end_date" required>
         <button class="btn primary" type="submit">새 학기 만들기</button>
-        <p class="sm:col-span-3 text-xs muted">기간 안의 목요일 본 세미나와 다음 월요일 추가 세미나가 한 묶음으로 자동 생성됩니다. 월요일 정원은 10명으로 시작합니다.</p>
+        <p class="sm:col-span-3 text-xs muted">목요일과 다음 월요일이 한 묶음으로 생성됩니다. 목요일은 카카오톡 불참 투표, 월요일은 참석 투표를 반영하며 정원·선착순 제한은 없습니다.</p>
         {% if term and term.is_active %}<button type="button" class="btn soft sm:col-span-3 justify-self-start archive-term" data-term-id="{{ term.id }}">현재 학기 보관</button>{% endif %}
       </form>
       <div>
@@ -141,11 +141,12 @@
           </div>
         </div>
         <div class="rounded-2xl border border-[#dce6d2] p-4 order-3">
-          <div class="flex justify-between gap-2"><div><p class="text-xs font-bold muted">MONDAY</p><h3 class="font-extrabold">월요일 신청제</h3></div>{% if mon %}<span class="chip">{{ mon.yes_count }}/{{ mon.capacity or 10 }}명</span>{% endif %}</div>
+          <div class="flex justify-between gap-2"><div><p class="text-xs font-bold muted">MONDAY</p><h3 class="font-extrabold">월요일 참석 투표</h3></div>{% if mon %}<span class="chip">예정 {{ mon.expected_count }}명</span>{% endif %}</div>
           {% if mon %}
-            <p class="text-sm muted mt-2">{{ mon.meeting_date }} · 남은 자리 {{ [0,(mon.capacity or 10)-mon.yes_count]|max }}석</p>
-            <div class="flex gap-2 mt-3"><input class="field !w-24 capacity" type="number" min="1" value="{{ mon.capacity or 10 }}" aria-label="월요일 추가 세미나 정원"><button class="btn soft save-capacity" data-session-id="{{ mon.id }}">이 정원으로 변경</button></div>
-            <p class="text-xs muted mt-2">숫자를 바꾼 뒤 ‘이 정원으로 변경’을 눌러야 반영됩니다.</p>
+            <p class="text-sm muted mt-2">{{ mon.meeting_date }} · 정원·선착순 제한 없음</p>
+            <div class="flex flex-wrap gap-2 mt-3"><a class="btn primary" href="{{ url_for('admin_seminar_roster', session_id=mon.id) }}">카카오톡 참석 명단 반영·출석 확정</a></div>
+            <p class="text-sm muted mt-2">{{ '실제 출석 확정됨' if mon.attendance_confirmed_at else '실제 출석 미확정' }} · {{ '명단 반영됨' if mon.roster_updated_at else '투표 결과 반영 전' }}</p>
+            <p class="text-sm mt-2">사회자: {{ mon.moderator_name or '미입력' }} <a class="underline" href="{{ url_for('seminar_session_moderator', session_id=mon.id) }}">수정</a>{% if week.topic_event %} · <a class="underline" href="{{ url_for('download_topics_word', event_id=week.topic_event.id, session_id=mon.id) }}">월요일 Word</a>{% endif %}</p>
             <div class="flex flex-wrap gap-1 mt-3">{% for m in mon.attendees %}<span class="chip">{{ m.name }}</span>{% else %}<span class="text-sm muted">신청자가 없습니다.</span>{% endfor %}</div>
             <div class="flex flex-wrap gap-2 mt-4"><a class="btn primary" href="{{ url_for('bookclub_index', session_id=mon.id) }}">조 편성</a>{% if mon.history %}<a class="btn soft" href="{{ url_for('records_seminar_detail', history_id=mon.history.id) }}">진행 기록</a>{% endif %}{% if not mon.review_form %}<button class="btn soft open-review" data-session-id="{{ mon.id }}">후기 받기</button>{% endif %}</div>
             {{ review_panel(mon) }}
@@ -156,6 +157,10 @@
           <div class="flex justify-between gap-2"><div><p class="text-xs font-bold muted">THURSDAY</p><h3 class="font-extrabold">목요일 불참 기록</h3></div>{% if thu %}<span class="chip">예상 {{ thu.expected_count }}명</span>{% endif %}</div>
           {% if thu %}
             <p class="text-sm muted mt-2">{{ thu.meeting_date }} · 불참 {{ thu.absences|length }}명</p>
+            <div class="flex flex-wrap gap-2 mt-3"><a class="btn primary" href="{{ url_for('admin_seminar_roster', session_id=thu.id) }}">카카오톡 불참 명단 반영·출석 확정</a></div>
+            <p class="text-sm muted mt-2">{{ '실제 출석 확정됨' if thu.attendance_confirmed_at else '실제 출석 미확정' }} · {{ '명단 반영됨' if thu.roster_updated_at else '투표 결과 반영 전' }}</p>
+            <p class="text-sm mt-2">사회자: {{ thu.moderator_name or '미입력' }} <a class="underline" href="{{ url_for('seminar_session_moderator', session_id=thu.id) }}">수정</a>{% if week.topic_event %} · <a class="underline" href="{{ url_for('download_topics_word', event_id=week.topic_event.id, session_id=thu.id) }}">목요일 Word</a>{% endif %}</p>
+            {% if thu.planned_member_ids is none %}
             <div class="flex flex-wrap gap-1 mt-3">{% for a in thu.absences %}<button class="chip absence-cancel" title="불참 취소" data-session-id="{{ thu.id }}" data-member-id="{{ a.member.id }}">{{ a.member.name }}{% if a.note %} · {{ a.note }}{% endif %} ×</button>{% else %}<span class="text-sm muted">등록된 불참자가 없습니다.</span>{% endfor %}</div>
             <details class="absence-picker mt-3 rounded-xl border border-[#eadac5] bg-[#fffdf8] p-3">
               <summary class="font-bold cursor-pointer">여러 명 한 번에 선택</summary>
@@ -176,6 +181,7 @@
                 <button type="button" class="btn primary add-absences mt-2" data-session-id="{{ thu.id }}" {% if picker.count == 0 %}disabled{% endif %}>선택한 회원 불참 처리</button>
               </div>
             </details>
+            {% endif %}
             <div class="flex flex-wrap gap-2 mt-4"><a class="btn primary" href="{{ url_for('bookclub_index', session_id=thu.id) }}">조 편성</a>{% if thu.history %}<a class="btn soft" href="{{ url_for('records_seminar_detail', history_id=thu.history.id) }}">진행 기록</a>{% endif %}{% if not thu.review_form %}<button class="btn soft open-review" data-session-id="{{ thu.id }}">후기 받기</button>{% endif %}</div>
             {{ review_panel(thu) }}
             {{ no_show_panel(thu) }}

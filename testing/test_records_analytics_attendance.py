@@ -31,26 +31,29 @@ class RecordsAnalyticsAttendanceTest(unittest.TestCase):
             self.app_source.index("def _build_attendance_matrix"):
             self.app_source.index("def admin_attendance_matrix")
         ]
-        self.assertIn("session_key = str(h.get('id')", helper)
+        self.assertIn("build_term_attendance", helper)
+        self.assertIn("attendance_confirmed_at,actual_member_ids", helper)
         self.assertIn("weekday_labels", helper)
         self.assertNotIn("isocalendar", helper)
         self.assertIn("같은 주의 월·목 회차도 각각", self.matrix_template)
 
-    def test_analytics_uses_present_roster_and_exposes_adjustable_minimum(self):
+    def test_analytics_uses_actual_matrix_and_moves_minimum_to_term_page(self):
         route = self.app_source[
             self.app_source.index("def records_analytics"):
             self.app_source.index("from boards import init_board_routes")
         ]
         self.assertIn("select('id, date, genre, present, book_title')", route)
-        self.assertIn("min_attendance = max(1, min(", route)
-        self.assertIn("below_minimum", route)
+        self.assertIn("attendance_counts.get(member['id'], 0)", route)
+        self.assertNotIn("below_minimum", route)
         self.assertIn("member.get('is_active')", route)
 
     def test_analytics_renders_spreadsheet_export_and_shortfall_list(self):
         self.assertIn("날짜별 세미나 출석표", self.analytics)
-        self.assertIn('name="min_attendance"', self.analytics)
-        self.assertIn("최소 {{ min_attendance }}회 미달", self.analytics)
-        self.assertIn("member.shortage", self.analytics)
+        self.assertIn("admin_term_attendance", self.analytics)
+        self.assertNotIn('name="min_attendance"', self.analytics)
+        term_template = (ROOT / "templates" / "admin_term_attendance.html").read_text(encoding="utf-8")
+        self.assertIn("member.shortage", term_template)
+        self.assertIn("기준 미달", term_template)
         self.assertIn("attendance-sheet", self.analytics)
         self.assertIn("admin_attendance_matrix_export", self.analytics)
 

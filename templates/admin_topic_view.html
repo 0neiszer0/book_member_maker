@@ -82,7 +82,7 @@
                 <p class="submission-summary mt-2">모임 날짜: {{ event.meeting_date }} | 총 <strong class="submission-total">{{
                         submissions|length }}</strong>명 제출</p>
             </div>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
                 <a href="{{ url_for('admin_dashboard') }}"
                     class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded shadow border border-gray-500">
                     ◀ 대시보드
@@ -93,6 +93,23 @@
                 </a>
             </div>
         </div>
+
+        <section class="eva-card p-4 rounded-lg mb-6" aria-label="회차별 사회자와 다운로드">
+            {% if event.submission_deadline %}<p class="mb-3">공유 발제문 제출·수정 마감: <strong>{{ event.submission_deadline }} 00:00 (한국시간)</strong> · {{ '접수 중' if event.is_active else '마감' }}</p>{% endif %}
+            <div class="flex flex-wrap gap-3">
+            {% for item in seminar_sessions %}
+                <div class="border border-border-dark rounded-lg p-3 flex-1 min-w-0">
+                    <p class="font-bold">{{ item.meeting_date }} · 사회자 {{ item.moderator_name or '미입력' }}</p>
+                    <div class="flex flex-wrap gap-2 mt-3">
+                        <a class="py-2 px-3 rounded bg-gray-700" href="{{ url_for('topic_document_setup', event_id=event.id, session_id=item.id, download=0) }}">사회자 변경</a>
+                        <a class="py-2 px-3 rounded bg-eva-green text-white" href="{{ url_for('download_topics_word', event_id=event.id, session_id=item.id) }}">이 날짜 Word</a>
+                    </div>
+                </div>
+            {% else %}
+                <p>사회자: {{ event.moderator_name or '미입력' }} · <a href="{{ url_for('topic_document_setup', event_id=event.id, download=0) }}" class="underline">사회자 변경</a></p>
+            {% endfor %}
+            </div>
+        </section>
 
         <div class="grid gap-6">
             {% for sub in submissions %}

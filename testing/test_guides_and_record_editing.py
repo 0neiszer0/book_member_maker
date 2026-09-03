@@ -13,7 +13,8 @@ class GuidesAndRecordEditingTest(unittest.TestCase):
         guide = self.read("templates/help_member.html")
         self.assertIn("먼저, 필수 3가지", guide)
         self.assertIn("목요일은 별도 신청 없음", guide)
-        self.assertIn("월요일은 선착순 신청", guide)
+        self.assertIn("월요일은 카카오톡 참석 투표", guide)
+        self.assertIn("정원·선착순 제한은 없습니다", guide)
         self.assertIn("url_for('seminars')", guide)
         self.assertIn("url_for('my_page')", guide)
         self.assertNotIn("월/목 회차별로", guide)
@@ -22,15 +23,16 @@ class GuidesAndRecordEditingTest(unittest.TestCase):
         guide = self.read("templates/help_admin.html")
         for section_id in ("weekly", "term-start", "term-end", "yearly", "records"):
             self.assertIn(f'id="{section_id}"', guide)
-        self.assertIn("한 번에 편집", guide)
+        self.assertIn("날짜·도서 편집", guide)
         self.assertIn("무단 불참자는", guide)
 
     def test_seminar_records_use_one_edit_dialog(self):
         template = self.read("templates/records_seminars.html")
         self.assertIn('id="seminarEditDialog"', template)
         self.assertIn('id="editBookTitle"', template)
-        self.assertIn('id="editFacilitators"', template)
-        self.assertIn('id="editGroups"', template)
+        self.assertIn('id="editGroupDetail"', template)
+        self.assertNotIn('id="editFacilitators"', template)
+        self.assertNotIn('id="editGroups"', template)
         self.assertIn("변경사항 저장", template)
         self.assertNotIn("onblur=\"updateMeta", template)
 

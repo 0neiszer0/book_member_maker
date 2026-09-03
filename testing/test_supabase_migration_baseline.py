@@ -47,12 +47,13 @@ class SupabaseMigrationBaselineTests(unittest.TestCase):
         self.assertEqual(config["db"]["major_version"], 15)
         self.assertFalse(config["api"]["auto_expose_new_tables"])
 
-    def test_canonical_timestamps_match_remote_history(self):
+    def test_canonical_timestamps_match_baseline_and_pending_changes(self):
         actual = {path.name for path in CANONICAL.glob("*.sql")}
         expected = set(REMOTE_MIGRATION_FILES) | {
             "20260501000000_legacy_schema_baseline.sql",
             "20260508020003_005_special_events.sql",
             "20260901134512_secure_topic_edit_identity.sql",
+            "20260903103757_seminar_attendance_and_moderators.sql",
         }
         self.assertEqual(actual, expected)
         self.assertTrue(all(re.fullmatch(r"[0-9]{14}_[a-z0-9_]+\.sql", name) for name in actual))

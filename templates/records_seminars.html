@@ -67,7 +67,7 @@
                             <td class="p-3 text-center text-eva-purple">{{ h.facilitator_count }}</td>
                             <td class="p-3 text-center">
                                 <div class="flex justify-center gap-2">
-                                    <button type="button" class="edit-seminar bg-[#e8efdd] text-[#304923] font-bold text-xs py-1.5 px-3 rounded" data-history-id="{{ h.id }}">한 번에 편집</button>
+                                    <button type="button" class="edit-seminar bg-[#e8efdd] text-[#304923] font-bold text-xs py-1.5 px-3 rounded" data-history-id="{{ h.id }}">날짜·도서 편집</button>
                                     <a href="{{ url_for('records_seminar_detail', history_id=h.id) }}"
                                         class="bg-[#3d5c2e] text-white font-bold text-xs py-1.5 px-3 rounded">상세</a>
                                 </div>
@@ -88,13 +88,13 @@
         </nav>
         {% endif %}
 
-        <div class="mt-4 text-xs text-gray-500">‘한 번에 편집’에서 도서명·날짜·발제자·조 편성을 함께 확인하고 저장할 수 있습니다.</div>
+        <div class="mt-4 text-xs text-gray-500">날짜·도서명은 바로 편집하고, 참여자 이동·발제자·출석 확인·공지 이미지 만들기는 ‘상세’에서 진행하세요.</div>
     </div>
 
     <dialog id="seminarEditDialog" class="w-[min(94vw,680px)] rounded-2xl border border-[#e5d7b8] p-0 bg-[#fffdf8] text-[#2a241b]">
         <form method="dialog" id="seminarEditForm" class="p-5 sm:p-6">
             <div class="flex items-start justify-between gap-4">
-                <div><p class="text-xs font-bold text-[#6b6255]">세미나 기록</p><h2 class="text-xl font-extrabold mt-1">한 번에 편집</h2></div>
+                <div><p class="text-xs font-bold text-[#6b6255]">세미나 기록</p><h2 class="text-xl font-extrabold mt-1">날짜·도서 편집</h2></div>
                 <button type="button" id="seminarEditClose" class="text-2xl leading-none" aria-label="닫기">×</button>
             </div>
             <input type="hidden" id="editHistoryId">
@@ -103,14 +103,7 @@
                 <label class="edit-label">도서명<input type="text" id="editBookTitle" class="edit-field mt-1" placeholder="도서명을 입력하세요"></label>
             </div>
             <p id="editDateHelp" class="text-xs text-[#6b6255] mt-2"></p>
-            <label class="edit-label mt-4">발제자
-                <textarea id="editFacilitators" class="edit-field mt-1" rows="2" placeholder="예: 박민서, 김다솜"></textarea>
-                <span class="block font-normal mt-1">이름을 쉼표로 구분합니다.</span>
-            </label>
-            <label class="edit-label mt-4">조 편성
-                <textarea id="editGroups" class="edit-field mt-1 font-mono text-sm" rows="7" placeholder="1조 사람들을 쉼표로 입력&#10;2조 사람들을 쉼표로 입력"></textarea>
-                <span class="block font-normal mt-1">한 줄이 한 조입니다. 예: 박민서, 김다솜, 홍윤서</span>
-            </label>
+            <a id="editGroupDetail" class="block underline font-bold text-[#3d5c2e] mt-4" href="#">참여자 이동·발제자·출석은 상세 편집에서 →</a>
             <div class="rounded-xl bg-[#f2ebd8] p-3 text-xs text-[#5f5649] mt-4">일정에서 만든 세미나는 도서명을 저장하면 목요일·월요일 일정과 발제문에도 같은 제목이 바로 반영됩니다.</div>
             <div class="flex justify-end gap-2 mt-5">
                 <button type="button" id="seminarEditCancel" class="bg-[#eee7d8] text-[#4d463c] font-bold py-2 px-4 rounded-lg">취소</button>
@@ -123,7 +116,6 @@
         const HISTORY_ROWS = {{ history | tojson }};
         const HISTORY_MAP = new Map(HISTORY_ROWS.map(row => [String(row.id), row]));
         const editDialog = document.getElementById('seminarEditDialog');
-        const splitNames = value => value.split(',').map(name => name.trim()).filter(Boolean);
 
         document.querySelectorAll('.edit-seminar').forEach(button => button.addEventListener('click', () => {
             const row = HISTORY_MAP.get(button.dataset.historyId);
@@ -131,8 +123,7 @@
             document.getElementById('editHistoryId').value = row.id;
             document.getElementById('editDate').value = row.date || '';
             document.getElementById('editBookTitle').value = row.book_title || '';
-            document.getElementById('editFacilitators').value = (row.facilitators || []).join(', ');
-            document.getElementById('editGroups').value = (row.groups || []).map(group => Array.isArray(group) ? group.join(', ') : group).join('\n');
+            document.getElementById('editGroupDetail').href = '/records/seminars/' + encodeURIComponent(row.id);
             const linked = Boolean(row.seminar_session_id);
             document.getElementById('editDate').disabled = linked;
             document.getElementById('editDateHelp').textContent = linked
@@ -146,11 +137,8 @@
             event.preventDefault();
             const historyId = document.getElementById('editHistoryId').value;
             const saveButton = document.getElementById('seminarEditSave');
-            const groups = document.getElementById('editGroups').value.split(/\r?\n/).map(splitNames).filter(group => group.length);
             const payload = {
                 book_title: document.getElementById('editBookTitle').value,
-                facilitators: splitNames(document.getElementById('editFacilitators').value),
-                groups,
             };
             if (!document.getElementById('editDate').disabled) payload.date = document.getElementById('editDate').value;
             saveButton.disabled = true;

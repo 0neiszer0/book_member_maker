@@ -223,7 +223,7 @@
       if (event.target.closest('a')) setOpen(false);
     });
     document.addEventListener('click', event => {
-      if (window.matchMedia('(max-width: 900px)').matches && !sidebar.contains(event.target)) setOpen(false);
+      if (window.matchMedia('(max-width: 1100px)').matches && !sidebar.contains(event.target)) setOpen(false);
     });
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape' && sidebar.classList.contains('wd-admin-menu-open')) {
@@ -232,7 +232,7 @@
       }
     });
     window.addEventListener('resize', () => {
-      if (!window.matchMedia('(max-width: 900px)').matches) setOpen(false);
+      if (!window.matchMedia('(max-width: 1100px)').matches) setOpen(false);
     }, { passive: true });
   }
 
@@ -337,9 +337,9 @@
 
     const quickVoted = q('#quick-voted');
     if (quickVoted) {
-      quickVoted.textContent = '신청자 명단 적용';
-      quickVoted.title = '현재 참석 선택을 월요일 신청자 명단으로 바꿉니다.';
-      quickVoted.setAttribute('aria-label', '월요일 신청자 명단을 참석자 선택에 적용');
+      quickVoted.textContent = '투표 반영 명단 적용';
+      quickVoted.title = '현재 참석 선택을 이 회차에 반영된 카카오톡 투표 명단으로 되돌립니다.';
+      quickVoted.setAttribute('aria-label', '이 회차의 투표 반영 명단을 참석자 선택에 적용');
     }
 
     const actionWrap = quickVoted?.parentElement;
@@ -1001,6 +1001,25 @@
     });
   }
 
+  function measureStickyNavigation() {
+    const header = q('.wd-topbar');
+    const sidebar = q('.wd-admin-sidebar');
+    const update = () => {
+      const headerHeight = header ? Math.ceil(header.getBoundingClientRect().height) : 0;
+      const sidebarHeight = sidebar && getComputedStyle(sidebar).position === 'sticky'
+        ? Math.ceil(sidebar.getBoundingClientRect().height) : 0;
+      document.documentElement.style.setProperty('--app-header-height', `${headerHeight}px`);
+      document.documentElement.style.setProperty('--app-sticky-clearance', `${headerHeight + sidebarHeight + 16}px`);
+    };
+    if (window.ResizeObserver) {
+      const observer = new ResizeObserver(update);
+      if (header) observer.observe(header);
+      if (sidebar) observer.observe(sidebar);
+    }
+    window.addEventListener('resize', update, { passive: true });
+    update();
+  }
+
   function bootstrapEnhancements() {
     document.documentElement.classList.add('wd-ui-enhanced');
     const enhancements = [
@@ -1014,7 +1033,8 @@
       ['seminar vote', enhanceSeminarVote],
       ['my page', enhanceMyPage],
       ['profile pages', enhanceProfilePages],
-      ['records copy', enhanceRecordsCopy]
+      ['records copy', enhanceRecordsCopy],
+      ['sticky navigation', measureStickyNavigation]
     ];
     enhancements.forEach(([name, enhancement]) => {
       try {

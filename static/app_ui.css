@@ -424,7 +424,7 @@
   .overview-tool-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .wd-admin-sidebar {
     display: block !important;
     position: sticky !important;
@@ -563,4 +563,62 @@
 @media (prefers-reduced-motion: reduce) {
   .home-card, .workflow-card, .wd-toast, .wd-admin-menu-chevron { transition: none; }
   .home-card:hover, .workflow-card:hover { transform: none; }
+}
+
+/* Shared readable controls. Keep overflow inside a table, never the whole page. */
+body.wd-admin-layout { font-size: 1rem; }
+.wd-admin-layout :is(main, .container, .workspace),
+.wd-result-page .container { min-width: 0; }
+.wd-admin-layout :is(input:not([type=checkbox]):not([type=radio]), select, textarea),
+.wd-group-name-field input { min-height: 44px; max-width: 100%; font-size: 1rem !important; }
+.wd-admin-layout :is(.btn, .wood-btn, .eva-button, .eva-button-primary, .eva-button-secondary),
+.wd-admin-sidebar .wd-admin-sidebar-nav a,
+.wd-admin-seminar-filters button, .wd-tabs-nav button,
+.wd-bulk-selection > summary { min-height: 44px; font-size: .9375rem !important; line-height: 1.45; }
+.wd-admin-layout :is(.text-xs, .text-sm),
+.wd-group-name-field, .wd-group-name-help, .wd-group-name-empty,
+.wd-preflight-title, .wd-preflight-item span, .wd-preflight-note,
+.wd-solution-tab small, .wd-solution-switcher-head span,
+.wd-admin-seminar-visible-count, .wd-admin-menu-trigger small,
+.wd-admin-sidebar .wd-admin-nav-label { font-size: .875rem; line-height: 1.55; }
+.wd-admin-layout :is(h1, h2, h3, p, label),
+.wd-result-page :is(h1, h2, h3, p) { word-break: keep-all; overflow-wrap: anywhere; }
+.wd-admin-layout :is(.flex, .grid) > *,
+.wd-result-page :is(.flex, .grid) > * { min-width: 0; }
+.wd-group-stepper li { font-size: .875rem; }
+.wd-solution-tab { min-width: 160px; }
+.wd-solution-tab strong { font-size: .9375rem; }
+.wd-result-page .result-card-combined { max-width: 1180px; }
+.wd-result-page .button-group-view { grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)) !important; }
+.wd-result-page .button-group-view button { white-space: normal; min-height: 48px; font-size: 1rem; line-height: 1.5; }
+.wd-admin-sidebar { top: var(--app-header-height, 60px); font-family: var(--app-font) !important; }
+.wd-admin-layout :is(section[id], h1, h2, [data-week]),
+.wd-result-page .result-card-combined { scroll-margin-top: var(--app-sticky-clearance, 140px); }
+.wd-topbar .wd-icon-btn { min-width: 44px; min-height: 44px; }
+.wd-tabbar .wd-tb { font-size: .8125rem; }
+.wd-topbar .wd-dropdown-panel { max-width: calc(100vw - 24px); }
+dialog[open] { max-width: calc(100vw - 24px); max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; }
+.attendance-period span { display: inline-block; white-space: nowrap; }
+.attendance-actions > label { display: flex; align-items: center; gap: .5rem; white-space: nowrap; }
+.attendance-actions > label #minimum { width: 88px; flex: 0 1 88px; }
+
+@media (max-width: 1100px) {
+  .wd-admin-sidebar { top: var(--app-header-height, 60px) !important; }
+  .wd-admin-sidebar .wd-admin-sidebar-nav { max-height: calc(100dvh - var(--app-header-height, 60px) - 160px); }
+  .wd-admin-menu-trigger strong { font-size: 1rem; }
+  .wd-topbar .wd-link { white-space: nowrap; }
+}
+
+@media (max-width: 767px) {
+  .wd-group-stepper ol { grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; }
+  .wd-group-stepper li { padding: 9px; gap: 6px; }
+  .wd-group-name-fields { max-height: none; overflow: visible; }
+  .wd-admin-layout main { padding-left: 12px; padding-right: 12px; }
+  .wd-admin-layout .member-admin-table td::before { font-size: .8125rem !important; }
+  .wd-admin-layout .member-admin-table tr.member-row > td { padding-inline: 6px !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+  .wd-tabbar { transition: none !important; }
 }

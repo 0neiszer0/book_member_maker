@@ -181,45 +181,15 @@
                     </div>
                 </div>
 
-                {% if my_open_votes %}
-                <!-- 월요일 추가 세미나 신청 (신청 창이 열린 동안에만 노출) -->
                 <div class="action-card md:col-span-2">
-                    <div class="flex items-start justify-between flex-wrap gap-2 mb-1">
-                        <div>
-                            <div class="title"><i data-lucide="calendar-plus" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 추가 세미나 신청하기</div>
-                            <div class="desc">현재 {{ my_open_votes|length }}개 월요일 추가 세미나를 신청할 수 있습니다.</div>
-                        </div>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        {% for v in my_open_votes %}
-                        <a href="/seminar_vote?token={{ v.term_token }}"
-                            class="pill {% if v.my_vote == True %}pill-green{% elif v.my_vote == False %}pill-red{% else %}pill-yellow{% endif %}">
-                            <span>{{ v.meeting_date }} (월) · 정원 {{ v.capacity or 10 }}명</span>
-                            <span class="text-xs">
-                                {% if v.my_vote == True %}신청 완료
-                                {% else %}신청하기 →{% endif %}
-                            </span>
-                        </a>
-                        {% endfor %}
-                    </div>
-                    <p class="text-xs text-yellow-300 mt-2">선착순으로 확정되며, 취소하면 자리가 다시 열립니다.</p>
-                </div>
-                {% elif active_seminar_terms %}
-                <!-- 신청 창이 닫혀 있어도 추가 세미나 현황을 볼 수 있게 -->
-                <div class="action-card md:col-span-2">
-                    <div class="title"><i data-lucide="calendar-plus" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 추가 세미나 신청</div>
-                    <div class="desc">월요일 추가 세미나의 신청 현황과 남은 자리를 확인할 수 있습니다.</div>
+                    <div class="title">세미나 투표·학기 참석 현황</div>
+                    <div class="desc">목요일 불참과 월요일 참석은 카카오톡 단톡방에서 투표합니다. 정원·선착순 제한은 없습니다.</div>
                     <div class="flex flex-wrap gap-2 mt-1">
-                        {% for t in active_seminar_terms %}
-                        <a href="/seminar_vote?token={{ t.share_token }}" class="pill pill-yellow">
-                            <span>{{ t.name }}</span>
-                            <span class="text-xs">바로가기 →</span>
-                        </a>
-                        {% endfor %}
+                        <a href="{{ url_for('seminars') }}" class="pill pill-green">세미나 일정</a>
+                        <a href="{{ url_for('my_term_attendance') }}" class="pill pill-yellow">내 학기 참석 현황</a>
                     </div>
-                    <p class="text-xs text-gray-500 mt-2">목요일 본 세미나는 운영진이 불참자만 별도로 기록하므로 이곳에 표시하지 않습니다.</p>
+                    <p class="text-sm text-gray-500 mt-2">OT·세미나·벽돌책 실제 참석을 합산합니다. 같은 주 목요일과 다음 월요일은 1회로 인정합니다.</p>
                 </div>
-                {% endif %}
 
                 <!-- 발제문 제출 -->
                 <div class="action-card">

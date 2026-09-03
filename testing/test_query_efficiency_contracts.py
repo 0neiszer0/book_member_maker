@@ -21,7 +21,7 @@ class QueryEfficiencyContractsTest(unittest.TestCase):
             "    def engagement_now():",
             '    @app.route("/books/suggest"',
         )
-        self.assertIn('.in_("session_id", session_ids)', now)
+        self.assertNotIn('supabase.table("seminar_votes")', now)
         self.assertIn('.in_("id", seminar_ids)', now)
         self.assertIn('.in_("id", project_ids)', now)
         self.assertNotIn('.single().execute()', now)

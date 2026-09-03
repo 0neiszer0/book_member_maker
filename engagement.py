@@ -11,6 +11,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from engagement_utils import clean_text as _clean_text
 from engagement_utils import form_is_open as _form_is_open
 from engagement_utils import normalize_kyobo_url as _normalize_kyobo_url
+from topic_lifecycle import topic_event_deadline, topic_event_is_open
 
 
 FORM_TABLES = {
@@ -46,7 +47,8 @@ def _social_meta(title, description, canonical=None, image=None, noindex=False):
     }
 
 
-def init_engagement_routes(app, supabase, login_required, voting_window_for=None):
+def init_engagement_routes(app, supabase, login_required, voting_window_for=None,
+                           topic_event_lifecycle=None):
     def current_member(allow_remembered=True):
         member_id = session.get("user_id")
         if not member_id and allow_remembered:
@@ -153,70 +155,32 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
     @app.get("/now")
     def engagement_now():
         cards = []
-        if voting_window_for:
-            terms = (
-                supabase.table("seminar_terms")
-                .select("id,name,share_token")
-                .eq("is_active", True)
-                .execute().data or []
-            )
-            term_map = {row["id"]: row for row in terms}
-            if term_map:
-                monday_sessions = (
-                    supabase.table("seminar_sessions")
-                    .select("id,term_id,meeting_date,book_title,capacity,day_type,participation_mode,vote_open_at,vote_close_at")
-                    .in_("term_id", list(term_map))
-                    .eq("is_active", True)
-                    .eq("day_type", "mon")
-                    .eq("participation_mode", "opt_in")
-                    .order("meeting_date")
-                    .execute().data or []
-                )
-                now_kst = datetime.now(timezone(timedelta(hours=9)))
-                open_sessions = []
-                for row in monday_sessions:
-                    open_at, close_at = voting_window_for(row)
-                    if open_at <= now_kst <= close_at:
-                        open_sessions.append((row, close_at))
-                vote_counts = {}
-                session_ids = [row["id"] for row, _ in open_sessions]
-                if session_ids:
-                    vote_rows = (
-                        supabase.table("seminar_votes")
-                        .select("session_id")
-                        .in_("session_id", session_ids)
-                        .eq("attending", True)
-                        .execute().data or []
-                    )
-                    for vote in vote_rows:
-                        sid = vote.get("session_id")
-                        vote_counts[sid] = vote_counts.get(sid, 0) + 1
-                for row, close_at in open_sessions:
-                    term = term_map[row["term_id"]]
-                    seats = vote_counts.get(row["id"], 0)
-                    capacity = row.get("capacity") or 10
-                    cards.append({
-                        "kind": "추가 세미나 신청",
-                        "title": f"{row['meeting_date']} 월요일",
-                        "description": f"{row.get('book_title') or '도서 미정'} · {seats}/{capacity}명 신청 · 남은 자리 {max(0, capacity-seats)}석",
-                        "url": url_for("seminar_vote_page", token=term["share_token"]),
-                        "close_at": close_at.astimezone(timezone.utc).isoformat(),
-                    })
+        # 세미나 참석/불참 투표는 카카오톡에서 진행합니다.
 
         topic_rows = (
             supabase.table("topic_events")
-            .select("id,meeting_date,book_title,book_author,share_token,created_at")
+            .select("id,meeting_date,book_title,book_author,share_token,created_at,is_active,seminar_week_id,seminar_session_id")
             .eq("is_active", True)
             .order("meeting_date")
             .execute().data or []
         )
+        # 이 화면에 먼저 들어와도 세미나 화면과 동일한 공유 회차 마감 기준을 적용한다.
+        if topic_event_lifecycle:
+            topic_rows = topic_event_lifecycle(topic_rows)
+        else:
+            topic_rows = [row for row in topic_rows if topic_event_is_open(row)]
         for row in topic_rows:
+            if not row.get("is_active"):
+                continue
+            deadline = topic_event_deadline(row)
+            close_at = (datetime.fromisoformat(f"{deadline.isoformat()}T00:00:00+09:00")
+                        .astimezone(timezone.utc).isoformat()) if deadline else None
             cards.append({
                 "kind": "발제문",
                 "title": row.get("book_title") or "이번 세미나 발제문",
                 "description": f"{row.get('meeting_date')} 세미나 · 먼저 제출된 발제문을 확인하고 중복을 피할 수 있어요.",
                 "url": url_for("view_shared_topics", token=row["share_token"]),
-                "close_at": None,
+                "close_at": close_at,
             })
 
         seminar_forms = [

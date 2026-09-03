@@ -112,6 +112,8 @@
             <p class="topic-author text-sm mt-2">{{ event.book_author }}</p>
             {% endif %}
             <p class="topic-date mt-3 text-sm"><i data-lucide="calendar" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 모임 날짜: {{ event.meeting_date }}</p>
+            {% if event.seminar_week_id %}<p class="topic-date mt-2">목요일·월요일이 같은 질문 목록을 공유합니다.</p>{% endif %}
+            {% if event.submission_deadline %}<p class="topic-date mt-2"><strong>제출·수정 마감: {{ event.submission_deadline }} 00:00 (한국시간)</strong>{% if event.submission_session_id %} · 선택한 회차 기준{% elif event.seminar_week_id %} · 마지막 회차 기준{% endif %}</p>{% endif %}
         </div>
 
         <!-- 가이드 카드 -->
@@ -381,6 +383,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         event_id: document.getElementById('eventId').value,
+                        session_id: {{ event.submission_session_id|default(none)|tojson }},
                         author_name: author, department: dept,
                         student_id: sid, edit_credential: credential,
                     }),
@@ -466,6 +469,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         event_id: document.getElementById('eventId').value,
+                        session_id: {{ event.submission_session_id|default(none)|tojson }},
                         author_name: verified.author, department: verified.dept,
                         student_id: verified.sid, edit_credential: verified.credential,
                         topics,
