@@ -1,0 +1,30 @@
+.schedule-tool { padding:1.1rem; margin-bottom:1.3rem; scroll-margin-top:160px; font:inherit; }
+.schedule-tool * { box-sizing:border-box; min-width:0; }
+.schedule-tool summary { cursor:pointer; font-weight:800; }
+.schedule-tool > summary { font-size:1.12rem; }
+.schedule-tool > summary span { display:inline-block; margin-left:.5rem; color:#655c4e; font-size:.9rem; font-weight:500; }
+.schedule-tool label { display:grid; gap:.35rem; font-weight:700; margin:.75rem 0; }
+.schedule-tool .field, .schedule-tool button { font:inherit; min-height:44px; max-width:100%; }
+.schedule-tool .field { font-weight:400; }
+.schedule-tool p { margin:.65rem 0; line-height:1.6; overflow-wrap:anywhere; }
+.schedule-tool .muted { font-size:.92rem; font-weight:400; }
+.schedule-tool h3 { font-size:1.05rem; font-weight:800; }
+.schedule-tool fieldset { border:0; padding:0; margin:0; }
+.schedule-tool fieldset:disabled { opacity:.65; }
+.schedule-new-term, .schedule-bulk, .schedule-archive { margin-top:1rem; padding:1rem; border:1px solid #ddcfb5; border-radius:12px; }
+.schedule-new-term form { display:grid; grid-template-columns:2fr 1fr 1fr auto; align-items:end; gap:.75rem; }
+.schedule-new-term form label { margin:0; }
+.schedule-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:1rem; }
+.schedule-grid > section { padding:1rem; border:1px solid #ddcfb5; border-radius:12px; background:#fcfaf3; }
+.schedule-actions { display:flex; flex-wrap:wrap; gap:.6rem; align-items:center; margin-top:1rem; }
+.schedule-date-label { max-width:760px; }
+.schedule-tool [data-error="true"] { color:#9b3027; font-weight:700; }
+.schedule-book-display, .schedule-author-display { overflow-wrap:anywhere; }
+.schedule-selected { outline:2px solid #557840; outline-offset:3px; }
+@media(max-width:760px) {
+  .schedule-tool { padding:.85rem; }
+  .schedule-tool > summary span { display:block; margin:.3rem 0 0; }
+  .schedule-grid, .schedule-new-term form { grid-template-columns:minmax(0,1fr); }
+  .schedule-grid > section { padding:.85rem; }
+  .schedule-actions button { flex:1 1 100%; }
+}

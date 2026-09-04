@@ -44,6 +44,15 @@
 .ge-history li span { color:#6b5746; }
 .ge-history p { margin:0; color:#655c4e; }
 .ge-drop-target { outline:3px solid #557840; outline-offset:2px; background:#edf3e4; }
+.ge-chip .ge-member { cursor:grab; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+.ge-grip { opacity:.65; font-size:1.25rem; line-height:1; }
+.ge-drag-origin { opacity:.3; outline:2px dashed #557840; }
+.ge-dragging, .ge-dragging * { cursor:grabbing !important; }
+.ge-drag-preview { position:fixed; z-index:10050; pointer-events:none; display:grid; justify-items:start; gap:6px; max-width:calc(100vw - 16px); font:700 1rem/1.5 'Pretendard',sans-serif; }
+.ge-drag-preview * { pointer-events:none; box-sizing:border-box; }
+.ge-drag-preview .ge-chip { box-shadow:0 8px 24px #302b2340; border:2px solid #557840; }
+.ge-drag-preview .ge-member { font:inherit; color:inherit; padding:.55rem .8rem; white-space:normal; }
+.ge-drag-hint { border-radius:8px; padding:5px 9px; background:#304c27; color:#fff; font-size:.85rem; box-shadow:0 2px 8px #302b2320; }
 .group-editor-actions { display:flex; flex-wrap:wrap; gap:.65rem; margin-top:1rem; }
 .group-editor-actions button { min-height:44px; flex:1 1 170px; font:inherit; padding:.65rem 1rem; }
 .group-result-heading { display:flex; justify-content:space-between; flex-wrap:wrap; gap:.75rem; align-items:center; }

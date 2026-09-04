@@ -4596,8 +4596,18 @@ def admin_seminars():
         terms, term, weeks, active_members = _load_weekly_seminar_view(request.args.get('term_id'))
         weeks = [row for row in weeks if not row['is_past']] + list(reversed([row for row in weeks if row['is_past']]))
         share_url = f"{request.host_url}seminar_vote?token={term['share_token']}" if term else ''
+        schedule_rows = [{
+            'id': row['id'], 'book_title': row.get('book_title') or '',
+            'book_author': row.get('book_author') or '', 'note': row.get('note') or '',
+            'sessions': [{
+                'id': item['id'], 'day_type': item['day_type'],
+                'meeting_date': item['meeting_date'], 'moderator_name': item.get('moderator_name') or '',
+            } for item in sorted(row['sessions_by_day'].values(), key=lambda item: item['meeting_date'])],
+        } for row in weeks]
+        schedule_csrf = session.setdefault('topic_moderator_csrf', secrets.token_urlsafe(32))
         return render_template('admin_seminars.html', terms=terms, term=term, weeks=weeks,
-                               all_members=active_members, share_url=share_url)
+                               all_members=active_members, share_url=share_url,
+                               schedule_rows=schedule_rows, schedule_csrf=schedule_csrf)
     except Exception as e:
         app.logger.error(f"admin_seminars error: {e}", exc_info=True)
         flash(f"세미나 운영 정보를 불러오는 중 오류가 발생했습니다: {e}", 'danger')
@@ -6009,11 +6019,36 @@ def seminar_session_cancel_no_show(session_id, member_id):
 @login_required(role="admin")
 def seminar_week_update(week_id):
     try:
-        data = request.json or {}
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({'status': 'error', 'message': '입력 형식을 확인해주세요.'}), 400
+        # The inline editor uses the same session-bound CSRF protection as the
+        # existing moderator form. Validate every moderator before any writes.
+        moderators = data.get('moderators', [])
+        if 'moderators' in data:
+            expected = session.get('topic_moderator_csrf') or ''
+            supplied = request.headers.get('X-Schedule-CSRF') or ''
+            if not expected or not secrets.compare_digest(expected, supplied):
+                return jsonify({'status': 'error', 'message': '화면을 새로 열어 다시 시도해주세요.'}), 403
+        if not isinstance(moderators, list):
+            return jsonify({'status': 'error', 'message': '사회자 입력 형식을 확인해주세요.'}), 400
         sessions = supabase.table('seminar_sessions').select('id') \
             .eq('seminar_week_id', week_id).order('meeting_date').execute().data or []
         if not sessions:
             return jsonify({'status': 'error', 'message': '주차를 찾을 수 없습니다.'}), 404
+        session_ids = {str(row['id']) for row in sessions}
+        moderator_updates = {}
+        for item in moderators:
+            if not isinstance(item, dict) or str(item.get('id')) not in session_ids:
+                return jsonify({'status': 'error', 'message': '선택한 일정에 속하지 않는 회차입니다.'}), 400
+            sid = str(item['id'])
+            name = item.get('moderator_name')
+            if sid in moderator_updates or not isinstance(name, str) or len(name.strip()) > 100:
+                return jsonify({'status': 'error', 'message': '사회자 이름은 회차별로 100자 이내로 입력해주세요.'}), 400
+            moderator_updates[sid] = ' '.join(name.split()) or None
+        for key, limit in [('book_title', 500), ('book_author', 200), ('note', 4000)]:
+            if data.get(key) is not None and (not isinstance(data[key], str) or len(data[key]) > limit):
+                return jsonify({'status': 'error', 'message': '도서·안내 입력 형식 또는 길이를 확인해주세요.'}), 400
         book_title = (data.get('book_title') or '').strip()
         book_author = (data.get('book_author') or '').strip()
         note = (data.get('note') or '').strip()
@@ -6027,10 +6062,15 @@ def seminar_week_update(week_id):
         session_ids = [row['id'] for row in sessions]
         supabase.table('history').update({'book_title': book_title or None}) \
             .in_('seminar_session_id', session_ids).execute()
+        for sid, name in moderator_updates.items():
+            updated = supabase.table('seminar_sessions').update({'moderator_name': name}) \
+                .eq('id', sid).eq('seminar_week_id', week_id).execute().data or []
+            if not updated:
+                raise RuntimeError('사회자를 저장할 회차가 변경되었거나 삭제되었습니다.')
         return jsonify({'status': 'success'})
     except Exception as e:
         app.logger.error(f"seminar_week_update error: {e}", exc_info=True)
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'status': 'error', 'message': '저장을 완료하지 못했습니다. 일부 항목은 반영되었을 수 있습니다. 입력 내용을 유지한 채 다시 저장해주세요.'}), 500
 
 
 @app.route('/api/admin/bookclub/rebuild_matrix', methods=['POST'])

@@ -6,6 +6,7 @@
     {% include '_tailwind_head.html' %}{% include '_app_theme_head.html' %}
     <link rel="stylesheet" href="{{ url_for('static', filename='group_editor.css') }}">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="{{ url_for('static', filename='group_drag.js') }}"></script>
     <script src="{{ url_for('static', filename='group_editor.js') }}"></script>
     <style>
         .solutions-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:1rem; width:100%; }
