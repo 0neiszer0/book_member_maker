@@ -269,6 +269,7 @@
       const item = document.createElement('div');
       const strong = document.createElement('strong');
       strong.textContent = String(value);
+      if (label === '도서 확인 필요') strong.dataset.scheduleReviewCount = '';
       const span = document.createElement('span');
       span.textContent = label;
       item.append(strong, span);
@@ -316,6 +317,14 @@
       button.textContent = label;
       button.addEventListener('click', () => applyFilter(value));
       filterWrap.appendChild(button);
+    });
+
+    document.addEventListener('seminar:schedule-saved', event => {
+      const item = metadata.find(row => row.week.dataset.week === event.detail.weekId);
+      if (!item) return;
+      item.needsReview = false;
+      q('[data-schedule-review-count]', stats).textContent = String(metadata.filter(row => row.needsReview).length);
+      applyFilter(currentFilter);
     });
 
     const list = weeks[0].parentElement;

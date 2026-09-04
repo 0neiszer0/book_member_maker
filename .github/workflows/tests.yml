@@ -26,6 +26,10 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run build:css
       - run: git diff --exit-code -- static/tailwind.css
+      - run: node testing/test_group_editor_state.js
+      - run: node testing/test_group_drag.js
+      - run: node testing/test_seminar_schedule.js
+      - run: node testing/test_attendance_roster_race.js
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

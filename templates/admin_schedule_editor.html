@@ -1,0 +1,54 @@
+<link rel="stylesheet" href="{{ url_for('static', filename='seminar_schedule.css') }}">
+<details class="panel schedule-tool" id="schedule-tool">
+  <summary>학기·도서 일정 도구 <span>날짜 선택 → 도서·사회자 입력 → 저장</span></summary>
+  <details class="schedule-new-term" {% if not term %}open{% endif %}>
+    <summary>새 학기 만들기</summary>
+    <form id="term-create">
+      <label>학기명<input class="field" name="name" required placeholder="예: 2026-2학기"></label>
+      <label>시작일<input class="field" type="date" name="start_date" required></label>
+      <label>종료일<input class="field" type="date" name="end_date" required></label>
+      <button class="btn primary" type="submit">날짜 생성하고 일정 입력</button>
+    </form>
+    <p class="muted">목요일과 다음 월요일이 한 묶음으로 생성됩니다. 목요일은 카카오톡 불참 투표, 월요일은 참석 투표를 반영하며 정원·선착순 제한은 없습니다.</p>
+    <p id="term-create-status" role="status"></p>
+  </details>
+  {% if weeks %}
+  <div id="schedule-editor">
+    <fieldset id="schedule-fields">
+      <label class="schedule-date-label">편집할 세미나 날짜<select class="field" id="schedule-week"></select></label>
+      <p class="muted" id="schedule-date-detail"></p>
+      <form id="schedule-form">
+        <div class="schedule-grid">
+          <section>
+            <h3>함께 읽는 도서</h3><p class="muted">목·월 도서와 발제문은 공유합니다.</p>
+            <label>도서명<input class="field" name="book_title" maxlength="500" placeholder="미정이면 비워둘 수 있습니다"></label>
+            <label>저자<input class="field" name="book_author" maxlength="200" placeholder="저자명"></label>
+            <label>안내·운영 메모<textarea class="field" name="note" maxlength="4000" rows="3" placeholder="선택 입력"></textarea></label>
+          </section>
+          <section>
+            <h3>회차별 사회자</h3><p class="muted">이름을 검색해 선택하거나 직접 입력하세요.</p>
+            <div id="schedule-moderators"></div>
+            <p class="muted">사회자는 나중에 정해도 됩니다. Word 다운로드 전에는 반드시 입력해야 합니다.</p>
+          </section>
+        </div>
+        <div class="schedule-actions">
+          <button class="btn primary" type="submit">이 일정 저장</button>
+          <button class="btn soft" type="button" id="schedule-save-all">변경한 일정 모두 저장</button>
+          <span id="schedule-dirty" role="status"></span>
+        </div>
+      </form>
+      <details class="schedule-bulk">
+        <summary>여러 도서 일정 붙여넣기 (선택)</summary>
+        <p class="muted">날짜 | 도서명 | 저자 | 안내 순서입니다. 엑셀에서 복사한 탭 구분도 가능합니다. 빈 칸은 기존 값을 유지합니다.</p>
+        <label>도서 일정 목록<textarea id="bulk-books" class="field" rows="4" placeholder="2026-09-03 | 도서 제목 | 저자명 | 이번 주 안내"></textarea></label>
+        <button type="button" class="btn soft" id="bulk-stage">입력 내용 확인·채우기</button>
+        <p class="muted">채운 후 날짜별로 확인하고 ‘변경한 일정 모두 저장’을 누르세요. 이 단계에서는 저장하지 않습니다.</p>
+      </details>
+    </fieldset>
+    <p id="schedule-status" role="status" aria-live="polite"></p>
+    <datalist id="schedule-member-names">{% for member in all_members %}<option value="{{ member.name }}">{{ member.department or '' }}</option>{% endfor %}</datalist>
+  </div>
+  {% elif term %}<p class="muted">이 학기에 생성된 세미나 날짜가 없습니다.</p>{% endif %}
+  {% if term and term.is_active %}<details class="schedule-archive"><summary>학기 보관</summary><p class="muted">학기가 끝났을 때 사용합니다. 기존 기록은 삭제되지 않습니다.</p><button type="button" class="btn soft archive-term" data-term-id="{{ term.id }}">현재 학기 보관</button></details>{% endif %}
+</details>
+<script id="schedule-data" type="application/json">{{ {'rows': schedule_rows|default([]), 'csrf': schedule_csrf|default('')}|tojson }}</script>

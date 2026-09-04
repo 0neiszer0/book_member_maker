@@ -89,8 +89,6 @@
         const state = new GroupEditorState(options);
         const genders = options.genders || {};
         let selected = null;
-        let dragging = null;
-        let pointerDrag = null;
         let suppressClickUntil = 0;
         const groupName = index => state.groupNames[index] || `조 ${index + 1}`;
         container.classList.add('ge-editor');
@@ -99,7 +97,7 @@
         function chip(name, removable) {
             const gender = genders[name] === 'M' ? '남' : (genders[name] === 'W' ? '여' : '');
             const genderClass = gender === '남' ? 'ge-male' : (gender === '여' ? 'ge-female' : '');
-            return `<span class="ge-chip ${genderClass}"><button type="button" class="ge-member" draggable="true" data-member="${escape(name)}" aria-pressed="${selected === name}" aria-label="${escape(name)} 이동 또는 수정">${escape(name)}${gender ? `<small>${gender}</small>` : ''}${state.facilitators.includes(name) ? '<span aria-label="발제자">★</span>' : ''}</button>${removable ? `<button type="button" class="ge-unassign" data-member="${escape(name)}" aria-label="${escape(name)} 미배정으로 이동">×</button>` : ''}</span>`;
+            return `<span class="ge-chip ${genderClass}"><button type="button" class="ge-member" draggable="false" title="잡고 끌어 이동 · 모바일은 길게 누르기" data-member="${escape(name)}" aria-pressed="${selected === name}" aria-label="${escape(name)} 이동 또는 수정"><span class="ge-grip" aria-hidden="true">⠿</span>${escape(name)}${gender ? `<small>${gender}</small>` : ''}${state.facilitators.includes(name) ? '<span aria-label="발제자">★</span>' : ''}</button>${removable ? `<button type="button" class="ge-unassign" data-member="${escape(name)}" aria-label="${escape(name)} 미배정으로 이동">×</button>` : ''}</span>`;
         }
         function historyHtml(group) {
             const {known, fresh} = pairHistory(group, options.meetingHistory || {});
@@ -110,7 +108,7 @@
             const unassigned = state.unassigned;
             const candidates = unique((options.members || []).map(member => typeof member === 'string' ? member : member.name)).filter(name => !state.participants.includes(name));
             container.innerHTML = `<div class="ge-summary" role="status" aria-live="polite"><strong>배정 ${assigned}명 · 미배정 ${unassigned.length}명 · 편성 제외 ${state.excluded.length}명</strong><span>${state.dirty ? '저장하지 않은 변경사항' : '현재 편성'}</span></div>
-                <p class="ge-help">사람을 끌어서 이동하거나 이름을 눌러 이동할 조를 선택하세요. ×는 삭제가 아니라 미배정으로 이동합니다. 이전 만남은 즉시 갱신됩니다.</p>
+                <p class="ge-help"><strong>⠿ 이름을 잡고 끌어 조 이동 · 모바일은 길게 누르세요.</strong><br>이름을 한 번 눌러 이동할 조를 선택할 수도 있습니다. ×는 미배정으로 이동하며, 조 이동 후 이전 만남이 바로 갱신됩니다.</p>
                 <div class="ge-tools"><button type="button" data-action="undo" ${state.undoStack.length ? '' : 'disabled'}>이동·수정 되돌리기</button><button type="button" data-action="add-group">+ 조 추가</button>${candidates.length ? `<label>참여자 추가 <select data-add-member><option value="">회원 선택</option>${candidates.map(name => `<option value="${escape(name)}">${escape(name)}</option>`).join('')}</select></label><button type="button" data-action="add-member">추가</button>` : ''}</div>
                 <section class="ge-tray" data-destination="unassigned" aria-label="미배정 참여자"><h3>미배정 참여자 <span>${unassigned.length}명</span></h3><div class="ge-chips">${unassigned.map(name => chip(name, false)).join('') || '<p>조에서 뺀 사람은 여기에 남습니다.</p>'}</div></section>
                 ${selected ? `<section class="ge-move-panel" aria-label="참여자 이동"><strong>${escape(selected)}</strong><label>이동할 곳 <select data-move-destination><option value="unassigned">미배정 참여자</option>${state.groups.map((group, index) => `<option value="${index}">${escape(groupName(index))} (${group.length}명)</option>`).join('')}</select></label><button type="button" data-action="move">이동</button><button type="button" data-action="facilitator">발제자 ${state.facilitators.includes(selected) ? '해제' : '지정'}</button><button type="button" data-action="close-move">닫기</button><div class="ge-exclude-control"><label>편성 제외 사유 <input data-exclusion-reason maxlength="200" placeholder="예: 이번 회차 참석 취소"></label><button type="button" data-action="exclude">편성에서 제외</button><p>편성에서만 제외합니다. 실제 출석·무단 불참 상태는 변경하지 않습니다.</p></div></section>` : ''}
@@ -148,62 +146,11 @@
             }
             render();
         });
-        // Some embedded browsers do not dispatch HTML5 drops for draggable buttons.
-        // Mouse pointers use a threshold + hit test; touch remains native scrolling
-        // with the same accessible tap-to-move controls.
-        container.addEventListener('pointerdown', event => {
-            const member = event.target.closest('.ge-member');
-            if (!member || event.pointerType !== 'mouse' || event.button !== 0) return;
-            pointerDrag = {name: member.dataset.member, x: event.clientX, y: event.clientY, id: event.pointerId, member, active: false};
-            member.draggable = false;
-            member.setPointerCapture?.(event.pointerId);
+        scope.GroupDrag?.mount(container, {
+            groupName,
+            onFinish() { suppressClickUntil = Date.now() + 500; },
+            onMove(name, destination) { state.move(name, destination); selected = null; render(); }
         });
-        container.addEventListener('pointermove', event => {
-            if (!pointerDrag || pointerDrag.id !== event.pointerId) return;
-            if (Math.hypot(event.clientX - pointerDrag.x, event.clientY - pointerDrag.y) > 7) pointerDrag.active = true;
-            if (!pointerDrag.active) return;
-            event.preventDefault();
-            container.querySelectorAll('.ge-drop-target').forEach(node => node.classList.remove('ge-drop-target'));
-            const destination = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-destination]');
-            if (destination && container.contains(destination)) destination.classList.add('ge-drop-target');
-        });
-        function endPointerDrag(event, cancelled) {
-            if (!pointerDrag || pointerDrag.id !== event.pointerId) return;
-            const drag = pointerDrag;
-            pointerDrag = null;
-            drag.member.draggable = true;
-            if (drag.member.hasPointerCapture?.(event.pointerId)) drag.member.releasePointerCapture(event.pointerId);
-            container.querySelectorAll('.ge-drop-target').forEach(node => node.classList.remove('ge-drop-target'));
-            if (!drag.active) return;
-            suppressClickUntil = Date.now() + 350;
-            event.preventDefault();
-            if (cancelled) return;
-            const destination = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-destination]');
-            if (destination && container.contains(destination)) { state.move(drag.name, destination.dataset.destination); selected = null; render(); }
-        }
-        container.addEventListener('pointerup', event => endPointerDrag(event, false));
-        container.addEventListener('pointercancel', event => endPointerDrag(event, true));
-        container.addEventListener('dragstart', event => {
-            const member = event.target.closest('.ge-member');
-            if (!member) return;
-            dragging = member.dataset.member;
-            event.dataTransfer.setData('text/plain', dragging);
-            event.dataTransfer.effectAllowed = 'move';
-        });
-        container.addEventListener('dragover', event => {
-            if (!dragging) return;
-            const destination = event.target.closest('[data-destination]');
-            if (destination) { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; destination.classList.add('ge-drop-target'); }
-        });
-        container.addEventListener('dragleave', event => event.target.closest('[data-destination]')?.classList.remove('ge-drop-target'));
-        container.addEventListener('drop', event => {
-            const destination = event.target.closest('[data-destination]');
-            if (!dragging || !destination) return;
-            event.preventDefault();
-            state.move(dragging, destination.dataset.destination);
-            dragging = null; selected = null; render();
-        });
-        container.addEventListener('dragend', () => { dragging = null; container.querySelectorAll('.ge-drop-target').forEach(node => node.classList.remove('ge-drop-target')); });
         render();
         return {state, render, markSaved() { state.markSaved(); render(); }, ready() { const error = state.error(); if (error) scope.alert(error); return !error; }};
     }
@@ -228,7 +175,7 @@
             const gender = (options.genders || {})[name];
             const color = gender === 'M' ? '#2E6275' : (gender === 'W' ? '#8A4F62' : '#40382E');
             return `<span style="color:${color};white-space:nowrap;font-weight:${(options.facilitators || []).includes(name) ? '850' : '500'}">${escape(name)}</span>`;
-        }).join(', ')}</div></section>`).join('')}</div><p style="margin-top:24px;font-size:14px;color:#6B6255">여성은 자주색, 남성은 청록색 · 진한 이름은 발제자</p>`;
+        }).join(', ')}</div></section>`).join('')}</div>`;
         document.body.appendChild(container);
         try {
             if (document.fonts && document.fonts.ready) await document.fonts.ready;

@@ -39,10 +39,11 @@ class GroupingHistoryUiContracts(unittest.TestCase):
         self.assertIn('현재 ${selectedCount}명 · 예상 ${groupCount}개 조', self.index_source)
 
     def test_shared_editor_updates_all_meeting_dates_without_a_toggle(self):
-        self.assertIn("container.addEventListener('drop'", self.editor_source)
+        self.assertIn('scope.GroupDrag?.mount(container', self.editor_source)
+        self.assertIn('onMove(name, destination) { state.move(name, destination); selected = null; render(); }', self.editor_source)
         self.assertIn('function historyHtml(group)', self.editor_source)
         self.assertIn('entry.dates', self.editor_source)
-        self.assertIn('이전 만남은 즉시 갱신됩니다', self.editor_source)
+        self.assertIn('조 이동 후 이전 만남이 바로 갱신됩니다', self.editor_source)
         self.assertNotIn('show-history-btn', self.results_source)
         self.assertIn("card.querySelector('.result-total-count').textContent = state.groups.flat().length", self.results_source)
         self.assertIn('GroupEditor.mount', self.record_source)
@@ -71,6 +72,13 @@ class GroupingHistoryUiContracts(unittest.TestCase):
         self.assertIn('id="record-image-download"', self.record_source)
         self.assertIn("'genders': member_genders", self.record_source)
         self.assertIn('GroupEditor.validate(payload.groups)', self.record_source)
+
+    def test_capture_has_no_gender_or_presenter_legend(self):
+        capture = self.editor_source.split('async function capture(options)')[1]
+        for label in ['여성은', '남성은', '진한 이름은', 'ge-grip', 'ge-help']:
+            self.assertNotIn(label, capture)
+        self.assertIn("filename='group_drag.js'", self.record_source)
+        self.assertIn("filename='group_drag.js'", self.results_source)
 
 
 if __name__ == '__main__':
