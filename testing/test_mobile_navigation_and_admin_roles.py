@@ -28,7 +28,7 @@ class MobileNavigationAndAdminRoleContracts(unittest.TestCase):
         self.assertIn("requested_role != current_role and not _current_user_is_primary_admin()", self.app_source)
         self.assertIn("자신의 관리자 권한은 직접 해제할 수 없습니다.", self.app_source)
         self.assertIn("최소 한 명의 활성 관리자가 필요합니다.", self.app_source)
-        self.assertIn('session["user_role"] = member["role"]', self.app_source)
+        self.assertIn("user_role=member.get('role') or 'member'", self.app_source)
 
     def test_dropdowns_and_mobile_more_are_keyboard_accessible(self):
         self.assertIn('<button id="notification-btn"', self.header)

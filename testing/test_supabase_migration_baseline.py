@@ -54,6 +54,7 @@ class SupabaseMigrationBaselineTests(unittest.TestCase):
             "20260508020003_005_special_events.sql",
             "20260901134512_secure_topic_edit_identity.sql",
             "20260903103757_seminar_attendance_and_moderators.sql",
+            "20260905052040_semester_membership.sql",
         }
         self.assertEqual(actual, expected)
         self.assertTrue(all(re.fullmatch(r"[0-9]{14}_[a-z0-9_]+\.sql", name) for name in actual))

@@ -39,6 +39,7 @@ from group_history import (
 from topic_preview import anonymous_topic_previews
 from topic_document import number_topic_submissions, topic_submitter_identity
 from seminar_absence import normalize_member_ids
+from term_membership import scope_members, choose_term
 from seminar_cycle import cycle_monday, is_member_signup_session, next_seminar_cycle
 from group_restrictions import find_restriction_conflicts, restricted_pairs_from_rows
 from recruitment_results import (
@@ -88,12 +89,14 @@ _cookie_secure_setting = os.environ.get("SESSION_COOKIE_SECURE")
 _cookie_secure = (
     _cookie_secure_setting.lower() in {"1", "true", "yes", "on"}
     if _cookie_secure_setting is not None
-    else os.environ.get("PUBLIC_BASE_URL", "").startswith("https://")
+    else PUBLIC_BASE_URL.startswith("https://")
 )
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SECURE=_cookie_secure,
     SESSION_COOKIE_SAMESITE="Lax",
+    PERMANENT_SESSION_LIFETIME=timedelta(days=90),
+    SESSION_REFRESH_EACH_REQUEST=True,
     MAX_CONTENT_LENGTH=60 * 1024 * 1024,
 )
 EXTERNAL_HTTP_TIMEOUT = (5, 15)
@@ -353,14 +356,14 @@ def login_required(role="ANY"):
                 return _access_denied("로그인이 필요합니다.", 401)
 
             user_role = session["user_role"]
-            if role == "admin":
+            if session.get("user_id"):
                 user_id = session.get("user_id")
                 try:
                     rows = supabase.table("members").select(
-                        "role, is_active, member_status, account_status"
+                        "role,is_active,member_status,account_status,name,profile_pic"
                     ).eq("id", user_id).limit(1).execute().data or []
                 except Exception as exc:
-                    app.logger.error("Admin authorization refresh failed: %s", exc)
+                    app.logger.error("Account authorization refresh failed: %s", exc)
                     return _access_denied("권한을 확인하지 못했습니다. 잠시 후 다시 시도해주세요.", 503)
 
                 if not rows:
@@ -369,13 +372,22 @@ def login_required(role="ANY"):
 
                 member = rows[0]
                 user_role = member.get("role") or "member"
-                session["user_role"] = user_role
+                if not session.get('member_preview') or role == 'admin':
+                    session["user_role"] = user_role
+                if member.get('name'):
+                    session['user_name'] = member['name']
+                session['profile_pic'] = member.get('profile_pic') or ''
                 if member.get("account_status") != "active" or member.get("member_status") == "inactive":
                     session.clear()
                     return _access_denied("비활성화된 계정입니다.", 403)
-                if member.get("is_active") is False or user_role not in ("admin", "officer"):
+                if role == 'admin' and (member.get("is_active") is False or user_role not in ("admin", "officer")):
                     return _access_denied("이 페이지에 접근할 권한이 없습니다.", 403)
-            elif role != "ANY" and user_role != role:
+                # Upgrade existing logins too, while respecting shared-device opt-out.
+                session.permanent = session.get('remember_login', True)
+            else:
+                session.clear()
+                return _access_denied("로그인이 필요합니다.", 401)
+            if role not in ('ANY', 'admin') and user_role != role:
                 return _access_denied("이 페이지에 접근할 권한이 없습니다.", 403)
 
             return f(*args, **kwargs)
@@ -559,8 +571,20 @@ class KakaoOauth:
 
 @app.route('/login')
 def login():
-    # 이 페이지는 이제 카카오 로그인 버튼만 보여줍니다.
+    if session.get('user_id'):
+        return redirect(safe_internal_next_url(request.args.get('next')) or url_for('my_page'))
     return render_template('login.html')
+
+
+def _start_member_session(member):
+    remember = session.get('remember_login', True)
+    next_url = safe_internal_next_url(session.get('next_url'))
+    session.clear()
+    session.update(user_id=member['id'], user_role=member.get('role') or 'member',
+                   user_name=member['name'], profile_pic=member.get('profile_pic') or '',
+                   remember_login=remember)
+    session.permanent = remember
+    return next_url
 
 
 def _kakao_authorize_url(kakao_oauth, prompt=None):
@@ -580,7 +604,10 @@ def _kakao_authorize_url(kakao_oauth, prompt=None):
 @app.route('/login/kakao')
 def kakao_login():
     kakao_oauth = KakaoOauth()
+    # Starting another account's OAuth flow must not retain the old identity.
+    session.clear()
     session['next_url'] = safe_internal_next_url(request.args.get('next'))
+    session['remember_login'] = request.args.get('remember', '1') != '0'
     mode = request.args.get('mode', 'login')
     session['auth_mode'] = mode if mode in ('login', 'signup') else 'login'
     return redirect(_kakao_authorize_url(kakao_oauth))
@@ -625,30 +652,19 @@ def kakao_callback():
         member = member_res.data[0] if member_res.data else None
 
         if member:
-            # [수정] 세션 업데이트 로직 추가
+            if member.get('account_status') != 'active' or member.get('member_status') == 'inactive':
+                session.clear()
+                flash("승인 대기 또는 비활성화된 계정입니다. 관리자에게 문의해주세요.", "warning")
+                return redirect(url_for('login'))
+            # A Kakao nickname is not the registered real name used in attendance.
             update_data = {}
-            new_name = member['name']  # 기본값은 기존 이름
 
             if profile.get("profile_image_url"):
                 update_data['profile_pic'] = profile.get("profile_image_url")
 
-            if profile.get("nickname"):
-                new_name = profile.get("nickname")
-                update_data['name'] = new_name  # 닉네임도 함께 업데이트
-
             if update_data:
                 supabase.table("members").update(update_data).eq("id", member['id']).execute()
-                flash("카카오 프로필 정보가 업데이트되었습니다.", "success")
-                # [핵심] DB 업데이트 후, 세션에 저장된 이름도 새로운 이름으로 갱신
-                session['user_name'] = new_name
-
-            # ... (계정 상태 및 활성 상태 체크 로직은 기존과 동일) ...
-            if member.get('account_status') != 'active':
-                flash("승인 대기 중입니다. 관리자가 가입/연동 요청을 확인 중입니다.", "warning")
-                return redirect(url_for('login'))
-            if member.get('member_status', 'active') == 'inactive':
-                flash("비활성화된 계정입니다. 관리자에게 문의하세요.", "danger")
-                return redirect(url_for('login'))
+                member.update(update_data)
         else:
             # ... (신규 사용자 '계정 연결' 로직은 기존과 동일) ...
             social_data = {
@@ -658,13 +674,7 @@ def kakao_callback():
             session['temp_social_data'] = social_data
             return redirect(url_for('link_account_page'))
 
-        # 세션 설정 (DB에서 읽은 최신 값으로 매번 갱신)
-        session["user_id"] = member["id"]
-        session["user_role"] = member["role"]
-        session["user_name"] = member["name"]  # 항상 DB 최신값으로 갱신
-        session.pop("member_preview", None)
-
-        next_url = safe_internal_next_url(session.pop('next_url', None))
+        next_url = _start_member_session(member)
         if next_url:
             return redirect(next_url)
         if member["role"] in ("admin", "officer"):
@@ -785,13 +795,14 @@ def link_account_submit():
                 existing_name and student_id
                 and existing_name == db_name
                 and student_id == db_student_id
+                and member_to_link.get('member_status') != 'inactive'
             )
 
             update_data = {
                 "social_id": social_info['social_id'],
                 "profile_pic": social_info['profile_pic'],
                 "account_status": 'active' if auto_approve else 'pending',
-                "is_active": True if auto_approve else member_to_link.get('is_active', False)
+                "is_active": member_to_link.get('is_active', False)
             }
             # 이메일이 있고, 현재 멤버가 사용 중인 이메일이 아닌 경우에만 업데이트
             # (다른 멤버가 이미 같은 이메일을 사용 중이면 UNIQUE 제약 위반 방지)
@@ -807,14 +818,9 @@ def link_account_submit():
 
             if auto_approve:
                 # 세션 설정 및 자동 로그인
-                session.pop('temp_social_data', None)
-                session['user_id'] = member['id']
-                session['user_name'] = member['name']
-                session['user_role'] = member.get('role', 'member')
-                session.pop('member_preview', None)
-                session['profile_pic'] = member.get('profile_pic', '')
+                next_url = _start_member_session(member)
                 flash(f"학번 확인이 완료되었습니다. {member['name']}님, 환영합니다!", "success")
-                return redirect(url_for('my_page'))
+                return redirect(next_url or url_for('my_page'))
             else:
                 # notifications 테이블에 알림 생성
                 supabase.table('notifications').insert({
@@ -1439,8 +1445,10 @@ def create_member():
             if isinstance(val, str) and val.strip() == '':
                 val = None
             insert_fields[field] = val
-        supabase.table('members').insert(insert_fields).execute()
-        return jsonify({"status": "success", "message": f"{name} 멤버가 추가되었습니다."})
+        created = supabase.table('members').insert(insert_fields).execute().data or []
+        public_fields = ('id', 'name', 'student_id', 'department', 'gender', 'is_active', 'member_status')
+        return jsonify({"status": "success", "message": f"{name} 멤버가 추가되었습니다.",
+                        "member": {key: created[0].get(key) for key in public_fields} if created else None})
     except Exception as e:
         app.logger.error(f"Error creating member: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -1529,6 +1537,9 @@ def merge_members():
         both = supabase.table('members').select('id, name, social_id, email').in_('id', [source_id, target_id]).execute().data or []
         if len(both) != 2:
             return jsonify({"status": "error", "message": "멤버를 찾을 수 없습니다."}), 404
+        protected = supabase.table('seminar_term_members').select('member_id').eq('member_id', source_id).limit(1).execute().data or []
+        if protected:
+            return jsonify(status='error', message='학기 명단이 있는 회원은 기존 합치기 기능으로 삭제할 수 없습니다. 학기 기록 보존을 위해 합치기를 중단했습니다.'), 409
         source_row = next(m for m in both if m['id'] == source_id)
         target_row = next(m for m in both if m['id'] == target_id)
 
@@ -1814,9 +1825,9 @@ def bookclub_index():
     pair_restrictions = []
 
     try:
-        all_active_members_res = supabase.table("members").select("id, name, student_id, department, gender") \
-            .eq('is_active', True).order("name").execute()
-        all_active_members = all_active_members_res.data or []
+        member_rows = supabase.table("members").select("id,name,student_id,department,gender,is_active").order('name').execute().data or []
+        terms = supabase.table('seminar_terms').select('*').order('start_date', desc=True).execute().data or []
+        all_active_members = [m for m in scope_members(supabase, member_rows, term=choose_term(terms)) if m.get('is_active')]
         for member in all_active_members:
             member['gender_code'] = normalize_gender(member.get('gender'))
         active_member_ids = {member['id'] for member in all_active_members}
@@ -1827,6 +1838,10 @@ def bookclub_index():
                 .eq('id', seminar_session_id).single().execute().data
             if not selected_session:
                 raise ValueError('선택한 세미나 회차를 찾을 수 없습니다.')
+            all_active_members = [m for m in scope_members(supabase, member_rows, term_id=selected_session.get('term_id')) if m.get('is_active')]
+            for member in all_active_members:
+                member['gender_code'] = normalize_gender(member.get('gender'))
+            active_member_ids = {m['id'] for m in all_active_members}
             meeting_date = selected_session['meeting_date']
             day_choice = selected_session.get('day_type') or day_choice
             if day_choice == 'mon':
@@ -1876,10 +1891,11 @@ def bookclub_index():
                 elif row.get('meeting_date') == thu_date_iso:
                     thu_attendee_ids.add(row['user_id'])
             sess_rows = supabase.table('seminar_sessions').select(
-                'id, meeting_date, day_type, participation_mode, seminar_week_id, book_title, planned_member_ids'
+                'id,term_id,meeting_date,day_type,participation_mode,seminar_week_id,book_title,planned_member_ids'
             ) \
                 .in_('meeting_date', date_strs).eq('is_active', True).execute().data or []
             for s in sess_rows:
+                scoped_ids = {m['id'] for m in scope_members(supabase, member_rows, term_id=s.get('term_id')) if m.get('is_active')}
                 target_ids = mon_attendee_ids if s.get('day_type') == 'mon' else thu_attendee_ids
                 mode = s.get('participation_mode') or 'legacy_explicit'
                 if s.get('planned_member_ids') is not None:
@@ -1889,7 +1905,7 @@ def bookclub_index():
                     target_ids.clear()
                     absent = supabase.table('seminar_absences').select('member_id') \
                         .eq('session_id', s['id']).is_('cancelled_at', 'null').execute().data or []
-                    target_ids |= active_member_ids - {row['member_id'] for row in absent}
+                    target_ids |= scoped_ids - {row['member_id'] for row in absent}
                 else:
                     if mode == 'opt_in':
                         target_ids.clear()
@@ -1911,6 +1927,9 @@ def bookclub_index():
                 )
                 if linked_session:
                     seminar_session_id = linked_session['id']
+                    all_active_members = [m for m in scope_members(supabase, member_rows, term_id=linked_session.get('term_id')) if m.get('is_active')]
+                    for member in all_active_members:
+                        member['gender_code'] = normalize_gender(member.get('gender'))
                     selected_topic_event, pre_checked_facilitator_names, unmatched_facilitators = \
                         _topic_facilitators_for_session(linked_session, all_active_members)
 
@@ -3377,7 +3396,7 @@ def toggle_topic_event(event_id):
         return jsonify({"error": "상태 변경 중 오류가 발생했습니다."}), 500
 
 
-def _authenticated_topic_member():
+def _authenticated_topic_member(event_id=None):
     """Return the active member tied to the authenticated session.
 
     Topic submission links are public, so client-provided names and student IDs
@@ -3404,9 +3423,24 @@ def _authenticated_topic_member():
     if (
         member.get('account_status') != 'active'
         or member.get('member_status') == 'inactive'
-        or member.get('is_active') is False
         or not (member.get('name') or '').strip()
     ):
+        return None
+    if event_id:
+        try:
+            events = supabase.table('topic_events').select('seminar_session_id,seminar_week_id').eq('id', event_id).limit(1).execute().data or []
+            event = events[0] if events else {}
+            related = []
+            if event.get('seminar_week_id'):
+                related = supabase.table('seminar_sessions').select('term_id').eq('seminar_week_id', event['seminar_week_id']).limit(1).execute().data or []
+            elif event.get('seminar_session_id'):
+                related = supabase.table('seminar_sessions').select('term_id').eq('id', event['seminar_session_id']).limit(1).execute().data or []
+            if related and related[0].get('term_id'):
+                member = scope_members(supabase, [member], term_id=related[0]['term_id'])[0]
+        except Exception:
+            app.logger.exception('Topic semester membership lookup failed')
+            return None
+    if member.get('is_active') is False:
         return None
     return member
 
@@ -3499,7 +3533,7 @@ def view_shared_topics():
             .eq('event_id', event_data['id']).order('created_at').execute().data or []
         existing_topic_previews = anonymous_topic_previews(preview_rows)
 
-        member = _authenticated_topic_member()
+        member = _authenticated_topic_member(event_data['id'])
         user_name = member.get('name') if member else None
         user_department = member.get('department') if member else None
         user_student_id = member.get('student_id') if member else None
@@ -3526,7 +3560,7 @@ def submit_topics():
     topics = data.get('topics')  # JSON Array
 
     # 회원 권한은 입력한 이름/학번이 아니라 서버 세션의 member id로만 확인한다.
-    member = _authenticated_topic_member()
+    member = _authenticated_topic_member(event_id)
     is_logged_in_member = member is not None
     if member:
         author_name = (member.get('name') or '').strip()
@@ -3709,7 +3743,7 @@ def load_topics():
     student_id = (data.get('student_id') or '').strip()
 
     # 회원 권한은 입력한 이름/학번이 아니라 서버 세션의 member id로만 확인한다.
-    member = _authenticated_topic_member()
+    member = _authenticated_topic_member(event_id)
     is_logged_in_member = member is not None
     if member:
         author_name = (member.get('name') or '').strip()
@@ -4242,12 +4276,23 @@ def seminar_term_create():
         if not (name and start_date and end_date):
             return jsonify({'status': 'error', 'message': '학기명/시작일/종료일은 필수입니다.'}), 400
 
+        try:
+            start, end = date.fromisoformat(start_date), date.fromisoformat(end_date)
+            if end < start or (end - start).days > 366 or len(name) > 100:
+                raise ValueError()
+        except (ValueError, TypeError):
+            return jsonify({'status': 'error', 'message': '학기 기간은 시작일부터 1년 이내로 설정해주세요.'}), 400
+        duplicate = supabase.table('seminar_terms').select('id').eq('name', name).limit(1).execute().data or []
+        if duplicate:
+            return jsonify({'status': 'error', 'message': '같은 이름의 학기가 이미 있습니다. 기존 학기를 선택해주세요.'}), 409
+
         term_res = supabase.table('seminar_terms').insert({
             'name': name,
             'start_date': start_date,
             'end_date': end_date,
             'max_capacity': max_capacity,
             'is_active': True,
+            'roster_initialized_at': datetime.now(timezone.utc).isoformat(),
         }).execute()
         term = term_res.data[0]
 
@@ -4432,8 +4477,8 @@ def admin_seminar_term(term_id):
                 upcoming_sessions.append(s)
 
         # 전체 활성 멤버 (관리자 수동 추가용)
-        all_members = supabase.table('members').select('id, name, student_id, department') \
-            .eq('is_active', True).order('name').execute().data or []
+        all_members = supabase.table('members').select('id,name,student_id,department,is_active').order('name').execute().data or []
+        all_members = [m for m in scope_members(supabase, all_members, term=term) if m.get('is_active')]
 
         share_url = f"{request.host_url}seminar_vote?token={term['share_token']}"
         return render_template('admin_seminar_term.html', term=term, sessions=sessions,
@@ -4451,7 +4496,7 @@ def _load_weekly_seminar_view(term_id=None):
         return terms, None, [], []
     term = next((row for row in terms if str(row['id']) == str(term_id)), None)
     if term is None:
-        term = next((row for row in terms if row.get('is_active')), terms[0])
+        term = choose_term(terms)
 
     weeks = supabase.table('seminar_weeks').select('*').eq('term_id', term['id']) \
         .order('week_start').execute().data or []
@@ -4495,7 +4540,7 @@ def _load_weekly_seminar_view(term_id=None):
 
     all_members = supabase.table('members').select('id, name, student_id, department, is_active') \
         .order('name').execute().data or []
-    active_members = [row for row in all_members if row.get('is_active')]
+    active_members = [row for row in scope_members(supabase, all_members, term=term) if row.get('is_active')]
     member_by_id = {row['id']: row for row in all_members}
     topic_by_week = {row['seminar_week_id']: row for row in topics if row.get('seminar_week_id')}
     submission_count = defaultdict(int)
@@ -4564,7 +4609,7 @@ def _load_weekly_seminar_view(term_id=None):
             member for member in no_show_pool
             if member['id'] not in item['no_show_member_ids']
         ]
-        item['expected_count'] = max(0, len(active_members) - len(item['absences'])) \
+        item['expected_count'] = len({m['id'] for m in active_members} - set(item['absent_member_ids'])) \
             if item.get('participation_mode') == 'absence_only' else item['yes_count']
         if item.get('planned_member_ids') is not None:
             planned_set = set(item['planned_member_ids'])
@@ -4948,8 +4993,8 @@ def admin_special_event_detail(event_id):
         attendees = supabase.table('special_event_attendees') \
             .select('id, member_id, role, note, members(id, name, student_id, department)') \
             .eq('event_id', event_id).order('created_at').execute().data or []
-        all_members = supabase.table('members').select('id, name, student_id, department') \
-            .eq('is_active', True).order('name').execute().data or []
+        # Actual event attendance can include returning or previously dormant members.
+        all_members = supabase.table('members').select('id, name, student_id, department').order('name').execute().data or []
         attendee_ids = {a['member_id'] for a in attendees}
         candidates = [m for m in all_members if m['id'] not in attendee_ids]
         return render_template('admin_special_event_detail.html',
@@ -5871,15 +5916,14 @@ def seminar_session_add_absence(session_id):
         data = request.json or {}
         member_ids = normalize_member_ids(data)
         note = (data.get('note') or '').strip()[:500]
-        target = supabase.table('seminar_sessions').select('participation_mode,planned_member_ids') \
+        target = supabase.table('seminar_sessions').select('term_id,participation_mode,planned_member_ids') \
             .eq('id', session_id).single().execute().data or {}
         if target.get('planned_member_ids') is not None:
             return jsonify({'status': 'error', 'message': '카카오톡 명단 반영 화면에서 불참 명단을 수정해주세요.'}), 409
         if target.get('participation_mode') != 'absence_only':
             return jsonify({'status': 'error', 'message': '목요일 불참 입력 회차가 아닙니다.'}), 400
-        members = supabase.table('members').select('id').in_('id', member_ids) \
-            .eq('is_active', True).execute().data or []
-        valid_member_ids = {row['id'] for row in members}
+        members = supabase.table('members').select('id,is_active').in_('id', member_ids).execute().data or []
+        valid_member_ids = {row['id'] for row in scope_members(supabase, members, term_id=target.get('term_id')) if row.get('is_active')}
         invalid_member_ids = [member_id for member_id in member_ids if member_id not in valid_member_ids]
         if invalid_member_ids:
             return jsonify({'status': 'error', 'message': '비활성 또는 존재하지 않는 회원이 포함되어 있습니다.'}), 400
@@ -5935,14 +5979,13 @@ def seminar_session_add_no_shows(session_id):
         data = request.json or {}
         member_ids = normalize_member_ids(data)
         note = (data.get('note') or '').strip()[:500]
-        target = supabase.table('seminar_sessions').select('participation_mode,planned_member_ids,actual_member_ids,attendance_confirmed_at') \
+        target = supabase.table('seminar_sessions').select('term_id,participation_mode,planned_member_ids,actual_member_ids,attendance_confirmed_at') \
             .eq('id', session_id).single().execute().data or {}
         if not target:
             return jsonify({'status': 'error', 'message': '세미나 회차를 찾을 수 없습니다.'}), 404
 
-        members = supabase.table('members').select('id').in_('id', member_ids) \
-            .eq('is_active', True).execute().data or []
-        eligible_ids = {row['id'] for row in members}
+        members = supabase.table('members').select('id,is_active').in_('id', member_ids).execute().data or []
+        eligible_ids = {row['id'] for row in scope_members(supabase, members, term_id=target.get('term_id')) if row.get('is_active')}
         if target.get('planned_member_ids') is not None:
             eligible_ids = set(target['planned_member_ids'])
         elif target.get('participation_mode') == 'opt_in':
@@ -6428,6 +6471,8 @@ init_engagement_routes(app, supabase, login_required, _voting_window_for,
 
 from attendance_routes import init_attendance_routes
 init_attendance_routes(app, lambda: supabase, login_required, _rebuild_matrix_for_session)
+from term_membership_routes import init_term_membership_routes
+init_term_membership_routes(app, lambda: supabase, login_required, create_member, seminar_term_create)
 
 
 # ==============================================================================

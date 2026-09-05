@@ -56,7 +56,8 @@ class AttendanceRouteTests(unittest.TestCase):
         self.fake.rpc = rpc
         response = self.client.post('/api/admin/seminar_sessions/thu/roster/apply', headers=self.headers, json={'token': preview['token']})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(captured['name'], 'apply_seminar_roster')
+        self.assertEqual(captured['name'], 'apply_seminar_roster_for_term')
+        self.assertEqual(captured['params']['p_term_revision'], 0)
         self.assertEqual(captured['params']['p_member_ids'], [2])
         self.assertEqual(captured['params']['p_expected_member_ids'], [1])
 

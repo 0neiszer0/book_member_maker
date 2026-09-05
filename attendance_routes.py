@@ -6,6 +6,7 @@ from flask import abort, jsonify, render_template, request, session, send_file
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from attendance_workflow import (build_term_attendance, expected_member_ids,
                                  match_roster_rows, parse_roster_text)
+from term_membership import scope_members
 
 KST = timezone(timedelta(hours=9))
 
@@ -36,7 +37,11 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
         members = db().table('members').select('id,name,student_id,department,is_active').order('name').execute().data or []
         audit = db().table('seminar_roster_imports').select('*').eq('session_id', session_id).order('created_at', desc=True).limit(10).execute().data or []
         mode = 'absence' if target.get('day_type') == 'thu' else 'attendance'
-        active = {int(m['id']) for m in members if m.get('is_active')}
+        terms = db().table('seminar_terms').select('*').eq('id', target.get('term_id')).limit(1).execute().data or []
+        term = terms[0] if terms else {}
+        target['term_revision'] = term.get('roster_revision', 0)
+        scoped = scope_members(db(), members, term=term)
+        active = {int(m['id']) for m in scoped if m.get('is_active')}
         if mode == 'absence' and audit:
             eligible = set(audit[0].get('member_ids') or []) | set(audit[0].get('expected_member_ids') or [])
         else:
@@ -139,7 +144,8 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
             by_id = {int(m['id']): m for m in members}
             payload = {'session_id': session_id, 'user_id': session.get('user_id'), 'mode': mode,
                        'member_ids': sorted(ids), 'expected_member_ids': expected,
-                       'previous_member_ids': planned, 'previous_updated_at': target.get('roster_updated_at')}
+                       'previous_member_ids': planned, 'previous_updated_at': target.get('roster_updated_at'),
+                       'term_revision': target['term_revision']}
             return jsonify(status='success', issues=issues,
                            matched=[by_id[mid] for mid in sorted(ids)],
                            added=[by_id[mid] for mid in sorted(set(expected) - set(planned))],
@@ -153,12 +159,13 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
 
     def apply_preview(payload):
         try:
-            result = db().rpc('apply_seminar_roster', {
+            result = db().rpc('apply_seminar_roster_for_term', {
                 'p_session_id': payload['session_id'], 'p_member_ids': payload['member_ids'],
                 'p_expected_member_ids': payload['expected_member_ids'],
                 'p_previous_member_ids': payload['previous_member_ids'],
                 'p_previous_updated_at': payload['previous_updated_at'], 'p_mode': payload['mode'],
                 'p_created_by': session.get('user_id'),
+                'p_term_revision': payload.get('term_revision', -1),
             }).execute().data or {}
         except Exception:
             app.logger.exception('Atomic roster apply failed')
@@ -190,7 +197,8 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
         return apply_preview({'session_id': session_id, 'mode': mode,
                               'member_ids': sorted(set(eligible) - set(previous)) if mode == 'absence' else previous,
                               'expected_member_ids': previous, 'previous_member_ids': planned,
-                              'previous_updated_at': target.get('roster_updated_at')})
+                              'previous_updated_at': target.get('roster_updated_at'),
+                              'term_revision': target['term_revision']})
 
     @app.post('/api/admin/seminar_sessions/<session_id>/attendance/confirm')
     @login_required(role='admin')
@@ -230,6 +238,7 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
             return terms, None, None
         start, end = term['start_date'], term['end_date']
         members = db().table('members').select('id,name,student_id,department,is_active').order('name').execute().data or []
+        members = scope_members(db(), members, term=term)
         histories = db().table('history').select('id,date,present,book_title,seminar_session_id,attendance_confirmed_at,actual_member_ids').gte('date', start).lte('date', end).execute().data or []
         sessions = db().table('seminar_sessions').select('*').gte('meeting_date', start).lte('meeting_date', end).execute().data or []
         session_ids = [s['id'] for s in sessions]
@@ -243,6 +252,7 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
         report = build_term_attendance(members, histories, sessions, events, attendees, bricks, brick_members,
                                        start, end, term.get('attendance_minimum', 3), datetime.now(KST).date(), no_shows)
         report['events'] = events
+        report['roster_initialized'] = bool(term.get('roster_initialized_at'))
         report['pending_sessions'] = [s for s in sessions if s['meeting_date'] <= datetime.now(KST).date().isoformat()
                                       and not s.get('attendance_confirmed_at')
                                       and not any(h.get('attendance_confirmed_at') and h.get('seminar_session_id') == s['id'] for h in histories)]
@@ -296,7 +306,7 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
             return "'" + value if isinstance(value, str) and value.startswith(('=', '+', '-', '@')) else value
         for member in report['members']:
             row = [member.get('name'), member.get('student_id'), member.get('department'),
-                   '활성' if member.get('is_active') else '비활성·휴면',
+                   '학기 활동' if member.get('is_active') else {'paused':'학기 휴식','left':'학기 종료'}.get(member.get('term_status'), '학기 미등록'),
                    member['counts']['seminar'], member['counts']['ot'], member['counts']['brick'],
                    member['total'], member['shortage']] + [
                        'O' if report['matrix'].get(member['id'], {}).get(c['key']) else '' for c in report['columns']]
@@ -317,5 +327,5 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
         terms, term, report = term_report(request.args.get('term_id'))
         mine = next((m for m in (report or {}).get('members', []) if int(m['id']) == int(session['user_id'])), None)
         columns = [c for c in (report or {}).get('columns', []) if mine and report['matrix'].get(mine['id'], {}).get(c['key'])]
-        return render_template('my_term_attendance.html', term=term, mine=mine, columns=columns,
+        return render_template('my_term_attendance.html', terms=terms, term=term, mine=mine, columns=columns,
                                minimum=(report or {}).get('minimum', 3))
