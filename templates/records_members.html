@@ -22,7 +22,7 @@
 <body>{% include '_header.html' %}{% include '_admin_sidebar.html' %}
 {% set ns=namespace(active=0,dormant=0,inactive=0,incomplete=0) %}{% for m in members %}{% set st=m.member_status or 'active' %}{% if st=='active' %}{% set ns.active=ns.active+1 %}{% elif st=='dormant' %}{% set ns.dormant=ns.dormant+1 %}{% else %}{% set ns.inactive=ns.inactive+1 %}{% endif %}{% if not m.student_id or not m.department or not m.recruiting_class %}{% set ns.incomplete=ns.incomplete+1 %}{% endif %}{% endfor %}
 <main class="max-w-[1500px] mx-auto px-4 lg:px-8 py-7">
-  <div class="flex flex-wrap items-end justify-between gap-4 mb-6"><div><p class="text-sm font-bold muted">운영 관리</p><h1 class="text-3xl font-extrabold">회원 관리</h1><p class="muted mt-2">회원 정보, 활동 상태와 참여 요약을 한 화면에서 관리합니다.</p></div><div class="flex gap-2"><button class="btn soft" id="merge-open">중복 회원 합치기</button><button class="btn primary" id="member-add">회원 추가</button></div></div>
+  <div class="flex flex-wrap items-end justify-between gap-4 mb-6"><div><p class="text-sm font-bold muted">운영 관리</p><h1 class="text-3xl font-extrabold">회원 관리</h1><p class="muted mt-2">회원 정보와 로그인 권한을 관리합니다. 학기별 활동·휴식은 학기 회원 명단에서 변경해주세요.</p></div><div class="flex flex-wrap gap-2"><a class="btn soft" href="{{ url_for('admin_term_members') }}">학기 회원 명단</a><button class="btn soft" id="merge-open">중복 회원 합치기</button><button class="btn primary" id="member-add">회원 추가</button></div></div>
 
   <div class="panel p-4 mb-4 border-l-4 !border-l-[#71875e]"><p class="font-extrabold">상태를 바꾸려면 회원 행의 ‘활성 · 휴면 · 비활성’ 버튼을 누르세요.</p><p class="muted text-sm mt-1">누르는 즉시 저장됩니다. 활성은 조 편성에 포함, 휴면은 기록을 유지한 채 명단에서 제외, 비활성은 졸업·탈퇴 등 장기 미활동 상태입니다.</p></div>
 

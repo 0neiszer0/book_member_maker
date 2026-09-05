@@ -88,6 +88,7 @@
         {% for item in terms %}<option value="{{ item.id }}" {% if term and item.id==term.id %}selected{% endif %}>{{ item.name }}{% if not item.is_active %} · 보관됨{% endif %}</option>{% endfor %}
       </select>
       <a class="btn soft" href="{{ url_for('admin_term_attendance', term_id=term.id if term else '') }}">학기 참석 현황</a>
+      <a class="btn soft" href="{{ url_for('admin_term_members', term_id=term.id if term else '') }}">학기 회원 명단</a>
     </div>
   </div>
 

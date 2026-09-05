@@ -7,6 +7,7 @@
     <a href="{{ url_for('admin_seminars') }}" class="{% if endpoint in ['admin_seminars', 'admin_seminar_term', 'admin_seminar_roster', 'seminar_session_moderator', 'topic_document_setup'] %}active{% endif %}">세미나 운영</a>
     <a href="{{ url_for('bookclub_index') }}" class="{% if endpoint in ['bookclub_index', 'bookclub_ga_results'] %}active{% endif %}">조 편성</a>
     <a href="{{ url_for('records_members') }}" class="{% if endpoint in ['records_members', 'records_member_profile'] %}active{% endif %}">회원 관리</a>
+    <a href="{{ url_for('admin_term_members') }}" class="{% if endpoint == 'admin_term_members' %}active{% endif %}">학기별 회원</a>
     <a href="/admin/term_attendance" class="{% if endpoint == 'admin_term_attendance' %}active{% endif %}">학기 참석 현황</a>
     <a href="{{ url_for('admin_recruitment_results') }}" class="{% if endpoint.startswith('admin_recruitment_result') %}active{% endif %}">면접 지원자</a>
     <a href="{{ url_for('admin_special_events') }}" class="{% if endpoint.startswith('admin_special_event') %}active{% endif %}">활동·행사</a>

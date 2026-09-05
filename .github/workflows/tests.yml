@@ -30,6 +30,7 @@ jobs:
       - run: node testing/test_group_drag.js
       - run: node testing/test_seminar_schedule.js
       - run: node testing/test_attendance_roster_race.js
+      - run: node testing/test_term_membership.js
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
