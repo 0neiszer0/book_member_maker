@@ -2,8 +2,10 @@ import importlib
 import os
 from types import SimpleNamespace
 import unittest
-from term_membership import scope_members, validate_entries, choose_term
-from testing._fake_supabase import FakeSupabase
+from unittest.mock import patch
+from term_membership import (automatic_source_terms, carried_entries, choose_term,
+                             parse_term_name, scope_members, validate_entries)
+from testing._fake_supabase import FakeQuery, FakeSupabase
 
 os.environ.setdefault('PYTHON_DOTENV_DISABLED', '1')
 os.environ.setdefault('FLASK_SECRET_KEY', 'term-members-test')
@@ -43,6 +45,31 @@ class SemesterMembershipTests(unittest.TestCase):
         self.assertEqual([m['id'] for m in spring if m['is_active']], [2])
         self.assertEqual([m['id'] for m in fall if m['is_active']], [3])
         self.assertFalse(members[2]['is_active'])
+
+    def test_operating_blocks_choose_and_merge_the_right_prior_terms(self):
+        terms = [
+            dict(id='2025-fall', name='2025-2학기', start_date='2025-09-01', roster_initialized_at='yes'),
+            dict(id='2025-winter', name='2025-겨울학기', start_date='2025-12-20', roster_initialized_at='yes'),
+            dict(id='spring', name='2026-1학기', start_date='2026-03-01', roster_initialized_at='yes'),
+            dict(id='summer', name='2026-여름학기', start_date='2026-07-01', roster_initialized_at='yes'),
+            dict(id='fall', name='2026-2학기', start_date='2026-09-01'),
+        ]
+        self.assertEqual(parse_term_name('2026년 2학기'), (2026, '2학기'))
+        self.assertEqual([t['id'] for t in automatic_source_terms(terms, terms[-1])], ['spring', 'summer'])
+        next_spring = dict(id='next', name='2026-1학기', start_date='2026-03-01')
+        previous_block = automatic_source_terms(terms, next_spring)
+        self.assertEqual([t['id'] for t in previous_block], ['2025-fall', '2025-winter'])
+
+        memberships = [
+            dict(term_id='spring', member_id=2, status='active'),
+            dict(term_id='summer', member_id=2, status='active'),
+            dict(term_id='summer', member_id=3, status='active'),
+            dict(term_id='spring', member_id=4, status='paused'),
+        ]
+        self.assertEqual(carried_entries(memberships, automatic_source_terms(terms, terms[-1])), [
+            {'member_id': 2, 'status': 'active', 'entry_type': 'continuing'},
+            {'member_id': 3, 'status': 'active', 'entry_type': 'continuing'},
+        ])
 
     def test_legacy_fallback_and_initialized_empty_are_distinct(self):
         members = self.fake.rows['members']
@@ -119,6 +146,53 @@ class SemesterMembershipTests(unittest.TestCase):
                                        json={'name':'2026-겨울학기','start_date':start,'end_date':end})
             self.assertEqual(response.status_code, 400)
         self.assertFalse(any(call[0]=='insert' for call in self.fake.calls))
+
+    def test_new_term_automatically_saves_the_paired_prior_active_roster(self):
+        class TermCreateQuery(FakeQuery):
+            def execute(query):
+                if query.table_name == 'seminar_terms' and query.operation == 'insert':
+                    query.payload = {**query.payload, 'id': 'new-fall', 'share_token': 'share',
+                                     'roster_revision': 0, 'roster_initialized_at': None}
+                return super().execute()
+
+        class TermCreateFake(FakeSupabase):
+            def __init__(database, rows):
+                super().__init__(rows)
+                database.rpc_call = None
+
+            def table(database, table_name):
+                database.calls.append(('table', table_name, (), {}))
+                return TermCreateQuery(database, table_name)
+
+            def rpc(database, name, params):
+                database.rpc_call = (name, params)
+                return SimpleNamespace(execute=lambda: SimpleNamespace(data={'accepted': True, 'revision': 1}))
+
+        fake = TermCreateFake({
+            'members': self.fake.rows['members'],
+            'seminar_terms': [
+                dict(id='spring', name='2026-1학기', start_date='2026-03-01', end_date='2026-06-30', roster_initialized_at='yes'),
+                dict(id='summer', name='2026-여름학기', start_date='2026-07-01', end_date='2026-08-20', roster_initialized_at='yes'),
+            ],
+            'seminar_term_members': [
+                dict(term_id='spring', member_id=2, status='active', entry_type='new'),
+                dict(term_id='summer', member_id=2, status='active', entry_type='continuing'),
+                dict(term_id='summer', member_id=3, status='active', entry_type='returning'),
+            ],
+        })
+        self.module.supabase = fake
+        with patch.object(self.module, '_enumerate_mon_thu', return_value=[]):
+            response = self.client.post('/api/admin/seminar_terms/create', json={
+                'name': '2026-2학기', 'start_date': '2026-09-01', 'end_date': '2026-12-20',
+            })
+        self.assertEqual(response.status_code, 200, response.get_json())
+        self.assertEqual(response.get_json()['carried_member_count'], 2)
+        self.assertEqual(response.get_json()['carried_from'], ['2026-1학기', '2026-여름학기'])
+        self.assertEqual(fake.rpc_call[0], 'save_seminar_term_members')
+        self.assertEqual(fake.rpc_call[1]['p_entries'], [
+            {'member_id': 2, 'status': 'active', 'entry_type': 'continuing'},
+            {'member_id': 3, 'status': 'active', 'entry_type': 'continuing'},
+        ])
 
 
 if __name__ == '__main__': unittest.main()

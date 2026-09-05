@@ -29,3 +29,13 @@ assert.throws(() => draft.carry('winter'));
 assert.throws(() => draft.carry('missing'));
 assert.equal(JSON.stringify(data), before, 'past semester data must not be mutated');
 console.log('PASS: carry-forward, new/returning classification, draft isolation, explicit pause/end preservation');
+
+const paired = new TermRosterDraft({
+  term: {id:'fall', start_date:'2026-09-01'},
+  terms: data.terms,
+  members: data.members,
+  memberships: data.memberships,
+  source_term_ids: ['spring', 'summer'],
+});
+assert.equal(paired.suggestedType(1), 'continuing');
+assert.equal(paired.suggestedType(2), 'continuing');

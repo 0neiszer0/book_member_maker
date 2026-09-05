@@ -1,7 +1,7 @@
 """Admin-only semester roster drafts, carry-forward and atomic saves."""
 import secrets
 from flask import abort, jsonify, render_template, request, session
-from term_membership import choose_term, validate_entries, STATUSES, ENTRY_TYPES
+from term_membership import automatic_source_terms, choose_term, validate_entries, STATUSES, ENTRY_TYPES
 
 
 def init_term_membership_routes(app, get_db, login_required, create_member, create_term):
@@ -30,10 +30,12 @@ def init_term_membership_routes(app, get_db, login_required, create_member, crea
             memberships.extend(batch)
             if len(batch) < 1000:
                 break
+        source_terms = automatic_source_terms(terms, term) if term else []
         audit = db.table('seminar_term_roster_changes').select('created_at,revision').eq('term_id', term['id']).order('revision', desc=True).limit(5).execute().data or [] if term else []
         return render_template('admin_term_members.html', terms=terms, term=term, members=members,
                                memberships=memberships, audit=audit, csrf_token=csrf(),
-                               statuses=STATUSES, entry_types=ENTRY_TYPES)
+                               statuses=STATUSES, entry_types=ENTRY_TYPES,
+                               source_terms=source_terms)
 
     @app.post('/api/admin/term_members/<term_id>')
     @login_required(role='admin')

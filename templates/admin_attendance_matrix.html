@@ -172,11 +172,11 @@
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs text-gray-400 mb-1">시작일 <span class="text-red-400">*</span></label>
+                        <label class="block text-xs text-gray-400 mb-1">첫 세미나 날짜 <span class="text-red-400">*</span></label>
                         <input id="tStart" type="date" class="eva-input w-full rounded px-3 py-2 text-sm">
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-400 mb-1">종료일 <span class="text-red-400">*</span></label>
+                        <label class="block text-xs text-gray-400 mb-1">마지막 세미나 날짜 <span class="text-red-400">*</span></label>
                         <input id="tEnd" type="date" class="eva-input w-full rounded px-3 py-2 text-sm">
                     </div>
                 </div>
@@ -204,7 +204,7 @@
             const name = document.getElementById('tName').value.trim();
             const start = document.getElementById('tStart').value;
             const end = document.getElementById('tEnd').value;
-            if (!name || !start || !end) { alert('학기명/시작일/종료일을 모두 입력해주세요.'); return; }
+            if (!name || !start || !end) { alert('학기명과 첫·마지막 세미나 날짜를 모두 입력해주세요.'); return; }
             try {
                 const res = await fetch('/api/admin/seminar_terms/create', {
                     method: 'POST',

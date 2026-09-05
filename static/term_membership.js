@@ -6,13 +6,15 @@
       this.terms = data.terms;
       this.members = data.members;
       this.history = data.memberships;
+      this.sourceTermIds = data.source_term_ids || [];
       this.entries = new Map(this.history.filter(row => row.term_id === this.term.id).map(row => [row.member_id, {member_id: row.member_id, status: row.status, entry_type: row.entry_type}]));
       this.original = this.serialize();
     }
     suggestedType(id) {
       const prior = this.terms.filter(t => t.start_date < this.term.start_date).sort((a, b) => b.start_date.localeCompare(a.start_date));
-      const previous = this.history.find(row => row.member_id === id && row.term_id === prior[0]?.id);
-      if (previous?.status === 'active') return 'continuing';
+      const automatic = this.sourceTermIds.length ? this.sourceTermIds : [prior[0]?.id].filter(Boolean);
+      const previous = this.history.find(row => row.member_id === id && automatic.includes(row.term_id) && row.status === 'active');
+      if (previous) return 'continuing';
       return this.history.some(row => row.member_id === id && prior.some(t => t.id === row.term_id)) ? 'returning' : 'new';
     }
     setStatus(id, status) {
@@ -97,11 +99,17 @@
     } catch (error) { byId('new-term-status').textContent = error.message; lock(false); }
   });
   if (!draft) return;
+  const recentMemberIds = new Set(draft.history
+    .filter(row => draft.sourceTermIds.includes(row.term_id) && row.status === 'active')
+    .map(row => row.member_id));
   function visibleMembers() {
     const search = byId('term-member-search').value.trim().toLocaleLowerCase();
     return draft.members.filter(member => {
       const assigned = draft.entries.has(member.id);
-      return (filter === 'all' || (filter === 'assigned' ? assigned : !assigned)) &&
+      const inFilter = filter === 'assigned' ? assigned
+        : filter === 'recent' ? !assigned && recentMemberIds.has(member.id)
+          : !assigned;
+      return inFilter &&
         [member.name, member.student_id, member.department].join(' ').toLocaleLowerCase().includes(search);
     });
   }
@@ -151,10 +159,6 @@
   byId('copy-term').addEventListener('click', () => {
     try { const count = draft.carry(byId('copy-source').value); byId('term-save-status').textContent = `${count}명을 추가했습니다. 명단을 확인하고 저장해주세요.`; render(); }
     catch (error) { byId('term-save-status').textContent = error.message; }
-  });
-  byId('seed-active').addEventListener('click', () => {
-    draft.members.filter(m => m.is_active && !draft.entries.has(m.id)).forEach(m => draft.setStatus(m.id, 'active'));
-    byId('term-save-status').textContent = '기존 활성 회원을 추가했습니다. 이 학기의 실제 명단과 일치하는지 확인하고 저장해주세요.'; render();
   });
   byId('bulk-apply').addEventListener('click', async () => {
     const visible = visibleMembers(), status = byId('bulk-status').value;
