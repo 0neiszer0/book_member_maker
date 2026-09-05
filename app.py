@@ -39,7 +39,7 @@ from group_history import (
 from topic_preview import anonymous_topic_previews
 from topic_document import number_topic_submissions, topic_submitter_identity
 from seminar_absence import normalize_member_ids
-from term_membership import scope_members, choose_term
+from term_membership import automatic_source_terms, carried_entries, scope_members, choose_term
 from seminar_cycle import cycle_monday, is_member_signup_session, next_seminar_cycle
 from group_restrictions import find_restriction_conflicts, restricted_pairs_from_rows
 from recruitment_results import (
@@ -4267,6 +4267,7 @@ def _session_payload(term_id, meeting_date, day_type, weeks):
 @app.route('/api/admin/seminar_terms/create', methods=['POST'])
 @login_required(role="admin")
 def seminar_term_create():
+    created_term_id = None
     try:
         data = request.json or request.form
         name = (data.get('name') or '').strip()
@@ -4274,16 +4275,16 @@ def seminar_term_create():
         end_date = data.get('end_date')
         max_capacity = int(data.get('max_capacity') or 32)
         if not (name and start_date and end_date):
-            return jsonify({'status': 'error', 'message': '학기명/시작일/종료일은 필수입니다.'}), 400
+            return jsonify({'status': 'error', 'message': '학기명과 첫·마지막 세미나 날짜는 필수입니다.'}), 400
 
         try:
             start, end = date.fromisoformat(start_date), date.fromisoformat(end_date)
             if end < start or (end - start).days > 366 or len(name) > 100:
                 raise ValueError()
         except (ValueError, TypeError):
-            return jsonify({'status': 'error', 'message': '학기 기간은 시작일부터 1년 이내로 설정해주세요.'}), 400
-        duplicate = supabase.table('seminar_terms').select('id').eq('name', name).limit(1).execute().data or []
-        if duplicate:
+            return jsonify({'status': 'error', 'message': '마지막 세미나 날짜는 첫 세미나 날짜부터 1년 이내로 설정해주세요.'}), 400
+        existing_terms = supabase.table('seminar_terms').select('*').order('start_date').execute().data or []
+        if any(term.get('name') == name for term in existing_terms):
             return jsonify({'status': 'error', 'message': '같은 이름의 학기가 이미 있습니다. 기존 학기를 선택해주세요.'}), 409
 
         term_res = supabase.table('seminar_terms').insert({
@@ -4292,9 +4293,9 @@ def seminar_term_create():
             'end_date': end_date,
             'max_capacity': max_capacity,
             'is_active': True,
-            'roster_initialized_at': datetime.now(timezone.utc).isoformat(),
         }).execute()
         term = term_res.data[0]
+        created_term_id = term['id']
 
         dates = _enumerate_mon_thu(start_date, end_date)
         weeks = _ensure_term_weeks(term['id'], dates)
@@ -4302,15 +4303,51 @@ def seminar_term_create():
         if sessions_payload:
             supabase.table('seminar_sessions').insert(sessions_payload).execute()
 
+        # A new semester starts with the active roster from the paired previous
+        # operating block.  Save through the same revisioned transaction as
+        # manual edits so an initialized empty roster stays intentionally empty.
+        source_terms = automatic_source_terms(existing_terms, term)
+        source_ids = [source['id'] for source in source_terms]
+        source_memberships = []
+        if source_ids:
+            offset = 0
+            while True:
+                batch = supabase.table('seminar_term_members') \
+                    .select('term_id,member_id,status,entry_type').in_('term_id', source_ids) \
+                    .order('member_id').range(offset, offset + 999).execute().data or []
+                source_memberships.extend(batch)
+                if len(batch) < 1000:
+                    break
+                offset += 1000
+        entries = carried_entries(source_memberships, source_terms)
+        roster_result = supabase.rpc('save_seminar_term_members', {
+            'p_term_id': term['id'],
+            'p_revision': 0,
+            'p_entries': entries,
+            'p_actor': session.get('user_id'),
+        }).execute().data or {}
+        if not roster_result.get('accepted'):
+            raise RuntimeError('새 학기 회원 명단을 초기화하지 못했습니다.')
+        term['roster_revision'] = roster_result['revision']
+        term['roster_initialized_at'] = datetime.now(timezone.utc).isoformat()
+
         share_url = f"{request.host_url}seminar_vote?token={term['share_token']}"
         return jsonify({
             'status': 'success',
             'term': term,
             'session_count': len(sessions_payload),
+            'carried_member_count': len(entries),
+            'carried_from': [source['name'] for source in source_terms],
             'share_url': share_url,
         })
     except Exception as e:
         app.logger.error(f"seminar_term_create error: {e}", exc_info=True)
+        if created_term_id:
+            try:
+                # Exact rollback target: sessions and the roster cascade with it.
+                supabase.table('seminar_terms').delete().eq('id', created_term_id).execute()
+            except Exception:
+                app.logger.exception('Failed to roll back incomplete seminar term %s', created_term_id)
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 

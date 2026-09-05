@@ -1,8 +1,56 @@
 """Semester participation is independent of account access and global status."""
 from datetime import datetime, timedelta, timezone
+import re
 
 STATUSES = {'active': '활동', 'paused': '휴식', 'left': '종료'}
 ENTRY_TYPES = {'continuing': '계속 활동', 'new': '신규', 'returning': '복귀'}
+
+_TERM_NAME = re.compile(r'(?P<year>20\d{2})\s*(?:년|[-–—])?\s*(?P<season>1학기|여름학기|2학기|겨울학기)')
+
+
+def parse_term_name(name):
+    """Return the operational year/season used for paired-semester carry-forward."""
+    match = _TERM_NAME.search(str(name or ''))
+    return (int(match.group('year')), match.group('season')) if match else None
+
+
+def automatic_source_terms(terms, target):
+    """Choose the earlier roster(s) that feed a newly created semester.
+
+    Spring + summer and fall + winter are treated as one operating block.  A
+    fall roster therefore carries the union of spring and summer, while the
+    next spring carries the union of the previous fall and winter.
+    """
+    if not target:
+        return []
+    parsed = parse_term_name(target.get('name'))
+    if not parsed:
+        prior = [term for term in terms if term.get('start_date', '') < target.get('start_date', '')]
+        initialized = [term for term in prior if term.get('roster_initialized_at')]
+        return sorted(initialized, key=lambda term: term.get('start_date', ''), reverse=True)[:1]
+
+    year, season = parsed
+    wanted = {
+        '여름학기': {(year, '1학기')},
+        '2학기': {(year, '1학기'), (year, '여름학기')},
+        '겨울학기': {(year, '2학기')},
+        '1학기': {(year - 1, '2학기'), (year - 1, '겨울학기')},
+    }[season]
+    matches = [term for term in terms
+               if term.get('id') != target.get('id')
+               and term.get('roster_initialized_at')
+               and parse_term_name(term.get('name')) in wanted
+               and term.get('start_date', '') < target.get('start_date', '')]
+    return sorted(matches, key=lambda term: term.get('start_date', ''))
+
+
+def carried_entries(memberships, source_terms):
+    """Build a de-duplicated active roster from one paired operating block."""
+    source_ids = {term['id'] for term in source_terms}
+    member_ids = sorted({int(row['member_id']) for row in memberships
+                         if row.get('term_id') in source_ids and row.get('status') == 'active'})
+    return [{'member_id': member_id, 'status': 'active', 'entry_type': 'continuing'}
+            for member_id in member_ids]
 
 
 def choose_term(terms, term_id=None):

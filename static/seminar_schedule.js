@@ -179,7 +179,7 @@
             if (saving || !confirmLeave()) return;
             const createForm = event.target, resultNode = document.getElementById('term-create-status');
             const values = Object.fromEntries(new FormData(createForm));
-            if (values.start_date > values.end_date) { resultNode.textContent = '종료일은 시작일 이후로 선택해주세요.'; return; }
+            if (values.start_date > values.end_date) { resultNode.textContent = '마지막 세미나 날짜는 첫 세미나 날짜 이후로 선택해주세요.'; return; }
             const button = createForm.querySelector('button');
             button.disabled = true;
             resultNode.textContent = '학기와 세미나 날짜를 생성하고 있습니다…';

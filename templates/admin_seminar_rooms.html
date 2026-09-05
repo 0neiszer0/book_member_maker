@@ -369,12 +369,12 @@
                             class="settings-field w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
                     </div>
                     <div>
-                        <div class="text-[0.7rem] text-gray-400 mb-1">학기 시작일</div>
+                        <div class="text-[0.7rem] text-gray-400 mb-1">첫 세미나 날짜</div>
                         <input id="semesterStart" type="date" value="{{ settings.semester_start or '' }}"
                             class="settings-field w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
                     </div>
                     <div>
-                        <div class="text-[0.7rem] text-gray-400 mb-1">학기 종료일</div>
+                        <div class="text-[0.7rem] text-gray-400 mb-1">마지막 세미나 날짜</div>
                         <input id="semesterEnd" type="date" value="{{ settings.semester_end or '' }}"
                             class="settings-field w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
                     </div>
@@ -390,7 +390,7 @@
                     </div>
                 </div>
                 <p class="text-[0.7rem] text-gray-500 mt-2 leading-relaxed">
-                    <i data-lucide="lightbulb" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 학기 시작·종료일과 N일 범위는 <strong>예약 가능 날짜</strong> 계산에 사용됩니다.
+                    <i data-lucide="lightbulb" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 첫·마지막 세미나 날짜와 N일 범위는 <strong>예약 가능 날짜</strong> 계산에 사용됩니다.
                     저장 후 페이지가 새로고침되어 후보 날짜가 다시 계산됩니다.
                 </p>
             </div>

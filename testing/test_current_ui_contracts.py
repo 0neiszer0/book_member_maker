@@ -108,6 +108,17 @@ class CurrentUiContractsTest(unittest.TestCase):
         self.assertIn("eg-card-action", books)
         self.assertIn("도서 보기 · 같이 읽고 싶어요", books)
 
+    def test_semester_members_lead_with_current_roster_and_seminar_dates(self):
+        roster = self.read("templates/admin_term_members.html")
+        schedule = self.read("templates/admin_schedule_editor.html")
+        self.assertIn("data-filter=\"assigned\" aria-pressed=\"true\"", roster)
+        self.assertIn("직전 활동자 중 미포함", roster)
+        self.assertIn("다른 회원 찾기", roster)
+        self.assertNotIn("기존 활성 회원 불러오기", roster)
+        for source in (roster, schedule):
+            self.assertIn("첫 세미나 날짜", source)
+            self.assertIn("마지막 세미나 날짜", source)
+
 
 if __name__ == "__main__":
     unittest.main()
