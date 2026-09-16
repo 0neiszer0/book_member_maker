@@ -3499,16 +3499,30 @@ def _guest_topic_credential_matches(existing_record, credential):
     return False
 
 
-def _registered_topic_student_id(student_id):
-    sid = str(student_id or '').strip()
-    if not sid:
-        return False
-    try:
-        rows = supabase.table('members').select('id').eq('student_id', sid).limit(1).execute().data or []
-        return bool(rows)
-    except Exception as exc:
-        app.logger.error("topic member student-id check failed: %s", exc)
+def _topic_edit_denial(existing_record, member, credential, event_id):
+    """Account-owned posts use the session; link submissions keep their edit code.
+
+    Roster registration is not a login requirement for public submission links.
+    Logging in later must not bypass a link submission's edit code either.
+    """
+    owner_id = existing_record.get('member_id')
+    if member and owner_id is not None:
+        if str(owner_id) == str(member.get('id')):
+            return None
+        return jsonify({"error": "수정 권한을 확인할 수 없습니다."}), 403
+    if member and existing_record.get('pin_code') == 'MEMBER':
+        # Compatibility with account submissions made before member_id existed.
         return None
+    if _topic_edit_is_rate_limited(event_id):
+        return jsonify({"error": "수정 확인이 잠시 제한되었습니다. 15분 후 다시 시도해주세요."}), 429
+    credential_ok = _guest_topic_credential_matches(existing_record, credential)
+    _record_topic_edit_attempt(event_id, credential_ok)
+    if not credential_ok:
+        return jsonify({
+            "error": "수정 정보를 확인할 수 없습니다. 로그인 없이 제출한 글은 발급받은 수정 코드를 입력해주세요. 계정으로 제출한 글은 해당 계정으로 로그인해주세요.",
+            "code": "edit_credential_required",
+        }), 403
+    return None
 
 
 # 2. 사용자: 공유 링크를 통한 발제문 작성 페이지
@@ -3601,17 +3615,9 @@ def submit_topics():
 
         if existing_record:
             issued_edit_token = None
-            if is_logged_in_member:
-                owner_id = existing_record.get('member_id')
-                if owner_id is not None and str(owner_id) != str(member.get('id')):
-                    return jsonify({"error": "수정 권한을 확인할 수 없습니다."}), 403
-            else:
-                if _topic_edit_is_rate_limited(event_id):
-                    return jsonify({"error": "수정 확인이 잠시 제한되었습니다. 15분 후 다시 시도해주세요."}), 429
-                credential_ok = _guest_topic_credential_matches(existing_record, edit_credential)
-                _record_topic_edit_attempt(event_id, credential_ok)
-                if not credential_ok:
-                    return jsonify({"error": "수정 정보를 확인할 수 없습니다."}), 403
+            denial = _topic_edit_denial(existing_record, member, edit_credential, event_id)
+            if denial is not None:
+                return denial
 
             # 업데이트 실행
             update_payload = {'topics': topics, 'updated_at': 'now()', 'department': department}
@@ -3619,7 +3625,10 @@ def submit_topics():
                 update_payload['admission_year'] = admission_year
             if sid:
                 update_payload['student_id'] = sid
-            if is_logged_in_member:
+            if is_logged_in_member and (
+                existing_record.get('member_id') is not None
+                or existing_record.get('pin_code') == 'MEMBER'
+            ):
                 update_payload.update({
                     'member_id': member.get('id'),
                     'identity_kind': 'member',
@@ -3645,13 +3654,8 @@ def submit_topics():
                 response['message'] = "발제문이 수정되었고, 안전한 새 수정 코드가 발급되었습니다."
             return jsonify(response)
         else:
-            # 신규 생성 모드
-            if not is_logged_in_member:
-                registered_student_id = _registered_topic_student_id(sid)
-                if registered_student_id is None:
-                    return jsonify({"error": "회원 정보를 확인하지 못했습니다. 잠시 후 다시 시도해주세요."}), 503
-                if registered_student_id:
-                    return jsonify({"error": "등록된 회원 학번은 로그인 후 제출해주세요."}), 403
+            # 명부 등록 여부와 관계없이 공개 링크에서 제출할 수 있다.
+            # 비로그인 제출은 계정 소유권을 부여하지 않고 수정 코드로 보호한다.
             issued_edit_token = None
             insert_payload = {
                 'event_id': event_id,
@@ -3709,27 +3713,14 @@ def _find_topic_submission(event_id, author_name, department, student_id, member
         res = supabase.table('topic_submissions').select('*') \
             .eq('event_id', event_id).eq('student_id', sid).execute()
         if res.data:
-            candidate = res.data[0]
-            if member_id is None:
-                return candidate
-            if (
-                candidate.get('member_id') is None
-                and candidate.get('pin_code') == 'MEMBER'
-            ):
-                return candidate
+            # Finding a record is not authorization. The caller checks its owner
+            # or edit code, including when a link submitter logs in later.
+            return res.data[0]
     res = supabase.table('topic_submissions').select('*') \
         .eq('event_id', event_id).eq('author_name', author_name).eq('department', department).execute()
     if not res.data:
         return None
-    candidate = res.data[0]
-    if member_id is None:
-        return candidate
-    if (
-        candidate.get('member_id') is None
-        and candidate.get('pin_code') == 'MEMBER'
-    ):
-        return candidate
-    return None
+    return res.data[0]
 
 
 # 3.5. 사용자: 발제문 불러오기 API
@@ -3744,7 +3735,6 @@ def load_topics():
 
     # 회원 권한은 입력한 이름/학번이 아니라 서버 세션의 member id로만 확인한다.
     member = _authenticated_topic_member(event_id)
-    is_logged_in_member = member is not None
     if member:
         author_name = (member.get('name') or '').strip()
         department = (member.get('department') or department).strip()
@@ -3769,17 +3759,9 @@ def load_topics():
         )
 
         if existing_record:
-            if is_logged_in_member:
-                owner_id = existing_record.get('member_id')
-                if owner_id is not None and str(owner_id) != str(member.get('id')):
-                    return jsonify({"error": "수정 권한을 확인할 수 없습니다."}), 403
-            else:
-                if _topic_edit_is_rate_limited(event_id):
-                    return jsonify({"error": "수정 확인이 잠시 제한되었습니다. 15분 후 다시 시도해주세요."}), 429
-                credential_ok = _guest_topic_credential_matches(existing_record, edit_credential)
-                _record_topic_edit_attempt(event_id, credential_ok)
-                if not credential_ok:
-                    return jsonify({"error": "수정 정보를 확인할 수 없습니다."}), 403
+            denial = _topic_edit_denial(existing_record, member, edit_credential, event_id)
+            if denial is not None:
+                return denial
 
             return jsonify({
                 "status": "success",
