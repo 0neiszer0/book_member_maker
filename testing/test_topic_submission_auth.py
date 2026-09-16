@@ -295,20 +295,109 @@ class TopicSubmissionAuthorizationTests(unittest.TestCase):
         self.assertEqual(inserted["pin_code"], "TOKEN")
         self.assertEqual(inserted["identity_kind"], "guest")
 
-    def test_registered_student_id_cannot_be_squatted_by_guest(self):
+    def test_registered_member_can_submit_without_login(self):
         self.fake.rows["topic_submissions"] = []
         client = self.app_module.app.test_client()
         response = client.post("/api/topics/submit", json={
             "event_id": "event-1",
-            "author_name": "다른사람",
-            "department": "다른학과",
+            "author_name": "인증회원",
+            "department": "국문학과",
             "student_id": "2026123456",
-            "topics": [{"topic": "가로채기 시도", "page": "", "reference": ""}],
+            "topics": [{"topic": "링크로 제출", "page": "", "reference": ""}],
         })
 
-        self.assertEqual(response.status_code, 403)
-        self.assertIn("로그인 후", response.get_json()["error"])
+        self.assertEqual(response.status_code, 200)
+        record = self.fake.rows["topic_submissions"][0]
+        self.assertIsNone(record["member_id"])
+        self.assertEqual(record["identity_kind"], "guest")
+        self.assertTrue(topic_edit_token_matches(
+            record["edit_token_hash"], response.get_json()["edit_token"], "topic-auth-test"
+        ))
+        self.assertFalse(any(call[1] == "members" for call in self.fake.calls))
+
+    def test_registered_link_submission_remains_code_protected_after_login(self):
+        record = self.fake.rows["topic_submissions"][0]
+        token = "registered-member-link-submission-token"
+        record.update({
+            "member_id": None, "identity_kind": "guest", "pin_code": "TOKEN",
+            "edit_token_hash": topic_edit_token_digest(token, "topic-auth-test"),
+        })
+        client = self.app_module.app.test_client()
+        payload = {
+            "event_id": "event-1", "author_name": "인증회원",
+            "department": "국문학과", "student_id": "2026123456",
+            "topics": [{"topic": "수정된 링크 발제"}],
+        }
+        for logged_in in (False, True):
+            if logged_in:
+                with client.session_transaction() as flask_session:
+                    flask_session["user_id"] = 7
+            for route in ("load", "submit"):
+                with self.subTest(logged_in=logged_in, route=route):
+                    denied = client.post(f"/api/topics/{route}", json=payload)
+                    self.assertEqual(denied.status_code, 403)
+                    self.assertEqual(denied.get_json()["code"], "edit_credential_required")
+                    allowed = client.post(f"/api/topics/{route}", json={
+                        **payload, "edit_credential": token,
+                    })
+                    self.assertEqual(allowed.status_code, 200)
+                    self.assertEqual(len(self.fake.rows["topic_submissions"]), 1)
+        self.assertIsNone(record["member_id"])
+        self.assertEqual(record["identity_kind"], "guest")
+        self.assertTrue(topic_edit_token_matches(record["edit_token_hash"], token, "topic-auth-test"))
+        # Editing while logged in must not revoke the link's original edit code.
+        anonymous = self.app_module.app.test_client()
+        allowed = anonymous.post("/api/topics/load", json={**payload, "edit_credential": token})
+        self.assertEqual(allowed.status_code, 200)
+
+    def test_registered_member_cannot_overwrite_account_submission_without_login(self):
+        client = self.app_module.app.test_client()
+        denied = client.post("/api/topics/submit", json={
+            "event_id": "event-1", "author_name": "인증회원",
+            "department": "국문학과", "student_id": "2026123456",
+            "edit_credential": "MEMBER", "topics": [{"topic": "덮어쓰기 시도"}],
+        })
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(self.fake.rows["topic_submissions"][0]["topics"], [{"topic": "기존 발제"}])
+
+    def test_different_account_owner_is_not_ignored_or_duplicated(self):
+        self.fake.rows["topic_submissions"][0]["member_id"] = 99
+        client = self.app_module.app.test_client()
+        with client.session_transaction() as flask_session:
+            flask_session["user_id"] = 7
+        for route in ("load", "submit"):
+            response = client.post(f"/api/topics/{route}", json={
+                "event_id": "event-1", "topics": [{"topic": "덮어쓰기 시도"}],
+            })
+            self.assertEqual(response.status_code, 403)
+        self.assertEqual(len(self.fake.rows["topic_submissions"]), 1)
+
+    def test_registered_member_link_still_respects_closed_event(self):
+        self.fake.rows["topic_submissions"] = []
+        self.fake.rows["topic_events"][0]["is_active"] = False
+        response = self.app_module.app.test_client().post("/api/topics/submit", json={
+            "event_id": "event-1", "author_name": "인증회원",
+            "department": "국문학과", "student_id": "2026123456",
+            "topics": [{"topic": "마감된 발제"}],
+        })
+        self.assertEqual(response.status_code, 400)
         self.assertEqual(self.fake.rows["topic_submissions"], [])
+
+    def test_public_page_explains_link_submission_for_registered_members(self):
+        response = self.app_module.app.test_client().get("/shared_topics?token=public-token")
+        html = response.get_data(as_text=True)
+        self.assertIn("명부에 등록된 회원도 로그인 없이", html)
+        self.assertIn("로그인 없이 제출</span>", html)
+        self.assertNotIn("비회원", html)
+
+    def test_logged_in_page_can_request_code_for_earlier_link_submission(self):
+        client = self.app_module.app.test_client()
+        with client.session_transaction() as flask_session:
+            flask_session["user_id"] = 7
+        html = client.get("/shared_topics?token=public-token").get_data(as_text=True)
+        self.assertIn('id="credentialField" class="hidden"', html)
+        self.assertIn('type="text" id="pinCode"', html)
+        self.assertIn("data.code === 'edit_credential_required'", html)
 
     def test_legacy_pin_is_upgraded_after_successful_edit(self):
         record = self.fake.rows["topic_submissions"][0]
