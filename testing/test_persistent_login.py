@@ -50,6 +50,78 @@ class PersistentLoginTests(unittest.TestCase):
             self.assertEqual(state['user_name'], '등록실명')
             self.assertTrue(state.permanent)
 
+    def test_auto_login_refreshes_stale_role_on_home_navigation(self):
+        self.oauth()
+        with self.client.session_transaction() as state:
+            state['user_role'] = 'member'
+        fresh = self.module.app.test_client()
+        fresh.set_cookie('session', self.client.get_cookie('session').value)
+
+        response = fresh.get('/')
+        html = response.get_data(as_text=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('class="wd-link wd-link-staff">운영 관리', html)
+        self.assertIn('운영자 홈', html)
+        with fresh.session_transaction() as state:
+            self.assertEqual(state['user_role'], 'admin')
+
+    def test_preview_session_can_return_to_admin_menu(self):
+        self.oauth()
+        with self.client.session_transaction() as state:
+            state['user_role'] = 'member'
+            state['member_preview'] = True
+        fresh = self.module.app.test_client()
+        fresh.set_cookie('session', self.client.get_cookie('session').value)
+
+        preview = fresh.get('/')
+        self.assertIn('회원 홈', preview.get_data(as_text=True))
+        self.assertIn('관리자 화면으로 돌아가기', preview.get_data(as_text=True))
+        self.assertIn('class="wd-link wd-link-staff">운영 관리', preview.get_data(as_text=True))
+
+        admin = fresh.get('/admin/dashboard')
+        self.assertEqual(admin.status_code, 200)
+        with fresh.session_transaction() as state:
+            self.assertEqual(state['user_role'], 'admin')
+            self.assertNotIn('member_preview', state)
+
+    def test_home_navigation_removes_stale_admin_role_after_demotion(self):
+        self.oauth()
+        self.fake.rows['members'][0]['role'] = 'member'
+        response = self.client.get('/')
+        html = response.get_data(as_text=True)
+        self.assertNotIn('class="wd-link wd-link-staff">운영 관리', html)
+        self.assertIn('회원 홈', html)
+        with self.client.session_transaction() as state:
+            self.assertEqual(state['user_role'], 'member')
+
+    def test_home_navigation_rejects_inactive_saved_login(self):
+        self.oauth()
+        self.fake.rows['members'][0]['account_status'] = 'pending'
+        response = self.client.get('/')
+        self.assertNotIn('class="wd-link wd-link-staff">운영 관리', response.get_data(as_text=True))
+        with self.client.session_transaction() as state:
+            self.assertNotIn('user_id', state)
+
+    def test_inactive_admin_has_no_staff_menu_on_home_or_member_page(self):
+        self.oauth()
+        self.fake.rows['members'][0]['is_active'] = False
+        for path in ('/', '/mypage'):
+            with self.subTest(path=path):
+                response = self.client.get(path)
+                self.assertEqual(response.status_code, 200)
+                self.assertNotIn('class="wd-link wd-link-staff">운영 관리', response.get_data(as_text=True))
+
+    def test_demotion_clears_saved_member_preview(self):
+        self.oauth()
+        with self.client.session_transaction() as state:
+            state['member_preview'] = True
+            state['user_role'] = 'member'
+        self.fake.rows['members'][0]['role'] = 'member'
+        response = self.client.get('/')
+        self.assertNotIn('class="wd-link wd-link-staff">운영 관리', response.get_data(as_text=True))
+        with self.client.session_transaction() as state:
+            self.assertNotIn('member_preview', state)
+
     def test_opt_out_uses_session_cookie_and_survives_access_without_upgrading(self):
         result = self.oauth('0')
         self.assertNotIn('Expires=', result.headers['Set-Cookie'])
