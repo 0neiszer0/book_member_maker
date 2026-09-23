@@ -47,7 +47,7 @@ class UiUsabilityOverhaulTest(unittest.TestCase):
         self.assertIn("가장 가까운 세미나", seminars)
         self.assertIn('class="seminar-past"', seminars)
         self.assertIn("발제문 작성하기", seminars)
-        self.assertIn("월요일 참석 투표는 카카오톡에서", seminars)
+        self.assertIn("추가 세미나 참석 투표는 카카오톡에서", seminars)
         self.assertIn("내 학기 참석 현황", seminars)
 
     def test_engagement_page_has_priority_and_empty_states(self):

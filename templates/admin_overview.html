@@ -18,7 +18,7 @@
     <div>
       <p class="overview-eyebrow">운영 관리</p>
       <h1>이번 주 운영 개요</h1>
-      <p>기능 목록보다 실제 운영 순서에 맞춰 확인합니다.</p>
+      <p>선택한 세미나에서 아직 끝내지 않은 작업을 확인하세요.</p>
     </div>
     <a class="overview-guide-link" href="{{ url_for('help_admin') }}">운영 가이드</a>
   </header>
@@ -29,6 +29,38 @@
     {% endfor %}
   {% endwith %}
 
+  {% if load_error %}
+    {% include '_load_error.html' %}
+  {% else %}
+  {% if overview %}
+  <section class="operations-current" aria-labelledby="operations-current-title">
+    <div class="operations-pickers">
+      <details class="operations-term-picker"><summary>{{ overview.term.name if overview.term else '학기 없음' }} · 학기 변경</summary><form method="get"><label for="overview-term">학기</label><select id="overview-term" name="term_id">{% for term in overview.terms %}<option value="{{ term.id }}" {% if overview.term and term.id == overview.term.id %}selected{% endif %}>{{ term.name }}</option>{% endfor %}</select><button class="home-btn home-btn-secondary">학기 선택</button></form></details>
+      {% if overview.sessions %}<form method="get"><input type="hidden" name="term_id" value="{{ overview.term.id }}"><label for="overview-session">확인할 세미나</label><select id="overview-session" name="session_id">{% for item in overview.sessions %}<option value="{{ item.id }}" {% if overview.selected and item.id == overview.selected.id %}selected{% endif %}>{{ item.meeting_date|seminar_date }}</option>{% endfor %}</select><button class="home-btn home-btn-secondary">회차 선택</button></form>{% endif %}
+    </div>
+    {% if overview.selected %}
+      {% set selected=overview.selected %}
+      {% set unfinished=overview.tasks|rejectattr('done')|list %}
+      <p class="home-current-date">{{ selected.meeting_date|seminar_date }} · {{ selected.kind_label }}</p>
+      <h2 id="operations-current-title">{{ selected.book_title }}</h2>
+      <p>사회자 {{ selected.moderator_name or '미입력' }} · 준비 {{ overview.tasks|selectattr('done')|list|length }}/{{ overview.tasks|length }} 완료</p>
+      <ul class="operations-tasks">
+      {% for task in unfinished %}
+        {% if task.key in ['book', 'moderator'] %}{% set task_url=url_for('admin_seminars', term_id=overview.term.id, schedule=1, week_id=selected.seminar_week_id, session_id=selected.id, _anchor='schedule-tool') %}
+        {% elif task.key in ['roster', 'attendance'] %}{% set task_url=url_for('admin_seminar_roster', session_id=selected.id) %}
+        {% elif task.key == 'groups' %}{% set task_url=url_for('bookclub_index', session_id=selected.id) %}
+        {% else %}{% set task_url=url_for('admin_seminars', term_id=overview.term.id, _anchor='week-' ~ selected.seminar_week_id) %}{% endif %}
+        <li><span>{{ task.label }} <small>미완료</small></span><a class="home-btn home-btn-secondary" href="{{ task_url }}">{{ task.action }} →</a></li>
+      {% else %}<li class="operations-complete">이 회차의 준비·기록 작업이 모두 완료됐어요.</li>{% endfor %}
+      </ul>
+      <p class="overview-task-help">실제 출석 확정은 세미나 당일부터 표시됩니다. 참석 예정 명단과 실제 출석은 별도로 확인해주세요.</p>
+    {% else %}<h2 id="operations-current-title">등록된 세미나가 없어요.</h2><a class="home-btn home-btn-primary" href="{{ url_for('admin_seminars', schedule=1) }}">도서·일정 등록</a>{% endif %}
+    {% if overview.pending_attendance %}
+    <details class="operations-pending"><summary>지난 세미나 출석 미확정 {{ overview.pending_attendance|length }}건</summary><ul>{% for item in overview.pending_attendance %}<li><a href="{{ url_for('admin_seminar_roster', session_id=item.id) }}">{{ item.meeting_date|seminar_date }} · {{ item.book_title }} 출석 확정 →</a></li>{% endfor %}</ul></details>
+    {% endif %}
+  </section>
+  {% endif %}
+  <details class="overview-reference"><summary>전체 운영 순서와 데이터 보기</summary>
   <section class="overview-next" aria-labelledby="workflow-title">
     <div class="overview-next-copy">
       <p class="overview-kicker">권장 순서</p>
@@ -79,6 +111,7 @@
     </div>
   </section>
 
+  </details>
   <section aria-labelledby="tools-title">
     <div class="overview-section-head">
       <div><p class="overview-kicker">그 밖의 관리</p><h2 id="tools-title">업무별 도구</h2></div>
@@ -103,6 +136,7 @@
       </div>
     </div>
   </section>
+  {% endif %}
 </main>
 </body>
 </html>

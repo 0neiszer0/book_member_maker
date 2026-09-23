@@ -111,8 +111,8 @@
             {% if event.book_author %}
             <p class="topic-author text-sm mt-2">{{ event.book_author }}</p>
             {% endif %}
-            <p class="topic-date mt-3 text-sm"><i data-lucide="calendar" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 모임 날짜: {{ event.meeting_date }}</p>
-            {% if event.seminar_week_id %}<p class="topic-date mt-2">목요일·월요일이 같은 질문 목록을 공유합니다.</p>{% endif %}
+            <p class="topic-date mt-3 text-sm"><i data-lucide="calendar" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 모임 날짜: {{ event.meeting_date|seminar_date }}</p>
+            {% if event.seminar_week_id %}<p class="topic-date mt-2">본 세미나·추가 세미나가 같은 질문 목록을 공유합니다.</p>{% endif %}
             {% if event.submission_deadline %}<p class="topic-date mt-2"><strong>제출·수정 마감: {{ event.submission_deadline }} 00:00 (한국시간)</strong>{% if event.submission_session_id %} · 선택한 회차 기준{% elif event.seminar_week_id %} · 마지막 회차 기준{% endif %}</p>{% endif %}
         </div>
 
@@ -238,6 +238,16 @@
 
                 <h2 class="text-lg font-bold text-eva-green"><span class="step-num">2</span>발제문 작성</h2>
 
+                <div class="topic-draft-panel">
+                    <p id="topicSaveStatus" role="status" aria-live="polite">작성 후 제출 버튼을 눌러주세요.</p>
+                    <p class="topic-draft-help">임시저장은 이 브라우저에만 7일간 보관되며 제출이 아닙니다. 다른 기기에서는 복구할 수 없어요. 공용 기기에서는 사용 후 임시저장을 삭제해주세요.</p>
+                    <div id="topicDraftRecovery" hidden>
+                        <p id="topicDraftFound"></p>
+                        <button type="button" id="restoreTopicDraft" class="home-btn home-btn-secondary">임시저장 복구</button>
+                    </div>
+                    <button type="button" id="discardTopicDraft" class="topic-draft-discard">임시저장 삭제</button>
+                </div>
+
                 <div id="topicsContainer" class="space-y-4"></div>
 
                 <p class="text-xs text-gray-400">발제문 1개는 필수이고, 선택으로 1개를 더 제출할 수 있어요. 개인 한도는 회장이 조정할 수 있습니다.</p>
@@ -265,12 +275,65 @@
         </div>
     </div>
 
+    <script src="{{ url_for('static', filename='topic_drafts.js') }}"></script>
     <script>
         const IS_LOGGED_IN = {{ 'true' if user_name else 'false' }};
         let topicCount = 0;
         let topicLimit = 2; // 1개는 필수, 기본 2개. 회장이 바꾼 개인 한도는 API 응답으로 갱신됨
         let verified = null; // {author, dept, sid, credential, isMember}
-        const container = document.createElement('div'); // placeholder until verified
+        const draftStore = new TopicDraftStore({
+            getItem: key => window.localStorage.getItem(key),
+            setItem: (key, value) => window.localStorage.setItem(key, value),
+            removeItem: key => window.localStorage.removeItem(key),
+        });
+        let savedTopics = '', pendingDraft = null, draftPaused = false, submitting = false;
+        const saveStatus = document.getElementById('topicSaveStatus');
+        const recovery = document.getElementById('topicDraftRecovery');
+        function readTopics() {
+            return [...getContainer().querySelectorAll(':scope > div')].map(el => ({
+                topic: el.querySelector('.topic-text').value,
+                page: el.querySelector('.topic-page').value,
+                reference: el.querySelector('.topic-ref').value,
+            }));
+        }
+        function isDirty() { return !!verified && JSON.stringify(readTopics()) !== savedTopics; }
+        function persistDraft() {
+            if (!verified || !isDirty() || draftPaused) return;
+            if (pendingDraft) {
+                saveStatus.textContent = '아직 제출되지 않았어요. 기존 임시저장을 복구하거나 삭제하면 새 내용을 임시저장합니다.';
+                return;
+            }
+            const ok = draftStore.save(document.getElementById('eventId').value, verified.sid, readTopics());
+            saveStatus.textContent = ok ? '이 브라우저에 임시저장됨 · 아직 제출되지 않았어요.' : '임시저장할 수 없어요. 창을 닫기 전에 내용을 복사하거나 제출해주세요.';
+        }
+        function changed() {
+            draftPaused = false;
+            if (verified && !isDirty() && !pendingDraft) {
+                const cleared = draftStore.remove(document.getElementById('eventId').value, verified.sid);
+                saveStatus.textContent = cleared ? '불러온 내용과 같아요. 새로 작성하거나 수정한 뒤 제출해주세요.' : '브라우저 임시저장을 정리하지 못했어요. 저장 설정을 확인해주세요.';
+            } else persistDraft();
+        }
+        getContainer().addEventListener('input', changed);
+        window.addEventListener('pagehide', persistDraft);
+        window.addEventListener('beforeunload', event => {
+            if (isDirty()) { persistDraft(); event.preventDefault(); event.returnValue = ''; }
+        });
+        document.getElementById('restoreTopicDraft').addEventListener('click', () => {
+            if (!verified || !pendingDraft || submitting) return;
+            if (isDirty() && !window.confirm('지금 화면의 내용을 임시저장된 내용으로 바꿀까요?')) return;
+            getContainer().replaceChildren(); topicCount = 0;
+            pendingDraft.topics.forEach(t => addTopicField(t));
+            if (!topicCount) addTopicField();
+            pendingDraft = null; recovery.hidden = true; changed();
+            saveStatus.textContent = '임시저장 복구됨 · 내용을 확인하고 제출해주세요.';
+            getContainer().querySelector('textarea')?.focus();
+        });
+        document.getElementById('discardTopicDraft').addEventListener('click', () => {
+            if (!verified || submitting || !window.confirm('이 브라우저의 임시저장만 삭제할까요? 화면의 내용과 이미 제출한 글은 유지됩니다.')) return;
+            const ok = draftStore.remove(document.getElementById('eventId').value, verified.sid);
+            if (ok) { pendingDraft = null; recovery.hidden = true; draftPaused = true; }
+            saveStatus.textContent = ok ? '임시저장 삭제됨 · 다시 입력하면 임시저장을 재개합니다.' : '임시저장을 삭제하지 못했어요. 브라우저 저장 설정을 확인해주세요.';
+        });
 
         function getContainer() { return document.getElementById('topicsContainer'); }
 
@@ -318,6 +381,7 @@
                 topicCount = 0;
                 c.querySelectorAll('h3').forEach(h => { topicCount++; h.textContent = `#${topicCount} 발제`; });
                 updateAddBtn();
+                changed();
             });
             if (prefill) {
                 div.querySelector('.topic-text').value = prefill.topic || '';
@@ -428,13 +492,24 @@
             } else {
                 addTopicField();
             }
+            savedTopics = JSON.stringify(readTopics());
+            draftPaused = false;
+            const stored = draftStore.read(document.getElementById('eventId').value, verified.sid);
+            pendingDraft = stored.draft && JSON.stringify(stored.draft.topics) !== savedTopics ? stored.draft : null;
+            recovery.hidden = !pendingDraft;
+            if (pendingDraft) document.getElementById('topicDraftFound').textContent = new Date(pendingDraft.savedAt).toLocaleString('ko-KR') + '에 임시저장한 내용이 있어요. 서버에 제출된 내용은 자동으로 덮어쓰지 않습니다.';
+            saveStatus.textContent = !stored.ok ? '브라우저 임시저장을 사용할 수 없어요. 작성한 내용을 따로 보관해주세요.' : topics.length ? '서버에 제출된 발제문을 불러왔어요.' : '아직 제출되지 않았어요. 작성 후 제출 버튼을 눌러주세요.';
         }
 
-        document.getElementById('addTopicBtn').addEventListener('click', () => addTopicField());
+        document.getElementById('addTopicBtn').addEventListener('click', () => { addTopicField(); changed(); });
         document.getElementById('verifyBtn').addEventListener('click', tryVerify);
 
         document.getElementById('resetBtn').addEventListener('click', () => {
+            if (submitting) return;
+            if (isDirty() && !window.confirm('아직 제출하지 않은 내용이 있어요. 본인 확인 정보를 변경할까요?')) return;
+            persistDraft();
             verified = null;
+            pendingDraft = null; recovery.hidden = true;
             document.getElementById('writeCard').classList.add('hidden');
             document.getElementById('verifyCard').classList.remove('hidden');
             document.getElementById('loadedNote').classList.add('hidden');
@@ -448,19 +523,15 @@
         document.getElementById('topicForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!verified) { alert('먼저 본인 확인을 해주세요.'); return; }
+            if (submitting) return;
 
             const submitBtn = document.getElementById('submitBtn');
             submitBtn.disabled = true; submitBtn.textContent = '처리 중...';
 
-            const topics = [];
-            getContainer().querySelectorAll(':scope > div').forEach(el => {
-                topics.push({
-                    topic: el.querySelector('.topic-text').value,
-                    page: el.querySelector('.topic-page').value,
-                    reference: el.querySelector('.topic-ref').value,
-                });
-            });
+            const topics = readTopics();
             if (!topics.length) { alert('최소 1개의 발제문을 작성해주세요.'); submitBtn.disabled = false; submitBtn.textContent = '제출 / 수정 완료'; return; }
+            submitting = true;
+            document.getElementById('resetBtn').disabled = true;
 
             try {
                 const res = await fetch('/api/topics/submit', {
@@ -476,6 +547,11 @@
                 });
                 const result = await res.json();
                 if (!res.ok) throw new Error(result.error || '제출 실패');
+                savedTopics = JSON.stringify(topics);
+                pendingDraft = null; recovery.hidden = true;
+                const cleared = draftStore.remove(document.getElementById('eventId').value, verified.sid);
+                saveStatus.textContent = cleared ? '제출 완료 · 운영진에게 정상적으로 전달됐어요.' : '제출 완료 · 브라우저 임시저장을 삭제하지 못했어요. 공용 기기라면 브라우저 데이터를 삭제해주세요.';
+                if (isDirty()) { draftPaused = false; persistDraft(); }
                 if (result.edit_token) {
                     verified.credential = result.edit_token;
                     storeCredential(verified.sid, result.edit_token);
@@ -490,8 +566,12 @@
                     alert(result.message || '제출되었습니다.');
                 }
             } catch (err) {
+                persistDraft();
+                saveStatus.textContent = '제출에 실패했어요. 입력한 내용은 화면에 유지됩니다. 연결을 확인하고 다시 제출해주세요.';
                 alert('오류: ' + err.message);
             } finally {
+                submitting = false;
+                document.getElementById('resetBtn').disabled = false;
                 submitBtn.disabled = false; submitBtn.textContent = '제출 / 수정 완료';
             }
         });

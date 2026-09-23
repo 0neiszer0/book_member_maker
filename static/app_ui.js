@@ -258,6 +258,8 @@
     const filterWrap = q('.wd-admin-seminar-filters', summary);
     const visibleCount = q('.wd-admin-seminar-visible-count', summary);
     let currentFilter = upcomingCount ? 'upcoming' : 'all';
+    const linkedWeek = metadata.find(item => '#' + item.week.id === window.location.hash);
+    if (linkedWeek) currentFilter = linkedWeek.past ? 'past' : 'upcoming';
 
     function matches(item, filter) {
       if (filter === 'upcoming') return !item.past;

@@ -11,6 +11,9 @@
 {% include '_header.html' %}
 
 <main class="home-shell flex-1">
+    {% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}
+    <div class="overview-flash {% if category != 'success' %}overview-flash-error{% endif %}" role="status">{{ message }}</div>
+    {% endfor %}{% endwith %}
     {% if session.user_role in ['admin', 'officer'] %}
     <section class="home-hero" aria-labelledby="home-title">
         <p class="home-eyebrow">운영자 홈</p>
@@ -18,7 +21,7 @@
         <p>이번 주 세미나 준비, 조 편성, 기록 확인 순서로 바로 이동할 수 있습니다.</p>
         <div class="home-actions">
             <a class="home-btn home-btn-primary" href="{{ url_for('admin_dashboard') }}">운영 개요 열기</a>
-            <a class="home-btn home-btn-secondary" href="{{ url_for('my_page') }}">회원 화면 보기</a>
+            <a class="home-btn home-btn-secondary" href="{{ url_for('my_page') }}">내 활동 보기</a>
         </div>
     </section>
 
@@ -43,15 +46,44 @@
         </div>
     </section>
     {% elif session.user_role %}
-    <section class="home-hero" aria-labelledby="home-title">
-        <p class="home-eyebrow">회원 홈</p>
-        <h1 id="home-title">{{ session.user_name or '회원' }}님, 지금 할 일을 확인하세요.</h1>
-        <p>열린 신청과 발제문을 먼저 처리하고, 일정과 내 기록을 이어서 확인할 수 있습니다.</p>
-        <div class="home-actions">
-            <a class="home-btn home-btn-primary" href="{{ url_for('engagement_now') }}">지금 참여하기</a>
-            <a class="home-btn home-btn-secondary" href="{{ url_for('seminars') }}">세미나 일정 보기</a>
+    <section class="home-current" aria-labelledby="current-seminar-title">
+      <p class="home-eyebrow">회원 홈 · {{ session.user_name or '회원' }}님</p>
+      {% if home_error %}
+        <h1 id="current-seminar-title">이번 세미나</h1>{% include '_load_error.html' %}
+      {% elif home and home.seminar %}
+        {% set seminar=home.seminar %}
+        <p class="home-current-date">{{ seminar.meeting_date|seminar_date }} · {{ seminar.kind_label }}</p>
+        <h1 id="current-seminar-title">{{ seminar.book_title }}</h1>
+        <p>사회자 · {{ seminar.moderator_name or '아직 정해지지 않았어요' }}</p>
+        <div class="home-topic-status">
+          <strong>{{ '발제문 제출 완료' if home.submitted else '아직 발제문을 제출하지 않았어요' }}</strong>
+          {% if seminar.topic %}
+            <span>{{ '접수 중' if seminar.topic.open else '접수 마감' }}{% if seminar.topic.deadline_label %} · 마감 {{ seminar.topic.deadline_label }} (한국시간){% endif %}</span>
+          {% else %}<span>발제문 접수가 열리면 여기에서 작성할 수 있어요.</span>{% endif %}
         </div>
+        <div class="home-actions">
+          {% if seminar.topic and seminar.topic.open and seminar.topic.share_token %}
+          <a class="home-btn home-btn-primary" href="{{ url_for('view_shared_topics', token=seminar.topic.share_token) }}">{{ '제출한 발제문 수정' if home.submitted else '발제문 작성' }}</a>
+          {% endif %}
+          <a class="home-btn home-btn-secondary" href="{{ url_for('seminars') }}">세미나 일정 보기</a>
+        </div>
+      {% else %}
+        <h1 id="current-seminar-title">예정된 세미나가 없어요.</h1><p>새 일정이 등록되면 이곳에 표시됩니다.</p>
+        <a class="home-btn home-btn-secondary" href="{{ url_for('seminars') }}">세미나 일정 보기</a>
+      {% endif %}
     </section>
+    <section class="home-attendance" aria-labelledby="home-attendance-title">
+      <div><h2 id="home-attendance-title">내 학기 참석 현황</h2>
+      {% if attendance_error %}<p role="alert">참석 기록을 불러오지 못했어요. <a href="{{ url_for('main_index') }}">다시 시도</a></p>
+      {% elif attendance and attendance.term and attendance.mine %}
+        <p>{{ attendance.term.name }} · 확정 출석 기준</p>
+        <p class="home-attendance-count">{{ attendance.mine.total }} / {{ attendance.minimum }}회 <span>{% if not attendance.mine.is_active %}이번 학기 활동 대상 아님{% else %}{{ '기준 달성' if not attendance.mine.shortage else (attendance.mine.shortage|string ~ '회 더 참석하면 달성') }}{% endif %}</span></p>
+        <p>세미나 {{ attendance.mine.counts.seminar }} · OT {{ attendance.mine.counts.ot }} · 벽돌책 {{ attendance.mine.counts.brick }}</p>
+      {% else %}<p>현재 표시할 학기 참석 기록이 없습니다.</p>{% endif %}</div>
+      <a class="home-btn home-btn-secondary" href="{{ url_for('my_term_attendance') }}">참석 날짜 확인</a>
+    </section>
+    <details class="home-secondary-guide"><summary>다른 활동 찾기</summary>
+    <div class="home-actions"><a class="home-btn home-btn-primary" href="{{ url_for('engagement_now') }}">지금 참여하기</a></div>
 
     <section class="home-section" aria-labelledby="member-shortcuts">
         <div class="home-section-head">
@@ -72,6 +104,7 @@
             </a>
         </div>
     </section>
+    </details>
     {% else %}
     <section class="home-hero home-hero-public" aria-labelledby="home-title">
         <p class="home-eyebrow">KNU Book Club</p>
