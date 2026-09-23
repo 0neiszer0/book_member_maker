@@ -147,37 +147,10 @@
       else link.removeAttribute('aria-current');
     });
 
-    if (userRole === 'admin') {
+    // Both roles already have operations access on the server. Keep the
+    // server-rendered links in desktop and mobile/profile navigation.
+    if (userRole === 'admin' || userRole === 'officer') {
       qa('.wd-link-staff').forEach(link => { link.href = '/admin/dashboard'; });
-    }
-    if (userRole !== 'officer') return;
-
-    qa('.wd-link-staff').forEach(link => link.remove());
-    const profile = q('#profile-list');
-    if (!profile) return;
-
-    qa('a', profile).forEach(link => {
-      let path = '';
-      try { path = new URL(link.getAttribute('href') || link.href, document.baseURI).pathname; } catch (_) { return; }
-      if (path.startsWith('/admin/') || path === '/records' || path.startsWith('/records/') || path === '/making_team' || path === '/help/admin') link.remove();
-    });
-    qa('.wd-menu-label', profile).forEach(label => {
-      if (cleanText(label) === '관리') label.remove();
-    });
-    qa('.wd-menu-divider', profile).forEach(divider => {
-      const previous = divider.previousElementSibling;
-      const next = divider.nextElementSibling;
-      if (!previous || !next || previous.classList.contains('wd-menu-divider') || next.classList.contains('wd-menu-divider')) divider.remove();
-    });
-
-    if (!qa('a', profile).some(link => cleanText(link) === '이용 안내')) {
-      const logout = qa('a', profile).find(link => cleanText(link) === '로그아웃');
-      const help = makeLink('/help/member', '이용 안내', 'wd-menu-item');
-      const icon = document.createElement('span');
-      icon.className = 'wd-menu-ico';
-      icon.textContent = 'i';
-      help.prepend(icon);
-      profile.insertBefore(help, logout || null);
     }
   }
 

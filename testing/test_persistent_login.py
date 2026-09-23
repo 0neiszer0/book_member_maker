@@ -1,6 +1,8 @@
 import importlib
 import os
+import subprocess
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 from testing._fake_supabase import FakeSupabase
 
@@ -64,6 +66,40 @@ class PersistentLoginTests(unittest.TestCase):
         self.assertIn('운영자 홈', html)
         with fresh.session_transaction() as state:
             self.assertEqual(state['user_role'], 'admin')
+
+    def test_existing_staff_keep_operations_home_after_remembered_login(self):
+        for role in ('admin', 'officer'):
+            with self.subTest(role=role):
+                self.fake.rows['members'][0]['role'] = role
+                self.oauth()
+                fresh = self.module.app.test_client()
+                fresh.set_cookie('session', self.client.get_cookie('session').value)
+                home = fresh.get('/')
+                self.assertEqual(home.status_code, 200)
+                self.assertIn('운영자 홈', home.get_data(as_text=True))
+                self.assertIn('운영 개요 열기', home.get_data(as_text=True))
+                self.assertEqual(fresh.get('/admin/dashboard').status_code, 200)
+                with fresh.session_transaction() as state:
+                    self.assertEqual(state['user_role'], role)
+                    self.assertTrue(state.permanent)
+
+    def test_remembered_member_has_no_operations_access(self):
+        self.fake.rows['members'][0]['role'] = 'member'
+        self.oauth()
+        fresh = self.module.app.test_client()
+        fresh.set_cookie('session', self.client.get_cookie('session').value)
+        home = fresh.get('/').get_data(as_text=True)
+        self.assertIn('회원 홈', home)
+        self.assertNotIn('운영 개요 열기', home)
+        self.assertNotIn('class="wd-link wd-link-staff"', home)
+        self.assertEqual(fresh.get('/admin/dashboard').status_code, 302)
+
+    def test_browser_script_preserves_server_rendered_staff_navigation(self):
+        result = subprocess.run(
+            ['node', str(Path(__file__).with_name('test_role_navigation.js'))],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_preview_session_can_return_to_admin_menu(self):
         self.oauth()
