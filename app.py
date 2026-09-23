@@ -243,6 +243,37 @@ def enforce_applicant_portal_boundary():
     return redirect(url_for("applicant_result_portal", token=portal_token), code=303)
 
 
+@app.before_request
+def refresh_home_navigation_role():
+    """Refresh saved-login identity before the public home renders its menus."""
+    if request.endpoint != 'main_index' or not session.get('user_id'):
+        return None
+    try:
+        rows = supabase.table('members').select(
+            'role,is_active,member_status,account_status,name,profile_pic'
+        ).eq('id', session['user_id']).limit(1).execute().data or []
+    except Exception as exc:
+        app.logger.error('Home navigation role refresh failed: %s', exc)
+        session.pop('user_role', None)
+        session.pop('member_preview', None)
+        return None
+
+    if not rows or rows[0].get('account_status') != 'active' or rows[0].get('member_status') == 'inactive':
+        session.clear()
+        return None
+
+    member = rows[0]
+    role = member.get('role') or 'member'
+    if role != 'admin' or member.get('is_active') is False:
+        session.pop('member_preview', None)
+    if not session.get('member_preview'):
+        session['user_role'] = role if member.get('is_active') is not False else 'member'
+    session['user_name'] = member.get('name') or session.get('user_name') or ''
+    session['profile_pic'] = member.get('profile_pic') or ''
+    session.permanent = session.get('remember_login', True)
+    return None
+
+
 # ==============================================================================
 # --- 2. 헬퍼 함수 및 공용 시스템 ---
 # ==============================================================================
@@ -372,8 +403,10 @@ def login_required(role="ANY"):
 
                 member = rows[0]
                 user_role = member.get("role") or "member"
-                if not session.get('member_preview') or role == 'admin':
-                    session["user_role"] = user_role
+                if role == 'admin' or user_role != 'admin':
+                    session.pop('member_preview', None)
+                if not session.get('member_preview'):
+                    session["user_role"] = user_role if member.get("is_active") is not False else "member"
                 if member.get('name'):
                     session['user_name'] = member['name']
                 session['profile_pic'] = member.get('profile_pic') or ''
