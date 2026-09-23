@@ -1,7 +1,7 @@
 <!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>카카오톡 명단 반영 · 실제 출석</title>{% include '_tailwind_head.html' %}{% include '_app_theme_head.html' %}<link rel="stylesheet" href="{{ url_for('static', filename='attendance.css') }}"></head><body>{% include '_header.html' %}{% include '_admin_sidebar.html' %}
 <main class="attendance-shell" data-session-id="{{ seminar.id }}" data-csrf="{{ csrf_token }}">
  <a href="{{ url_for('admin_seminars', term_id=seminar.term_id) }}">← 세미나 운영</a>
- <h1>{{ seminar.meeting_date }} · {{ '목요일 불참' if mode == 'absence' else '월요일 참석' }} 명단</h1>
+ <h1>{{ seminar.meeting_date|seminar_date }} · {{ '본 세미나 불참' if mode == 'absence' else '추가 세미나 참석' }} 명단</h1>
  <p>카카오톡 투표 결과를 옮겨 주세요. {{ '기본 대상에서 불참 투표자를 제외합니다.' if mode == 'absence' else '참석 투표자만 조 편성 대상에 포함합니다. 정원·선착순 제한은 없습니다.' }}</p>
  <p class="attendance-notice">참석 예정 명단은 실제 출석이 아닙니다. 세미나 후 아래에서 실제 출석을 별도로 확정해야 학기 참석 횟수에 반영됩니다.</p>
  <section class="attendance-panel"><h2>1. 투표 결과 명단 반영</h2><p>현재 참석 예정 {{ planned_ids|length }}명 · 마지막 반영 {{ seminar.roster_updated_label }} (한국시간)</p>

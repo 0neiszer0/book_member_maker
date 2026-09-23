@@ -51,6 +51,7 @@ from recruitment_results import (
     parse_applicant_rows,
 )
 from topic_lifecycle import topic_event_deadline, topic_event_is_expired
+from home_overview import date_label, member_seminar_summary, operations_summary
 from security_utils import forwarded_client_address, safe_internal_next_url
 from topic_credentials import (
     generate_topic_edit_token,
@@ -71,6 +72,7 @@ load_dotenv()
 
 # Flask 앱 초기화 및 시크릿 키 설정
 app = Flask(__name__)
+app.add_template_filter(date_label, 'seminar_date')
 app.secret_key = os.environ.get("FLASK_SECRET_KEY")
 if not app.secret_key:
     raise ValueError("FLASK_SECRET_KEY가 .env 파일에 설정되지 않았습니다.")
@@ -547,26 +549,23 @@ def keep_alive_endpoint():
 
 @app.route('/')
 def main_index():
-    # --- [수정] D-데이 계산 로직 추가 ---
-    try:
-        # 모집 마감일을 설정합니다. (년, 월, 일)
-        end_date_str = "2025-08-31"
-        # templates/main_index.html 파일의 모집 기간 마지막 날짜와 일치시킵니다.
-        end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
-
-        # 오늘 날짜를 가져옵니다.
-        today = datetime.now()
-
-        # 남은 날짜(D-데이)를 계산합니다.
-        # 날짜만 비교하기 위해 .date()를 사용합니다.
-        delta = end_date.date() - today.date()
-        d_day = delta.days
-    except Exception as e:
-        app.logger.error(f"D-day calculation error: {e}")
-        d_day = -1  # 오류 발생 시 기간이 지난 것으로 처리
-
-    # 계산된 d_day 값을 템플릿으로 전달합니다.
-    return render_template('main_index.html', d_day=d_day)
+    home = attendance = None
+    home_error = attendance_error = False
+    if session.get('user_id') and session.get('user_role') not in (None, 'admin', 'officer'):
+        try:
+            home = member_seminar_summary(supabase, session['user_id'])
+        except Exception:
+            app.logger.exception('Home seminar summary failed')
+            home_error = True
+        try:
+            _, term, report = _term_attendance_report((home or {}).get('term', {}).get('id') if (home or {}).get('term') else None)
+            mine = next((m for m in (report or {}).get('members', []) if str(m['id']) == str(session['user_id'])), None)
+            attendance = {'term': term, 'mine': mine, 'minimum': (report or {}).get('minimum', 3)}
+        except Exception:
+            app.logger.exception('Home attendance summary failed')
+            attendance_error = True
+    return render_template('main_index.html', home=home, attendance=attendance,
+                           home_error=home_error, attendance_error=attendance_error)
 
 
 class KakaoOauth:
@@ -1048,6 +1047,8 @@ def profile_detail_page(member_id):
 @app.route('/admin/dashboard')
 @login_required(role="admin")
 def admin_dashboard():
+    load_error = False
+    overview = None
     try:
         next_monday = get_next_monday()
     except Exception:
@@ -1083,8 +1084,11 @@ def admin_dashboard():
                 t['session_count'] = counts.get(t['id'], 0)
                 t['share_url'] = f"{request.host_url}seminar_vote?token={t['share_token']}"
 
+        overview = operations_summary(supabase, request.args.get('term_id'), request.args.get('session_id'))
+
     except Exception as e:
-        flash(f"대시보드 로딩 중 오류 발생: {e}", "danger")
+        app.logger.exception('Operations overview failed')
+        load_error = True
         all_members_res = []
         topic_events = []
         seminar_terms = []
@@ -1097,7 +1101,8 @@ def admin_dashboard():
         topic_events=topic_events,
         seminar_terms=seminar_terms,
         latest_history=latest_history,
-    )
+        overview=overview, load_error=load_error,
+    ), 503 if load_error else 200
 
 
 def _recruitment_campaign(campaign_id):
@@ -4707,8 +4712,7 @@ def admin_seminars():
                                schedule_rows=schedule_rows, schedule_csrf=schedule_csrf)
     except Exception as e:
         app.logger.error(f"admin_seminars error: {e}", exc_info=True)
-        flash(f"세미나 운영 정보를 불러오는 중 오류가 발생했습니다: {e}", 'danger')
-        return redirect(url_for('admin_dashboard'))
+        return render_template('page_load_error.html', page_title='세미나 운영', is_admin=True), 503
 
 
 @app.route('/seminars')
@@ -4721,8 +4725,7 @@ def seminars():
         return render_template('seminars.html', terms=terms, term=term, weeks=weeks, vote_url=vote_url)
     except Exception as e:
         app.logger.error(f"seminars error: {e}", exc_info=True)
-        flash('세미나 일정을 불러오지 못했습니다.', 'danger')
-        return redirect(url_for('main_index'))
+        return render_template('page_load_error.html', page_title='세미나 일정', is_admin=False), 503
 
 
 @app.route('/api/admin/seminar_sessions/<session_id>/update_book', methods=['POST'])
@@ -6522,7 +6525,7 @@ init_engagement_routes(app, supabase, login_required, _voting_window_for,
                        topic_event_lifecycle=_auto_close_topic_events)
 
 from attendance_routes import init_attendance_routes
-init_attendance_routes(app, lambda: supabase, login_required, _rebuild_matrix_for_session)
+_term_attendance_report = init_attendance_routes(app, lambda: supabase, login_required, _rebuild_matrix_for_session)
 from term_membership_routes import init_term_membership_routes
 init_term_membership_routes(app, lambda: supabase, login_required, create_member, seminar_term_create)
 

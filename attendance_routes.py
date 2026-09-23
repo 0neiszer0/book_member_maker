@@ -329,3 +329,6 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
         columns = [c for c in (report or {}).get('columns', []) if mine and report['matrix'].get(mine['id'], {}).get(c['key'])]
         return render_template('my_term_attendance.html', terms=terms, term=term, mine=mine, columns=columns,
                                minimum=(report or {}).get('minimum', 3))
+
+    # Shared server-side aggregation; the home only renders the signed-in member.
+    return term_report

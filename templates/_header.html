@@ -20,7 +20,7 @@
         <a href="{{ url_for('my_page') }}" class="wd-link">내 활동</a>
         <a href="{{ notion_public_wiki_url }}" target="_blank" rel="noopener noreferrer" class="wd-link">위키</a>
         {% if session.user_role in ['admin', 'officer'] or session.get('member_preview') %}
-          <a href="{{ url_for('admin_seminars') }}" class="wd-link wd-link-staff">운영 관리</a>
+          <a href="{{ url_for('admin_dashboard') }}" class="wd-link wd-link-staff">운영 관리</a>
         {% endif %}
       {% endif %}
     </nav>
@@ -49,7 +49,7 @@
           </button>
           <div id="profile-list" class="wd-dropdown-panel wd-dropdown-panel-sm" aria-labelledby="profile-btn">
             <a href="{{ url_for('my_page') }}" class="wd-menu-item">
-              <span class="wd-menu-ico"><i data-lucide="user" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>마이페이지
+              <span class="wd-menu-ico"><i data-lucide="user" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>내 활동
             </a>
             <a href="{{ url_for('engagement_now') }}" class="wd-menu-item">
               <span class="wd-menu-ico"><i data-lucide="send" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>지금 참여하기
@@ -72,7 +72,7 @@
             {% if session.user_role in ['admin', 'officer'] or session.get('member_preview') %}
               <div class="wd-menu-divider"></div>
               <div class="wd-menu-label">관리</div>
-              <a href="{{ url_for('admin_seminars') }}" class="wd-menu-item">
+              <a href="{{ url_for('admin_dashboard') }}" class="wd-menu-item">
                 <span class="wd-menu-ico"><i data-lucide="settings" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>운영 관리
               </a>
               {% if session.user_role == 'admin' %}

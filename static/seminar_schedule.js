@@ -3,6 +3,11 @@
     'use strict';
     const copy = value => JSON.parse(JSON.stringify(value));
     const fields = ['book_title', 'book_author', 'note'];
+    function dateLabel(value) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return value || '';
+        const day = new Date(value + 'T00:00:00Z');
+        return Number.isNaN(day.getTime()) ? value : value + ' (' + '일월화수목금토'[day.getUTCDay()] + ')';
+    }
     class ScheduleDrafts {
         constructor(rows) {
             this.rows = copy(rows);
@@ -62,13 +67,13 @@
             status.textContent = text; status.dataset.error = String(error);
             status.style.whiteSpace = 'pre-line';
         }
-        const dateLabel = row => row.sessions.map(item => item.meeting_date + (item.day_type === 'thu' ? ' (목)' : ' (월)')).join(' · ');
+        const rowDateLabel = row => row.sessions.map(item => dateLabel(item.meeting_date)).join(' · ');
         function refreshOptions() {
             if (!picker) return;
             picker.replaceChildren(...drafts.rows.map(row => {
                 const option = document.createElement('option');
                 option.value = row.id;
-                option.textContent = dateLabel(row) + ' — ' + (row.book_title || '도서 미정') + (drafts.dirty(row.id) ? ' · 미저장' : '');
+                option.textContent = rowDateLabel(row) + ' — ' + (row.book_title || '도서 미정') + (drafts.dirty(row.id) ? ' · 미저장' : '');
                 return option;
             }));
             picker.value = selected;
@@ -79,11 +84,11 @@
             if (!form || !selected) return;
             const row = drafts.get(selected);
             fields.forEach(key => form.elements.namedItem(key).value = row[key]);
-            document.getElementById('schedule-date-detail').textContent = dateLabel(row) + ' · 날짜를 바꿔도 작성 중인 내용은 유지됩니다.';
+            document.getElementById('schedule-date-detail').textContent = rowDateLabel(row) + ' · 날짜를 바꿔도 작성 중인 내용은 유지됩니다.';
             const moderators = document.getElementById('schedule-moderators');
             moderators.replaceChildren(...row.sessions.map(item => {
                 const label = document.createElement('label'), input = document.createElement('input');
-                label.textContent = item.meeting_date + (item.day_type === 'thu' ? ' 목요일 사회자' : ' 월요일 사회자');
+                label.textContent = dateLabel(item.meeting_date) + ' ' + (item.day_type === 'thu' ? '본 세미나 사회자' : '추가 세미나 사회자');
                 input.className = 'field'; input.dataset.sessionId = item.id;
                 input.setAttribute('list', 'schedule-member-names');
                 input.maxLength = 100; input.value = item.moderator_name; input.placeholder = '이름 검색 또는 직접 입력';
@@ -192,8 +197,10 @@
             } catch (error) { resultNode.textContent = error.message; button.disabled = false; }
         });
         render();
-        if (new URLSearchParams(scope.location.search).has('schedule') || !drafts.rows.length) tool.open = true;
+        const params = new URLSearchParams(scope.location.search);
+        if (params.has('schedule') || !drafts.rows.length) tool.open = true;
+        if (params.has('week_id')) open(params.get('week_id'), params.get('session_id'));
     }
-    if (typeof module !== 'undefined' && module.exports) module.exports = {ScheduleDrafts};
+    if (typeof module !== 'undefined' && module.exports) module.exports = {ScheduleDrafts, dateLabel};
     else mount();
 })(typeof window !== 'undefined' ? window : globalThis);

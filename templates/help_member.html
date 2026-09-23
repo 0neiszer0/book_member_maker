@@ -22,7 +22,7 @@
     <div class="grid md:grid-cols-3 gap-3 mt-4">
       <div class="rounded-xl bg-[#f7f1e4] p-4"><strong>1. 목요일은 별도 신청 없음</strong><p class="muted text-sm mt-1">활성 회원은 기본 참석 대상입니다. 못 오는 날만 카카오톡 불참 투표에 참여해주세요.</p></div>
       <div class="rounded-xl bg-[#f7f1e4] p-4"><strong>2. 월요일은 카카오톡 참석 투표</strong><p class="muted text-sm mt-1">단톡방의 참석 투표에 참여해주세요. 정원·선착순 제한은 없습니다.</p></div>
-      <div class="rounded-xl bg-[#f7f1e4] p-4"><strong>3. 발제문 링크는 매주 새로 열림</strong><p class="muted text-sm mt-1">카톡 공지나 마이페이지의 진행 중 활동에서 해당 주 링크를 여세요.</p></div>
+      <div class="rounded-xl bg-[#f7f1e4] p-4"><strong>3. 발제문 링크는 매주 새로 열림</strong><p class="muted text-sm mt-1">홈의 이번 세미나 또는 내 활동에서 해당 주 링크를 여세요.</p></div>
     </div>
     <div class="flex flex-wrap gap-2 mt-5">
       <a class="btn primary" href="{{ url_for('seminars') }}">세미나 일정 확인</a>
@@ -34,7 +34,7 @@
 
   <div class="grid lg:grid-cols-[210px_minmax(0,1fr)] gap-5">
     <nav class="panel p-3 h-fit lg:sticky lg:top-24 text-sm" aria-label="이용 안내 목차">
-      <a class="block p-2 font-bold" href="#weekly">매주 참여 순서</a><a class="block p-2 font-bold" href="#topic">발제문 제출</a><a class="block p-2 font-bold" href="#mypage">마이페이지</a><a class="block p-2 font-bold" href="#example">한 주 예시</a><a class="block p-2 font-bold" href="#faq">자주 묻는 질문</a>
+      <a class="block p-2 font-bold" href="#weekly">매주 참여 순서</a><a class="block p-2 font-bold" href="#topic">발제문 제출</a><a class="block p-2 font-bold" href="#mypage">내 활동</a><a class="block p-2 font-bold" href="#example">한 주 예시</a><a class="block p-2 font-bold" href="#faq">자주 묻는 질문</a>
     </nav>
     <div class="space-y-5">
       <section id="weekly" class="panel p-5 sm:p-6">
@@ -50,14 +50,14 @@
 
       <section id="topic" class="panel p-5 sm:p-6">
         <h2 class="text-xl font-extrabold">발제문은 이렇게 제출해요</h2>
-        <ol class="list-decimal pl-5 mt-3 space-y-2 text-sm"><li>카톡 공지 또는 <a class="underline font-bold text-[#3d5c2e]" href="{{ url_for('my_page') }}">마이페이지</a>에서 이번 주 발제문 링크를 엽니다.</li><li>이름·소속·학번을 확인하고 질문, 관련 페이지, 참고 내용을 입력합니다. 1개는 필수이고 원하면 1개를 더 추가할 수 있습니다.</li><li>제출 후 같은 정보로 다시 들어가면 마감 전까지 내용을 수정할 수 있습니다.</li></ol>
+        <ol class="list-decimal pl-5 mt-3 space-y-2 text-sm"><li>카톡 공지 또는 <a class="underline font-bold text-[#3d5c2e]" href="{{ url_for('my_page') }}">내 활동</a>에서 이번 주 발제문 링크를 엽니다.</li><li>이름·소속·학번을 확인하고 질문, 관련 페이지, 참고 내용을 입력합니다. 1개는 필수이고 원하면 1개를 더 추가할 수 있습니다.</li><li>임시저장은 현재 브라우저에만 7일간 보관되며 제출이 아닙니다. 반드시 제출 버튼을 누르고 ‘제출 완료’를 확인하세요.</li><li>제출 후 같은 정보로 다시 들어가면 마감 전까지 내용을 수정할 수 있습니다.</li></ol>
         <p class="muted text-sm mt-3"><strong>예시</strong> · “주인공의 마지막 선택은 책임인가 회피인가요? 182~185쪽 장면을 함께 보고 싶어요.”</p>
       </section>
 
       <section id="mypage" class="panel p-5 sm:p-6">
-        <h2 class="text-xl font-extrabold">마이페이지에서 확인할 수 있는 것</h2>
+        <h2 class="text-xl font-extrabold">내 활동에서 확인할 수 있는 것</h2>
         <ul class="list-disc pl-5 mt-3 space-y-2 text-sm"><li>현재 열려 있는 발제문과 바로가기</li><li>세미나 참석 횟수와 발제 이력</li><li>벽돌책·소모임·스페셜 이벤트 등 내 활동 기록</li><li>등록된 이름·학번·소속 정보</li></ul>
-        <a class="btn soft mt-4" href="{{ url_for('my_page') }}">내 마이페이지 열기</a>
+        <a class="btn soft mt-4" href="{{ url_for('my_page') }}">내 활동 열기</a>
       </section>
 
       <section id="example" class="panel p-5 sm:p-6">

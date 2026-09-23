@@ -34,7 +34,7 @@
         <label for="document-session">세미나 날짜</label>
         <select id="document-session" class="moderator-field" name="session_id" required>
           <option value="">날짜를 선택해주세요</option>
-          {% for item in seminar_sessions %}<option value="{{ item.id }}" data-moderator="{{ item.moderator_name or '' }}" {% if selected_session and selected_session.id == item.id %}selected{% endif %}>{{ item.meeting_date }}{% if item.day_type == 'thu' %} (목){% elif item.day_type == 'mon' %} (월){% endif %}</option>{% endfor %}
+          {% for item in seminar_sessions %}<option value="{{ item.id }}" data-moderator="{{ item.moderator_name or '' }}" {% if selected_session and selected_session.id == item.id %}selected{% endif %}>{{ item.meeting_date|seminar_date }} · {{ '본 세미나' if item.day_type == 'thu' else '추가 세미나' }}</option>{% endfor %}
         </select>
         {% else %}
         {% if selected_session %}<input type="hidden" name="session_id" value="{{ selected_session.id }}">{% endif %}
