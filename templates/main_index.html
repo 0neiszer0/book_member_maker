@@ -11,7 +11,7 @@
 {% include '_header.html' %}
 
 <main class="home-shell flex-1">
-    {% if session.user_role == 'admin' %}
+    {% if session.user_role in ['admin', 'officer'] %}
     <section class="home-hero" aria-labelledby="home-title">
         <p class="home-eyebrow">운영자 홈</p>
         <h1 id="home-title">{{ session.user_name or '관리자' }}님, 이번 주 운영을 시작하세요.</h1>

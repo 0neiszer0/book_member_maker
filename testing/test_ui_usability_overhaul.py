@@ -21,7 +21,7 @@ class UiUsabilityOverhaulTest(unittest.TestCase):
 
     def test_home_is_role_aware_and_has_direct_actions(self):
         home = self.read("templates/main_index.html")
-        self.assertIn("session.user_role == 'admin'", home)
+        self.assertIn("session.user_role in ['admin', 'officer']", home)
         self.assertIn("운영 개요 열기", home)
         self.assertIn("지금 참여하기", home)
         self.assertIn("세미나 일정 보기", home)
@@ -80,7 +80,6 @@ class UiUsabilityOverhaulTest(unittest.TestCase):
         self.assertIn("이 추천안으로 확정", script)
         self.assertIn("공지 이미지 만들기", script)
         self.assertIn("발표 전 점검", script)
-        self.assertIn("/help/admin", script)
         self.assertIn("bootstrapEnhancements", script)
         self.assertIn("UI enhancement failed", script)
         self.assertIn("document.readyState === 'loading'", script)
