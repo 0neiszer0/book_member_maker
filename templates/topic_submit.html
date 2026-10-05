@@ -98,6 +98,12 @@
             border-color: #C9B38A !important;
         }
         #writeCard { color: #2A241B; }
+        @media(max-width:767px) {
+            input.eva-input, textarea.eva-input, select.eva-input { font-size:16px; }
+            .preview-card > div:first-child { flex-direction:column; }
+            #existingTopicsTitle { word-break:keep-all; }
+            #existingTopicsTitle svg { flex-shrink:0; }
+        }
     </style>
     {% include '_app_theme_head.html' %}
 </head>

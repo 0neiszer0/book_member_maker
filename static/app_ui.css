@@ -98,7 +98,10 @@
   background: rgba(92, 122, 74, .08);
 }
 .home-hero > * { position: relative; z-index: 1; }
-.home-hero-public { max-width: 860px; margin: 7vh auto 0; text-align: center; }
+.home-hero-public { margin: 0; text-align: center; padding: 32px 24px; }
+.home-hero-public h1 { font-size: clamp(1.7rem, 4vw, 2.7rem); word-break: keep-all; }
+.home-public-note { margin-top: 18px; color: var(--ink-soft, #5C5142); font-size: .9rem; line-height: 1.7; word-break: keep-all; }
+@media(max-width:767px){.eg-form .eg-input,.eg-form .eg-textarea,.eg-form .eg-select{font-size:16px}}
 .home-eyebrow, .home-kicker, .overview-eyebrow, .overview-kicker, .seminar-kicker {
   margin: 0;
   color: var(--moss-deep, #3D5C2E);

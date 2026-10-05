@@ -3,7 +3,7 @@
 <section class="eg-hero engagement-hero">
   <div class="eg-kicker">지금 할 일</div>
   <div class="engagement-title-row">
-    <div><h1>지금 참여하기</h1><p class="eg-lead">열려 있는 신청·발제문·후기를 우선순위대로 확인하세요.</p></div>
+    <div><h1>지금 참여하기</h1><p class="eg-lead">열려 있는 신청·발제문·후기를 확인하세요. 로그인 없이 이용할 수 있고, 일부 활동은 이름·학번 확인이 필요해요.</p></div>
     <span class="engagement-open-count">현재 열린 활동 {{ cards|length }}개</span>
   </div>
 </section>
@@ -42,7 +42,7 @@
 <section class="eg-panel eg-empty engagement-empty">
   <strong>지금 바로 제출하거나 신청할 활동이 없습니다.</strong>
   <p class="eg-muted">새 활동이 열리면 이 화면의 가장 위에 표시됩니다.</p>
-  <div class="eg-actions"><a class="eg-btn eg-btn-soft" href="{{ url_for('seminars') }}">다음 세미나 보기</a><a class="eg-btn eg-btn-paper" href="{{ url_for('my_page') }}">내 활동 기록 보기</a></div>
+  <div class="eg-actions">{% if session.user_role %}<a class="eg-btn eg-btn-soft" href="{{ url_for('seminars') }}">다음 세미나 보기</a><a class="eg-btn eg-btn-paper" href="{{ url_for('my_page') }}">내 활동 기록 보기</a>{% else %}<a class="eg-btn eg-btn-soft" href="{{ url_for('club_room') }}">동아리방 사용하기</a><a class="eg-btn eg-btn-paper" href="{{ url_for('book_suggestions') }}">추천 도서 둘러보기</a>{% endif %}</div>
 </section>
 {% endif %}
 

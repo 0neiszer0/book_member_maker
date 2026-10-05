@@ -11,7 +11,7 @@
 {% include '_header.html' %}
 
 <main class="home-shell flex-1">
-    <a href="{{ url_for('club_room') }}" class="cr-home-entry"><div><strong>동아리방, 언제 비어 있나요?</strong><span id="cr-home-status">오늘 빈 시간을 확인하고 있어요</span><br><span>로그인 없이 사용 신청</span></div><b aria-hidden="true">↗</b></a>
+    {% if session.user_role %}<a href="{{ url_for('club_room') }}" class="cr-home-entry"><div><strong>동아리방, 언제 비어 있나요?</strong><span id="cr-home-status">오늘 빈 시간을 확인하고 있어요</span><br><span>로그인 없이 사용 신청</span></div><b aria-hidden="true">↗</b></a>{% endif %}
     <script defer src="{{ url_for('static', filename='club_room.js') }}"></script>
     {% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}
     <div class="overview-flash {% if category != 'success' %}overview-flash-error{% endif %}" role="status">{{ message }}</div>
@@ -110,10 +110,27 @@
     {% else %}
     <section class="home-hero home-hero-public" aria-labelledby="home-title">
         <p class="home-eyebrow">KNU Book Club</p>
-        <h1 id="home-title">책을 읽고, 질문을 나누고, 기록을 남깁니다.</h1>
-        <p>책 먹는 호반우의 세미나 일정과 독서 활동을 한곳에서 관리하는 공간입니다.</p>
+        <h1 id="home-title">함께 읽고, 편하게 참여해요.</h1>
+        <p>동아리방 신청부터 발제문과 책 추천까지.<br>로그인 없이도 바로 시작할 수 있어요.</p>
+    </section>
+    <section class="home-section" aria-labelledby="public-shortcuts">
+        <div class="home-section-head"><h2 id="public-shortcuts">무엇을 하러 왔나요?</h2></div>
+        <div class="home-card-grid home-card-grid-3">
+            <a class="home-card home-card-priority" href="{{ url_for('club_room') }}">
+                <strong>동아리방</strong><p>09:00~24:00 · 원하는 시간을 골라 대표자와 참여자를 적어주세요.</p>
+                <p id="cr-home-status" role="status">오늘 빈 시간을 확인하고 있어요.</p><span class="home-card-link">시간 확인·사용 신청 →</span>
+            </a>
+            <a class="home-card" href="{{ url_for('engagement_now') }}">
+                <strong>지금 참여하기</strong><p>현재 열려 있는 발제문 제출, 세미나 후기와 벽돌책 신청을 모았어요.</p><span class="home-card-link">열린 활동 보기 →</span>
+            </a>
+            <a class="home-card" href="{{ url_for('book_suggestions') }}">
+                <strong>책 추천</strong><p>함께 읽고 싶은 책을 둘러보고, 새로운 책도 추천해주세요.</p><span class="home-card-link">추천 둘러보기·작성 →</span>
+            </a>
+        </div>
+        <p class="home-public-note">일부 활동은 이름·학번으로 회원 여부를 확인해요. 발제문 수정 등은 각 화면의 확인 절차를 따라주세요.</p>
         <div class="home-actions">
-            <a class="home-btn home-btn-primary" href="{{ url_for('login') }}">로그인</a>
+            <a class="home-btn home-btn-secondary" href="{{ notion_public_wiki_url }}" target="_blank" rel="noopener noreferrer">동아리 소개·공식 위키 ↗</a>
+            <a class="home-btn home-btn-secondary" href="{{ url_for('login') }}">로그인하고 내 활동 보기</a>
         </div>
     </section>
     {% endif %}

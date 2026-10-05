@@ -119,6 +119,45 @@ class OverviewRouteTests(unittest.TestCase):
         self.assertNotIn('202600002', html)
         self.assertNotIn('운영 개요 열기', html)
 
+    def test_guest_home_exposes_public_tools_without_private_navigation(self):
+        with self.client.session_transaction() as state:
+            state.clear()
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        for path in ('/club-room', '/now', '/books/suggestions', '/login'):
+            self.assertIn('href="' + path + '"', html)
+        for private_path in ('/admin/dashboard', '/mypage', '/seminars', '/applicant-result/'):
+            self.assertNotIn('href="' + private_path, html)
+        self.assertEqual(html.count('id="cr-home-status"'), 1)
+        self.assertIn('aria-label="로그인 없이 이용하기"', html)
+        self.assertIn('이름·학번', html)
+
+    def test_guest_empty_participation_links_remain_public(self):
+        from flask import render_template
+        with self.module.app.test_request_context('/now'):
+            html = render_template('engagement_now.html', cards=[], remembered_member=None)
+        self.assertIn('href="/club-room"', html)
+        self.assertIn('href="/books/suggestions"', html)
+        self.assertNotIn('href="/seminars"', html)
+        self.assertNotIn('href="/mypage"', html)
+
+    def test_mobile_attendance_keeps_filter_rows_and_labeled_totals(self):
+        self.login(2, 'admin')
+        html = self.client.get('/admin/term_attendance?term_id=term').get_data(as_text=True)
+        self.assertIn('attendance-table attendance-members', html)
+        self.assertIn('data-member-row', html)
+        self.assertIn('data-label="합계"', html)
+        self.assertIn('data-label="부족"', html)
+        self.assertIn('attendance-table attendance-sheet', html)
+
+    def test_empty_charts_have_no_oversized_canvas(self):
+        self.login(2, 'admin')
+        html = self.client.get('/records/analytics').get_data(as_text=True)
+        self.assertIn('아직 기록이 없어요.', html)
+        self.assertNotIn('<canvas id="bbMonthlyChart"', html)
+        self.assertNotIn('<canvas id="sgMonthlyChart"', html)
+
     def test_submitted_action_and_closed_event(self):
         self.db.rows['topic_submissions'] = [{'id': 'own', 'event_id': 'event', 'member_id': 1}]
         self.assertIn('제출한 발제문 수정', self.client.get('/').get_data(as_text=True))

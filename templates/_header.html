@@ -23,6 +23,10 @@
         {% if session.user_role in ['admin', 'officer'] or session.get('member_preview') %}
           <a href="{{ url_for('admin_dashboard') }}" class="wd-link wd-link-staff">운영 관리</a>
         {% endif %}
+      {% else %}
+        <a href="{{ url_for('engagement_now') }}" class="wd-link">지금 참여하기</a>
+        <a href="{{ url_for('book_suggestions') }}" class="wd-link">책 추천</a>
+        <a href="{{ notion_public_wiki_url }}" target="_blank" rel="noopener noreferrer" class="wd-link">위키</a>
       {% endif %}
     </nav>
 
@@ -106,6 +110,15 @@
   </div>
 </header>
 
+{% if not session.user_role %}
+<nav class="wd-public-nav" aria-label="로그인 없이 이용하기">
+  <a href="{{ url_for('main_index') }}" class="wd-link">홈</a>
+  <a href="{{ url_for('club_room') }}" class="wd-link">동아리방</a>
+  <a href="{{ url_for('engagement_now') }}" class="wd-link">참여하기</a>
+  <a href="{{ url_for('book_suggestions') }}" class="wd-link">책 추천</a>
+</nav>
+{% endif %}
+
 {# --- 모바일 하단 탭바 (로그인 회원만) --- #}
 {% if session.user_role %}
 <nav class="wd-tabbar" role="navigation" aria-label="주 메뉴">
@@ -163,6 +176,11 @@
 
   .wd-top-nav{
     display:flex;gap:4px;align-items:center;margin-left:8px;
+  }
+  .wd-public-nav{display:none}
+  @media(max-width:1100px){
+    .wd-public-nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));padding:4px 8px;background:var(--surface,#FFFCF3);border-bottom:1px solid var(--line,#E5D7B8)}
+    .wd-public-nav .wd-link{display:flex;align-items:center;justify-content:center;min-height:44px;padding:6px 2px;font-size:14px;white-space:nowrap}
   }
   @media(max-width:1100px){ .wd-top-nav{display:none} }
   .wd-link{
