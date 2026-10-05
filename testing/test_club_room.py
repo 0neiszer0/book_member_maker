@@ -142,6 +142,25 @@ class RoomTests(unittest.TestCase):
         self.assertEqual(self.client.get('/club-room').status_code,303)
         self.assertEqual(self.client.get('/api/club-room/schedule').status_code,403)
 
+    def test_opening_hours_for_create_update_and_meetings(self):
+        for action in ('create', 'update'):
+            for start, end in [('00:00','09:00'), ('08:00','10:00'), ('23:00','NEXT01:00')]:
+                end_date = '2099-10-06T' if end.startswith('NEXT') else '2099-10-05T'
+                result = self.post({**self.body, 'action':action, 'version':1,
+                    'starts_at':'2099-10-05T'+start, 'ends_at':end_date+end.replace('NEXT','')})
+                self.assertEqual(result.status_code,400)
+                self.assertIn('오전 9시',result.json['error'])
+        self.assertEqual(self.rpc_calls,[])
+        for start in ('09:00','23:00'):
+            self.assertEqual(self.post({**self.body,'starts_at':'2099-10-05T'+start,'ends_at':'2099-10-06T00:00'}).status_code,200)
+        self.login(1,'officer')
+        self.assertEqual(self.post({**self.body,'kind':'meeting','starts_at':'2099-10-05T08:00'}).status_code,400)
+
+    def test_legacy_night_booking_remains_readable_and_cancellable(self):
+        self.db.rows['club_room_bookings'][0]['starts_at']='2099-10-05T02:00:00+09:00'
+        self.assertEqual(self.post(dict(action='read',edit_code=self.code)).status_code,200)
+        self.assertEqual(self.post(dict(action='cancel',edit_code=self.code,version=1)).status_code,200)
+
 
 if __name__ == '__main__':
     unittest.main()

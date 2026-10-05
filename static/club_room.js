@@ -14,7 +14,7 @@
   }
   function freeRanges(bookings, day, now) {
     const ranges = [];
-    for (let h = 0; h < 24; h++) {
+    for (let h = 9; h < 24; h++) {
       const slot = slotState(bookings, day, h, now);
       if (slot.rows.length || slot.past) continue;
       const last = ranges[ranges.length - 1];
@@ -96,21 +96,20 @@
       const tab = node('button', undefined, isSelected ? 'is-selected' : '');
       tab.type = 'button'; tab.setAttribute('aria-pressed', String(isSelected)); tab.setAttribute('aria-label', dateText(day));
       tab.append(node('span', '일월화수목금토'[new Date(day + 'T00:00:00Z').getUTCDay()]), node('strong', String(Number(day.slice(8)))));
-      tab.addEventListener('click', () => { selected = day; render(); scrollToDay(); if (staff) refreshStaff(); }); $('cr-days').append(tab);
-      const column = node('section', undefined, 'cr-day' + (isSelected ? ' is-selected' : ''));
-      column.setAttribute('aria-label', dateText(day)); const list = node('ol');
-      for (let h = 0; h < 24; h++) {
-        const slot = slotState(bookings, day, h, now);
-        const item = node('li', undefined, 'cr-slot' + (slot.blocked ? ' is-blocked' : slot.rows.length ? ' is-shared' : '') + (slot.past ? ' is-past' : ''));
-        const button = node('button'); button.type = 'button'; button.disabled = !ready || slot.past || slot.blocked;
-        const names = slot.rows.filter(r => r.kind === 'regular').map(r => r.representative);
-        const label = !ready ? '확인 필요' : slot.blocked ? '이용 불가' : names.length ? names.join(', ') : slot.past ? '지난 시간' : '예약 없음';
-        button.append(node('span', pad(h) + ':00', 'cr-time'), node('strong', label), node('small', slot.blocked ? '동아리 일정' : names.length ? '함께 사용 가능' : slot.past ? '' : '선택해서 신청'));
-        button.setAttribute('aria-label', dateText(day) + ' ' + pad(h) + '시 · ' + label);
-        button.title = label;
-        button.addEventListener('click', () => openNew(day, h)); item.append(button); list.append(item);
+      tab.addEventListener('click', () => { selected = day; render(); if (staff) refreshStaff(); }); $('cr-days').append(tab);
+    }
+    if (ready) {
+      const start = Date.parse(selected + 'T00:00:00+09:00');
+      const rows = bookings.filter(row => overlaps(row, start, start + 24 * hourMs)).sort((a,b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
+      for (const row of rows) {
+        const item = node('div', undefined, 'cr-booking-row' + (row.kind === 'blocked' ? ' is-blocked' : ''));
+        const from = kst(row.starts_at), to = kst(row.ends_at);
+        item.append(node('strong', (from.slice(0,10) === selected ? from.slice(11) : from.replace('T',' ')) + '–' + (to.slice(0,10) === selected ? to.slice(11) : to === shiftDate(selected,1) + 'T00:00' ? '24:00' : to.replace('T',' '))),
+          node('span', row.kind === 'blocked' ? '이용 불가 · 동아리 일정' : row.representative),
+          node('small', row.kind === 'blocked' ? '이 시간 외에 신청해주세요' : '함께 사용 가능'));
+        $('cr-grid').append(item);
       }
-      column.append(list); $('cr-grid').append(column);
+      if (!rows.length) $('cr-grid').append(node('p', '등록된 예약이 없어요. 원하는 시간으로 신청하세요.', 'cr-empty'));
     }
     if (!ready) $('cr-free').textContent = '시간표를 다시 불러온 뒤 확인해주세요.';
     else {
@@ -119,23 +118,19 @@
         const button = node('button', pad(startHour) + ':00–' + pad(endHour) + ':00'); button.type = 'button';
         button.addEventListener('click', () => openNew(selected, startHour)); $('cr-free').append(button);
       });
-      if (!ranges.length) $('cr-free').textContent = '예약 없는 시간이 없어요. 함께 사용 가능한 칸은 선택할 수 있어요.';
+      if (!ranges.length) $('cr-free').textContent = '예약 없는 시간이 없어요. 일반 예약과는 함께 사용할 수 있어요.';
     }
-    $('cr-new').disabled = !ready;
-    if (staff) $('cr-meeting').disabled = !ready;
+    $('cr-new').disabled = !ready || selected < kst(now).slice(0,10);
+    if (staff) $('cr-meeting').disabled = $('cr-new').disabled;
     if (focusedLabel) [...root.querySelectorAll('button[aria-label]')].find(button => button.getAttribute('aria-label') === focusedLabel)?.focus({preventScroll:true});
   }
-  function scrollToDay() {
-    $('cr-grid-scroll').scrollTop = (window.matchMedia('(max-width:767px)').matches ? 72 : 88) * Math.max(0, (selected === kst(now).slice(0,10) ? Number(kst(now).slice(11,13)) - 1 : 8));
-  }
-  async function refresh(scroll = false) {
+  async function refresh() {
     const seq = ++requestNumber, start = weekStart(selected);
     try {
       const data = await api('/api/club-room/schedule?date=' + start);
       if (seq !== requestNumber) return;
       bookings = data.bookings; now = Date.parse(data.now); ready = true; message('cr-error', '');
       $('cr-updated').textContent = '방금 확인 · 화면이 열려 있으면 30초마다 갱신'; render();
-      if (scroll) scrollToDay();
       if (staff) refreshStaff();
     } catch (error) {
       if (seq !== requestNumber) return;
@@ -161,29 +156,40 @@
       if (!data.bookings.length) $('cr-staff-list').textContent = '이 주에는 등록된 예약이 없어요.';
     } catch (error) { if (seq === staffRequest) $('cr-staff-list').textContent = error.message; }
   }
-  function setTime(prefix, value) { const local = kst(value); $('cr-' + prefix + '-date').value = local.slice(0,10); $('cr-' + prefix + '-hour').value = local.slice(11,13); }
-  function times() { return {starts_at:$('cr-start-date').value + 'T' + $('cr-start-hour').value + ':00', ends_at:$('cr-end-date').value + 'T' + $('cr-end-hour').value + ':00'}; }
+  function times() {
+    const day = $('cr-start-date').value, end = $('cr-end-hour').value;
+    return {starts_at:day + 'T' + $('cr-start-hour').value + ':00', ends_at:(end === '24' && day ? shiftDate(day,1) : day) + 'T' + (end === '24' ? '00' : end) + ':00'};
+  }
   function duration() {
+    for (const option of $('cr-end-hour').options) option.disabled = Number(option.value) <= Number($('cr-start-hour').value);
     const t = times(), hours = (Date.parse(t.ends_at + ':00+09:00') - Date.parse(t.starts_at + ':00+09:00')) / hourMs;
-    $('cr-duration').textContent = hours > 0 ? '총 ' + hours + '시간 · 한국시간 기준' : '종료 시간을 시작 시간보다 뒤로 선택해주세요.';
+    $('cr-duration').textContent = hours > 0 ? '총 ' + hours + '시간 · ' + ($('cr-end-hour').value === '24' ? '24:00은 자정이에요' : '한국시간 기준') : '종료 시간을 시작 시간보다 뒤로 선택해주세요.';
   }
   function showForm(booking) {
     dirty = false; form.reset(); $('cr-fields').hidden = false; $('cr-fields').disabled = false; $('cr-save').hidden = false;
     $('cr-copy').textContent = '코드 복사';
     $('cr-receipt').hidden = true; message('cr-form-error', ''); $('cr-kind').value = booking.kind;
     $('cr-representative').value = booking.representative || ''; $('cr-participants').value = (booking.participants || []).join(', '); $('cr-purpose').value = booking.purpose || '';
-    setTime('start', booking.starts_at); setTime('end', booking.ends_at); duration();
+    const from = kst(booking.starts_at), to = kst(booking.ends_at);
+    const endHour = to === shiftDate(from.slice(0,10),1) + 'T00:00' ? '24' : to.slice(11,13);
+    const supported = Number(from.slice(11,13)) >= 9 && (to.slice(0,10) === from.slice(0,10) || endHour === '24');
+    $('cr-start-date').value = from.slice(0,10);
+    $('cr-start-date').min = kst(now).slice(0,10);
+    $('cr-start-hour').value = from.slice(11,13);
+    $('cr-end-hour').value = endHour;
+    duration();
     $('cr-dialog-title').textContent = current.version ? '예약 확인·수정' : booking.kind === 'meeting' ? '임원진 회의 등록' : '동아리방 사용 신청';
     $('cr-save').textContent = current.version ? '변경 내용 저장' : booking.kind === 'meeting' ? '회의 등록 완료' : '사용 신청 완료';
     $('cr-cancel').hidden = !current.version || !!booking.cancelled_at;
     $('cr-meeting-note').hidden = booking.kind !== 'meeting'; $('cr-code-details').hidden = !current.code; $('cr-code-details').open = false;
     $('cr-issued-code').value = current.code ? current.id + '.' + current.code : '';
+    if (!supported) { $('cr-save').hidden = true; $('cr-fields').disabled = true; message('cr-form-error', '기존 예약은 그대로 유지돼요: ' + timeText(booking) + '. 야간 예약 변경은 운영진에게 문의해주세요. 취소는 가능합니다.'); }
     if (booking.cancelled_at) { $('cr-save').hidden = true; $('cr-fields').disabled = true; message('cr-form-error', '취소된 예약이에요. 다시 사용하려면 새로 신청해주세요.'); }
     if (!dialog.open) dialog.showModal();
   }
   function openNew(day, hour, kind = 'regular') {
     if (!ready || busy) return;
-    const start = Date.parse(day + 'T' + pad(hour) + ':00:00+09:00');
+    const start = Date.parse(day + 'T' + pad(Math.max(9, hour)) + ':00:00+09:00');
     const code = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
     current = {id:crypto.randomUUID(), code, version:null};
     showForm({kind, starts_at:new Date(start).toISOString(), ends_at:new Date(start + hourMs).toISOString(), participants:[]});
@@ -222,7 +228,11 @@
     finally { setBusy(false); }
   }
   $('cr-form').addEventListener('submit', event => { event.preventDefault(); if (current && !$('cr-save').hidden) save(current.version ? 'update' : 'create'); });
-  form.addEventListener('input', () => { dirty = true; duration(); });
+  form.addEventListener('input', event => {
+    dirty = true;
+    if (event.target.id === 'cr-start-hour' && Number($('cr-end-hour').value) <= Number(event.target.value)) $('cr-end-hour').value = pad(Number(event.target.value) + 1);
+    duration();
+  });
   $('cr-cancel').addEventListener('click', () => { if (window.confirm('이 예약을 취소할까요? 취소 이력은 운영진에게 남습니다.')) save('cancel'); });
   function close() { if (!busy && (!dirty || window.confirm('저장하지 않은 입력을 닫을까요?'))) { dirty = false; dialog.close(); } }
   $('cr-close').addEventListener('click', close); dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });

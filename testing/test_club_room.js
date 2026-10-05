@@ -16,4 +16,6 @@ assert.equal(slotState(rows, '2026-10-06', 0, now).blocked, true);
 assert.equal(slotState(rows, '2026-10-06', 1, now).blocked, false);
 assert.deepEqual(freeRanges(rows, '2026-10-05', now), [[10,12], [14,18]]);
 assert.deepEqual(freeRanges([], '2026-10-04', now), []);
+assert.deepEqual(freeRanges([], '2026-10-06', now), [[9,24]]);
+assert.deepEqual(freeRanges(rows, '2026-10-06', now), [[9,24]]);
 console.log('Room calendar: KST, week/year boundaries, shared/blocked slots, midnight and free ranges passed.');
