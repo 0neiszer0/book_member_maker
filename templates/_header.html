@@ -13,6 +13,7 @@
     </a>
 
     <nav class="wd-top-nav">
+      <a href="{{ url_for('club_room') }}" class="wd-link">동아리방</a>
       {% if session.user_role %}
         <a href="{{ url_for('main_index') }}" class="wd-link">홈</a>
         <a href="{{ url_for('seminars') }}" class="wd-link">세미나</a>
@@ -48,6 +49,7 @@
             <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
           <div id="profile-list" class="wd-dropdown-panel wd-dropdown-panel-sm" aria-labelledby="profile-btn">
+            <a href="{{ url_for('club_room') }}" class="wd-menu-item">동아리방 시간표·신청</a>
             <a href="{{ url_for('my_page') }}" class="wd-menu-item">
               <span class="wd-menu-ico"><i data-lucide="user" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>내 활동
             </a>

@@ -12,6 +12,7 @@
     <a href="{{ url_for('admin_recruitment_results') }}" class="{% if endpoint.startswith('admin_recruitment_result') %}active{% endif %}">면접 지원자</a>
     <a href="{{ url_for('admin_special_events') }}" class="{% if endpoint.startswith('admin_special_event') %}active{% endif %}">활동·행사</a>
     <a href="{{ url_for('admin_seminar_rooms') }}" class="{% if endpoint == 'admin_seminar_rooms' %}active{% endif %}">세미나실 예약</a>
+    <a href="{{ url_for('club_room') }}">동아리방 예약</a>
     <a href="{{ url_for('records_hub') }}" class="{% if (endpoint.startswith('records_') and endpoint not in ['records_members', 'records_member_profile']) or endpoint == 'admin_attendance_matrix' %}active{% endif %}">기록·통계</a>
 <a href="{{ url_for('admin_engagement') }}" class="{% if endpoint == 'admin_engagement' %}active{% endif %}">벽돌책·도서 추천</a>
     <a href="{{ url_for('admin_bug_reports') }}" class="{% if endpoint == 'admin_bug_reports' %}active{% endif %}">버그 제보</a>

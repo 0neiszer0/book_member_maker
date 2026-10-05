@@ -624,6 +624,10 @@ dialog[open] { max-width: calc(100vw - 24px); max-height: calc(100dvh - 24px); o
 }
 
 /* Current tasks, recoverable errors, and readable supporting text. */
+.cr-home-entry { display:flex; justify-content:space-between; align-items:center; gap:18px; padding:18px 22px; background:#edf2e4; border:1px solid #d8e2c8; border-radius:14px; margin:0 0 24px; text-decoration:none; color:#3d5633; }
+.cr-home-entry strong { display:block; font-weight:800; font-size:17px; }
+.cr-home-entry span { font-size:13px; line-height:1.7; }
+.cr-home-entry b { font-size:24px; }
 .home-shell :is(h1,h2,p,strong), .admin-overview-shell :is(h1,h2,p,strong),
 .seminar-shell :is(h1,h2,p,strong) { word-break: keep-all; overflow-wrap: anywhere; }
 .home-current, .operations-current, .home-attendance, .load-error {

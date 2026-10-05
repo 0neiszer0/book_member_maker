@@ -11,6 +11,8 @@
 {% include '_header.html' %}
 
 <main class="home-shell flex-1">
+    <a href="{{ url_for('club_room') }}" class="cr-home-entry"><div><strong>동아리방, 언제 비어 있나요?</strong><span id="cr-home-status">오늘 빈 시간을 확인하고 있어요</span><br><span>로그인 없이 사용 신청</span></div><b aria-hidden="true">↗</b></a>
+    <script defer src="{{ url_for('static', filename='club_room.js') }}"></script>
     {% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}
     <div class="overview-flash {% if category != 'success' %}overview-flash-error{% endif %}" role="status">{{ message }}</div>
     {% endfor %}{% endwith %}
