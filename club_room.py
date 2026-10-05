@@ -159,6 +159,12 @@ def init_club_room_routes(app, get_db, login_required):
                     return jsonify(error='예약 또는 개인 관리 코드를 확인해주세요.'), 403
                 return jsonify(status='success', booking={k: row.get(k) for k in PRIVATE_FIELDS.split(',')})
             payload = booking_payload(body) if action in ('create', 'update') else {}
+            if payload:
+                start = datetime.fromisoformat(payload['starts_at'])
+                end = datetime.fromisoformat(payload['ends_at'])
+                midnight = datetime.combine(start.date() + timedelta(days=1), time(), KST)
+                if start.hour < 9 or end > midnight:
+                    return jsonify(error='예약은 오전 9시부터 밤 12시(24:00)까지만 가능해요.'), 400
             if payload.get('kind') == 'meeting' and not actor:
                 return jsonify(error='임원진 회의는 로그인한 임원만 등록할 수 있어요.'), 403
             version = body.get('version')

@@ -7,8 +7,8 @@
 <body>{% include '_header.html' %}
 <main class="cr-shell" id="club-room" data-today="{{ room_today }}" data-csrf="{{ room_csrf }}" data-staff="{{ 'true' if room_staff else 'false' }}">
   <header class="cr-hero">
-    <div><p class="cr-eyebrow">OUR SHARED SPACE</p><h1>동아리방, 언제 비어 있나요?</h1>
-      <p>빈 시간을 고르고, 함께할 사람을 적어주세요.<br>로그인 없이 신청하고 여러 팀이 함께 사용할 수 있어요.</p></div>
+    <div><p class="cr-eyebrow">OUR SHARED SPACE</p><h1>동아리방 사용하기</h1>
+      <p>오전 9시부터 밤 12시까지, 원하는 시간을 골라주세요.<br>로그인 없이 신청하고 여러 팀이 함께 사용할 수 있어요.</p></div>
     <div class="cr-hero-actions"><button class="cr-primary" id="cr-new" disabled>사용 신청하기 <span aria-hidden="true">↗</span></button><a href="#cr-my">내 예약 수정·취소</a></div>
   </header>
   <section class="cr-availability" aria-labelledby="cr-free-title"><div><p class="cr-eyebrow" id="cr-summary-date">선택한 날짜</p><h2 id="cr-free-title">예약 없는 시간</h2></div><div id="cr-free" role="status">시간표를 확인하고 있어요.</div></section>
@@ -18,8 +18,8 @@
     <div class="cr-calendar-meta"><p><span class="cr-dot cr-free-dot"></span>예약 없음 <span class="cr-dot cr-shared-dot"></span>함께 사용 가능 <span class="cr-dot cr-blocked-dot"></span>이용 불가</p><span id="cr-updated" role="status">불러오는 중</span></div>
     <p class="cr-error" id="cr-error" role="alert" hidden></p>
     <div class="cr-days" id="cr-days" aria-label="날짜 선택"></div>
-    <div class="cr-grid-scroll" id="cr-grid-scroll" tabindex="0" aria-label="24시간 시간표 · 위아래로 스크롤"><div class="cr-grid" id="cr-grid"></div></div>
-    <p class="cr-footnote">한국시간 · 1시간 단위 · 날짜를 넘겨 신청할 수 있어요. ‘예약 없음’은 실제 이용 여부가 아닌 등록된 예약 기준입니다.</p>
+    <div class="cr-bookings" id="cr-grid" aria-label="선택한 날짜의 예약"></div>
+    <p class="cr-footnote">한국시간 · 1시간 단위 · 00:00~09:00은 이용하지 않아요. ‘예약 없음’은 실제 이용 여부가 아닌 등록된 예약 기준입니다.</p>
   </section>
   {% if room_staff %}
   <section class="cr-staff"><div class="cr-section-heading"><div><p class="cr-eyebrow">임원 전용</p><h2>동아리방 운영</h2></div><button class="cr-primary" id="cr-meeting" disabled>임원진 회의 등록</button></div>
@@ -30,12 +30,12 @@
   <section class="cr-my" id="cr-my"><div><p class="cr-eyebrow">YOUR BOOKING</p><h2>내 예약 수정·취소</h2><p>신청할 때 받은 개인 관리 코드로 불러오세요.<br>공용 신청 코드나 회원 로그인은 필요하지 않아요.</p></div>
     <div><form id="cr-lookup"><label for="cr-code">개인 관리 코드</label><div class="cr-lookup-row"><input id="cr-code" autocomplete="off" spellcheck="false" placeholder="예약 완료 후 받은 코드를 붙여넣으세요" required><button class="cr-secondary">불러오기</button></div></form><p id="cr-lookup-error" class="cr-error" role="alert" hidden></p><div id="cr-saved"></div><p class="cr-footnote">공용 기기에서는 사용 후 저장된 코드를 지워주세요. 코드를 잃어버렸다면 운영진에게 문의해주세요.</p><button class="cr-text-button" id="cr-forget">이 브라우저의 관리 코드 지우기</button></div>
   </section>
-  <details class="cr-help"><summary>처음 이용한다면</summary><p>① 시간표에서 원하는 시간 선택 → ② 대표자·참여자 입력 → ③ 신청 완료 확인. 다른 팀과 겹치면 한 번 확인 후 신청할 수 있어요. 대표자 이름과 사용 시간은 누구나 볼 수 있고, 참여자 명단·사용 목적은 신청자와 임원만 확인할 수 있습니다.</p><p>동아리방 사용은 학기 출석 횟수에 포함되지 않습니다.</p></details>
+  <details class="cr-help"><summary>처음 이용한다면</summary><p>① 사용 신청하기 → 날짜·시작·종료 시간 선택 → ② 대표자·참여자 입력 → ③ 신청 완료 확인. 다른 팀과 겹치면 한 번 확인 후 신청할 수 있어요. 대표자 이름과 사용 시간은 누구나 볼 수 있고, 참여자 명단·사용 목적은 신청자와 임원만 확인할 수 있습니다.</p><p>동아리방 사용은 학기 출석 횟수에 포함되지 않습니다.</p></details>
 </main>
 <dialog class="cr-dialog" id="cr-dialog" aria-labelledby="cr-dialog-title">
   <div class="cr-dialog-heading"><div><p class="cr-eyebrow" id="cr-dialog-eyebrow">BOOK THE ROOM</p><h2 id="cr-dialog-title">동아리방 사용 신청</h2></div><button type="button" id="cr-close" aria-label="예약 창 닫기">×</button></div>
   <form id="cr-form"><fieldset id="cr-fields"><input type="hidden" id="cr-kind" value="regular">
-    <div class="cr-time-fields"><label>시작 날짜<input type="date" id="cr-start-date" required></label><label>시작 시간<select id="cr-start-hour">{% for hour in range(24) %}<option value="{{ '%02d'|format(hour) }}">{{ '%02d'|format(hour) }}:00</option>{% endfor %}</select></label><label>종료 날짜<input type="date" id="cr-end-date" required></label><label>종료 시간<select id="cr-end-hour">{% for hour in range(24) %}<option value="{{ '%02d'|format(hour) }}">{{ '%02d'|format(hour) }}:00</option>{% endfor %}</select></label></div>
+    <div class="cr-time-fields"><label class="cr-use-date">사용 날짜<input type="date" id="cr-start-date" required></label><label>시작 시간<select id="cr-start-hour">{% for hour in range(9,24) %}<option value="{{ '%02d'|format(hour) }}">{{ '%02d'|format(hour) }}:00</option>{% endfor %}</select></label><label>종료 시간<select id="cr-end-hour">{% for hour in range(10,25) %}<option value="{{ '%02d'|format(hour) }}">{{ '%02d'|format(hour) }}:00</option>{% endfor %}</select></label></div>
     <p class="cr-duration" id="cr-duration"></p>
     <label for="cr-representative">대표자 이름 <span>시간표에 공개돼요</span></label><input id="cr-representative" maxlength="80" autocomplete="name" required>
     <label for="cr-participants">참여자 이름 <span>신청자와 임원만 확인해요</span></label><textarea id="cr-participants" rows="3" maxlength="17000" placeholder="대표자를 포함해 적어주세요. 예: 김하늘, 이봄, 박여름&#10;여러 줄을 그대로 붙여넣어도 돼요." required></textarea>
