@@ -1,0 +1,76 @@
+// Run with: node testing/test_club_room_database.mjs <path-to-@electric-sql/pglite/dist/index.js>
+// This exercises the actual migration on disposable PostgreSQL, never the live DB.
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {pathToFileURL} from 'node:url';
+import {randomUUID} from 'node:crypto';
+const {PGlite} = await import(pathToFileURL(process.argv[2]).href);
+const db = new PGlite();
+await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
+  create table public.members(id bigint primary key, role text, is_active boolean, account_status text, member_status text);
+  insert into public.members values (1,'officer',true,'active','active'), (2,'member',true,'active','active');
+  grant usage on schema public to service_role; grant select on public.members to service_role;`);
+const migration = await readFile(new URL('../supabase/migrations/20261005122140_club_room_bookings.sql', import.meta.url), 'utf8');
+await db.exec(migration);
+const digest = 'a'.repeat(64);
+function args(overrides = {}) {
+  return {action:'create', id:randomUUID(), payload:{kind:'regular', starts_at:'2099-10-05T12:00:00+09:00', ends_at:'2099-10-05T14:00:00+09:00', representative:'대표 테스트', participants:['대표 테스트','비공개 참여자'], purpose:'비공개 목적'}, digest, actor:null, fingerprint:randomUUID(), ack:false, version:null, ...overrides};
+}
+async function mutate(a) {
+  const result = await db.query('select public.club_room_mutate($1,$2,$3,$4,$5,$6,$7,$8) as result', [a.action,a.id,a.payload,a.digest,a.actor,a.fingerprint,a.ack,a.version]);
+  return result.rows[0].result;
+}
+await db.exec('set role service_role');
+const first = args();
+assert.equal((await mutate(first)).status, 'success');
+assert.equal((await mutate(first)).booking.version, 1, 'retry is idempotent');
+assert.equal((await mutate({...first,digest:'b'.repeat(64)})).status, 'forbidden');
+const second = args();
+const warning = await mutate(second);
+assert.equal(warning.status, 'overlap');
+assert.equal(JSON.stringify(warning).includes('비공개 참여자'), false);
+assert.equal(JSON.stringify(warning).includes('비공개 목적'), false);
+assert.equal((await mutate({...second,ack:true})).status, 'success');
+const meeting = args({actor:1}); meeting.payload.kind = 'meeting';
+assert.equal((await mutate({...meeting,actor:null})).status, 'forbidden');
+assert.equal((await mutate({...meeting,actor:2})).status, 'forbidden');
+assert.equal((await mutate(meeting)).status, 'overlap');
+assert.equal((await mutate({...meeting,ack:true})).status, 'success');
+assert.equal((await db.query('select count(*)::int as n from club_room_bookings where cancelled_at is null')).rows[0].n, 3, 'meeting keeps old bookings');
+assert.equal((await mutate(args({ack:true}))).status, 'blocked', 'ack cannot bypass meeting');
+assert.equal((await mutate({...first,action:'update',version:1,payload:{...first.payload,purpose:'명단만 수정'}})).status, 'success', 'existing booking can edit details');
+assert.equal((await mutate({...first,action:'cancel',version:1})).status, 'stale');
+assert.equal((await mutate({...meeting,action:'cancel',version:1,actor:null})).status, 'forbidden', 'meeting code never grants staff power');
+assert.equal((await mutate({...meeting,action:'cancel',version:1})).status, 'success');
+assert.equal((await mutate({...meeting,action:'cancel',version:1})).status, 'success', 'cancel retry is safe');
+assert.equal((await mutate(args({ack:true}))).status, 'success', 'cancelling meeting reopens sharing');
+const adjacent = args(); adjacent.payload.starts_at = '2099-10-05T14:00:00+09:00'; adjacent.payload.ends_at = '2099-10-06T02:00:00+09:00';
+assert.equal((await mutate(adjacent)).status, 'success', 'end boundary does not overlap; overnight allowed');
+const badTime = args(); badTime.payload.starts_at = '2099-10-05T12:30:00+09:00';
+assert.equal((await mutate(badTime)).status, 'invalid');
+const past = args(); past.payload.starts_at='2020-01-01T12:00:00Z'; past.payload.ends_at='2020-01-01T13:00:00Z';
+assert.equal((await mutate(past)).status, 'past');
+const far = args({actor:1}); far.payload = {...far.payload, kind:'meeting', starts_at:'2099-12-01T12:00:00Z',ends_at:'2099-12-01T13:00:00Z'};
+const following = args({ack:true,payload:{...far.payload,kind:'regular'}});
+const sequence = await Promise.all([mutate(far), mutate(following)]);
+assert.deepEqual(sequence.map(r=>r.status), ['success','blocked'], 'queued writes see the prior commit');
+const limited = args({fingerprint:'rate-test',ack:true});
+for (let i = 0; i < 20; i++) assert.equal((await mutate({...limited,id:randomUUID()})).status, 'success');
+assert.equal((await mutate({...limited,id:randomUUID()})).status, 'rate_limited');
+await db.exec('reset role; update members set role = \'member\' where id = 1; set role service_role');
+assert.equal((await mutate({...far,action:'cancel',version:1})).status, 'forbidden', 'revoked officer rejected inside DB too');
+const audit = (await db.query('select * from club_room_booking_audit')).rows;
+assert.ok(audit.length >= 7);
+assert.equal(JSON.stringify(audit).includes(digest), false, 'audit excludes credential digests');
+await db.exec('reset role; set role anon');
+await assert.rejects(db.query('select * from public.club_room_bookings'), /permission denied/);
+await assert.rejects(mutate(args()), /permission denied/);
+await db.exec('reset role; set role authenticated');
+await assert.rejects(db.query('select * from public.club_room_booking_audit'), /permission denied/);
+await assert.rejects(mutate(args()), /permission denied/);
+await db.exec('reset role');
+const security = (await db.query(`select relrowsecurity from pg_class where oid in ('public.club_room_bookings'::regclass,'public.club_room_booking_audit'::regclass)`)).rows;
+assert.ok(security.every(row => row.relrowsecurity));
+assert.equal((await db.query("select prosecdef from pg_proc where proname='club_room_mutate'")).rows[0].prosecdef, false);
+console.log('PostgreSQL room migration and booking rules passed: overlap confirmation, staff blocks, preserved reservations, cancellations, overnight, idempotency, versions, revoked roles, RLS and private audit.');
+await db.close();

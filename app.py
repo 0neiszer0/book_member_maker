@@ -6526,6 +6526,8 @@ init_engagement_routes(app, supabase, login_required, _voting_window_for,
 
 from attendance_routes import init_attendance_routes
 _term_attendance_report = init_attendance_routes(app, lambda: supabase, login_required, _rebuild_matrix_for_session)
+from club_room import init_club_room_routes
+init_club_room_routes(app, lambda: supabase, login_required)
 from term_membership_routes import init_term_membership_routes
 init_term_membership_routes(app, lambda: supabase, login_required, create_member, seminar_term_create)
 
