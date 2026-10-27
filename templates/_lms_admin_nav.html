@@ -1,0 +1,6 @@
+{% set endpoint = request.endpoint or '' %}
+<nav class="lms-classroom-nav" aria-label="운영 관리 메뉴"><p class="lms-term-name">운영 관리</p>
+{% set active_target = 'bookclub_index' if endpoint in ['bookclub_index','bookclub_ga_results','start_group_generation','manual_entry'] else ('records_members' if endpoint in ['records_members','records_member_profile'] else ('records_hub' if endpoint.startswith('records_') or endpoint == 'admin_attendance_matrix' else ('admin_seminars' if endpoint in ['admin_seminars','admin_seminar_term','admin_seminar_roster','seminar_session_moderator','topic_document_setup','view_admin_topics'] else ('admin_special_events' if endpoint.startswith('admin_special_event') else ('admin_recruitment_results' if endpoint.startswith('admin_recruitment_result') else endpoint))))) %}
+{% for target,label in [('admin_dashboard','개요'),('admin_seminars','세미나 운영'),('bookclub_index','조 편성'),('records_members','회원 관리'),('admin_term_members','학기별 회원'),('admin_term_attendance','학기 참석 현황'),('admin_recruitment_results','면접 지원자'),('admin_special_events','활동·행사'),('admin_seminar_rooms','세미나실 예약'),('club_room','동아리방 예약'),('records_hub','기록·통계'),('admin_engagement','벽돌책·도서 추천'),('admin_bug_reports','버그 제보'),('help_admin','시스템')] %}
+<a href="{{ url_for(target) }}" {% if active_target == target %}aria-current="page"{% endif %}>{{ label }}</a>
+{% endfor %}</nav>

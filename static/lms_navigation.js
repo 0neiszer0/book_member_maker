@@ -1,5 +1,5 @@
 (() => {
- const body=document.body;if(!body.classList.contains('lms-page'))return;
+ const body=document.body;if(!body.classList.contains('lms-page')||body.classList.contains('lms-isolated-auth'))return;
  let owner=null;
  const close=()=>{document.querySelectorAll('.lms-tray').forEach(p=>p.hidden=true);document.querySelectorAll('[data-lms-panel]').forEach(b=>b.setAttribute('aria-expanded','false'));if(owner)owner.focus()};
  document.querySelectorAll('[data-lms-panel]').forEach(b=>b.addEventListener('click',()=>{const p=document.getElementById(b.dataset.lmsPanel),opening=p.hidden;close();owner=b;p.hidden=!opening;b.setAttribute('aria-expanded',String(opening));if(opening){p.querySelector('button,a').focus();if(p.id==='lms-notifications')loadNotifications()}}));

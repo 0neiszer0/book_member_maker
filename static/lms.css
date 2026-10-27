@@ -32,3 +32,5 @@ body.lms-page.lms-nav-collapsed{--lms-rail:54px}.lms-nav-collapsed .lms-global-i
 body.lms-page[data-lms-page=calendar]{overflow-y:auto}
 
 @media(max-width:767px){.lms-mobile-heading{flex:1;min-width:0;text-align:center}.lms-mobile-heading span{display:block;white-space:normal;overflow-wrap:anywhere}}
+
+body.lms-isolated-auth .lms-wrapper{margin-left:0;margin-right:0;max-width:none}

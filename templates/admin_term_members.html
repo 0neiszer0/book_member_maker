@@ -1,5 +1,8 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>학기별 회원 관리</title>{% include '_tailwind_head.html' %}{% include '_app_theme_head.html' %}<link rel="stylesheet" href="{{ url_for('static', filename='attendance.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='term_membership.css') }}"></head><body>{% include '_header.html' %}{% include '_admin_sidebar.html' %}
-<main class="attendance-shell" id="term-members" data-csrf="{{ csrf_token }}">
+{% extends 'lms_admin_base.html' %}
+{% set lms_title='학기별 회원 관리' %}
+{% block title %}학기별 회원 관리 · 책 먹는 호반우{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_attendance.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='lms_term_membership.css') }}">{% endblock %}
+{% block content %}<div class="attendance-shell" id="term-members" data-csrf="{{ csrf_token }}">
   <h1>학기별 회원 관리</h1><p>이 학기에 활동할 사람만 따로 관리합니다. 휴식·종료로 바꿔도 이전 학기 명단과 출석 기록, 로그인 권한은 유지됩니다.</p>
   <form method="get" id="term-picker"><label for="term-id">관리할 학기</label><select name="term_id" id="term-id"><option value="">학기 선택</option>{% for item in terms %}<option value="{{ item.id }}" {% if term and item.id == term.id %}selected{% endif %}>{{ item.name }} · {{ item.start_date }} ~ {{ item.end_date }}</option>{% endfor %}</select></form>
   <details class="attendance-panel" {% if not term %}open{% endif %}><summary>새 학기 만들기</summary><p>첫·마지막 세미나 날짜를 정하면 월·목 일정이 생성되고, 직전 활동 명단도 자동으로 들어옵니다.</p><form id="new-term" class="term-form"><label>연도<input name="year" type="number" min="2020" max="2100" required></label><label>학기<select name="season"><option>1학기</option><option>여름학기</option><option>2학기</option><option>겨울학기</option></select></label><label>첫 세미나 날짜<input name="start_date" type="date" required></label><label>마지막 세미나 날짜<input name="end_date" type="date" required></label><button type="submit">새 학기 생성</button></form><p id="new-term-status" role="status"></p></details>
@@ -12,4 +15,5 @@
   {% if audit %}<details class="attendance-panel"><summary>최근 저장 이력</summary>{% for row in audit %}<p>{{ row.created_at|datetime }} · {{ row.revision }}번째 저장</p>{% endfor %}</details>{% endif %}
   {% endif %}
   <p><a href="{{ url_for('records_members') }}">전체 회원 정보·로그인 권한 관리</a></p>
-</main><script id="term-members-data" type="application/json">{{ {'term':term,'terms':terms,'members':members,'memberships':memberships,'statuses':statuses,'entry_types':entry_types,'source_term_ids':source_terms|map(attribute='id')|list}|tojson }}</script><script src="{{ url_for('static', filename='term_membership.js') }}" defer></script></body></html>
+</div><script id="term-members-data" type="application/json">{{ {'term':term,'terms':terms,'members':members,'memberships':memberships,'statuses':statuses,'entry_types':entry_types,'source_term_ids':source_terms|map(attribute='id')|list}|tojson }}</script><script src="{{ url_for('static', filename='term_membership.js') }}" defer></script>
+{% endblock %}

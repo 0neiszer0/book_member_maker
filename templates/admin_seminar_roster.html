@@ -1,5 +1,8 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>카카오톡 명단 반영 · 실제 출석</title>{% include '_tailwind_head.html' %}{% include '_app_theme_head.html' %}<link rel="stylesheet" href="{{ url_for('static', filename='attendance.css') }}"></head><body>{% include '_header.html' %}{% include '_admin_sidebar.html' %}
-<main class="attendance-shell" data-session-id="{{ seminar.id }}" data-csrf="{{ csrf_token }}">
+{% extends 'lms_admin_base.html' %}
+{% set lms_title='카카오톡 명단 반영 · 실제 출석' %}
+{% block title %}카카오톡 명단 반영 · 실제 출석 · 책 먹는 호반우{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_attendance.css') }}">{% endblock %}
+{% block content %}<div class="attendance-shell" data-session-id="{{ seminar.id }}" data-csrf="{{ csrf_token }}">
  <a href="{{ url_for('admin_seminars', term_id=seminar.term_id) }}">← 세미나 운영</a>
  <h1>{{ seminar.meeting_date|seminar_date }} · {{ '본 세미나 불참' if mode == 'absence' else '추가 세미나 참석' }} 명단</h1>
  <p>카카오톡 투표 결과를 옮겨 주세요. {{ '기본 대상에서 불참 투표자를 제외합니다.' if mode == 'absence' else '참석 투표자만 조 편성 대상에 포함합니다. 정원·선착순 제한은 없습니다.' }}</p>
@@ -19,4 +22,5 @@
  </section>
  <div class="attendance-actions"><a href="{{ url_for('bookclub_index', session_id=seminar.id) }}">이 회차 조 편성</a><a href="{{ url_for('admin_term_attendance', term_id=seminar.term_id) }}">학기 참석 현황</a></div>
  <p id="attendance-status" role="status"></p>
-</main><script src="{{ url_for('static', filename='attendance_roster.js') }}" defer></script></body></html>
+</div><script src="{{ url_for('static', filename='attendance_roster.js') }}" defer></script>
+{% endblock %}
