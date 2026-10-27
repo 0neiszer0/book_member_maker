@@ -1,6 +1,11 @@
 # 미니 PC 이전 진행 상태
 
 갱신: 2026-10-27 KST. 재부팅/세션 중단 후 이 파일부터 읽는다.
+최신 재개: 사용자가 직접 재부팅한 뒤 계속 진행 요청. 아래 과거 '재부팅 보류' 기록은 이 항목으로 대체한다.
+Windows 부팅 시각 2026-10-27 23:05:09 KST. Hyper-V Enabled, HypervisorPresent=true,
+vmms Running/Automatic, 기존 VM 0개, Default Switch 확인. 결과: work/hyperv-postboot.json.
+원격 main 재조회 bda8a82 유지. 사용자 VM 생성·Ubuntu 설치·SSH 키 등록 승인 후 VM 생성 완료.
+현재 Ubuntu 설치 확인 프롬프트에서 사용자 yes/Enter 입력 대기. 설치 완료로 간주하지 않는다.
 작업 사본: C:/Users/HOME/Documents/Codex/2026-10-27/markdown-0neiszer0-book-member-maker-pc/work/book_member_maker
 브랜치: codex/minipc-security. 기준 main: 91b7dd6d9d0c6771a1e07c1ea977396f72dae4ce.
 현재 GitHub main 및 Render live: bda8a82e66ac828dd3bfe1971c37e7e98cca356f. 사용자 승인 후 보안 배포 완료. 이후 백업 준비 변경은 로컬에만 있다.
@@ -26,8 +31,9 @@
 
 ## 다음 순서 / 미완료
 
-1. 사용자 재부팅 승인 후 Windows 재시작. 다른 세션 작업 저장 확인. 강제 종료 금지. 재접속 후 Hyper-V 실제 상태 확인.
-2. 별도 VM 생성·Ubuntu 설치 승인 후 New-BookVm.ps1 실행. bookmembers-ubuntu, Gen2, 2CPU, 동적 RAM 1/1.5/3GiB, 30GiB, Default Switch, 자동 시작/정상 종료. VM 아직 없음.
+1. 완료: 사용자 직접 Windows 재부팅 후 Hyper-V 실제 상태 확인. 서비스 자동 복구 검증용 재부팅은 별도 후속 단계.
+2. VM 생성·Ubuntu 설치·관리 SSH 키 등록 승인됨. bookmembers-ubuntu 생성 완료,
+   설치 확인 프롬프트 대기. 아래 최신 VM 기록부터 재개한다. 설치 후 디스크 부팅·SSH 검증 필요.
 3. 보안 코드 bda8a82는 Render 운영 배포 완료. 다른 UI 작업은 포함하지 않음. UI 통합 시 최신 main을 기준으로 보안 코드와 CSRF를 보존한다. 추가 main push는 새 배포를 일으키므로 승인 필요.
 4. Kakao Worker 콜백 추가 완료. Render의 PUBLIC_BASE_URL/허용 Origin/프록시 콜백/원본 비밀 변경은 필요성 질문 후 보류. 현재 Worker 로그인 시작은 Render 콜백을 사용하므로 Worker OAuth 완료로 표시하지 않는다. VM에서 직접 검증하고 최종 전환 때 복구용 Render 유지 여부를 결정한다.
 5. Ubuntu 서비스 설치·비밀 환경 설정·별도 Tailscale 노드 인증. Funnel 공개 및 필요 정책 변경은 별도 승인. 원본 인증 필수, 직접 Funnel 접근은 403이어야 함.
@@ -38,7 +44,7 @@
 ## 승인 경계와 검증 한계
 
 승인 완료: Hyper-V 기능만, Wrangler 권한·키링, Worker 생성·Secret·공개 GET, My Workspace 읽기, 백업 없이 해당 확장 SQL만.
-미승인/보류: 호스트 재부팅, VM 생성·설치, Render 추가 코드·환경 변경, 추가 Kakao 설정, Funnel 공개, Worker 원본 전환, Render 중지. bda8a82 보안 코드 배포와 Worker 콜백 1개 추가는 승인받아 완료.
+미승인/보류: 추가 호스트 재부팅, Render 추가 코드·환경 변경, 추가 Kakao 설정, Funnel 공개, Worker 원본 전환, Render 중지. VM 생성·Ubuntu 설치·관리 SSH 키 등록은 승인됨. bda8a82 보안 코드 배포와 Worker 콜백 1개 추가는 승인받아 완료.
 SQL 합성 검증은 PGlite이며 실제 다중 연결 동시성 시험은 하지 않았다. 운영에서는 정의·권한·인덱스 읽기 검증만 했다.
 Supabase CLI migration new는 홈 설정 폴더 권한 오류로 실패하여 로컬 timestamp 파일을 작성했다.
 최초 Wrangler 권한 요청은 자동 승인 검토가 차단했으나 이후 명시적 사용자 승인으로 해소됐다.
@@ -114,3 +120,38 @@ Supabase CLI migration new는 홈 설정 폴더 권한 오류로 실패하여 �
   외부 저장소와 복구키 보관, 보존 정책·실패 알림, 첫 실행 승인과 격리 복원이 선행 조건.
   Ubuntu pg_dump/age/rclone 설치와 실제 왕복 검증은 재부팅·VM 준비 이후 진행.
 - 재부팅 및 VM/Funnel 구축은 계속 대기. 새 ZIP/패치/인수인계 묶음은 생성하지 않았다.
+
+## 재부팅 후 준비 (2026-10-27 KST)
+
+- 관리자 읽기 점검에서 Hyper-V 정상, 기존 VM 없음, Default Switch 확인. 가용 RAM 약 4.5GiB,
+  C 여유 약 366GiB. 기존 Windows Tailscale/RDP/네트워크 설정 변경 없음.
+- 검증된 ISO 내부 casper/install-sources.yaml에서도 ubuntu-server-minimal ID 확인.
+- autoinstall.yaml.example 준비: 최소 설치, bookadmin SSH 공개키 인증, 암호 로그인 잠금,
+  관리키 보유자에게 sudo 권한, Asia/Seoul, 보안 업데이트, Hyper-V 게스트 통합 도구.
+  새 VM의 /dev/sda 가상 디스크만 설치 대상으로 사용. 설치 완료 시 VM만 poweroff.
+- New-BookVm.ps1에 선택적 CIDATA ISO 부착 지원 추가. PowerShell 구문 및 YAML 파싱 확인.
+- 승인 제안: C:/Users/HOME/Documents/Codex/servers/bookmembers-ubuntu에 Gen2 VM,
+  2 vCPU, 30GiB 동적 디스크. 설치 중 최대 3GiB RAM 사용 후 기존 계획 1/1.5/3GiB 적용.
+  부팅 자동 시작 30초/호스트 종료 시 정상 종료. SSH 개인키는 Git 밖 접근 제한 로컬 파일.
+- 실제 VM 생성·시작·설치·SSH 키 등록은 아직 하지 않음. 별도 승인 후 진행.
+
+### VM 생성 승인 후 실행
+
+- 사용자: 'VM 생성·Ubuntu 설치·관리 SSH 키 등록 승인'.
+- VM 생성·시작 완료: bookmembers-ubuntu, UUID b2d974cc-c827-42ac-a974-5d54c17a6864,
+  디스크 C:/Users/HOME/Documents/Codex/servers/bookmembers-ubuntu/system.vhdx.
+- 2 vCPU, 30GiB VHDX, 설치 중 3GiB startup, 설치 후 1.5GiB로 복귀 예정.
+- SSH 키는 work/vm-access에 현재 Windows 사용자·SYSTEM·Administrators만 접근 가능하도록
+  NTFS ACL 제한. 개인키 원문 출력 없음. 공개키만 CIDATA 설치 ISO에 포함.
+- Ubuntu 최소 설치 설정을 실제 설치 프로그램에서 읽고 검증한 상태. 설치 확인 대기/진행은
+  VM 연결 창으로 확인. 설치 완료 전에는 Complete-UbuntuInstall.ps1을 실행하지 않는다.
+- 정상 설치 종료 후 VM Off 확인 → 설치 DVD 분리 → 시스템 디스크 부팅 → SSH 검증 예정.
+- Computer Use에서 관리자 VMConnect의 입력은 SendInput Access Denied로 차단됨.
+  Hyper-V TypeText('yes')는 반환값 0이었지만 화면상 문자가 전달되지 않고 같은 확인을 반복함.
+  따라서 설치가 시작됐다고 간주하지 않음. 개별 TypeKey로 재시도하려던 두 번째 관리자
+  UAC가 Windows에서 '사용자가 작업을 취소했습니다'로 반환되어 실행하지 못함.
+- 사용자에게 VM 연결 창의 'Continue with autoinstall? (yes|no)'에 직접 yes/Enter 입력을 요청함.
+  이 입력 완료 후 화면을 새로 확인한다. 취소된 UAC 요청을 무단 재시도하지 않는다.
+- work/Confirm-ApprovedUbuntuInstall.ps1은 개별 키 코드로 수정돼 있으나 해당 버전은 미실행.
+  사용자가 관리자 요청 재시도를 요청하면 새 화면을 확인한 뒤에만 실행한다.
+- 현재 운영 사이트/DB/Worker 원본에는 이번 재개 작업으로 변경 없음.

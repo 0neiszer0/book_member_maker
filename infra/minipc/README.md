@@ -25,6 +25,14 @@ Worker는 https://book-member-maker.alstj816.workers.dev 에 배포되어 현재
    기존 Windows Tailscale/RDP/개인 파일/스위치 변경 금지. VM 이름 bookmembers-ubuntu.
    2 vCPU, 동적 RAM 1/1.5/3GiB, 동적 VHDX 30GiB, Gen2, 자동 시작 Start, 종료 ShutDown.
    설치 후 DVD를 분리하고 시스템 디스크 우선 부팅으로 바꾼다. 변경 전 생성 VM만 대상으로 확인한다.
+   선택적으로 `autoinstall.yaml.example`과 `prepare-install-media.py`로 CIDATA 설치 ISO를 만든다.
+   제작용 Python에만 pycdlib/PyYAML이 필요하며 운영 앱 요구사항에는 넣지 않는다.
+   `--public-key <공개키 파일> --output <새 seed.iso>`로 생성 후 `New-BookVm.ps1 -SeedIsoPath`에 전달.
+   관리 개인키는 Git 밖 접근 제한된 위치에 보관한다. 설치 ISO에는 공개키만 포함한다.
+   최소 설치의 bookadmin은 키 인증·sudo 관리 계정이고 앱은 별도 bookapp으로 실행한다.
+   새 VM에는 지정 VHDX 하나만 부착한다. 자동 설치는 그 VM의 /dev/sda만 사용한다.
+   설치 중 startup RAM 3GiB 사용 후 설치 poweroff를 확인하고 1536MiB로 복귀한다.
+   설치 확인 화면과 종료 결과를 확인하고, 설치 ISO를 분리한 후 디스크로 부팅한다.
 5. Ubuntu 최소 설치 후 검증된 Git SHA의 소스를 `/opt/book_member_maker`에 배치한다.
    서버에 개인 GitHub 토큰을 복사하지 않고 검증 커밋 archive를 전송해도 된다.
    `infra/minipc/install-service.sh`를 VM 안에서 실행한다. 운영 Node/Docker/Nginx 불필요.

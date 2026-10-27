@@ -3,12 +3,14 @@
 param(
   [Parameter(Mandatory)][string]$IsoPath,
   [Parameter(Mandatory)][string]$VmRoot,
+  [string]$SeedIsoPath,
   [string]$SwitchName = 'Default Switch'
 )
 $ErrorActionPreference = 'Stop'
 $vmName = 'bookmembers-ubuntu'
 if (Get-VM -Name $vmName -ErrorAction SilentlyContinue) { throw 'VM already exists; inspect before reuse.' }
 if (!(Test-Path -LiteralPath $IsoPath -PathType Leaf)) { throw 'Verified Ubuntu 24.04 server ISO required.' }
+if ($SeedIsoPath -and !(Test-Path -LiteralPath $SeedIsoPath -PathType Leaf)) { throw 'Seed ISO missing.' }
 Get-VMSwitch -Name $SwitchName | Out-Null
 $vmDirectory = Join-Path ([IO.Path]::GetFullPath($VmRoot)) $vmName
 if (Test-Path -LiteralPath $vmDirectory) { throw 'Destination already exists; refusing to overwrite.' }
@@ -20,4 +22,7 @@ Set-VM -Name $vmName -AutomaticStartAction Start -AutomaticStartDelay 30 -Automa
 Set-VMFirmware -VMName $vmName -EnableSecureBoot On -SecureBootTemplate MicrosoftUEFICertificateAuthority
 $dvd = Add-VMDvdDrive -VMName $vmName -Path ([IO.Path]::GetFullPath($IsoPath)) -Passthru
 Set-VMFirmware -VMName $vmName -FirstBootDevice $dvd
+if ($SeedIsoPath) {
+  Add-VMDvdDrive -VMName $vmName -Path ([IO.Path]::GetFullPath($SeedIsoPath)) | Out-Null
+}
 # Start/installation is a separate explicit step. No Windows networking or power settings changed.
