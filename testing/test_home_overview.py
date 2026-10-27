@@ -214,6 +214,10 @@ class OverviewRouteTests(unittest.TestCase):
             html = response.get_data(as_text=True)
             self.assertIn('name="app-layout" content="canvas"', html)
             self.assertIn('id="' + section + '"', html)
+            if section == 'topics':
+                self.assertIn('id="classroom-assignment-search"', html)
+                self.assertIn('aria-controls="classroom-assignment-results"', html)
+                self.assertIn('<h1 class="lms-sr">', html)
             self.assertIn('/static/lms_classroom.css', html)
             self.assertNotIn('/static/theme.css', html)
             self.assertNotIn('/static/tailwind.css', html)

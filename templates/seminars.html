@@ -20,11 +20,11 @@
 <div class="lms-item-meta">마감 {{ topic.deadline_label or '미정' }} (한국시간){% if topic.open and topic.share_token %} · {{ '제출한 발제문 수정' if topic.submitted else '발제문 작성하기' }}{% endif %}{% if staff %} · <a href="{{ url_for('view_admin_topics', event_id=topic.id) }}">제출 관리</a>{% endif %}</div></div><span class="lms-item-status">{{ topic.status_label }}</span></li>
 {% endmacro %}
 {% block content %}
-<div class="{% if section not in ['topics','resources'] %}classroom-curriculum-heading{% else %}lms-toolbar classroom-toolbar{% endif %}"><h1 {% if section not in ['topics','resources'] %}class="lms-sr"{% endif %}>{{ lms_title }}</h1>{% if terms|length > 1 %}<form method="get"><input type="hidden" name="section" value="{{ section }}"><label class="lms-sr" for="classroom-term">다른 학기</label><select name="term_id" id="classroom-term">{% for item in terms %}<option value="{{ item.id }}" {% if term and item.id == term.id %}selected{% endif %}>{{ item.name }}</option>{% endfor %}</select><button class="lms-button" type="submit">학기 이동</button></form>{% endif %}</div>
+<div class="{% if section == 'topics' %}classroom-assignment-toolbar{% elif section != 'resources' %}classroom-curriculum-heading{% else %}lms-toolbar classroom-toolbar{% endif %}"><h1 {% if section != 'resources' %}class="lms-sr"{% endif %}>{{ lms_title }}</h1>{% if section == 'topics' %}<label class="lms-sr" for="classroom-assignment-search">발제문 검색</label><input type="search" id="classroom-assignment-search" placeholder="발제문 검색" aria-controls="classroom-assignment-results">{% endif %}{% if terms|length > 1 %}<form method="get"><input type="hidden" name="section" value="{{ section }}"><label class="lms-sr" for="classroom-term">다른 학기</label><select name="term_id" id="classroom-term">{% for item in terms %}<option value="{{ item.id }}" {% if term and item.id == term.id %}selected{% endif %}>{{ item.name }}</option>{% endfor %}</select><button class="lms-button" type="submit">학기 이동</button></form>{% endif %}</div>
 {% if not term %}<p class="lms-empty">현재 등록된 세미나 일정이 없습니다. 새 일정이 등록되면 이 화면에 표시됩니다.</p>{% else %}
 {% if not term.is_active %}<p class="lms-alert">보관된 학기입니다. 지난 커리큘럼과 기록을 확인할 수 있습니다.</p>{% endif %}
 {% if section == 'topics' %}
-<section id="topics"><h2 class="lms-list-heading">학기 발제문 목록</h2><ul class="lms-assignment-list">{% for week in weeks if week.topic_event %}{{ topic_row(week) }}{% else %}<li class="classroom-empty">등록된 발제문이 없습니다.</li>{% endfor %}</ul></section>
+<section id="topics"><p id="classroom-assignment-search-status" role="status" hidden></p><h2 class="lms-list-heading">학기 발제문 목록</h2><ul class="lms-assignment-list" id="classroom-assignment-results">{% for week in weeks if week.topic_event %}{{ topic_row(week) }}{% else %}<li class="classroom-empty">등록된 발제문이 없습니다.</li>{% endfor %}</ul></section>
 {% elif section == 'resources' %}
 <section id="resources"><h2 class="lms-list-heading">자료·기록</h2><ul class="lms-assignment-list">{% set resources=namespace(count=0) %}{% for week in weeks %}{% for item in week.sessions %}{% if item.history and (review_board or staff) %}{% set resources.count=resources.count+1 %}<li class="lms-item"><span class="lms-item-icon" aria-hidden="true">{{ icon('book') }}</span><div class="lms-item-body"><span class="lms-item-title">{{ week.book_title or '도서 미정' }}</span><div class="lms-item-meta">{{ item.meeting_date|seminar_date }} · {{ '본 세미나' if item.day_type == 'thu' else '추가 세미나' }}</div><div class="classroom-actions">{% if review_board %}<a href="{{ url_for('boards.board_list', slug=review_board.slug, history_id=item.history.id) }}">공유 후기·자료</a>{% endif %}{% if staff %}<a href="{{ url_for('records_seminar_detail', history_id=item.history.id) }}">운영 진행 기록</a>{% endif %}</div></div></li>{% endif %}{% endfor %}{% endfor %}{% if not resources.count %}<li class="classroom-empty">이 학기에 연결된 자료·기록이 없습니다.</li>{% endif %}</ul></section>
 {% else %}
@@ -45,6 +45,14 @@
 
 {% block scripts %}<script>
 (function(){
+  var search=document.getElementById('classroom-assignment-search');
+  if(search) search.addEventListener('input',function(){
+    var query=search.value.trim().toLocaleLowerCase('ko-KR');
+    var count=0;
+    document.querySelectorAll('#classroom-assignment-results > [data-event-id]').forEach(function(row){row.hidden=!!query && !row.textContent.toLocaleLowerCase('ko-KR').includes(query);if(!row.hidden) count++;});
+    var status=document.getElementById('classroom-assignment-search-status');
+    status.hidden=!query;status.textContent=count ? count+'개의 발제문을 찾았습니다.' : '검색 조건에 맞는 발제문이 없습니다.';
+  });
   var collapse=document.getElementById('classroom-collapse-all');
   if(collapse) collapse.addEventListener('click',function(){document.querySelectorAll('.classroom-module').forEach(function(module){module.open=false;});});
   document.querySelectorAll('[data-classroom-week]').forEach(function(link){link.addEventListener('click',function(){var module=document.getElementById(link.dataset.classroomWeek);if(module) module.open=true;});});
