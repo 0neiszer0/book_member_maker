@@ -131,7 +131,7 @@ def add_security_headers(response):
 
 @app.after_request
 def add_default_social_preview(response):
-    """모든 HTML에 첫 화면용 밝은 배경과 기본 공유 메타데이터를 넣는다."""
+    """공유 메타데이터를 추가하고 기존 화면에만 Wood 테마를 보완한다."""
     content_type = response.headers.get("Content-Type", "")
     if response.status_code != 200 or not content_type.startswith("text/html"):
         return response
@@ -140,11 +140,12 @@ def add_default_social_preview(response):
         return response
     # Public and legacy pages do not always include the shared header. Load
     # the current theme last so their page-local old palette cannot leak out.
-    if 'data-wood-theme="1"' not in page and "/static/theme.css" not in page:
+    uses_lms_layout = '<meta name="app-layout" content="canvas">' in page
+    if not uses_lms_layout and 'data-wood-theme="1"' not in page and "/static/theme.css" not in page:
         theme_href = url_for("static", filename="theme.css")
         theme_link = f'\n  <link rel="stylesheet" href="{theme_href}" data-wood-theme="1">\n'
         page = page.replace("</head>", f"{theme_link}</head>", 1)
-    if 'data-critical-theme="wood"' not in page:
+    if not uses_lms_layout and 'data-critical-theme="wood"' not in page:
         critical_theme = """
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#FAF6EC">

@@ -74,7 +74,13 @@ class FlaskRenderSmokeTests(unittest.TestCase):
         login = client.get("/login")
         self.assertEqual(home.status_code, 200)
         self.assertEqual(login.status_code, 200)
-        self.assert_common_head(home.get_data(as_text=True))
+        html = home.get_data(as_text=True)
+        self.assertIn('/static/lms.css', html)
+        self.assertIn('name="app-layout" content="canvas"', html)
+        for legacy_asset in ('/static/theme.css', '/static/tailwind.css', 'data-critical-theme="wood"', 'wd-topbar'):
+            self.assertNotIn(legacy_asset, html)
+        self.assertIn('property="og:title"', html)
+        self.assertEqual(home.headers['X-Content-Type-Options'], 'nosniff')
         self.assert_common_head(login.get_data(as_text=True), expect_tailwind=False)
 
     def test_admin_record_pages_render_with_one_feedback_widget(self):
