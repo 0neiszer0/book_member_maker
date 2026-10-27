@@ -1,0 +1,23 @@
+{% set lms_endpoint = request.endpoint or '' %}
+{% macro lms_links() %}
+  <a href="{{ url_for('main_index') }}" {% if lms_endpoint == 'main_index' %}aria-current="page"{% endif %}><span aria-hidden="true">▦</span>대시보드</a>
+  {% if session.user_role %}<a href="{{ url_for('seminars') }}" {% if lms_endpoint in ['seminars', 'view_shared_topics'] %}aria-current="page"{% endif %}><span aria-hidden="true">▤</span>강의실</a>{% endif %}
+  <a href="{{ url_for('lms_calendar') }}" {% if lms_endpoint == 'lms_calendar' %}aria-current="page"{% endif %}><span aria-hidden="true">▦</span>캘린더</a>
+  <a href="{{ url_for('club_room') }}" {% if lms_endpoint == 'club_room' %}aria-current="page"{% endif %}><span aria-hidden="true">⌂</span>동아리방</a>
+  {% if session.user_role %}
+  <a href="{{ url_for('my_page') }}" {% if lms_endpoint == 'my_page' %}aria-current="page"{% endif %}><span aria-hidden="true">○</span>내 활동</a>
+  {% if session.user_role in ['admin', 'officer'] or session.get('member_preview') %}
+  <a href="{{ url_for('admin_dashboard') }}" {% if lms_endpoint.startswith('admin_') %}aria-current="page"{% endif %}><span aria-hidden="true">⚙</span>전체 운영</a>
+  {% endif %}
+  {% endif %}
+  <a href="{{ url_for('help_member') }}"><span aria-hidden="true">?</span>이용 안내</a>
+{% endmacro %}
+<nav class="lms-global" aria-label="전역 메뉴">
+  <a class="lms-brand" href="{{ url_for('main_index') }}">책 먹는<br>호반우</a>
+  {{ lms_links() }}
+</nav>
+<dialog id="lms-menu-dialog" class="lms-menu-dialog" aria-labelledby="lms-menu-title">
+  <div class="lms-drawer-head"><strong id="lms-menu-title">책 먹는 호반우</strong><button type="button" id="lms-menu-close">닫기</button></div>
+  <nav aria-label="전체 메뉴">{{ lms_links() }}</nav>
+</dialog>
+<script defer src="{{ url_for('static', filename='lms_navigation.js') }}"></script>

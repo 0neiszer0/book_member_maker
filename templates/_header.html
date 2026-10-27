@@ -5,8 +5,10 @@
    - 마지막 부분에 기존 scroll-x-host(가로 스크롤 힌트) JS 보존
    ============================================================= #}
 
+{% include '_lms_navigation.html' %}
 <header class="wd-topbar">
   <div class="wd-topbar-inner">
+    <button type="button" id="lms-menu-open" class="lms-menu-open" aria-controls="lms-menu-dialog" aria-expanded="false" aria-haspopup="dialog">메뉴</button>
     <a href="/" class="wd-brand">
       <span class="wd-brand-mark"><i data-lucide="book" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>
       <span class="wd-brand-text">책 먹는 호반우</span>
