@@ -1,16 +1,25 @@
-<!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>통합 캘린더 · 책 먹는 호반우</title>
-{% include '_tailwind_head.html' %}{% include '_app_theme_head.html' %}
-<link rel="stylesheet" href="{{ url_for('static', filename='integrated_calendar.css') }}">
-<script defer src="{{ url_for('static', filename='integrated_calendar.js') }}"></script></head>
-<body>{% include '_header.html' %}
-<main class="ic-shell" id="integrated-calendar" data-today="{{ calendar_today }}" data-member="{{ 'true' if calendar_member else 'false' }}" data-term="{{ calendar_term }}">
-<header><p>우리의 일정</p><h1>통합 캘린더</h1><p>세미나와 발제문 마감, 동아리방 일정을 함께 확인하세요.</p><a href="{{ url_for('club_room') }}">동아리방 신청 · 내 예약 관리 ↗</a></header>
-<div class="ic-controls"><button id="ic-prev" aria-label="이전 기간">←</button><label>기준 날짜 <input id="ic-date" type="date" value="{{ calendar_today }}" required></label><button id="ic-next" aria-label="다음 기간">→</button><button id="ic-today">오늘</button><button id="ic-refresh">새로고침</button><label>보기 <select id="ic-view"><option value="month">월</option><option value="week">주 · 시간표</option><option value="agenda">일정 목록</option></select></label></div>
-<fieldset class="ic-filters"><legend>표시할 일정</legend>{% for key, label in [('seminar','세미나'),('deadline','발제문 마감'),('room','동아리방 예약'),('blocked','동아리방 이용 불가')] %}<label><input type="checkbox" data-filter="{{ key }}" checked> {{ label }}</label>{% endfor %}</fieldset>
-{% if not calendar_member %}<p>세미나·발제문 일정은 로그인 후 확인할 수 있어요. 동아리방 일정은 로그인 없이 볼 수 있어요.</p>{% endif %}
-<p id="ic-status" role="status" aria-live="polite"></p><p id="ic-error" role="alert" hidden></p>
-<h2 id="ic-range"></h2><div id="ic-content" aria-busy="true"></div>
-<p class="ic-note">한국시간(KST) 기준입니다. 세미나는 날짜 일정이며 별도 시간이 표시되지 않아요. 동아리방 신청은 기존 예약 화면에서 진행해요. 등록된 예약이 없어도 실제로 비어 있다는 뜻은 아닙니다. 필터는 표시만 바꾸며 예약 제한은 서버에서 확인합니다.</p>
-</main></body></html>
+{% extends 'lms_base.html' %}
+{% set lms_page='calendar' %}{% set lms_title='캘린더' %}{% set lms_aside=true %}
+{% block title %}통합 캘린더 · 책 먹는 호반우{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static',filename='lms_calendar.css') }}">{% endblock %}
+{% block content %}
+<div id="integrated-calendar" data-today="{{ calendar_today }}" data-member="{{ 'true' if calendar_member else 'false' }}" data-term="{{ calendar_term }}">
+<h1 class="lms-sr">통합 캘린더</h1>
+<div class="ic-controls">
+<div class="ic-navigator"><button id="ic-today" class="ic-button" type="button">오늘</button><span class="ic-navigation-buttons"><button id="ic-prev" class="ic-button" type="button" aria-label="이전 기간">{{ icon('chevron',14) }}</button><button id="ic-next" class="ic-button" type="button" aria-label="다음 기간">{{ icon('chevron',14) }}</button></span><h2 id="ic-title"></h2></div>
+<div class="ic-toolbar-right"><div class="ic-view-tabs" role="tablist" aria-label="캘린더 보기"><button class="ic-button" type="button" role="tab" data-calendar-view="week" aria-controls="ic-content" aria-selected="false">주</button><button class="ic-button" type="button" role="tab" data-calendar-view="month" aria-controls="ic-content" aria-selected="true">월</button><button class="ic-button" type="button" role="tab" data-calendar-view="agenda" aria-controls="ic-content" aria-selected="false">일정</button></div><a class="ic-button ic-room-action" href="{{ url_for('club_room') }}" aria-label="동아리방 신청·내 예약 관리" title="동아리방 신청·내 예약 관리">{{ icon('plus',18) }}</a></div>
+</div>
+<select id="ic-view" class="lms-sr" aria-label="캘린더 보기" tabindex="-1"><option value="month">월</option><option value="week">주 · 시간표</option><option value="agenda">일정 목록</option></select>
+<h2 id="ic-range" class="lms-sr"></h2><div id="ic-content" role="tabpanel" aria-label="캘린더 일정" aria-busy="true"></div>
+<div class="ic-calendar-meta"><p id="ic-status" role="status" aria-live="polite"></p><button id="ic-refresh" type="button">새로고침</button></div>
+<p id="ic-error" class="lms-alert" role="alert" hidden></p>
+</div>
+{% endblock %}
+{% block aside %}
+<section class="ic-mini-section" aria-label="날짜 선택"><h2 id="ic-mini-title">날짜 선택</h2><div id="ic-mini-calendar"></div><label class="ic-date-label" for="ic-date">기준 날짜</label><input id="ic-date" type="date" value="{{ calendar_today }}" required></section>
+<section><fieldset class="ic-filters" id="ic-filters"><legend>캘린더</legend>{% for key,label in [('seminar','세미나'),('deadline','발제문 마감'),('room','동아리방 예약'),('blocked','동아리방 이용 불가')] %}<label class="ic-filter-{{ key }}"><input type="checkbox" data-filter="{{ key }}" checked><span>{{ label }}</span></label>{% endfor %}</fieldset></section>
+{% if not calendar_member %}<section><p class="ic-note">세미나·발제문 일정은 로그인 후 확인할 수 있어요. 동아리방 일정은 로그인 없이 볼 수 있어요.</p></section>{% endif %}
+<section class="ic-room-links"><h2>동아리방</h2><a href="{{ url_for('club_room') }}">신청 · 내 예약 관리</a><p class="ic-note">09:00–24:00 · 1시간 단위<br>일반 예약 중복은 함께 사용 동의가 필요하고, 이용 불가 시간에는 새 예약이 차단돼요.</p></section>
+<section><p class="ic-note">한국시간(KST) 기준 · 세미나는 날짜 일정으로 표시합니다. 등록된 예약이 없어도 실제로 비어 있다는 뜻은 아닙니다. 필터는 표시만 바꾸며 예약 제한은 서버에서 확인합니다.</p></section>
+{% endblock %}
+{% block scripts %}<script defer src="{{ url_for('static',filename='integrated_calendar.js') }}"></script>{% endblock %}

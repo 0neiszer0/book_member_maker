@@ -41,14 +41,18 @@ class UiUsabilityOverhaulTest(unittest.TestCase):
         self.assertEqual(overview.count('class="workflow-card"'), 5)
         self.assertIn("업무별 도구", overview)
 
-    def test_seminars_prioritize_upcoming_and_collapse_past(self):
+    def test_seminars_use_dense_semantic_modules_and_shared_canvas_shell(self):
         seminars = self.read("templates/seminars.html")
-        self.assertIn("macro seminar_card", seminars)
-        self.assertIn("가장 가까운 세미나", seminars)
-        self.assertIn('class="seminar-past"', seminars)
-        self.assertIn("발제문 작성하기", seminars)
-        self.assertIn("추가 세미나 참석 투표는 카카오톡에서", seminars)
-        self.assertIn("내 학기 참석 현황", seminars)
+        self.assertIn("extends 'lms_base.html'", seminars)
+        self.assertNotIn("_app_theme_head.html", seminars)
+        self.assertNotIn("_tailwind_head.html", seminars)
+        self.assertIn('class="classroom-module"', seminars)
+        self.assertIn('data-week-id="{{ week.id }}"', seminars)
+        self.assertIn('data-session-id="{{ item.id }}"', seminars)
+        self.assertIn('data-event-id="{{ topic.id }}"', seminars)
+        self.assertIn("topic.open and topic.share_token", seminars)
+        self.assertIn("section == 'topics'", seminars)
+        self.assertIn("section == 'resources'", seminars)
 
     def test_engagement_page_has_priority_and_empty_states(self):
         engagement = self.read("templates/engagement_now.html")
