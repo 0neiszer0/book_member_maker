@@ -1,58 +1,32 @@
-<!DOCTYPE html>
-<html lang="ko">
+{% extends 'lms_admin_base.html' %}
+{% from '_lms_icons.html' import icon %}
+{% set lms_page = 'operations' %}
+{% set lms_title = '스페셜 이벤트 관리' %}
+{% block title %}스페셜 이벤트 관리{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_operations.css') }}">{% endblock %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>스페셜 이벤트 관리</title>
-    {% include '_tailwind_head.html' %}
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
-    <style>
-        :root { --eva-purple:#7A5A3A; --eva-green:#3D5C2E; --bg-dark:#FAF6EC; --card-dark:#FFFCF3; --text-light:#2A241B; --border-dark:#C9B38A; }
-        body { font-family:'Noto Sans KR', sans-serif; background:var(--bg-dark); color:var(--text-light); }
-        h1, h2 { font-family:'Pretendard', 'Noto Sans KR', sans-serif; }
-        .eva-card { background:var(--card-dark); border:1px solid var(--border-dark); }
-        .eva-input { background:var(--bg-dark); border:1px solid var(--border-dark); color:var(--text-light); }
-        .eva-input:focus { border-color:var(--eva-green); outline:none; }
-        .text-eva-green { color:var(--eva-green); }
-        .bg-eva-green { background:var(--eva-green); }
-        .pill { display:inline-block; padding:0.15rem 0.5rem; border-radius:999px; font-size:0.7rem; font-weight:bold; }
-        .pill-mt { background:rgba(255,140,0,0.25); color:#C97A3A; }
-        .pill-workshop { background:rgba(122,90,58,0.14); color:#7A5A3A; }
-        .pill-lecture { background:rgba(59,130,246,0.25); color:#4D6572; }
-        .pill-event { background:rgba(92,122,74,0.16); color:var(--eva-green); }
-    </style>
-    {% include '_app_theme_head.html' %}
-</head>
-
-<body class="min-h-screen">
-    {% include '_header.html' %}
-    {% include '_admin_sidebar.html' %}
-
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-6xl">
+{% block content %}
+<div class="lms-operations">
+<div class="lms-operations-body">
         <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
-            <h1 class="text-2xl sm:text-3xl font-bold text-eva-green"><i data-lucide="sparkles" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 스페셜 이벤트</h1>
-            <a href="{{ url_for('admin_dashboard') }}" class="text-sm text-gray-400 hover:text-eva-green">← 관리자 대시보드</a>
+            <h1 class="text-2xl sm:text-3xl font-bold ops-accent">{{ icon('notice',18) }} 스페셜 이벤트</h1>
+            <a href="{{ url_for('admin_dashboard') }}" class="text-sm text-gray-400 hover:ops-accent">← 관리자 대시보드</a>
         </div>
         <p class="text-xs text-gray-500 mb-4">MT, 워크숍, 강연, 번개 등 세미나·벽돌책·소모임 외의 모든 활동을 기록합니다. 면접 이벤트와는 별개입니다.</p>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% for category, message in messages %}
-        <div class="p-3 mb-4 text-sm rounded-lg border {{ 'bg-green-900/40 text-green-200 border-green-500/40' if category=='success' else 'bg-red-900/40 text-red-200 border-red-500/40' }}">{{ message }}</div>
-        {% endfor %}
-        {% endwith %}
+
 
         <!-- 새 이벤트 -->
-        <div class="eva-card rounded-lg p-5 mb-6">
-            <h2 class="text-lg font-bold text-eva-green mb-3">+ 새 스페셜 이벤트</h2>
+        <div class="ops-panel rounded-lg p-5 mb-6">
+            <h2 class="text-lg font-bold ops-accent mb-3">+ 새 스페셜 이벤트</h2>
             <form id="newEventForm" class="grid grid-cols-1 md:grid-cols-6 gap-3">
                 <div class="md:col-span-2">
                     <label class="block text-xs text-gray-400 mb-1">이벤트 이름 *</label>
-                    <input name="name" required class="eva-input w-full rounded px-3 py-2 text-sm" placeholder="예: 2025 봄 MT">
+                    <input name="name" required class="ops-field w-full rounded px-3 py-2 text-sm" placeholder="예: 2025 봄 MT">
                 </div>
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">분류</label>
-                    <select name="category" class="eva-input w-full rounded px-3 py-2 text-sm">
+                    <select name="category" class="ops-field w-full rounded px-3 py-2 text-sm">
                         <option value="event">이벤트</option>
                         <option value="mt">MT</option>
                         <option value="workshop">워크숍</option>
@@ -61,15 +35,15 @@
                 </div>
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">시작일 *</label>
-                    <input name="event_date" type="date" required class="eva-input w-full rounded px-3 py-2 text-sm">
+                    <input name="event_date" type="date" required class="ops-field w-full rounded px-3 py-2 text-sm">
                 </div>
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">종료일</label>
-                    <input name="end_date" type="date" class="eva-input w-full rounded px-3 py-2 text-sm">
+                    <input name="end_date" type="date" class="ops-field w-full rounded px-3 py-2 text-sm">
                 </div>
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">학기 연결</label>
-                    <select name="term_id" class="eva-input w-full rounded px-3 py-2 text-sm">
+                    <select name="term_id" class="ops-field w-full rounded px-3 py-2 text-sm">
                         <option value="">없음</option>
                         {% for t in terms %}
                         <option value="{{ t.id }}">{{ t.name }}</option>
@@ -78,25 +52,25 @@
                 </div>
                 <div class="md:col-span-3">
                     <label class="block text-xs text-gray-400 mb-1">장소</label>
-                    <input name="location" class="eva-input w-full rounded px-3 py-2 text-sm" placeholder="예: 학생회관 3층">
+                    <input name="location" class="ops-field w-full rounded px-3 py-2 text-sm" placeholder="예: 학생회관 3층">
                 </div>
                 <div class="md:col-span-3">
                     <label class="block text-xs text-gray-400 mb-1">간단 설명</label>
-                    <input name="description" class="eva-input w-full rounded px-3 py-2 text-sm" placeholder="(선택)">
+                    <input name="description" class="ops-field w-full rounded px-3 py-2 text-sm" placeholder="(선택)">
                 </div>
                 <div class="md:col-span-6 text-right">
-                    <button type="submit" class="bg-eva-green text-black font-bold py-2 px-5 rounded text-sm hover:opacity-80">생성</button>
+                    <button type="submit" class="ops-primary text-black font-bold py-2 px-5 rounded text-sm hover:opacity-80">생성</button>
                 </div>
             </form>
         </div>
 
         <!-- 목록 -->
-        <div class="eva-card rounded-lg p-5">
-            <h2 class="text-lg font-bold text-eva-green mb-3">전체 이벤트</h2>
+        <div class="ops-panel rounded-lg p-5">
+            <h2 class="text-lg font-bold ops-accent mb-3">전체 이벤트</h2>
             {% if events %}
             <div class="overflow-x-auto">
                 <table class="min-w-full text-sm">
-                    <thead class="text-xs text-gray-400 border-b border-border-dark">
+                    <thead class="text-xs text-gray-400 border-b ops-border">
                         <tr>
                             <th class="px-3 py-2 text-left">이름</th>
                             <th class="px-3 py-2 text-center">분류</th>
@@ -107,11 +81,11 @@
                             <th class="px-3 py-2 text-right">관리</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-border-dark">
+                    <tbody class="divide-y ops-divide">
                         {% for ev in events %}
                         <tr data-event-id="{{ ev.id }}">
                             <td class="px-3 py-3">
-                                <a href="{{ url_for('admin_special_event_detail', event_id=ev.id) }}" class="font-bold hover:text-eva-green">{{ ev.name }}</a>
+                                <a href="{{ url_for('admin_special_event_detail', event_id=ev.id) }}" class="font-bold hover:ops-accent">{{ ev.name }}</a>
                                 {% if ev.description %}<div class="text-xs text-gray-500 truncate max-w-xs">{{ ev.description }}</div>{% endif %}
                             </td>
                             <td class="px-3 py-3 text-center">
@@ -119,7 +93,7 @@
                             </td>
                             <td class="px-3 py-3">{{ ev.event_date }}{% if ev.end_date and ev.end_date != ev.event_date %} ~ {{ ev.end_date }}{% endif %}</td>
                             <td class="px-3 py-3 text-gray-400">{{ ev.location or '-' }}</td>
-                            <td class="px-3 py-3 text-center font-bold text-eva-green">{{ ev.attendee_count or 0 }}</td>
+                            <td class="px-3 py-3 text-center font-bold ops-accent">{{ ev.attendee_count or 0 }}</td>
                             <td class="px-3 py-3 text-center">
                                 <input type="checkbox" class="toggle-active" {% if ev.is_active %}checked{% endif %}>
                             </td>
@@ -138,7 +112,11 @@
         </div>
     </div>
 
-    <script>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
     document.getElementById('newEventForm')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const fd = new FormData(e.target);
@@ -177,5 +155,5 @@
         });
     });
     </script>
-</body>
-</html>
+
+{% endblock %}

@@ -1,27 +1,13 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>사회자 설정 · 책 먹는 호반우</title>
-  {% include '_tailwind_head.html' %}
-  {% include '_app_theme_head.html' %}
-  <style>
-    .moderator-page { max-width: 44rem; margin: 2rem auto; padding: 0 1rem; }
-    .moderator-panel { background: #fffdf7; border: 1px solid #c9b38a; border-radius: 1.25rem; padding: clamp(1rem, 4vw, 2rem); }
-    .moderator-panel label { display: block; font-weight: 700; margin-bottom: .5rem; }
-    .moderator-field { width: 100%; min-width: 0; min-height: 48px; font: inherit; padding: .7rem; border: 1px solid #b6a989; border-radius: .65rem; background: #fffdf8; }
-    .moderator-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.5rem; }
-    .moderator-actions > * { min-height: 44px; padding: .7rem 1rem; border-radius: .65rem; font: inherit; font-weight: 700; }
-    .moderator-primary { background: #3d5c2e; color: white; }
-    .moderator-secondary { background: #f2ebd8; color: #2a241b; }
-    .moderator-note { margin-top: .5rem; color: #5e5548; line-height: 1.6; }
-    .moderator-error { border: 1px solid #b43c3c; color: #8d2626; background: #fff0ee; padding: .8rem; border-radius: .65rem; margin: 1rem 0; }
-  </style>
-</head>
-<body>
-  {% include '_header.html' %}
-  <main class="moderator-page">
+{% extends 'lms_admin_base.html' %}
+{% from '_lms_icons.html' import icon %}
+{% set lms_page = 'operations' %}
+{% set lms_title = '사회자 설정 · 책 먹는 호반우' %}
+{% block title %}사회자 설정 · 책 먹는 호반우{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_operations.css') }}">{% endblock %}
+
+{% block content %}
+<div class="lms-operations">
+<div class="lms-operations-body">
     <section class="moderator-panel">
       <h1 class="text-2xl font-extrabold">{% if download %}발제문 다운로드 준비{% else %}이 회차 사회자 설정{% endif %}</h1>
       <p class="moderator-note">{{ event.book_title or '세미나' }} · {% if download %}문서에 표시할 날짜와 사회자를 확인해주세요.{% else %}목요일·월요일 사회자를 각각 저장합니다.{% endif %}</p>
@@ -58,8 +44,12 @@
         </div>
       </form>
     </section>
-  </main>
-  <script>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+
+<script>
     const moderatorName = document.getElementById('moderator-name');
     document.getElementById('moderator-member').addEventListener('change', (event) => {
       if (event.target.value) moderatorName.value = event.target.value;
@@ -70,5 +60,4 @@
       document.getElementById('moderator-member').value = '';
     });
   </script>
-</body>
-</html>
+{% endblock %}

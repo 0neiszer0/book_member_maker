@@ -1,84 +1,16 @@
-<!DOCTYPE html>
-<html lang="ko">
+{% extends 'lms_admin_base.html' %}
+{% from '_lms_icons.html' import icon %}
+{% set lms_page = 'operations' %}
+{% set lms_title = '발제문 모음' %}
+{% block title %}{{ event.book_title }} - 발제문 모음{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_operations.css') }}">{% endblock %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ event.book_title }} - 발제문 모음</title>
-    {% include '_tailwind_head.html' %}
-    <link
-        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap"
-        rel="stylesheet">
-    <style>
-        :root {
-            --eva-purple: #7A5A3A;
-            --eva-green: #3D5C2E;
-            --bg-dark: #FAF6EC;
-            --card-dark: #FFFCF3;
-            --text-light: #2A241B;
-            --border-dark: #C9B38A;
-        }
-
-        body {
-            font-family: 'Noto Sans KR', sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-light);
-        }
-
-        h1,
-        h2,
-        h3 {
-            font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
-
-        }
-
-        .eva-card {
-            background-color: var(--card-dark);
-            border: 1px solid var(--border-dark);
-        }
-
-        .eva-input {
-            background-color: #FAF6EC;
-            border: 1px solid var(--border-dark);
-            color: var(--text-light);
-        }
-
-        .eva-input:focus {
-            border-color: var(--eva-green);
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(92, 122, 74, 0.20);
-        }
-
-        .btn-mini {
-            font-size: 0.75rem;
-            padding: 0.25rem 0.6rem;
-            border-radius: 0.25rem;
-            font-weight: 700;
-            transition: opacity 0.15s;
-        }
-        .btn-mini:hover { opacity: 0.8; }
-        .submission-summary { color: #5E5548; }
-        .submission-total {
-            display: inline-block;
-            min-width: 1.8rem;
-            padding: 0.1rem 0.45rem;
-            border-radius: 999px;
-            background: #E8EFDD;
-            color: #2F4A24;
-            text-align: center;
-            font-weight: 800;
-        }
-    </style>
-    {% include '_app_theme_head.html' %}
-</head>
-
-<body class="p-4 md:p-8">
-    {% include '_header.html' %}
-
-    <div class="container mx-auto max-w-5xl mt-8">
+{% block content %}
+<div class="lms-operations">
+<div class="lms-operations-body">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
             <div>
-                <h1 class="text-3xl font-bold text-eva-green">{{ event.book_title }}</h1>
+                <h1 class="text-3xl font-bold ops-accent">{{ event.book_title }}</h1>
                 <p class="submission-summary mt-2">모임 날짜: {{ event.meeting_date }} | 총 <strong class="submission-total">{{
                         submissions|length }}</strong>명 제출</p>
             </div>
@@ -89,20 +21,20 @@
                 </a>
                 <a href="/admin/topics/{{ event.id }}/download_word"
                     class="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded shadow border border-green-400">
-                    <i data-lucide="download" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> Word 다운로드
+                    {{ icon('document',18) }} Word 다운로드
                 </a>
             </div>
         </div>
 
-        <section class="eva-card p-4 rounded-lg mb-6" aria-label="회차별 사회자와 다운로드">
+        <section class="ops-panel p-4 rounded-lg mb-6" aria-label="회차별 사회자와 다운로드">
             {% if event.submission_deadline %}<p class="mb-3">공유 발제문 제출·수정 마감: <strong>{{ event.submission_deadline }} 00:00 (한국시간)</strong> · {{ '접수 중' if event.is_active else '마감' }}</p>{% endif %}
             <div class="flex flex-wrap gap-3">
             {% for item in seminar_sessions %}
-                <div class="border border-border-dark rounded-lg p-3 flex-1 min-w-0">
+                <div class="border ops-border rounded-lg p-3 flex-1 min-w-0">
                     <p class="font-bold">{{ item.meeting_date }} · 사회자 {{ item.moderator_name or '미입력' }}</p>
                     <div class="flex flex-wrap gap-2 mt-3">
                         <a class="py-2 px-3 rounded bg-gray-700" href="{{ url_for('topic_document_setup', event_id=event.id, session_id=item.id, download=0) }}">사회자 변경</a>
-                        <a class="py-2 px-3 rounded bg-eva-green text-white" href="{{ url_for('download_topics_word', event_id=event.id, session_id=item.id) }}">이 날짜 Word</a>
+                        <a class="py-2 px-3 rounded ops-primary text-white" href="{{ url_for('download_topics_word', event_id=event.id, session_id=item.id) }}">이 날짜 Word</a>
                     </div>
                 </div>
             {% else %}
@@ -113,37 +45,37 @@
 
         <div class="grid gap-6">
             {% for sub in submissions %}
-            <div class="eva-card p-6 rounded-lg shadow-lg" data-sub-id="{{ sub.id }}">
-                <div class="border-b border-border-dark pb-3 mb-4 flex justify-between items-center flex-wrap gap-2">
-                    <h2 class="text-xl font-bold text-eva-purple">
-                        <i data-lucide="user" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> {% if sub.admission_year %}<span class="text-eva-green font-mono mr-1">{{ sub.admission_year }}</span>{% endif %}<span class="sub-author">{{ sub.author_name }}</span>
+            <div class="ops-panel p-6 rounded-lg shadow-lg" data-sub-id="{{ sub.id }}">
+                <div class="border-b ops-border pb-3 mb-4 flex justify-between items-center flex-wrap gap-2">
+                    <h2 class="text-xl font-bold ops-accent">
+                        {{ icon('account',18) }} {% if sub.admission_year %}<span class="ops-accent font-mono mr-1">{{ sub.admission_year }}</span>{% endif %}<span class="sub-author">{{ sub.author_name }}</span>
                         <span class="text-sm text-gray-400 font-normal">(<span class="sub-dept">{{ sub.department }}</span>)</span>
                     </h2>
                     <div class="flex items-center gap-2">
                         <span class="text-xs text-gray-500">{{ sub.created_at | datetime('%Y-%m-%d %H:%M') }}</span>
                         <label class="text-xs text-gray-400 flex items-center gap-1" title="이 제출자가 작성할 수 있는 발제문 개수 (기본 2개)">
                             한도
-                            <select class="limit-select eva-input rounded text-xs py-1 px-1">
+                            <select class="limit-select ops-field rounded text-xs py-1 px-1">
                                 {% for n in range(1, 11) %}
                                 <option value="{{ n }}" {% if (sub.topic_limit or 2) == n %}selected{% endif %}>{{ n }}개</option>
                                 {% endfor %}
                             </select>
                         </label>
-                        <button type="button" class="btn-mini bg-blue-600 hover:bg-blue-500 text-white edit-btn"><i data-lucide="pencil" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 편집</button>
-                        <button type="button" class="btn-mini bg-red-700 hover:bg-red-600 text-white delete-btn"><i data-lucide="trash-2" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 삭제</button>
+                        <button type="button" class="btn-mini bg-blue-600 hover:bg-blue-500 text-white edit-btn">{{ icon('document',18) }} 편집</button>
+                        <button type="button" class="btn-mini bg-red-700 hover:bg-red-600 text-white delete-btn">{{ icon('document',18) }} 삭제</button>
                     </div>
                 </div>
 
                 <!-- 뷰 모드 -->
                 <div class="view-mode space-y-4">
                     {% for t in sub.topics %}
-                    <div class="bg-bg-dark p-4 rounded border-l-4 border-eva-green">
-                        <p class="text-xs text-eva-green font-bold mb-2">발제 {{ t.number }}</p>
-                        <p class="font-bold text-text-light whitespace-pre-wrap">{{ t.topic }}</p>
+                    <div class="ops-surface p-4 rounded border-l-4 ops-border">
+                        <p class="text-xs ops-accent font-bold mb-2">발제 {{ t.number }}</p>
+                        <p class="font-bold ops-ink whitespace-pre-wrap">{{ t.topic }}</p>
                         <div class="mt-3 text-sm flex gap-4 bg-gray-800 p-2 rounded">
-                            {% if t.page %}<span class="text-gray-400"><i data-lucide="map-pin" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 페이지: <span class="text-gray-200 font-bold">{{
+                            {% if t.page %}<span class="text-gray-400">{{ icon('room',18) }} 페이지: <span class="text-gray-200 font-bold">{{
                                     t.page }}</span></span>{% endif %}
-                            {% if t.reference %}<span class="text-gray-400"><i data-lucide="book-open" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 인용: <span
+                            {% if t.reference %}<span class="text-gray-400">{{ icon('book',18) }} 인용: <span
                                     class="text-gray-200 font-bold whitespace-pre-wrap">{{ t.reference }}</span></span>{% endif %}
                         </div>
                     </div>
@@ -155,11 +87,11 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
                             <label class="text-xs text-gray-400 block mb-1">작성자 이름</label>
-                            <input type="text" class="edit-author eva-input w-full rounded py-2 px-3 text-sm" value="{{ sub.author_name }}">
+                            <input type="text" class="edit-author ops-field w-full rounded py-2 px-3 text-sm" value="{{ sub.author_name }}">
                         </div>
                         <div>
                             <label class="text-xs text-gray-400 block mb-1">소속</label>
-                            <input type="text" class="edit-dept eva-input w-full rounded py-2 px-3 text-sm" value="{{ sub.department }}">
+                            <input type="text" class="edit-dept ops-field w-full rounded py-2 px-3 text-sm" value="{{ sub.department }}">
                         </div>
                     </div>
                     <div class="edit-topics space-y-3"></div>
@@ -167,7 +99,7 @@
                         <button type="button" class="btn-mini bg-gray-700 hover:bg-gray-600 text-white add-topic-btn">+ 발제 추가</button>
                         <div class="flex gap-2">
                             <button type="button" class="btn-mini bg-gray-600 hover:bg-gray-500 text-white cancel-edit-btn">취소</button>
-                            <button type="button" class="btn-mini bg-green-600 hover:bg-green-500 text-white save-edit-btn"><i data-lucide="save" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 저장</button>
+                            <button type="button" class="btn-mini bg-green-600 hover:bg-green-500 text-white save-edit-btn">{{ icon('document',18) }} 저장</button>
                         </div>
                     </div>
                 </div>
@@ -176,27 +108,31 @@
                 <script type="application/json" class="sub-data">{{ sub.topics | tojson }}</script>
             </div>
             {% else %}
-            <div class="eva-card p-12 text-center rounded-lg text-gray-500">
+            <div class="ops-panel p-12 text-center rounded-lg text-gray-500">
                 아직 제출된 발제문이 없습니다.
             </div>
             {% endfor %}
         </div>
     </div>
 
-    <script>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
         function topicFieldHtml(t) {
             t = t || {};
             const esc = (s) => (s || '').toString().replace(/"/g, '&quot;');
             return `
-                <div class="bg-bg-dark p-3 rounded border-l-4 border-eva-green topic-row">
+                <div class="ops-surface p-3 rounded border-l-4 ops-border topic-row">
                     <div class="flex justify-between items-start mb-2 gap-2">
                         <label class="text-xs text-gray-400">발제 내용 *</label>
                         <button type="button" class="text-red-400 hover:text-red-300 font-bold text-sm remove-topic-btn">× 제거</button>
                     </div>
-                    <textarea class="t-topic eva-input w-full rounded py-2 px-3 text-sm h-20 resize-none" required>${(t.topic || '').replace(/</g, '&lt;')}</textarea>
+                    <textarea class="t-topic ops-field w-full rounded py-2 px-3 text-sm h-20 resize-none" required>${(t.topic || '').replace(/</g, '&lt;')}</textarea>
                     <div class="grid grid-cols-1 md:grid-cols-[100px_1fr] gap-2 mt-2">
-                        <input type="text" class="t-page eva-input w-full rounded py-1.5 px-3 text-sm" placeholder="페이지" value="${esc(t.page)}">
-                        <textarea class="t-ref eva-input w-full rounded py-1.5 px-3 text-sm h-16 resize-none" placeholder="인용 (원문)">${(t.reference || '').replace(/</g, '&lt;')}</textarea>
+                        <input type="text" class="t-page ops-field w-full rounded py-1.5 px-3 text-sm" placeholder="페이지" value="${esc(t.page)}">
+                        <textarea class="t-ref ops-field w-full rounded py-1.5 px-3 text-sm h-16 resize-none" placeholder="인용 (원문)">${(t.reference || '').replace(/</g, '&lt;')}</textarea>
                     </div>
                 </div>
             `;
@@ -307,6 +243,5 @@
             });
         });
     </script>
-</body>
 
-</html>
+{% endblock %}

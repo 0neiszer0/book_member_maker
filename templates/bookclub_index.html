@@ -1,301 +1,23 @@
-<!DOCTYPE html>
-<html lang="ko">
+{% extends 'lms_admin_base.html' %}
+{% from '_lms_icons.html' import icon %}
+{% set lms_title = '조 편성 작업' %}
+{% set lms_page = 'groups' %}
+{% block title %}조 편성 작업 - 책 먹는 호반우{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='lms_groups.css') }}">
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>독서모임 조 편성</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap"
-        rel="stylesheet">
-    {% include '_tailwind_head.html' %}
-    <style>
-        :root {
-            --eva-purple: #7A5A3A;
-            --eva-green: #3D5C2E;
-            --bg-dark: #FAF6EC;
-            --card-dark: #FFFCF3;
-            --text-light: #2F2A22;
-            --border-dark: #E5D7B8;
-        }
-
-        body {
-            font-family: 'Noto Sans KR', sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-light);
-        }
-
-        h1,
-        h2,
-        h3,
-        summary {
-            font-family: 'Noto Sans KR', sans-serif;
-            letter-spacing: -0.02em;
-        }
-
-        .eva-card {
-            background-color: var(--card-dark);
-            border: 1px solid var(--border-dark);
-        }
-
-        .section {
-            background-color: var(--card-dark);
-            border: 1px solid var(--border-dark);
-            border-radius: 8px;
-            margin-bottom: 1rem;
-            overflow: hidden;
-        }
-
-        .section summary {
-            list-style: none;
-            background-color: var(--eva-purple);
-            color: #fff;
-            padding: 0.75rem 1rem;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        .section[open] summary {
-            border-bottom: 1px solid var(--border-dark);
-        }
-
-        .section div.content {
-            padding: 1rem;
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-            gap: 0.5rem;
-        }
-
-        .form-check {
-            display: flex;
-            align-items: center;
-            background-color: var(--bg-dark);
-            padding: 0.5rem;
-            border-radius: 4px;
-        }
-
-        .form-check input {
-            margin-right: 0.5rem;
-            accent-color: var(--eva-green);
-        }
-
-        .controls {
-            text-align: right;
-            grid-column: 1 / -1;
-            margin-bottom: 0.5rem;
-        }
-
-        .controls button {
-            background-color: var(--eva-green);
-            color: black;
-            border: none;
-            padding: 0.4rem 0.8rem;
-            border-radius: 4px;
-            font-size: 0.85rem;
-            margin-left: 0.5rem;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        .controls button.secondary {
-            background-color: var(--paper-2);
-            color: var(--text-light);
-        }
-
-        .settings {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-            padding: 1rem;
-        }
-
-        .settings label {
-            display: flex;
-            flex-direction: column;
-            font-size: 0.9rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .settings input {
-            margin-top: 0.3rem;
-            padding: 0.4rem;
-            background-color: var(--bg-dark);
-            border: 1px solid var(--border-dark);
-            border-radius: 4px;
-            color: var(--text-light);
-        }
-
-        .btn-submit {
-            width: 100%;
-            padding: 0.8rem;
-            background-color: var(--eva-green);
-            color: white;
-            border: none;
-            font-size: 1.1rem;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .btn-submit:hover {
-            box-shadow: 0 0 15px var(--eva-green);
-        }
-
-        dialog {
-            background-color: var(--card-dark);
-            color: var(--text-light);
-            border: 1px solid var(--border-dark);
-            border-radius: 8px;
-            width: 100%;
-            max-width: 600px;
-        }
-
-        dialog::backdrop {
-            background-color: rgba(0, 0, 0, 0.7);
-        }
-
-        #loading-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
-            z-index: 1000;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-        }
-
-        #loading-overlay .loader {
-            border: 8px solid var(--oak);
-            border-top: 8px solid var(--eva-green);
-            border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            animation: spin 1.5s linear infinite;
-        }
-
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
-        }
-
-        .summary-bar {
-            position: sticky;
-            top: 0;
-            z-index: 50;
-            background: rgba(26, 26, 26, 0.95);
-            backdrop-filter: blur(6px);
-            border-bottom: 1px solid var(--border-dark);
-            padding: 0.6rem 0.8rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-            font-size: 0.85rem;
-        }
-
-        .summary-bar .stat {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.3rem;
-            padding: 0.25rem 0.6rem;
-            background: var(--paper-2);
-            border: 1px solid var(--border-dark);
-            border-radius: 999px;
-        }
-
-        .summary-bar .stat .num {
-            color: var(--eva-green);
-            font-weight: 700;
-            font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
-        }
-
-        .filter-input {
-            grid-column: 1 / -1;
-            padding: 0.45rem 0.7rem;
-            background: #FAF6EC;
-            border: 1px solid var(--border-dark);
-            border-radius: 4px;
-            color: var(--text-light);
-            font-size: 0.9rem;
-            width: 100%;
-        }
-
-        .voted-badge {
-            font-size: 0.65rem;
-            margin-left: 0.3rem;
-            background: var(--eva-green);
-            color: #fff;
-            padding: 0.05rem 0.35rem;
-            border-radius: 999px;
-            font-weight: 700;
-        }
-
-        .form-check.hidden-by-filter { display: none; }
-        .form-check.is-prechecked { border-left: 3px solid var(--eva-green); }
-
-        .work-header { max-width: 1180px; margin: 1rem auto 0; padding: 1rem 1.25rem; background: var(--surface, #FFFCF3); border: 1px solid var(--line, #E5D7B8); border-radius: 16px; color: var(--ink, #2F2A22); }
-        .work-header-title { font-family: inherit; text-transform: none; letter-spacing: 0; color: var(--moss-deep, #3D5C2E); }
-        .work-chip { display:inline-flex; align-items:center; gap:.3rem; padding:.35rem .65rem; border-radius:999px; background:var(--paper-2,#F2EBD8); color:var(--ink-soft,#5E5548); font-size:.8rem; font-weight:700; }
-        .workspace { max-width:1180px; margin:1rem auto 3rem; padding:0 1rem; display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:1rem; align-items:start; }
-        .member-panel,.settings-panel { background:var(--surface,#FFFCF3); border:1px solid var(--line,#E5D7B8); border-radius:16px; color:var(--ink,#2F2A22); }
-        .member-panel { padding:1rem; }
-        .settings-panel { padding:1rem; position:sticky; top:84px; }
-        .member-toolbar { display:grid; grid-template-columns:minmax(180px,1fr) auto; gap:.75rem; align-items:center; margin-bottom:.75rem; }
-        .member-table-head,.member-row { display:grid; grid-template-columns:minmax(0,1fr) 64px 64px; gap:.5rem; align-items:center; min-width:0; }
-        .member-table-head { padding:.4rem .75rem; color:var(--ink-soft,#5E5548); font-size:.75rem; font-weight:800; }
-        .member-list { display:grid; grid-template-columns:minmax(0,1fr); gap:.45rem; max-height:62vh; overflow:auto; padding:.15rem; }
-        .member-row { width:100%; max-width:100%; box-sizing:border-box; background:var(--paper,#FAF6EC); border:1px solid var(--line,#E5D7B8); border-radius:10px; padding:.55rem .7rem; }
-        .member-row > span { min-width:0; overflow-wrap:anywhere; }
-        .member-row.gender-male { background:#F0F7F9; }
-        .member-row.gender-female { background:#FAF1F4; }
-        .member-row.is-prechecked { border-left:4px solid var(--moss,#5C7A4A); }
-        .member-row input { accent-color:var(--moss-deep,#3D5C2E); width:18px; height:18px; justify-self:center; }
-        .member-meta { color:var(--ink-muted,#8A7E6A); font-size:.72rem; }
-        .member-name.gender-male { color:#2E6275; }
-        .member-name.gender-female { color:#8A4F62; }
-        .gender-tag { display:inline-flex;align-items:center;justify-content:center;margin-left:.35rem;padding:.05rem .32rem;border-radius:999px;font-size:.62rem;font-weight:900;vertical-align:.08rem; }
-        .gender-tag.gender-male { color:#28596A;background:#DCECF1;border:1px solid #B8D5DE; }
-        .gender-tag.gender-female { color:#7A4053;background:#F2DCE4;border:1px solid #E2BBC9; }
-        .gender-legend { display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin:.15rem .75rem .55rem;color:var(--ink-soft,#6B6255);font-size:.72rem; }
-        .settings-panel label { display:block; font-size:.8rem; font-weight:700; margin-bottom:.9rem; }
-        .settings-panel input,.settings-panel select { width:100%; margin-top:.35rem; padding:.65rem; border:1px solid var(--line,#E5D7B8); border-radius:10px; background:#fff; color:var(--ink,#2F2A22); }
-        .bulk-tools { margin-top:.9rem; border-top:1px solid var(--line,#E5D7B8); padding-top:.9rem; }
-        .bulk-tools summary { font-family:inherit; text-transform:none; letter-spacing:0; color:var(--moss-deep,#3D5C2E); cursor:pointer; font-weight:800; }
-        .restriction-panel { margin:.9rem 0; padding:.8rem; border:1px solid #DFC7B5; border-radius:12px; background:#FFF8F2; }
-        .restriction-panel summary { cursor:pointer; color:#873E2B; font-weight:800; }
-        .restriction-row { padding:.55rem 0; border-top:1px solid #E8D8C8; }
-        .restriction-row:first-child { border-top:0; }
-        @media(max-width:900px){ .workspace{grid-template-columns:1fr}.settings-panel{position:static}.member-list{max-height:none}.member-toolbar{grid-template-columns:1fr}.work-header{margin:.75rem 1rem 0}.member-table-head,.member-row{grid-template-columns:minmax(0,1fr) 52px 52px} }
-    </style>
-    {% include '_app_theme_head.html' %}
-</head>
-
-<body class="w-full">
-    {% include '_header.html' %}
-    {% include '_admin_sidebar.html' %}
-
-    <section class="work-header">
-        <div class="flex items-start justify-between gap-4 flex-wrap">
+{% endblock %}
+{% block content %}
+<div class="groups-page">
+<section class="work-header">
+        <div class="groups-flex groups-items-start groups-justify-between groups-gap-4 groups-flex-wrap">
             <div>
-                <h1 class="work-header-title text-2xl font-bold">조 편성 작업</h1>
-                <p class="text-sm mt-1">{% if selected_session %}{{ selected_session.meeting_date|seminar_date }} · {% if selected_session.day_type == 'mon' %}추가 세미나{% else %}본 세미나{% endif %} · {{ selected_session.book_title or '도서 미입력' }}{% else %}추가 세미나 참석과 본 세미나 불참 기록을 기준으로 명단을 준비했습니다.{% endif %}</p>
+                <h1 class="work-header-title  ">조 편성 작업</h1>
+                <p class="groups-text-sm groups-mt-1">{% if selected_session %}{{ selected_session.meeting_date|seminar_date }} · {% if selected_session.day_type == 'mon' %}추가 세미나{% else %}본 세미나{% endif %} · {{ selected_session.book_title or '도서 미입력' }}{% else %}추가 세미나 참석과 본 세미나 불참 기록을 기준으로 명단을 준비했습니다.{% endif %}</p>
             </div>
-            <div class="flex gap-2 flex-wrap items-center">
-                <button type="button" id="manage-history-btn" class="work-chip" style="background:#E8EFDD;color:#304923">이전 세미나 기록</button>
-                <a href="/records/seminars" class="work-chip" style="background:#F2E8D8;color:#6B4B2D">전체 기록 관리</a>
+            <div class="groups-flex groups-gap-2 groups-flex-wrap groups-items-center">
+                <button type="button" id="manage-history-btn" class=" lms-button">이전 세미나 기록</button>
+                <a href="/records/seminars" class=" lms-button">전체 기록 관리</a>
                 <span class="work-chip">참석 <strong id="cnt-present">0</strong></span>
                 <span class="work-chip">발제 <strong id="cnt-facilitators">0</strong></span>
                 <span class="work-chip">투표 <strong id="cnt-voted">{{ pre_checked_attendee_ids|length }}</strong></span>
@@ -303,13 +25,13 @@
             </div>
         </div>
         {% if not selected_session %}
-        <div class="flex gap-2 mt-3 flex-wrap text-sm">
-            <a href="?day=mon" class="work-chip {% if day_choice == 'mon' %}bg-eva-green{% endif %}">월 {{ mon_date }} · {{ mon_attendee_ids|length }}명</a>
-            <a href="?day=thu" class="work-chip {% if day_choice == 'thu' %}bg-eva-green{% endif %}">목 {{ thu_date }} · {{ thu_attendee_ids|length }}명</a>
-            <a href="?day=all" class="work-chip {% if day_choice == 'all' %}bg-eva-green{% endif %}">월·목 합산</a>
+        <div class="groups-flex groups-gap-2 groups-mt-3 groups-flex-wrap groups-text-sm">
+            <a href="?day=mon" class="{% if day_choice == 'mon' %}groups-fill{% endif %} lms-button">월 {{ mon_date }} · {{ mon_attendee_ids|length }}명</a>
+            <a href="?day=thu" class="{% if day_choice == 'thu' %}groups-fill{% endif %} lms-button">목 {{ thu_date }} · {{ thu_attendee_ids|length }}명</a>
+            <a href="?day=all" class="{% if day_choice == 'all' %}groups-fill{% endif %} lms-button">월·목 합산</a>
         </div>
         {% endif %}
-        {% if unmatched_facilitators %}<p class="text-sm mt-3" style="color:var(--warn,#C97A3A)">멤버와 자동 연결하지 못한 제출자: {% for item in unmatched_facilitators %}{{ item.author_name }}{% if item.student_id %}({{ item.student_id }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+        {% if unmatched_facilitators %}<p class="groups-text-sm groups-mt-3">멤버와 자동 연결하지 못한 제출자: {% for item in unmatched_facilitators %}{{ item.author_name }}{% if item.student_id %}({{ item.student_id }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
     </section>
 
     <form id="group-form" class="workspace">
@@ -318,20 +40,20 @@
         <section class="member-panel">
             <div class="member-toolbar">
                 <input type="text" class="filter-input" data-filter-target="members" placeholder="이름·학번·학과로 검색…">
-                <div class="flex gap-2 flex-wrap text-xs">
-                    <button type="button" id="quick-voted" class="wood-chip on">투표자만</button>
-                    <button type="button" id="select-all-present" class="wood-chip">참석 전체</button>
-                    <button type="button" id="deselect-all-present" class="wood-chip">참석 해제</button>
-                    <button type="button" id="select-all-facilitators" class="wood-chip">발제 전체</button>
-                    <button type="button" id="deselect-all-facilitators" class="wood-chip">발제 해제</button>
+                <div class="groups-flex groups-gap-2 groups-flex-wrap groups-text-xs">
+                    <button type="button" id="quick-voted" class="on lms-button">투표자만</button>
+                    <button type="button" id="select-all-present" class=" lms-button">참석 전체</button>
+                    <button type="button" id="deselect-all-present" class=" lms-button">참석 해제</button>
+                    <button type="button" id="select-all-facilitators" class=" lms-button">발제 전체</button>
+                    <button type="button" id="deselect-all-facilitators" class=" lms-button">발제 해제</button>
                 </div>
             </div>
             <div class="gender-legend"><strong>성별 표시</strong><span><span class="gender-tag gender-female">여</span> 여성</span><span><span class="gender-tag gender-male">남</span> 남성</span></div>
-            <div class="member-table-head"><span>멤버</span><span class="text-center">참석</span><span class="text-center">발제</span></div>
+            <div class="member-table-head"><span>멤버</span><span class="groups-text-center">참석</span><span class="groups-text-center">발제</span></div>
             <div class="member-list content">
                 {% for m in all_members %}
                 <label class="member-row form-check {% if m.gender_code == 'M' %}gender-male{% elif m.gender_code == 'W' %}gender-female{% endif %} {% if m.id in pre_checked_attendee_ids %}is-prechecked{% endif %}" data-name="{{ m.name }} {{ m.student_id or '' }} {{ m.department or '' }}" data-gender="{{ m.gender_code or '' }}">
-                    <span><strong class="member-name {% if m.gender_code == 'M' %}gender-male{% elif m.gender_code == 'W' %}gender-female{% endif %}">{{ m.name }}</strong>{% if m.gender_code == 'M' %}<span class="gender-tag gender-male">남</span>{% elif m.gender_code == 'W' %}<span class="gender-tag gender-female">여</span>{% endif %}<span class="member-meta block">{{ m.student_id or '학번 없음' }}{% if m.department %} · {{ m.department }}{% endif %}</span></span>
+                    <span><strong class="member-name {% if m.gender_code == 'M' %}gender-male{% elif m.gender_code == 'W' %}gender-female{% endif %}">{{ m.name }}</strong>{% if m.gender_code == 'M' %}<span class="gender-tag gender-male">남</span>{% elif m.gender_code == 'W' %}<span class="gender-tag gender-female">여</span>{% endif %}<span class="member-meta groups-block">{{ m.student_id or '학번 없음' }}{% if m.department %} · {{ m.department }}{% endif %}</span></span>
                     <input type="checkbox" name="present" value="{{ m.name }}" {% if m.id in pre_checked_attendee_ids %}checked{% endif %} aria-label="{{ m.name }} 참석">
                     <input type="checkbox" name="facilitators" value="{{ m.name }}" {% if m.name in pre_checked_facilitator_names %}checked{% endif %} aria-label="{{ m.name }} 발제">
                 </label>
@@ -339,72 +61,72 @@
             </div>
             <details class="bulk-tools">
                 <summary>명단 붙여넣기</summary>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                    <div><textarea id="bulk-present-input" rows="3" placeholder="참석자 이름 붙여넣기" class="w-full p-2 rounded border"></textarea><button type="button" id="bulk-present-apply" class="wood-chip on mt-1">참석 적용</button><p id="bulk-present-msg" class="text-xs mt-1"></p></div>
-                    <div><textarea id="bulk-facilitators-input" rows="3" placeholder="발제자 이름 붙여넣기" class="w-full p-2 rounded border"></textarea><button type="button" id="bulk-facilitators-apply" class="wood-chip on mt-1">발제 적용</button><p id="bulk-facilitators-msg" class="text-xs mt-1"></p></div>
+                <div class="groups-grid groups-grid-cols-1 groups-md-grid-cols-2 groups-gap-3 groups-mt-3">
+                    <div><textarea id="bulk-present-input" rows="3" placeholder="참석자 이름 붙여넣기" class="groups-w-full groups-p-2 groups-rounded groups-border"></textarea><button type="button" id="bulk-present-apply" class="on groups-mt-1 lms-button">참석 적용</button><p id="bulk-present-msg" class="groups-text-xs groups-mt-1"></p></div>
+                    <div><textarea id="bulk-facilitators-input" rows="3" placeholder="발제자 이름 붙여넣기" class="groups-w-full groups-p-2 groups-rounded groups-border"></textarea><button type="button" id="bulk-facilitators-apply" class="on groups-mt-1 lms-button">발제 적용</button><p id="bulk-facilitators-msg" class="groups-text-xs groups-mt-1"></p></div>
                 </div>
             </details>
         </section>
         <aside class="settings-panel">
-            <h2 class="text-lg font-bold mb-4" style="color:var(--moss-deep,#3D5C2E)">편성 설정</h2>
+            <h2 class="  groups-mb-4">편성 설정</h2>
             <label>그룹 수<input type="number" name="group_count" min="1" max="30" placeholder="자동 계산"></label>
-            <p id="group-size-preview" class="text-xs -mt-2 mb-3" style="color:#6B6255"></p>
+            <p id="group-size-preview" class="groups-text-xs groups-mt-2 groups-mb-3"></p>
             <label>그룹 이름<input type="text" name="group_names" placeholder="A팀, B팀, C팀"></label>
             {% if can_manage_pair_restrictions %}
             <details class="restriction-panel">
                 <summary>비공개 편성 제한 · {{ pair_restrictions|length }}쌍</summary>
-                <p class="text-xs mt-2" style="color:#6B6255">DB 역할이 <strong>admin</strong>인 계정만 이 목록을 확인·관리할 수 있습니다. 다른 운영진의 조 편성에는 목록을 보여주지 않고 제약만 적용합니다.</p>
-                <label class="mt-3">첫 번째 회원
+                <p class="groups-text-xs groups-mt-2">DB 역할이 <strong>admin</strong>인 계정만 이 목록을 확인·관리할 수 있습니다. 다른 운영진의 조 편성에는 목록을 보여주지 않고 제약만 적용합니다.</p>
+                <label class="groups-mt-3">첫 번째 회원
                     <select id="restriction-member-a"><option value="">선택</option>{% for m in all_members %}<option value="{{ m.id }}">{{ m.name }} · {{ m.student_id or '학번 없음' }}</option>{% endfor %}</select>
                 </label>
                 <label>두 번째 회원
                     <select id="restriction-member-b"><option value="">선택</option>{% for m in all_members %}<option value="{{ m.id }}">{{ m.name }} · {{ m.student_id or '학번 없음' }}</option>{% endfor %}</select>
                 </label>
                 <label>관리 메모(선택)<input id="restriction-note" maxlength="200" placeholder="관리자만 확인"></label>
-                <button type="button" id="restriction-add" class="wood-chip on w-full justify-center">같은 조 금지로 저장</button>
-                <div class="mt-3 text-sm">
+                <button type="button" id="restriction-add" class="on groups-w-full groups-justify-center lms-button">같은 조 금지로 저장</button>
+                <div class="groups-mt-3 groups-text-sm">
                     {% for item in pair_restrictions %}
-                    <div class="restriction-row flex items-start justify-between gap-2">
-                        <span><strong>{{ item.member_a.name }} · {{ item.member_b.name }}</strong>{% if item.note %}<small class="block mt-1" style="color:#6B6255">{{ item.note }}</small>{% endif %}</span>
-                        <button type="button" class="restriction-delete text-xs font-bold" data-id="{{ item.id }}" style="color:#B14A2D">삭제</button>
+                    <div class="restriction-row groups-flex groups-items-start groups-justify-between groups-gap-2">
+                        <span><strong>{{ item.member_a.name }} · {{ item.member_b.name }}</strong>{% if item.note %}<small class="groups-block groups-mt-1">{{ item.note }}</small>{% endif %}</span>
+                        <button type="button" class="restriction-delete groups-text-xs groups-font-bold" data-id="{{ item.id }}">삭제</button>
                     </div>
-                    {% else %}<p class="text-xs" style="color:#6B6255">등록된 제한이 없습니다.</p>{% endfor %}
+                    {% else %}<p class="groups-text-xs">등록된 제한이 없습니다.</p>{% endfor %}
                 </div>
             </details>
             {% endif %}
-            <button type="button" id="generate-btn" class="btn-submit">조 편성 시작</button>
+            <button type="button" id="generate-btn" class=" lms-button lms-button-primary">조 편성 시작</button>
         </aside>
     </form>
 
-    <dialog id="history-dialog" class="p-6">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="text-xl text-eva-purple">이전 모임 기록</h3>
-            <button type="button" id="history-close" class="text-2xl hover:text-red-500">&times;</button>
+    <dialog id="history-dialog" class="groups-p-6">
+        <div class="groups-flex groups-justify-between groups-items-center groups-mb-4">
+            <h3 class=" groups-accent">이전 모임 기록</h3>
+            <button type="button" id="history-close" class="groups-text-2xl ">&times;</button>
         </div>
-        <div id="history-list" class="max-h-96 overflow-y-auto">
+        <div id="history-list" class="groups-max-h-96 groups-overflow-y-auto">
         </div>
     </dialog>
 
     <div id="loading-overlay" role="dialog" aria-modal="true" aria-labelledby="generation-status">
         <div class="loader"></div>
-        <p class="text-xl mt-4 font-bold text-eva-green">GENERATING GROUPS...</p>
+        <p class="groups-text-xl groups-mt-4 groups-font-bold groups-accent">GENERATING GROUPS...</p>
 
-        <div class="mt-4 w-full max-w-md bg-gray-700 rounded-full h-4">
+        <div class="groups-mt-4 groups-w-full groups-max-w-md groups-tint groups-rounded-full groups-h-4">
             <div id="progress-bar"
-                class="bg-eva-green h-4 rounded-full text-center text-xs text-black font-bold leading-4"
+                class="groups-fill groups-h-4 groups-rounded-full groups-text-center groups-text-xs groups-ink groups-font-bold groups-leading-4"
                 style="width: 0%;"></div>
         </div>
-        <p id="progress-text" class="mt-2 text-lg">0%</p>
+        <p id="progress-text" class="groups-mt-2 groups-text-lg">0%</p>
 
-        <div class="flex justify-between w-full max-w-md mt-2 text-sm text-gray-400">
+        <div class="groups-flex groups-justify-between groups-w-full groups-max-w-md groups-mt-2 groups-text-sm groups-muted">
             <span id="time-elapsed">00:00</span>
             <span id="time-remaining">계산 중...</span>
         </div>
-            <p id="generation-status" class="mt-4 text-sm text-gray-200" role="status" aria-live="polite">&#xCD5C;&#xC801;&#xC758; &#xC870; &#xD3B8;&#xC131;&#xC744; &#xACC4;&#xC0B0;&#xD558;&#xACE0; &#xC788;&#xC5B4;&#xC694;.</p>
-        <div class="mt-5 flex gap-2">
-            <button type="button" id="generation-cancel" class="wood-chip warn">&#xCDE8;&#xC18C;</button>
-            <button type="button" id="generation-retry" class="wood-chip on hidden">&#xB2E4;&#xC2DC; &#xC2DC;&#xC791;</button>
-            <button type="button" id="generation-close" class="wood-chip hidden">&#xB2EB;&#xAE30;</button>
+            <p id="generation-status" class="groups-mt-4 groups-text-sm groups-ink" role="status" aria-live="polite">&#xCD5C;&#xC801;&#xC758; &#xC870; &#xD3B8;&#xC131;&#xC744; &#xACC4;&#xC0B0;&#xD558;&#xACE0; &#xC788;&#xC5B4;&#xC694;.</p>
+        <div class="groups-mt-5 groups-flex groups-gap-2">
+            <button type="button" id="generation-cancel" class="warn lms-button">&#xCDE8;&#xC18C;</button>
+            <button type="button" id="generation-retry" class="on hidden lms-button">&#xB2E4;&#xC2DC; &#xC2DC;&#xC791;</button>
+            <button type="button" id="generation-close" class="hidden lms-button">&#xB2EB;&#xAE30;</button>
         </div>
     </div>
 
@@ -524,7 +246,7 @@
 
                 if (tokens.length === 0) {
                     msgEl.textContent = '입력된 이름이 없습니다.';
-                    msgEl.className = 'text-xs text-yellow-300 mt-1';
+                    msgEl.className = 'groups-text-xs groups-warning groups-mt-1';
                     return;
                 }
 
@@ -554,8 +276,8 @@
                 if (unmatched.length) msg += `·  미일치 ${unmatched.length}명: ${unmatched.join(', ')}`;
                 msgEl.textContent = msg;
                 msgEl.className = unmatched.length
-                    ? 'text-xs text-yellow-300 mt-1'
-                    : 'text-xs text-eva-green mt-1';
+                    ? 'groups-text-xs groups-warning groups-mt-1'
+                    : 'groups-text-xs groups-accent groups-mt-1';
                 updateCounts();
             }
 
@@ -599,7 +321,7 @@
                     .then(res => res.ok ? res.json() : Promise.reject(res.statusText))
                     .then(data => {
                         if (!data.length) {
-                            listDiv.innerHTML = '<p class="text-gray-500">저장된 기록이 없습니다.</p>';
+                            listDiv.innerHTML = '<p class="groups-muted">저장된 기록이 없습니다.</p>';
                             return;
                         }
 
@@ -613,33 +335,33 @@
                         const escapeHistoryHtml = value => String(value).replace(/[&<>"']/g, char => ({
                             '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
                         }[char]));
-                        let html = '<div class="space-y-4">';
+                        let html = '<div class="groups-space-y-4">';
                         Object.entries(byDate).sort(([a], [b]) => b.localeCompare(a)).forEach(([date, recs]) => {
-                            html += `<div class="border border-gray-600 rounded-lg overflow-hidden">
-                        <div class="bg-gray-700 px-4 py-2 font-bold text-eva-green flex justify-between items-center">
+                            html += `<div class="groups-border groups-line groups-rounded-lg groups-overflow-hidden">
+                        <div class="groups-tint groups-px-4 groups-py-2 groups-font-bold groups-accent groups-flex groups-justify-between groups-items-center">
                             <span> ${escapeHistoryHtml(date)}</span>
-                            <span class="text-xs text-gray-300">${recs.length}개 기록</span>
+                            <span class="groups-text-xs groups-ink">${recs.length}개 기록</span>
                         </div>`;
 
                             recs.forEach(rec => {
                                 const groups = rec.groups || [];
                                 const totalMembers = groups.reduce((s, g) => s + g.length, 0);
-                                html += `<div class="px-4 py-2 border-t border-gray-700">
-                            <div class="flex justify-between items-start">
+                                html += `<div class="groups-px-4 groups-py-2 groups-border-t groups-line">
+                            <div class="groups-flex groups-justify-between groups-items-start">
                                 <div>
-                                    <span class="text-xs text-gray-400">${groups.length}개 조 / 전체 ${totalMembers}명</span>
-                                    <div class="mt-1 space-y-1">`;
+                                    <span class="groups-text-xs groups-muted">${groups.length}개 조 / 전체 ${totalMembers}명</span>
+                                    <div class="groups-mt-1 groups-space-y-1">`;
 
                                 groups.forEach((g, gi) => {
                                     const safeNames = g.map(escapeHistoryHtml).join(', ');
-                                    html += `<div class="text-xs text-gray-300">
-                                        <span class="font-semibold text-gray-100">${gi + 1}조:</span> ${safeNames}
+                                    html += `<div class="groups-text-xs groups-ink">
+                                        <span class="groups-font-semibold groups-ink">${gi + 1}조:</span> ${safeNames}
                                     </div>`;
                                 });
 
                                 html += `</div>
                                 </div>
-                                <button data-id="${escapeHistoryHtml(rec.id)}" class="del-btn ml-4 flex-shrink-0 text-red-500 hover:text-red-400 text-xs font-bold px-2 py-1 border border-red-700 rounded">삭제</button>
+                                <button data-id="${escapeHistoryHtml(rec.id)}" class="del-btn groups-ml-4 groups-flex-shrink-0 groups-danger  groups-text-xs groups-font-bold groups-px-2 groups-py-1 groups-border groups-line groups-rounded">삭제</button>
                             </div>
                         </div>`;
                             });
@@ -688,7 +410,7 @@
             function showGenerationFailure(message) {
                 if (activeGeneration) activeGeneration.stop();
                 generationStatus.textContent = message;
-                generationStatus.classList.add('text-red-300');
+                generationStatus.classList.add('groups-danger');
                 loader.hidden = true;
                 cancelGenerationBtn.classList.add('hidden');
                 retryGenerationBtn.classList.remove('hidden');
@@ -754,7 +476,7 @@
                 generateBtn.disabled = true;
                 loader.hidden = false;
                 generationStatus.textContent = '최적의 조 편성을 계산하고 있어요.';
-                generationStatus.classList.remove('text-red-300');
+                generationStatus.classList.remove('groups-danger');
                 cancelGenerationBtn.classList.remove('hidden');
                 retryGenerationBtn.classList.add('hidden');
                 closeGenerationBtn.classList.add('hidden');
@@ -834,7 +556,5 @@
             });
         });
     </script>
-
-</body>
-
-</html>
+</div>
+{% endblock %}

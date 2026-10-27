@@ -1,127 +1,129 @@
+{% extends 'lms_admin_base.html' if session.user_role == 'admin' else 'lms_base.html' %}
 {% from '_records_base.html' import records_nav %}
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <title>{{ member.name }} - 활동 기록</title>
-    {% include '_records_base.html' %}
-    {% include '_app_theme_head.html' %}
-</head>
-<body class="min-h-screen">
-    {% include '_header.html' %}
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+{% from '_lms_icons.html' import icon %}
+{% set lms_title = '회원 활동 기록' %}
+{% set lms_page = 'records' %}
+{% block title %}{{ member.name }} - 활동 기록{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='lms_records.css') }}">
+
+{% endblock %}
+{% block content %}
+<div class="records-page">
+<div class="records-content">
         {% if session.user_role == 'admin' %}
         {{ records_nav('members') }}
-        <a href="{{ url_for('records_members') }}" class="text-sm text-gray-400 hover:text-eva-green mb-4 inline-block">← 회원명부</a>
+        <a href="{{ url_for('records_members') }}" class="records-text-sm records-muted records-link-hover records-mb-4 records-inline-block">← 회원명부</a>
         {% else %}
-        <a href="{{ url_for('my_page') }}" class="text-sm text-gray-400 hover:text-eva-green mb-4 inline-block">← 내 활동</a>
+        <a href="{{ url_for('my_page') }}" class="records-text-sm records-muted records-link-hover records-mb-4 records-inline-block">← 내 활동</a>
         {% endif %}
 
         <!-- 프로필 헤더 -->
-        <div class="eva-card p-6 rounded-lg mb-6">
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div class="records-panel records-p-6 records-rounded-lg records-mb-6">
+            <div class="records-flex records-flex-col md:flex-row records-md-items-center records-md-justify-between records-gap-4">
                 <div>
-                    <h1 class="text-3xl font-bold text-eva-green">{{ member.name }}</h1>
-                    <div class="text-sm text-gray-400 mt-2 flex flex-wrap gap-3">
-                        {% if member.student_id %}<span>학번 <span class="text-gray-200 font-mono">{{ member.student_id }}</span></span>{% endif %}
+                    <h1 class="records-accent">{{ member.name }}</h1>
+                    <div class="records-text-sm records-muted records-mt-2 records-flex records-flex-wrap records-gap-3">
+                        {% if member.student_id %}<span>학번 <span class="records-ink records-font-mono">{{ member.student_id }}</span></span>{% endif %}
                         {% if member.department %}<span>{{ member.department }}</span>{% endif %}
                         {% if member.recruiting_class %}<span>{{ member.recruiting_class }}기</span>{% endif %}
-                        {% if member.role == 'admin' %}<span class="bg-red-700 text-white px-2 py-0.5 rounded text-xs">관리자</span>
-                        {% elif member.role == 'officer' %}<span class="bg-yellow-700 text-white px-2 py-0.5 rounded text-xs">임원</span>{% endif %}
+                        {% if member.role == 'admin' %}<span class="records-accent-fill records-ink records-px-2 records-py-0-5 records-rounded records-text-xs">관리자</span>
+                        {% elif member.role == 'officer' %}<span class="records-accent-fill records-ink records-px-2 records-py-0-5 records-rounded records-text-xs">임원</span>{% endif %}
                     </div>
                 </div>
-                <div class="grid grid-cols-3 gap-6 text-center">
-                    <div><div class="text-xs text-gray-400">세미나 출석</div><div class="text-3xl font-bold text-eva-green">{{ seminar_count }}</div></div>
-                    <div><div class="text-xs text-gray-400">발제</div><div class="text-3xl font-bold text-eva-purple">{{ facilitator_count }}</div></div>
-                    <div><div class="text-xs text-gray-400">모임 참여</div><div class="text-3xl font-bold text-eva-orange">{{ brick_sessions|length + study_sessions|length }}</div></div>
+                <div class="records-grid records-grid-cols-3 records-gap-6 records-text-center">
+                    <div><div class="records-text-xs records-muted">세미나 출석</div><div class="records-text-3xl records-font-bold records-accent">{{ seminar_count }}</div></div>
+                    <div><div class="records-text-xs records-muted">발제</div><div class="records-text-3xl records-font-bold records-accent">{{ facilitator_count }}</div></div>
+                    <div><div class="records-text-xs records-muted">모임 참여</div><div class="records-text-3xl records-font-bold records-accent">{{ brick_sessions|length + study_sessions|length }}</div></div>
                 </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="records-grid records-grid-cols-1 records-lg-grid-cols-2 records-gap-6">
             <!-- 세미나 참여 이력 -->
-            <div class="eva-card p-5 rounded-lg">
-                <h2 class="text-lg font-bold text-eva-green mb-4"><i data-lucide="book-open" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 세미나 참여 ({{ seminar_count }}회)</h2>
+            <div class="records-panel records-p-5 records-rounded-lg">
+                <h2 class="records-accent records-mb-4">{{ icon('book', 18) }} 세미나 참여 ({{ seminar_count }}회)</h2>
                 {% if seminar_records %}
-                <div class="overflow-y-auto max-h-96 space-y-1.5">
+                <div class="records-overflow-y-auto records-max-h-96 records-space-y-1-5">
                     {% for s in seminar_records %}
                     <a href="{{ url_for('records_seminar_detail', history_id=s.history_id) }}"
-                        class="flex justify-between items-center p-3 bg-gray-800/50 hover:bg-gray-700 rounded text-sm transition">
+                        class="records-flex records-justify-between records-items-center records-p-3 records-rounded records-text-sm  lms-button">
                         <div>
-                            <span class="font-mono text-gray-400 mr-2">{{ s.date }}</span>
-                            {% if s.book_title %}<span class="text-eva-green">{{ s.book_title }}</span>{% endif %}
+                            <span class="records-font-mono records-muted records-mr-2">{{ s.date }}</span>
+                            {% if s.book_title %}<span class="records-accent">{{ s.book_title }}</span>{% endif %}
                         </div>
-                        <div class="flex gap-2">
-                            {% if s.is_facilitator %}<span class="bg-eva-purple text-white text-xs font-bold px-2 py-0.5 rounded border border-amber-300/40">발제</span>{% endif %}
+                        <div class="records-flex records-gap-2">
+                            {% if s.is_facilitator %}<span class="records-accent-fill records-ink records-text-xs records-font-bold records-px-2 records-py-0-5 records-rounded records-border records-line">발제</span>{% endif %}
                         </div>
                     </a>
                     {% endfor %}
                 </div>
                 {% else %}
-                <p class="text-gray-500 text-sm">참여한 세미나가 없습니다.</p>
+                <p class="records-muted records-text-sm">참여한 세미나가 없습니다.</p>
                 {% endif %}
             </div>
 
-            <div class="space-y-6">
+            <div class="records-space-y-6">
                 <!-- 벽돌책 -->
-                <div class="eva-card p-5 rounded-lg">
-                    <h2 class="text-lg font-bold text-eva-orange mb-4"><i data-lucide="blocks" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 벽돌책 세션 ({{ brick_sessions|length }})</h2>
+                <div class="records-panel records-p-5 records-rounded-lg">
+                    <h2 class="records-accent records-mb-4">{{ icon('folder', 18) }} 벽돌책 세션 ({{ brick_sessions|length }})</h2>
                     {% if brick_sessions %}
-                    <div class="space-y-1.5 max-h-48 overflow-y-auto">
+                    <div class="records-space-y-1-5 records-max-h-48 records-overflow-y-auto">
                         {% for s in brick_sessions %}
                         <a href="{{ url_for('records_brick_book_detail', book_id=s.book_id) }}"
-                            class="flex justify-between items-center p-2 bg-gray-800/50 hover:bg-gray-700 rounded text-sm transition">
-                            <span class="font-semibold text-eva-orange">{{ s.book_title or '제목 없음' }}</span>
-                            <span class="font-mono text-gray-400 text-xs">{{ s.meeting_date }}</span>
+                            class="records-flex records-justify-between records-items-center records-p-2 records-rounded records-text-sm  lms-button">
+                            <span class="records-font-semibold records-accent">{{ s.book_title or '제목 없음' }}</span>
+                            <span class="records-font-mono records-muted records-text-xs">{{ s.meeting_date }}</span>
                         </a>
                         {% endfor %}
                     </div>
                     {% else %}
-                    <p class="text-gray-500 text-sm">참여한 벽돌책 세션이 없습니다.</p>
+                    <p class="records-muted records-text-sm">참여한 벽돌책 세션이 없습니다.</p>
                     {% endif %}
                 </div>
 
                 <!-- 소모임 -->
-                <div class="eva-card p-5 rounded-lg">
-                    <h2 class="text-lg font-bold text-blue-400 mb-4"><i data-lucide="handshake" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 소모임 세션 ({{ study_sessions|length }})</h2>
+                <div class="records-panel records-p-5 records-rounded-lg">
+                    <h2 class="records-accent records-mb-4">{{ icon('account', 18) }} 소모임 세션 ({{ study_sessions|length }})</h2>
                     {% if study_sessions %}
-                    <div class="space-y-1.5 max-h-48 overflow-y-auto">
+                    <div class="records-space-y-1-5 records-max-h-48 records-overflow-y-auto">
                         {% for s in study_sessions %}
                         <a href="{{ url_for('records_study_group_detail', group_id=s.group_id) }}"
-                            class="flex justify-between items-center p-2 bg-gray-800/50 hover:bg-gray-700 rounded text-sm transition">
-                            <span class="font-semibold text-blue-300">{{ s.group_name or '이름 없음' }}</span>
-                            <span class="font-mono text-gray-400 text-xs">{{ s.meeting_date }}</span>
+                            class="records-flex records-justify-between records-items-center records-p-2 records-rounded records-text-sm  lms-button">
+                            <span class="records-font-semibold records-accent">{{ s.group_name or '이름 없음' }}</span>
+                            <span class="records-font-mono records-muted records-text-xs">{{ s.meeting_date }}</span>
                         </a>
                         {% endfor %}
                     </div>
                     {% else %}
-                    <p class="text-gray-500 text-sm">참여한 소모임 세션이 없습니다.</p>
+                    <p class="records-muted records-text-sm">참여한 소모임 세션이 없습니다.</p>
                     {% endif %}
                 </div>
             </div>
         </div>
 
         <!-- 스페셜 이벤트 -->
-        <div class="eva-card p-5 rounded-lg mt-6">
-            <h2 class="text-lg font-bold text-eva-green mb-4"><i data-lucide="sparkles" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 스페셜 이벤트 ({{ (special_events or [])|length }}회)</h2>
+        <div class="records-panel records-p-5 records-rounded-lg records-mt-6">
+            <h2 class="records-accent records-mb-4">{{ icon('notice', 18) }} 스페셜 이벤트 ({{ (special_events or [])|length }}회)</h2>
             {% if special_events %}
-            <div class="overflow-y-auto max-h-96 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div class="records-overflow-y-auto records-max-h-96 records-grid records-grid-cols-1 records-sm-grid-cols-2 records-gap-2">
                 {% for ev in special_events %}
-                <div class="p-3 bg-gray-800/50 rounded text-sm">
-                    <div class="font-bold">{{ ev.name }}
-                        <span class="text-xs text-gray-500 font-normal">[{{ ev.category }}]</span>
+                <div class="records-p-3 records-tint records-rounded records-text-sm">
+                    <div class="records-font-bold">{{ ev.name }}
+                        <span class="records-text-xs records-muted records-font-normal">[{{ ev.category }}]</span>
                     </div>
-                    <div class="text-xs text-gray-400 mt-1">
+                    <div class="records-text-xs records-muted records-mt-1">
                         {{ ev.event_date }}{% if ev.end_date and ev.end_date != ev.event_date %} ~ {{ ev.end_date }}{% endif %}
                         {% if ev.location %} · {{ ev.location }}{% endif %}
                     </div>
-                    {% if ev.role and ev.role != 'attendee' %}<div class="text-xs text-eva-purple mt-1">역할: {{ ev.role }}</div>{% endif %}
+                    {% if ev.role and ev.role != 'attendee' %}<div class="records-text-xs records-accent records-mt-1">역할: {{ ev.role }}</div>{% endif %}
                 </div>
                 {% endfor %}
             </div>
             {% else %}
-            <p class="text-gray-500 text-sm">참여한 스페셜 이벤트가 없습니다.</p>
+            <p class="records-muted records-text-sm">참여한 스페셜 이벤트가 없습니다.</p>
             {% endif %}
         </div>
     </div>
-</body>
-</html>
+</div>
+{% endblock %}

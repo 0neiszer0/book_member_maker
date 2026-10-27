@@ -1,13 +1,8 @@
-<!doctype html>
-<html lang="ko">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>{{ campaign.title }} · 지원자 결과</title>{% include '_tailwind_head.html' %}
-<style>body{background:var(--paper);color:var(--ink);font-family:Pretendard,-apple-system,BlinkMacSystemFont,sans-serif}.panel{background:var(--surface);border:1px solid var(--line);border-radius:18px}.muted{color:var(--ink-soft)}.field{width:100%;border:1px solid var(--line);border-radius:11px;background:#fff;padding:.7rem .8rem;font:inherit}.label{display:grid;gap:6px;font-size:.78rem;font-weight:850;color:var(--ink-soft)}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:42px;border:0;border-radius:11px;padding:.65rem 1rem;background:var(--moss-deep);color:#fff;font-weight:850;cursor:pointer;text-decoration:none}.btn.paper{background:var(--paper-2);color:var(--ink)}.btn.danger{background:#8b4334}.pill{display:inline-block;border-radius:999px;padding:.25rem .65rem;background:var(--paper-2);font-size:.72rem;font-weight:850}.applicant-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px}.status-accepted{background:#e8efdd;color:#304923}.status-waitlisted{background:#f8edcf;color:#725414}.status-rejected{background:#f3e8e2;color:#843e2c}.status-pending{background:#eee8dc;color:#655b4e}</style>
-    {% include '_app_theme_head.html' %}
-</head>
-<body>{% include '_header.html' %}{% include '_admin_sidebar.html' %}
-<main class="max-w-7xl mx-auto px-4 lg:px-8 py-7">
+{% extends 'lms_admin_base.html' %}
+{% set lms_title='지원자 결과 관리' %}
+{% block title %}지원자 결과 관리 · 책 먹는 호반우{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_admin_aux.css') }}">{% endblock %}
+{% block content %}<div class="lms-aux">
   <a class="muted text-sm" href="{{ url_for('admin_recruitment_results') }}">← 모집 차수 목록</a><div class="mt-3 mb-6"><h1 class="text-3xl font-extrabold tracking-tight">{{ campaign.title }}</h1><p class="muted mt-2">지원자 {{ applicants|length }}명 · 발표 상태와 개인 안내를 한 명씩 수정할 수 있습니다.</p></div>
   {% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<div class="panel p-4 mb-4 {% if category != 'success' %}text-red-700{% endif %}">{{ message }}</div>{% endfor %}{% endwith %}
 
@@ -23,6 +18,7 @@
   <section><div class="flex justify-between items-end gap-3 flex-wrap mb-3"><div><h2 class="text-lg font-extrabold">지원자 명단</h2><p class="muted text-sm mt-1">발표 전 {{ status_counts.pending }} · 합격 {{ status_counts.accepted }} · 예비 {{ status_counts.waitlisted }} · 불합격 {{ status_counts.rejected }}</p></div><div class="flex gap-2"><input class="field" id="applicantSearch" placeholder="이름·학번 검색"><select class="field" id="statusFilter"><option value="">전체 결과</option>{% for value,label in status_labels.items() %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div></div>
     <div class="grid lg:grid-cols-2 gap-3" id="applicantList">{% for applicant in applicants %}<form class="applicant-card applicant-row" data-search="{{ applicant.name }} {{ applicant.student_id }}" data-status="{{ applicant.result_status }}" method="post" action="{{ url_for('admin_recruitment_result_update_applicant', campaign_id=campaign.id, applicant_id=applicant.id) }}"><div class="flex justify-between gap-2 mb-3"><strong>{{ applicant.name }}</strong><span class="pill status-{{ applicant.result_status }}">{{ status_labels.get(applicant.result_status, '발표 전') }}</span></div><div class="grid sm:grid-cols-2 gap-2"><label class="label">이름<input class="field" name="name" value="{{ applicant.name }}" required maxlength="80"></label><label class="label">학번<input class="field" name="student_id" value="{{ applicant.student_id }}" required inputmode="numeric" maxlength="20"></label></div><label class="label mt-2">결과<select class="field" name="result_status">{% for value,label in status_labels.items() %}<option value="{{ value }}" {% if value == applicant.result_status %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label><label class="label mt-2">개인 안내<textarea class="field" name="personal_message" rows="2" maxlength="3000">{{ applicant.personal_message or '' }}</textarea></label><div class="flex gap-2 mt-3"><button class="btn flex-1" type="submit">저장</button><button class="btn danger" type="submit" formaction="{{ url_for('admin_recruitment_result_delete_applicant', campaign_id=campaign.id, applicant_id=applicant.id) }}" onclick="return confirm('이 지원자를 명단에서 삭제할까요?')">삭제</button></div></form>{% else %}<div class="panel p-8 muted text-center lg:col-span-2">위 붙여넣기 칸에서 지원자 명단을 먼저 추가해주세요.</div>{% endfor %}</div>
   </section>
-</main>
+</div>
 <script>document.getElementById('copyLink').addEventListener('click',async()=>{await navigator.clipboard.writeText(document.getElementById('shareLink').value);document.getElementById('copyLink').textContent='복사됨'});const search=document.getElementById('applicantSearch'),filter=document.getElementById('statusFilter');function applyFilter(){const q=search.value.trim().toLowerCase(),status=filter.value;document.querySelectorAll('.applicant-row').forEach(row=>{row.hidden=!!((q&&!row.dataset.search.toLowerCase().includes(q))||(status&&row.dataset.status!==status))})}search.addEventListener('input',applyFilter);filter.addEventListener('change',applyFilter)</script>
-</body></html>
+
+{% endblock %}

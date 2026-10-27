@@ -1,48 +1,50 @@
+{% extends 'lms_admin_base.html' %}
 {% from '_records_base.html' import records_nav %}
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <title>{{ group.name }} - 소모임</title>
-    {% include '_records_base.html' %}
-    {% include '_app_theme_head.html' %}
-</head>
-<body class="min-h-screen">
-    {% include '_header.html' %}
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
-        {{ records_nav('study') }}
-        <a href="{{ url_for('records_study_groups') }}" class="text-sm text-gray-400 hover:text-eva-green mb-4 inline-block">← 소모임 목록</a>
+{% from '_lms_icons.html' import icon %}
+{% set lms_title = '소모임 기록' %}
+{% set lms_page = 'records' %}
+{% block title %}{{ group.name }} - 소모임{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='lms_records.css') }}">
 
-        <div class="eva-card p-6 rounded-lg mb-6">
-            <div class="flex justify-between items-start">
+{% endblock %}
+{% block content %}
+<div class="records-page">
+<div class="records-content">
+        {{ records_nav('study') }}
+        <a href="{{ url_for('records_study_groups') }}" class="records-text-sm records-muted records-link-hover records-mb-4 records-inline-block">← 소모임 목록</a>
+
+        <div class="records-panel records-p-6 records-rounded-lg records-mb-6">
+            <div class="records-flex records-justify-between records-items-start">
                 <div>
-                    <h1 class="text-2xl font-bold text-blue-300"><i data-lucide="handshake" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> {{ group.name }}</h1>
-                    {% if group.notes %}<p class="text-gray-400 text-sm mt-1">{{ group.notes }}</p>{% endif %}
+                    <h1 class="records-accent">{{ icon('account', 18) }} {{ group.name }}</h1>
+                    {% if group.notes %}<p class="records-muted records-text-sm records-mt-1">{{ group.notes }}</p>{% endif %}
                 </div>
                 <button onclick="deleteGroup()"
-                    class="text-xs bg-red-700 hover:bg-red-600 text-white px-3 py-1.5 rounded">삭제</button>
+                    class="records-text-xs records-px-3 records-py-1-5 records-rounded lms-button records-danger">삭제</button>
             </div>
         </div>
 
         <!-- 세션 추가 폼 -->
-        <div class="eva-card p-5 rounded-lg mb-6">
-            <h2 class="text-lg font-bold text-eva-green mb-4">+ 새 세션 추가</h2>
-            <div class="flex flex-col md:flex-row gap-3">
+        <div class="records-panel records-p-5 records-rounded-lg records-mb-6">
+            <h2 class="records-accent records-mb-4">+ 새 세션 추가</h2>
+            <div class="records-flex records-flex-col md:flex-row records-gap-3">
                 <div>
-                    <label class="block text-xs text-gray-400 mb-1">날짜 *</label>
+                    <label class="records-block records-text-xs records-muted records-mb-1">날짜 *</label>
                     <input type="date" id="sessionDate"
-                        class="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm">
+                        class="records-tint records-border records-line records-rounded records-px-3 records-py-2 records-text-sm">
                 </div>
-                <div class="flex-1">
-                    <label class="block text-xs text-gray-400 mb-1">메모</label>
+                <div class="records-flex-1">
+                    <label class="records-block records-text-xs records-muted records-mb-1">메모</label>
                     <input type="text" id="sessionNotes" placeholder="(선택)"
-                        class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm">
+                        class="records-w-full records-tint records-border records-line records-rounded records-px-3 records-py-2 records-text-sm">
                 </div>
             </div>
-            <div class="mt-3">
-                <label class="block text-xs text-gray-400 mb-2">참여자 선택 (복수 가능)</label>
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+            <div class="records-mt-3">
+                <label class="records-block records-text-xs records-muted records-mb-2">참여자 선택 (복수 가능)</label>
+                <div class="records-grid records-grid-cols-2 records-sm-grid-cols-3 records-md-grid-cols-4 records-gap-2 records-max-h-48 records-overflow-y-auto">
                     {% for m in all_members %}
-                    <label class="flex items-center gap-2 text-sm cursor-pointer hover:text-eva-green">
+                    <label class="records-flex records-items-center records-gap-2 records-text-sm records-cursor-pointer records-link-hover">
                         <input type="checkbox" class="member-check" value="{{ m.id }}">
                         {{ m.name }}
                     </label>
@@ -50,35 +52,35 @@
                 </div>
             </div>
             <button onclick="addSession()"
-                class="mt-4 bg-eva-green text-black font-bold py-2 px-4 rounded text-sm hover:opacity-80">세션 등록</button>
+                class="records-mt-4 records-font-bold records-py-2 records-px-4 records-rounded records-text-sm  lms-button lms-button-primary">세션 등록</button>
         </div>
 
         <!-- 세션 목록 -->
-        <div class="space-y-4">
-            <h2 class="text-lg font-bold text-eva-green">세션 기록 ({{ sessions|length }}회)</h2>
+        <div class="records-space-y-4">
+            <h2 class="records-accent">세션 기록 ({{ sessions|length }}회)</h2>
             {% for s in sessions %}
-            <div class="eva-card p-5 rounded-lg">
-                <div class="flex justify-between items-start mb-3">
+            <div class="records-panel records-p-5 records-rounded-lg">
+                <div class="records-flex records-justify-between records-items-start records-mb-3">
                     <div>
-                        <span class="font-mono font-bold text-gray-200">{{ s.meeting_date }}</span>
-                        {% if s.notes %}<span class="text-gray-400 text-sm ml-3">{{ s.notes }}</span>{% endif %}
+                        <span class="records-font-mono records-font-bold records-ink">{{ s.meeting_date }}</span>
+                        {% if s.notes %}<span class="records-muted records-text-sm records-ml-3">{{ s.notes }}</span>{% endif %}
                     </div>
                     <button onclick="deleteSession('{{ s.id }}', '{{ s.meeting_date }}')"
-                        class="text-xs bg-red-700 hover:bg-red-600 text-white px-2 py-1 rounded">삭제</button>
+                        class="records-text-xs records-px-2 records-py-1 records-rounded lms-button records-danger">삭제</button>
                 </div>
-                <div class="flex flex-wrap gap-2">
+                <div class="records-flex records-flex-wrap records-gap-2">
                     {% for m in s.members %}
                     <a href="{{ url_for('records_member_profile', member_id=m.id) }}"
-                        class="bg-gray-700 hover:bg-gray-600 text-gray-200 px-3 py-1 rounded-full text-sm transition">
+                        class="records-ink records-px-3 records-py-1 records-rounded-full records-text-sm  lms-button">
                         {{ m.name }}
                     </a>
                     {% else %}
-                    <span class="text-gray-500 text-sm">참여자 없음</span>
+                    <span class="records-muted records-text-sm">참여자 없음</span>
                     {% endfor %}
                 </div>
             </div>
             {% else %}
-            <div class="eva-card p-8 rounded-lg text-center text-gray-500">아직 기록된 세션이 없습니다.</div>
+            <div class="records-panel records-p-8 records-rounded-lg records-text-center records-muted">아직 기록된 세션이 없습니다.</div>
             {% endfor %}
         </div>
     </div>
@@ -117,5 +119,5 @@
             else alert('실패: ' + (data.message || '오류'));
         }
     </script>
-</body>
-</html>
+</div>
+{% endblock %}

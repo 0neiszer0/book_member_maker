@@ -1,19 +1,16 @@
-<!doctype html>
-<html lang="ko">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>운영 관리 개요</title>
-  {% include '_tailwind_head.html' %}
-  {% include '_app_theme_head.html' %}
-</head>
-<body>
-{% include '_header.html' %}
-{% include '_admin_sidebar.html' %}
+{% extends 'lms_admin_base.html' %}
+{% from '_lms_icons.html' import icon %}
+{% set lms_page = 'operations' %}
+{% set lms_title = '이번 주 운영 개요' %}
+{% block title %}운영 관리 개요{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_operations.css') }}">{% endblock %}
+
+{% block content %}
+<div class="lms-operations">
 {% set active_terms = seminar_terms|selectattr('is_active')|list %}
 {% set active_topics = topic_events|selectattr('is_active')|list %}
 
-<main class="admin-overview-shell max-w-7xl mx-auto px-4 lg:px-8 py-7">
+<div class="lms-operations-body">
   <header class="overview-head">
     <div>
       <p class="overview-eyebrow">운영 관리</p>
@@ -23,11 +20,7 @@
     <a class="overview-guide-link" href="{{ url_for('help_admin') }}">운영 가이드</a>
   </header>
 
-  {% with messages=get_flashed_messages(with_categories=true) %}
-    {% for category,message in messages %}
-      <div class="overview-flash {% if category != 'success' %}overview-flash-error{% endif %}" role="status">{{ message }}</div>
-    {% endfor %}
-  {% endwith %}
+
 
   {% if load_error %}
     {% include '_load_error.html' %}
@@ -137,6 +130,10 @@
     </div>
   </section>
   {% endif %}
-</main>
-</body>
-</html>
+</div>
+</div>
+{% endblock %}
+{% block scripts %}
+
+
+{% endblock %}

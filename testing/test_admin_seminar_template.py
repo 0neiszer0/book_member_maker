@@ -11,7 +11,8 @@ class AdminSeminarTemplateTests(unittest.TestCase):
     def test_topic_actions_do_not_stretch_to_card_height(self):
         self.assertIn('flex flex-wrap items-start justify-between', self.source)
         self.assertIn('flex items-center self-start gap-2 flex-wrap', self.source)
-        self.assertIn('.chip{display:inline-flex;flex:none;', self.source)
+        css = (Path(__file__).parents[1] / 'static' / 'lms_operations.css').read_text(encoding='utf-8')
+        self.assertRegex(css, r'\.lms-operations :is\(\.chip[^)]*\)\{display:inline-flex;flex:none;')
 
     def test_bulk_absence_picker_is_present(self):
         self.assertIn('여러 명 한 번에 선택', self.source)
