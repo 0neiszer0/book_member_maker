@@ -1,3 +1,4 @@
 infra/minipc/*.sh text eol=lf
 infra/minipc/*.service text eol=lf
+infra/minipc/*.timer text eol=lf
 infra/minipc/*.example text eol=lf
