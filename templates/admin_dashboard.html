@@ -1,140 +1,20 @@
-<!DOCTYPE html>
-<html lang="ko">
+{% extends 'lms_admin_base.html' %}
+{% from '_lms_icons.html' import icon %}
+{% set lms_page = 'operations' %}
+{% set lms_title = '관리자 대시보드' %}
+{% block title %}관리자 대시보드{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_operations.css') }}">{% endblock %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>관리자 대시보드</title>
-    {% include '_tailwind_head.html' %}
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap"
-        rel="stylesheet">
-    <style>
-        :root {
-            --eva-purple: #7A5A3A;
-            --eva-green: #3D5C2E;
-            --eva-orange: #C97A3A;
-            --bg-dark: #FAF6EC;
-            --card-dark: #FFFCF3;
-            --text-light: #2A241B;
-            --border-dark: #C9B38A;
-        }
+{% block content %}
+<div class="lms-operations">
+<div class="lms-operations-body">
 
-        body {
-            font-family: 'Noto Sans KR', sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-light);
-        }
-
-        h1,
-        h2,
-        h3,
-        h4,
-        h5,
-        h6 {
-            font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
-
-
-        }
-
-        .eva-card {
-            background-color: var(--card-dark);
-            border: 1px solid var(--border-dark);
-        }
-
-        .eva-button-primary {
-            background-color: var(--eva-purple);
-            color: white;
-        }
-
-        .eva-button-primary:hover {
-            background-color: var(--walnut);
-        }
-
-        .eva-button-secondary {
-            background-color: var(--paper-2);
-            color: var(--text-light);
-        }
-
-        .eva-button-secondary:hover {
-            background-color: var(--moss-tint);
-        }
-
-        .eva-button-delete {
-            background-color: var(--eva-orange);
-            color: white;
-        }
-
-        .eva-button-delete:hover {
-            background-color: var(--danger);
-        }
-
-        .eva-link {
-            color: var(--eva-green);
-        }
-
-        .eva-link:hover {
-            color: var(--moss);
-        }
-
-        .eva-table-header {
-            background-color: var(--walnut-tint);
-        }
-
-        .eva-table-row:nth-child(even) {
-            background-color: var(--paper-2);
-        }
-
-        .eva-input {
-            background-color: #FAF6EC;
-            border-color: var(--border-dark);
-            color: var(--text-light);
-            cursor: pointer;
-        }
-
-        .eva-input:focus {
-            border-color: var(--eva-green);
-            outline: none;
-            box-shadow: 0 0 0 2px var(--eva-green);
-        }
-
-        .eva-toggle-bg {
-            background-color: var(--oak);
-        }
-
-        input.event-toggle:checked+.eva-toggle-bg {
-            background-color: var(--eva-green);
-        }
-
-        .member-toggle~.dot {
-            transition: transform .2s ease-in-out;
-        }
-
-        .member-toggle:checked~.dot {
-            transform: translateX(1.5rem);
-        }
-    </style>
-    {% include '_app_theme_head.html' %}
-</head>
-
-<body class="min-h-screen">
-    {% include '_header.html' %}
-
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}{% for category, message in messages %}
-        <div class="p-4 mb-4 text-sm rounded-lg {{ 'bg-green-900 text-green-200' if category == 'success' else 'bg-red-900 text-red-200' }}"
-            role="alert">{{ message }}</div>
-        {% endfor %}{% endif %}
-        {% endwith %}
 
         <!-- 페이지 내 섹션 빠른 이동 (전역 메뉴는 상단 헤더 사용) -->
-        <nav class="eva-card rounded-lg p-3 mb-6">
+        <nav class="ops-panel rounded-lg p-3 mb-6">
             <div class="flex flex-wrap gap-2 items-center text-sm">
                 <span class="text-xs text-gray-400 mr-1">이 페이지:</span>
-                <a href="{{ url_for('admin_seminars') }}" class="px-3 py-1 rounded bg-eva-green text-black font-bold transition">세미나 운영</a>
+                <a href="{{ url_for('admin_seminars') }}" class="px-3 py-1 rounded ops-primary text-black font-bold transition">세미나 운영</a>
                 <a href="#sec-members" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 transition">회원</a>
             </div>
         </nav>
@@ -142,38 +22,38 @@
         <!-- 추가 관리 도구 -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <a href="{{ url_for('admin_seminars') }}"
-                class="eva-card rounded-lg p-4 hover:border-eva-green transition flex items-center justify-between">
-                <div><div class="font-bold text-eva-green">세미나 운영</div><div class="text-xs text-gray-400 mt-1">도서·발제문·카카오톡 참석/불참 명단·조 편성·실제 출석</div></div><span class="text-2xl">→</span>
+                class="ops-panel rounded-lg p-4 hover:ops-border transition flex items-center justify-between">
+                <div><div class="font-bold ops-accent">세미나 운영</div><div class="text-xs text-gray-400 mt-1">도서·발제문·카카오톡 참석/불참 명단·조 편성·실제 출석</div></div><span class="text-2xl">→</span>
             </a>
             <a href="{{ url_for('admin_special_events') }}"
-                class="eva-card rounded-lg p-4 hover:border-eva-green transition flex items-center justify-between">
+                class="ops-panel rounded-lg p-4 hover:ops-border transition flex items-center justify-between">
                 <div>
-                    <div class="font-bold text-eva-green"><i data-lucide="sparkles" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 스페셜 이벤트</div>
+                    <div class="font-bold ops-accent">{{ icon('notice',18) }} 스페셜 이벤트</div>
                     <div class="text-xs text-gray-400 mt-1">MT, 워크숍, 강연 등 세미나 외 활동</div>
                 </div>
                 <span class="text-2xl">→</span>
             </a>
             <a href="{{ url_for('admin_attendance_matrix') }}"
-                class="eva-card rounded-lg p-4 hover:border-eva-green transition flex items-center justify-between">
+                class="ops-panel rounded-lg p-4 hover:ops-border transition flex items-center justify-between">
                 <div>
-                    <div class="font-bold text-eva-green"><i data-lucide="chart-column" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 출석 매트릭스</div>
+                    <div class="font-bold ops-accent">{{ icon('dashboard',18) }} 출석 매트릭스</div>
                     <div class="text-xs text-gray-400 mt-1">기간별 회원×회차 표 + 엑셀 내보내기</div>
                 </div>
                 <span class="text-2xl">→</span>
             </a>
             <a href="{{ url_for('admin_seminar_rooms') }}"
-                class="eva-card rounded-lg p-4 hover:border-eva-green transition flex items-center justify-between">
+                class="ops-panel rounded-lg p-4 hover:ops-border transition flex items-center justify-between">
                 <div>
-                    <div class="font-bold text-eva-green"><i data-lucide="calendar-days" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 세미나실 예약 현황</div>
+                    <div class="font-bold ops-accent">{{ icon('calendar',18) }} 세미나실 예약 현황</div>
                     <div class="text-xs text-gray-400 mt-1">총동연 게시판 캐시 · 달력 보기 · 다른 동아리 예약 확인</div>
                 </div>
                 <span class="text-2xl">→</span>
             </a>
             {% if latest_history %}
             <a href="{{ url_for('records_seminar_detail', history_id=latest_history.id) }}"
-                class="eva-card rounded-lg p-4 hover:border-eva-green transition flex items-center justify-between">
+                class="ops-panel rounded-lg p-4 hover:ops-border transition flex items-center justify-between">
                 <div>
-                    <div class="font-bold text-eva-green">최근 조 편성 수정</div>
+                    <div class="font-bold ops-accent">최근 조 편성 수정</div>
                     <div class="text-xs text-gray-400 mt-1">{{ latest_history.date }}{% if latest_history.book_title %} · {{ latest_history.book_title }}{% endif %} — 인원 추가·제외, 조 이동</div>
                 </div>
                 <span class="text-2xl">→</span>
@@ -183,22 +63,22 @@
 
         <div class="space-y-8">
 
-                <div id="sec-topics" class="hidden eva-card p-6 rounded-lg shadow-lg border-eva-purple scroll-mt-20">
-                    <h2 class="text-xl font-bold text-eva-green mb-4 border-b border-border-dark pb-2">주간 발제문 관리</h2>
+                <div id="sec-topics" class="hidden ops-panel p-6 rounded-lg shadow-lg ops-border scroll-mt-20">
+                    <h2 class="text-xl font-bold ops-accent mb-4 border-b ops-border pb-2">주간 발제문 관리</h2>
 
                     <form id="createTopicEventForm" class="flex flex-col sm:flex-row gap-4 mb-6">
                         <div class="flex-1">
                             <label class="block text-xs text-gray-400 mb-1">모임 날짜</label>
-                            <input type="date" id="topicDate" class="eva-input w-full rounded p-2" required>
+                            <input type="date" id="topicDate" class="ops-field w-full rounded p-2" required>
                         </div>
                         <div class="flex-[2]">
                             <label class="block text-xs text-gray-400 mb-1">책 제목</label>
-                            <input type="text" id="topicBookTitle" class="eva-input w-full rounded p-2"
+                            <input type="text" id="topicBookTitle" class="ops-field w-full rounded p-2"
                                 placeholder="예: 코스모스" required>
                         </div>
                         <div class="flex-[2]">
                             <label class="block text-xs text-gray-400 mb-1">책 저자</label>
-                            <input type="text" id="topicBookAuthor" class="eva-input w-full rounded p-2"
+                            <input type="text" id="topicBookAuthor" class="ops-field w-full rounded p-2"
                                 placeholder="예: 칼 세이건">
                         </div>
                         <div class="flex items-end">
@@ -224,7 +104,7 @@
                                 <tr class="border-b border-gray-800 hover:bg-gray-800/50 transition-colors {% if not event.is_active %}opacity-60{% endif %}"
                                     data-event-id="{{ event.id }}">
                                     <td class="p-3">{{ event.meeting_date }}</td>
-                                    <td class="p-3 font-bold text-text-light">{{ event.book_title }}</td>
+                                    <td class="p-3 font-bold ops-ink">{{ event.book_title }}</td>
                                     <td class="p-3">
                                         <span class="status-badge px-2 py-1 rounded text-xs font-bold
                                             {% if event.is_active %}bg-green-900/50 text-green-400{% else %}bg-gray-700 text-gray-400{% endif %}">
@@ -263,11 +143,11 @@
                 </div>
 
                 <!-- 스페셜 이벤트 (MT/워크숍/강연/친목) -->
-                <div id="sec-special" class="eva-card p-6 rounded-lg scroll-mt-20 mb-6">
+                <div id="sec-special" class="ops-panel p-6 rounded-lg scroll-mt-20 mb-6">
                     <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
-                        <h2 class="text-xl font-bold text-eva-green"><i data-lucide="party-popper" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 스페셜 이벤트</h2>
+                        <h2 class="text-xl font-bold ops-accent">{{ icon('notice',18) }} 스페셜 이벤트</h2>
                         <a href="{{ url_for('admin_special_events') }}"
-                           class="text-sm bg-eva-green text-black font-bold px-3 py-1.5 rounded hover:opacity-80">
+                           class="text-sm ops-primary text-black font-bold px-3 py-1.5 rounded hover:opacity-80">
                             관리 페이지로 →
                         </a>
                     </div>
@@ -278,11 +158,11 @@
                 </div>
 
                 <!-- 출석 매트릭스 (관리자 도구) -->
-                <div class="eva-card p-6 rounded-lg scroll-mt-20 mb-6">
+                <div class="ops-panel p-6 rounded-lg scroll-mt-20 mb-6">
                     <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
-                        <h2 class="text-xl font-bold text-eva-green"><i data-lucide="chart-column" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 출석 매트릭스</h2>
+                        <h2 class="text-xl font-bold ops-accent">{{ icon('dashboard',18) }} 출석 매트릭스</h2>
                         <a href="{{ url_for('admin_attendance_matrix') }}"
-                           class="text-sm bg-eva-green text-black font-bold px-3 py-1.5 rounded hover:opacity-80">
+                           class="text-sm ops-primary text-black font-bold px-3 py-1.5 rounded hover:opacity-80">
                             매트릭스 보기 →
                         </a>
                     </div>
@@ -292,10 +172,10 @@
                 </div>
 
                 <!-- 세미나 출석 투표 관리 -->
-                <div id="sec-seminars" class="hidden eva-card p-6 rounded-lg scroll-mt-20">
-                    <h2 class="text-xl font-bold text-eva-green mb-4">세미나 출석 투표 관리</h2>
+                <div id="sec-seminars" class="hidden ops-panel p-6 rounded-lg scroll-mt-20">
+                    <h2 class="text-xl font-bold ops-accent mb-4">세미나 출석 투표 관리</h2>
                     <p class="text-xs text-gray-500 mb-4">
-                        <i data-lucide="lightbulb" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 투표는 세미나 <strong>전주 금요일 18:00 ~ 일요일 23:59 KST</strong>까지 가능합니다.
+                        {{ icon('help',18) }} 투표는 세미나 <strong>전주 금요일 18:00 ~ 일요일 23:59 KST</strong>까지 가능합니다.
                         그 후엔 회차 관리에서 관리자가 직접 명단을 수정하세요.
                     </p>
 
@@ -322,7 +202,7 @@
                         </div>
                         <div class="md:col-span-5">
                             <button type="submit"
-                                class="bg-eva-green text-black font-bold py-1.5 px-4 rounded text-sm hover:opacity-80">
+                                class="ops-primary text-black font-bold py-1.5 px-4 rounded text-sm hover:opacity-80">
                                 + 새 학기 만들기 (월/목 회차 자동 생성)
                             </button>
                         </div>
@@ -331,7 +211,7 @@
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm">
                             <thead>
-                                <tr class="border-b border-border-dark text-left text-gray-400">
+                                <tr class="border-b ops-border text-left text-gray-400">
                                     <th class="p-3">학기명</th>
                                     <th class="p-3">기간</th>
                                     <th class="p-3 text-center">회차 수</th>
@@ -342,7 +222,7 @@
                             </thead>
                             <tbody>
                                 {% for term in seminar_terms %}
-                                <tr class="border-b border-border-dark/50 hover:bg-gray-700/30">
+                                <tr class="border-b ops-border/50 hover:bg-gray-700/30">
                                     <td class="p-3 font-semibold">{{ term.name }}</td>
                                     <td class="p-3 text-gray-300">{{ term.start_date }} ~ {{ term.end_date }}</td>
                                     <td class="p-3 text-center">{{ term.session_count }}</td>
@@ -381,17 +261,17 @@
                     </div>
                 </div>
 
-                <div id="sec-members" class="eva-card p-6 rounded-lg scroll-mt-20">
+                <div id="sec-members" class="ops-panel p-6 rounded-lg scroll-mt-20">
                     <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-bold text-eva-green">Member Management</h2>
+                        <h2 class="text-xl font-bold ops-accent">Member Management</h2>
                         <button onclick="openAddMemberModal()"
-                            class="bg-eva-green text-black font-bold py-1.5 px-4 rounded text-sm hover:opacity-80">+ 멤버
+                            class="ops-primary text-black font-bold py-1.5 px-4 rounded text-sm hover:opacity-80">+ 멤버
                             추가</button>
                     </div>
 
                     <!-- [신규] 탭 마크업 추가 -->
-                    <div class="flex border-b border-border-dark mb-4 space-x-4">
-                        <button class="member-tab active pb-2 border-b-2 border-eva-green text-eva-green font-bold px-2"
+                    <div class="flex border-b ops-border mb-4 space-x-4">
+                        <button class="member-tab active pb-2 border-b-2 ops-border ops-accent font-bold px-2"
                             data-target="active">활성 <span class="tab-count text-xs ml-1"></span></button>
                         <button
                             class="member-tab pb-2 border-b-2 border-transparent text-gray-400 hover:text-gray-200 px-2"
@@ -449,7 +329,7 @@
     <div id="memberModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
         <div class="bg-gray-800 border border-gray-600 rounded-xl p-6 w-full max-w-md shadow-2xl">
             <div class="flex justify-between items-center mb-5">
-                <h3 id="memberModalTitle" class="text-lg font-bold text-eva-green">멤버 추가</h3>
+                <h3 id="memberModalTitle" class="text-lg font-bold ops-accent">멤버 추가</h3>
                 <button onclick="closeMemberModal()"
                     class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
             </div>
@@ -457,29 +337,29 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-sm font-medium mb-1">이름 <span class="text-red-400">*</span></label>
-                        <input id="mName" type="text" required class="eva-input w-full px-3 py-2 rounded-md"
+                        <input id="mName" type="text" required class="ops-field w-full px-3 py-2 rounded-md"
                             placeholder="홍길동">
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1">학번</label>
-                        <input id="mStudentId" type="text" class="eva-input w-full px-3 py-2 rounded-md"
+                        <input id="mStudentId" type="text" class="ops-field w-full px-3 py-2 rounded-md"
                             placeholder="2024XXXXXX">
                     </div>
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-1">이메일</label>
-                    <input id="mEmail" type="email" class="eva-input w-full px-3 py-2 rounded-md"
+                    <input id="mEmail" type="email" class="ops-field w-full px-3 py-2 rounded-md"
                         placeholder="example@knu.ac.kr">
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-1">학과</label>
-                    <input id="mDepartment" type="text" class="eva-input w-full px-3 py-2 rounded-md"
+                    <input id="mDepartment" type="text" class="ops-field w-full px-3 py-2 rounded-md"
                         placeholder="컴퓨터학부">
                 </div>
                 <div class="grid grid-cols-3 gap-3">
                     <div>
                         <label class="block text-sm font-medium mb-1">성별</label>
-                        <select id="mGender" class="eva-input w-full px-3 py-2 rounded-md">
+                        <select id="mGender" class="ops-field w-full px-3 py-2 rounded-md">
                             <option value="">선택</option>
                             <option value="M">남성</option>
                             <option value="W">여성</option>
@@ -487,12 +367,12 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1">기수</label>
-                        <input id="mRecruitingClass" type="number" class="eva-input w-full px-3 py-2 rounded-md"
+                        <input id="mRecruitingClass" type="number" class="ops-field w-full px-3 py-2 rounded-md"
                             placeholder="12">
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1">역할</label>
-                        <select id="mRole" class="eva-input w-full px-3 py-2 rounded-md">
+                        <select id="mRole" class="ops-field w-full px-3 py-2 rounded-md">
                             <option value="member">일반 멤버</option>
                             <option value="officer">임원</option>
                             <option value="admin">관리자</option>
@@ -500,12 +380,16 @@
                     </div>
                 </div>
                 <button type="submit"
-                    class="w-full bg-eva-green text-black font-bold py-2 px-4 rounded-lg hover:opacity-80 mt-2">저장</button>
+                    class="w-full ops-primary text-black font-bold py-2 px-4 rounded-lg hover:opacity-80 mt-2">저장</button>
             </form>
         </div>
     </div>
 
-    <script>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
         document.addEventListener('DOMContentLoaded', () => {
 
 
@@ -545,7 +429,7 @@
             try {
                 const response = await fetch(`/api/admin/members/${memberId}/set_status`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'X-App-CSRF': document.querySelector('meta[name="lms-csrf"]').content },
                     body: JSON.stringify({ member_status: status })
                 });
                 const result = await response.json();
@@ -584,7 +468,7 @@
         async function deleteMember(memberId, name) {
             if (!confirm(`정말로 '${name}' 멤버를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
             try {
-                const response = await fetch(`/api/admin/members/${memberId}/delete`, { method: 'POST' });
+                const response = await fetch(`/api/admin/members/${memberId}/delete`, { method: 'POST', headers: { 'X-App-CSRF': document.querySelector('meta[name="lms-csrf"]').content } });
                 const result = await response.json();
                 if (result.status === 'success') {
                     document.getElementById(`member-row-${memberId}`)?.remove();
@@ -639,7 +523,7 @@
             try {
                 const response = await fetch(url, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'X-App-CSRF': document.querySelector('meta[name="lms-csrf"]').content },
                     body: JSON.stringify(payload)
                 });
                 const result = await response.json();
@@ -827,12 +711,12 @@
             tab.addEventListener('click', (e) => {
                 // 1. 모든 탭에서 활성화 스타일 제거
                 document.querySelectorAll('.member-tab').forEach(t => {
-                    t.classList.remove('active', 'border-eva-green', 'text-eva-green', 'font-bold');
+                    t.classList.remove('active', 'ops-border', 'ops-accent', 'font-bold');
                     t.classList.add('border-transparent', 'text-gray-400');
                 });
                 // 2. 클릭된 탭에 활성화 스타일 적용
                 const clickedTab = e.currentTarget;
-                clickedTab.classList.add('active', 'border-eva-green', 'text-eva-green', 'font-bold');
+                clickedTab.classList.add('active', 'ops-border', 'ops-accent', 'font-bold');
                 clickedTab.classList.remove('border-transparent', 'text-gray-400');
 
                 // 3. 목록 필터링
@@ -845,6 +729,5 @@
             filterMembers('active');
         });
     </script>
-</body>
 
-</html>
+{% endblock %}

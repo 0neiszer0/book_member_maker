@@ -54,10 +54,11 @@ class FlaskRenderSmokeTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.app_module.supabase = cls.original_supabase
 
-    def assert_common_head(self, html, expect_tailwind=True):
-        self.assertIn('/static/theme.css', html)
-        if expect_tailwind:
-            self.assertIn('/static/tailwind.css', html)
+    def assert_common_head(self, html):
+        self.assertIn('/static/lms.css', html)
+        self.assertIn('name="app-layout" content="canvas"', html)
+        self.assertNotIn('/static/theme.css', html)
+        self.assertNotIn('/static/tailwind.css', html)
         self.assertNotIn('cdn.tailwindcss.com', html)
 
     def authenticated_client(self):
@@ -81,7 +82,7 @@ class FlaskRenderSmokeTests(unittest.TestCase):
             self.assertNotIn(legacy_asset, html)
         self.assertIn('property="og:title"', html)
         self.assertEqual(home.headers['X-Content-Type-Options'], 'nosniff')
-        self.assert_common_head(login.get_data(as_text=True), expect_tailwind=False)
+        self.assert_common_head(login.get_data(as_text=True))
 
     def test_admin_record_pages_render_with_one_feedback_widget(self):
         client = self.authenticated_client()
@@ -92,7 +93,7 @@ class FlaskRenderSmokeTests(unittest.TestCase):
                 html = response.get_data(as_text=True)
                 self.assert_common_head(html)
                 self.assertEqual(
-                    html.count('<dialog id="wd-bug-report-dialog"'),
+                    html.count('id="lms-feedback-dialog"'),
                     1,
                 )
 

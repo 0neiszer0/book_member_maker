@@ -1,124 +1,17 @@
-{# 기록 시스템 공통 head — 다른 records_*.html 에서 {% include %} 로 사용 #}
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-{% include '_tailwind_head.html' %}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link
-    href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap"
-    rel="stylesheet">
-<style>
-    :root {
-        --eva-purple: #7A5A3A;
-        --eva-green: #3D5C2E;
-        --eva-orange: #C97A3A;
-        --bg-dark: #FAF6EC;
-        --card-dark: #FFFCF3;
-        --text-light: #2A241B;
-        --border-dark: #C9B38A;
-    }
-
-    body {
-        font-family: 'Noto Sans KR', sans-serif;
-        background-color: var(--bg-dark);
-        color: var(--text-light);
-    }
-
-    h1, h2, h3 {
-        font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
-        letter-spacing: 0.04em;
-    }
-
-    .eva-card {
-        background-color: var(--card-dark);
-        border: 1px solid var(--border-dark);
-    }
-
-    .eva-card:hover {
-        border-color: var(--eva-green);
-    }
-
-    .text-eva-green { color: var(--eva-green); }
-    .text-eva-purple { color: var(--eva-purple); }
-    .bg-eva-purple { background-color: #76501f; }
-    .text-eva-orange { color: var(--eva-orange); }
-    .bg-eva-green { background-color: var(--eva-green); }
-    .border-eva-green { border-color: var(--eva-green); }
-    .border-border-dark { border-color: var(--border-dark); }
-
-    /* 기록 시스템 서브탭 — 운영 메뉴 다음 줄에서 문서 흐름대로 표시한다.
-       두 메뉴를 모두 sticky로 두면 중간 폭 화면에서 서로 겹친다. */
-    .records-subbar {
-        background-color: var(--card-dark);
-        border-bottom: 1px solid var(--border-dark);
-        position: static;
-    }
-    .records-subbar-inner {
-        display: flex;
-        gap: 0.25rem;
-        overflow-x: auto;
-        padding: 0.4rem 0;
-    }
-    .records-tab {
-        display: inline-block;
-        padding: 0.4rem 0.9rem;
-        border-radius: 0.4rem;
-        background-color: transparent;
-        color: #756A59;
-        font-weight: 600;
-        font-size: 0.85rem;
-        text-decoration: none;
-        border: 1px solid transparent;
-        white-space: nowrap;
-    }
-
-    .records-tab.active {
-        background-color: rgba(92, 122, 74, 0.14);
-        color: var(--eva-green);
-        border-color: rgba(61, 92, 46, 0.35);
-    }
-
-    .records-tab:hover {
-        color: var(--eva-green);
-        background-color: rgba(255, 255, 255, 0.04);
-    }
-
-    .genre-pill {
-        display: inline-block;
-        padding: 0.15rem 0.6rem;
-        border-radius: 999px;
-        font-size: 0.7rem;
-        background-color: rgba(122, 90, 58, 0.14);
-        color: #7A5A3A;
-        border: 1px solid rgba(122, 90, 58, 0.35);
-    }
-
-    .status-pill {
-        display: inline-block;
-        padding: 0.15rem 0.6rem;
-        border-radius: 999px;
-        font-size: 0.7rem;
-        font-weight: bold;
-    }
-
-    .status-active { background-color: rgba(92, 122, 74, 0.20); color: var(--eva-green); }
-    .status-done { background-color: var(--paper-2); color: var(--ink-soft); }
-    .status-paused { background-color: rgba(201, 122, 58, 0.14); color: #81551A; }
-</style>
-
+{% from '_lms_icons.html' import icon %}
 {# 노션식 장르 셀렉터 — 표시 영역 한 곳에서 끌어다 사용 #}
 {% macro genre_selector(name, current, genres, with_label=true) %}
 <div class="genre-selector-wrap" data-name="{{ name }}">
-    {% if with_label %}<label class="block text-xs text-gray-400 mb-1">장르</label>{% endif %}
-    <div class="flex gap-2 items-center">
-        <select name="{{ name }}" class="genre-select bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm flex-1">
+    {% if with_label %}<label class="records-block records-text-xs records-muted records-mb-1">장르</label>{% endif %}
+    <div class="records-flex records-gap-2 records-items-center">
+        <select name="{{ name }}" class="genre-select records-tint records-border records-line records-rounded records-px-2 records-py-1-5 records-text-sm records-flex-1">
             <option value="">선택 안 함</option>
             {% for g in genres %}
             <option value="{{ g.name }}" {% if g.name == current %}selected{% endif %}>{{ g.name }}</option>
             {% endfor %}
         </select>
         <button type="button" onclick="addNewGenre(this)"
-            class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1.5 rounded">+ 장르 추가</button>
+            class="records-text-xs records-px-2 records-py-1-5 records-rounded lms-button">+ 장르 추가</button>
     </div>
 </div>
 {% endmacro %}
@@ -163,25 +56,25 @@ async function addNewGenre(btn) {
 {% endmacro %}
 
 {% macro records_nav(active) %}
-{% include '_admin_sidebar.html' %}
-{# 페이지 container 안에서 운영 메뉴 다음 줄에 표시되는 기록 서브바 #}
-<div class="records-subbar -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 mb-6">
+
+{# LMS 본문에 표시되는 기록 탐색 메뉴 #}
+<nav class="records-subbar" aria-label="활동 기록 메뉴">
     <div class="records-subbar-inner">
-        <a href="{{ url_for('records_hub') }}" class="records-tab {% if active == 'hub' %}active{% endif %}"><i data-lucide="book" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 홈</a>
-        <a href="{{ url_for('records_seminars') }}" class="records-tab {% if active == 'seminars' %}active{% endif %}"><i data-lucide="book-open" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 세미나</a>
-        <a href="{{ url_for('records_brick_books') }}" class="records-tab {% if active == 'brick' %}active{% endif %}"><i data-lucide="blocks" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 벽돌책</a>
-        <a href="{{ url_for('records_study_groups') }}" class="records-tab {% if active == 'study' %}active{% endif %}"><i data-lucide="handshake" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 소모임</a>
-        <a href="{{ url_for('records_analytics') }}" class="records-tab {% if active == 'analytics' %}active{% endif %}"><i data-lucide="chart-column" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 통계</a>
+        <a href="{{ url_for('records_hub') }}" class="records-tab {% if active == 'hub' %}active{% endif %}" {% if active == 'hub' %}aria-current="page"{% endif %}>{{ icon('book', 18) }} 홈</a>
+        <a href="{{ url_for('records_seminars') }}" class="records-tab {% if active == 'seminars' %}active{% endif %}" {% if active == 'seminars' %}aria-current="page"{% endif %}>{{ icon('book', 18) }} 세미나</a>
+        <a href="{{ url_for('records_brick_books') }}" class="records-tab {% if active == 'brick' %}active{% endif %}" {% if active == 'brick' %}aria-current="page"{% endif %}>{{ icon('folder', 18) }} 벽돌책</a>
+        <a href="{{ url_for('records_study_groups') }}" class="records-tab {% if active == 'study' %}active{% endif %}" {% if active == 'study' %}aria-current="page"{% endif %}>{{ icon('account', 18) }} 소모임</a>
+        <a href="{{ url_for('records_analytics') }}" class="records-tab {% if active == 'analytics' %}active{% endif %}" {% if active == 'analytics' %}aria-current="page"{% endif %}>{{ icon('dashboard', 18) }} 통계</a>
     </div>
-</div>
+</nav>
 {% endmacro %}
 
 {# 학기 필터 — 페이지 상단에 배치. id="termFilter" 의 change 이벤트로 navigate. #}
 {% macro term_filter(terms, selected_term_id, route_name) %}
-<div class="flex items-center gap-2 mb-4 flex-wrap">
-    <label class="text-xs text-gray-400 font-bold"><i data-lucide="calendar" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 학기 필터:</label>
+<div class="records-flex records-items-center records-gap-2 records-mb-4 records-flex-wrap">
+    <label for="termFilter" class="records-text-xs records-muted records-font-bold">{{ icon('calendar', 18) }} 학기 필터:</label>
     <select id="termFilter" onchange="navTerm(this.value, '{{ route_name }}')"
-        class="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm">
+        class="records-tint records-border records-line records-rounded records-px-3 records-py-1-5 records-text-sm">
         <option value="">전체 (모든 기간)</option>
         {% for t in terms %}
         <option value="{{ t.id }}" {% if t.id == selected_term_id %}selected{% endif %}>
@@ -190,12 +83,13 @@ async function addNewGenre(btn) {
         {% endfor %}
     </select>
     {% if selected_term_id %}
-    <a href="{{ url_for(route_name) }}" class="text-xs text-eva-green hover:underline">× 필터 해제</a>
+    <a href="{{ url_for(route_name) }}" class="records-text-xs records-accent records-hover-underline">× 필터 해제</a>
     {% endif %}
 </div>
 <script>
 function navTerm(termId, routeName) {
     const url = new URL(window.location.href);
+    url.searchParams.delete('page');
     if (termId) url.searchParams.set('term_id', termId);
     else url.searchParams.delete('term_id');
     window.location.href = url.pathname + (url.search || '');

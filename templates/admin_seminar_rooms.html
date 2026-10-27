@@ -1,169 +1,17 @@
-<!DOCTYPE html>
-<html lang="ko">
+{% extends 'lms_admin_base.html' %}
+{% from '_lms_icons.html' import icon %}
+{% set lms_page = 'operations' %}
+{% set lms_title = '세미나실 예약 현황 - 책 먹는 호반우' %}
+{% block title %}세미나실 예약 현황 - 책 먹는 호반우{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_operations.css') }}">{% endblock %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>세미나실 예약 현황 - 책 먹는 호반우</title>
-    {% include '_tailwind_head.html' %}
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap"
-        rel="stylesheet">
-    <style>
-        :root {
-            --eva-purple: #7A5A3A;
-            --eva-green: #3D5C2E;
-            --eva-orange: #C97A3A;
-            --bg-dark: #FAF6EC;
-            --card-dark: #FFFCF3;
-            --text-light: #2A241B;
-            --border-dark: #C9B38A;
-        }
-
-        body {
-            font-family: 'Noto Sans KR', sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-light);
-        }
-
-        h1, h2 {
-            font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
-        }
-
-        .eva-card {
-            background-color: var(--card-dark);
-            border: 1px solid var(--border-dark);
-        }
-
-        .cal-grid {
-            display: grid;
-            grid-template-columns: repeat(7, minmax(0, 1fr));
-            gap: 4px;
-        }
-
-        .cal-cell {
-            background-color: var(--surface);
-            border: 1px solid var(--border-dark);
-            border-radius: 6px;
-            min-height: 110px;
-            padding: 6px 6px 8px;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .cal-cell.out-of-month {
-            opacity: 0.35;
-        }
-
-        .cal-cell.today {
-            border-color: var(--eva-green);
-            box-shadow: 0 0 0 1px var(--eva-green) inset;
-        }
-
-        .cal-cell.target-day .day-num {
-            color: var(--eva-green);
-            font-weight: 700;
-        }
-
-        .day-num {
-            font-size: 0.78rem;
-            color: var(--ink-faint);
-            margin-bottom: 4px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .badge {
-            font-size: 0.66rem;
-            padding: 2px 5px;
-            border-radius: 4px;
-            margin-bottom: 3px;
-            line-height: 1.2;
-            display: block;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            border: 1px solid transparent;
-        }
-
-        .badge.approved {
-            background: rgba(92, 122, 74, 0.14);
-            color: #3D5C2E;
-            border-color: rgba(61, 92, 46, 0.35);
-        }
-
-        .badge.pending {
-            background: rgba(201, 122, 58, 0.12);
-            color: #81551A;
-            border-color: rgba(201, 122, 58, 0.35);
-        }
-
-        .badge.rejected {
-            background: rgba(177, 74, 45, 0.10);
-            color: #B14A2D;
-            border-color: rgba(177, 74, 45, 0.30);
-            text-decoration: line-through;
-            opacity: 0.7;
-        }
-
-        .badge.mine {
-            outline: 1px dashed var(--walnut);
-        }
-
-        .wd-header {
-            text-align: center;
-            font-size: 0.75rem;
-                color: var(--ink-faint);
-            padding: 6px 0;
-            font-weight: 700;
-
-        }
-
-        .wd-header.sat {
-            color: #4D6572;
-        }
-
-        .wd-header.sun {
-            color: #B14A2D;
-        }
-
-        .legend-chip {
-            font-size: 0.7rem;
-            padding: 2px 8px;
-            border-radius: 999px;
-            border: 1px solid var(--border-dark);
-        }
-
-        @media (max-width: 640px) {
-            .cal-cell {
-                min-height: 78px;
-                padding: 3px;
-            }
-            .badge {
-                font-size: 0.6rem;
-                padding: 1px 3px;
-            }
-            .day-num {
-                font-size: 0.7rem;
-            }
-        }
-    </style>
-    {% include '_app_theme_head.html' %}
-</head>
-
-<body class="min-h-screen">
-    {% include '_header.html' %}
-    {% include '_admin_sidebar.html' %}
-
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+{% block content %}
+<div class="lms-operations">
+<div class="lms-operations-body">
 
         <div class="flex items-center justify-between flex-wrap gap-2">
             <div>
-                <h1 class="text-2xl font-bold text-eva-green" style="color: var(--eva-green)"><i data-lucide="calendar-days" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 세미나실 예약 현황</h1>
+                <h1 class="text-2xl font-bold ops-accent">{{ icon('calendar',18) }} 세미나실 예약 현황</h1>
                 <p class="text-xs text-gray-400 mt-1">
                     경북대 총동연 게시판(dongari.knu.ac.kr) 캐시 기반 · 다른 동아리/세미나실 예약을 한눈에 확인
                 </p>
@@ -171,20 +19,14 @@
             <a href="{{ url_for('admin_dashboard') }}" class="text-sm text-gray-400 hover:text-white">← 대시보드</a>
         </div>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}{% for category, message in messages %}
-        <div class="p-3 text-sm rounded-lg {{ 'bg-green-900 text-green-200' if category == 'success' else 'bg-red-900 text-red-200' }}">
-            {{ message }}
-        </div>
-        {% endfor %}{% endif %}
-        {% endwith %}
+
 
         <!-- 컨트롤 바 -->
-        <div class="eva-card rounded-lg p-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="ops-panel rounded-lg p-4 flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-2">
                 <a href="?month={{ prev_month }}"
                     class="px-3 py-1.5 rounded text-sm bg-gray-700 hover:bg-gray-600">← {{ prev_month }}</a>
-                <span class="text-lg font-bold" style="font-family:'Pretendard','Noto Sans KR',sans-serif">
+                <span class="text-lg font-bold">
                     {{ year }}년 {{ '%02d' % month }}월
                 </span>
                 <a href="?month={{ next_month }}"
@@ -209,23 +51,23 @@
                     </span>
                 </div>
                 <button id="refreshBtn"
-                    class="bg-eva-green text-black font-bold px-3 py-1.5 rounded text-sm hover:opacity-80"
-                        style="background: var(--eva-green); color: #fff">
-                    <i data-lucide="refresh-cw" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 지금 새로고침
+                    class="ops-primary text-black font-bold px-3 py-1.5 rounded text-sm hover:opacity-80"
+                        >
+                    {{ icon('calendar',18) }} 지금 새로고침
                 </button>
             </div>
         </div>
 
         <!-- 범례 -->
-        <div class="eva-card rounded-lg p-3 flex flex-wrap items-center gap-3 text-xs text-gray-300">
-            <span class="legend-chip" style="color:#3D5C2E; border-color: rgba(61,92,46,.35)">● 승인</span>
-                    <span class="legend-chip" style="color:#81551A; border-color: rgba(201,122,58,.35)">● 대기</span>
-                    <span class="legend-chip" style="color:#B14A2D; border-color: rgba(177,74,45,.30)">● 반려</span>
-            <span class="text-gray-500">| 월/목 = 우리 동아리 세미나 요일 (초록색 강조)</span>
+        <div class="ops-panel rounded-lg p-3 flex flex-wrap items-center gap-3 text-xs text-gray-300">
+            <span class="legend-chip ops-approved">● 승인</span>
+                    <span class="legend-chip ops-pending">● 대기</span>
+                    <span class="legend-chip ops-rejected">● 반려</span>
+            <span class="text-gray-500">| 월/목 = 우리 동아리 세미나 요일 (파란색 강조)</span>
         </div>
 
         <!-- 달력 -->
-        <div class="eva-card rounded-lg p-3">
+        <div class="ops-panel rounded-lg p-3">
             <div class="cal-grid mb-1">
                 <div class="wd-header">월</div>
                 <div class="wd-header">화</div>
@@ -264,12 +106,12 @@
         </div>
 
         <!-- 이번 달 예약 리스트 (요약 테이블) -->
-        <div class="eva-card rounded-lg p-4">
-            <h2 class="text-lg font-bold text-eva-green mb-3" style="color:var(--eva-green)">이번 달 예약 목록</h2>
+        <div class="ops-panel rounded-lg p-4">
+            <h2 class="text-lg font-bold ops-accent mb-3">이번 달 예약 목록</h2>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
-                        <tr class="border-b border-border-dark text-left text-gray-400">
+                        <tr class="border-b ops-border text-left text-gray-400">
                             <th class="p-2">날짜</th>
                             <th class="p-2">요일</th>
                             <th class="p-2">세미나실</th>
@@ -299,14 +141,11 @@
                               <td class="p-2">{{ row.p.club_name or '?' }}</td>
                               <td class="p-2 text-center">
                                   {% if row.p.status == 'approved' %}
-                                  <span class="px-2 py-0.5 rounded text-xs"
-                                        style="background: rgba(92,122,74,.16); color:#3D5C2E">승인</span>
+                                  <span class="px-2 py-0.5 rounded text-xs ops-approved">승인</span>
                                   {% elif row.p.status == 'rejected' %}
-                                  <span class="px-2 py-0.5 rounded text-xs"
-                                            style="background: rgba(177,74,45,.12); color:#B14A2D">반려</span>
+                                  <span class="px-2 py-0.5 rounded text-xs ops-rejected">반려</span>
                                   {% else %}
-                                  <span class="px-2 py-0.5 rounded text-xs"
-                                            style="background: rgba(201,122,58,.12); color:#81551A">대기</span>
+                                  <span class="px-2 py-0.5 rounded text-xs ops-pending">대기</span>
                                   {% endif %}
                               </td>
                               <td class="p-2">
@@ -326,24 +165,24 @@
         </div>
 
         <!-- 예약 신청 글 도우미 -->
-        <div class="eva-card rounded-lg p-4">
-            <h2 class="text-lg font-bold mb-1" style="color:var(--eva-green)">
-                <i data-lucide="pen-line" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 예약 신청 글 도우미
+        <div class="ops-panel rounded-lg p-4">
+            <h2 class="text-lg font-bold mb-1">
+                {{ icon('document',18) }} 예약 신청 글 도우미
             </h2>
             <p class="text-xs text-gray-400 mb-4">
                 아래 설정을 채우면 게시판에 그대로 붙여넣을 <strong>제목/내용</strong>이 자동 생성됩니다.
-                "<i data-lucide="save" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 저장"을 누르면 다음 방문에도 값이 유지됩니다.
+                "{{ icon('document',18) }} 저장"을 누르면 다음 방문에도 값이 유지됩니다.
             </p>
 
             <!--  기본 설정 (DB 저장) -->
             <div class="border border-gray-700 rounded-lg p-3 mb-4 bg-gray-900/40">
                 <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-                    <h3 class="text-sm font-bold text-gray-200"><i data-lucide="settings" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 기본 설정</h3>
+                    <h3 class="text-sm font-bold text-gray-200">{{ icon('settings',18) }} 기본 설정</h3>
                     <div class="flex items-center gap-2">
                         <span id="saveStatus" class="text-[0.7rem] text-gray-500"></span>
                         <button type="button" id="saveSettingsBtn"
                             class="text-xs bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-1.5 rounded">
-                            <i data-lucide="save" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 저장
+                            {{ icon('document',18) }} 저장
                         </button>
                     </div>
                 </div>
@@ -390,7 +229,7 @@
                     </div>
                 </div>
                 <p class="text-[0.7rem] text-gray-500 mt-2 leading-relaxed">
-                    <i data-lucide="lightbulb" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 첫·마지막 세미나 날짜와 N일 범위는 <strong>예약 가능 날짜</strong> 계산에 사용됩니다.
+                    {{ icon('help',18) }} 첫·마지막 세미나 날짜와 N일 범위는 <strong>예약 가능 날짜</strong> 계산에 사용됩니다.
                     저장 후 페이지가 새로고침되어 후보 날짜가 다시 계산됩니다.
                 </p>
             </div>
@@ -435,7 +274,7 @@
             <div class="space-y-3">
                 <div>
                     <div class="flex items-center justify-between mb-1">
-                        <span class="text-xs text-gray-400"><i data-lucide="clipboard-list" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 제목</span>
+                        <span class="text-xs text-gray-400">{{ icon('document',18) }} 제목</span>
                         <button type="button" onclick="copyText('genTitle', this)"
                             class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">복사</button>
                     </div>
@@ -444,7 +283,7 @@
                 </div>
                 <div>
                     <div class="flex items-center justify-between mb-1">
-                        <span class="text-xs text-gray-400"><i data-lucide="notebook-pen" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 내용</span>
+                        <span class="text-xs text-gray-400">{{ icon('document',18) }} 내용</span>
                         <button type="button" onclick="copyText('genContent', this)"
                             class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">복사</button>
                     </div>
@@ -454,8 +293,8 @@
                 <div class="flex items-center gap-2 flex-wrap">
                     <a href="{{ write_url }}" target="_blank" rel="noopener"
                         class="font-bold px-3 py-2 rounded text-sm hover:opacity-80"
-                    style="background:var(--eva-green); color:#fff">
-                        <i data-lucide="pencil" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 총동연 글쓰기 페이지 열기 ↗
+                    >
+                        {{ icon('document',18) }} 총동연 글쓰기 페이지 열기 ↗
                     </a>
                     <span class="text-xs text-gray-500">로그인 후 제목/내용 붙여넣기</span>
                 </div>
@@ -469,8 +308,8 @@
         </div>
 
         <!-- 안내 -->
-        <div class="eva-card rounded-lg p-4 text-xs text-gray-400 leading-relaxed">
-            <strong class="text-gray-200"><i data-lucide="lightbulb" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 어떻게 동작하나요?</strong>
+        <div class="ops-panel rounded-lg p-4 text-xs text-gray-400 leading-relaxed">
+            <strong class="text-gray-200">{{ icon('help',18) }} 어떻게 동작하나요?</strong>
             <ul class="list-disc list-inside mt-1 space-y-0.5">
                 <li>외부 게시판은 <code>requests + BeautifulSoup</code> 으로 <strong>로그인 없이</strong> 읽기만 합니다.</li>
                 <li>승인/반려된 글은 <em>종착 상태</em>로 보고 다시 가져오지 않습니다. 신규 글 + 대기(pending) 글만 재확인.</li>
@@ -480,7 +319,11 @@
         </div>
     </div>
 
-    <script>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
         // ─── 예약 신청 글 도우미 ───
         const WD = ['월','화','수','목','금','토','일'];
 
@@ -643,6 +486,5 @@
             }
         });
     </script>
-</body>
 
-</html>
+{% endblock %}
