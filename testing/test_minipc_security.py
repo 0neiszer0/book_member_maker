@@ -93,7 +93,8 @@ class SecurityRouteTests(unittest.TestCase):
         self.app.config.update(REQUIRE_ORIGIN_AUTH=True,ORIGIN_AUTH_SECRET='x'*32)
         self.assertEqual(self.client.get('/static/theme.css').status_code,403)
         self.assertEqual(self.client.get('/static/theme.css',headers={'X-App-Origin-Auth':'wrong'}).status_code,403)
-        self.assertEqual(self.client.get('/static/theme.css',headers={'X-App-Origin-Auth':'x'*32}).status_code,200)
+        with self.client.get('/static/theme.css',headers={'X-App-Origin-Auth':'x'*32}) as response:
+            self.assertEqual(response.status_code,200)
         self.login()
         headers={**self.headers,'X-App-Origin-Auth':'x'*32,'Origin':self.module.PUBLIC_BASE_URL}
         self.assertEqual(self.client.post('/api/admin/members/1/delete',json={},headers=headers,base_url='https://node.example.ts.net').status_code,403)

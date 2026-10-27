@@ -50,7 +50,7 @@ begin
         'target_name',m.name,'target_student_id',m.student_id,'request_version',1));
     return jsonb_build_object('accepted',true);
   end if;
-  if p_action not in ('approve','deny') then return jsonb_build_object('accepted',false); end if;
+  if p_action is null or p_action not in ('approve','deny') then return jsonb_build_object('accepted',false); end if;
   select * into actor from public.members where id=p_actor_id for update;
   if not found or actor.role not in ('admin','officer') or actor.is_active is distinct from true
      or actor.account_status is distinct from 'active' or actor.member_status in ('inactive','blocked') then
@@ -110,7 +110,7 @@ begin
     return jsonb_build_object('accepted',false);
   end if;
   select * into m from public.members where id=p_member_id for update;
-  if not found or p_action not in ('status','edit','delete') then return jsonb_build_object('accepted',false); end if;
+  if not found or p_action is null or p_action not in ('status','edit','delete') then return jsonb_build_object('accepted',false); end if;
   if m.role='admin' and (actor.role <> 'admin' or p_action='delete') then
     return jsonb_build_object('accepted',false);
   end if;
