@@ -1,0 +1,23 @@
+[Unit]
+Description=Book members Flask application
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=bookapp
+Group=bookapp
+WorkingDirectory=/opt/book_member_maker
+EnvironmentFile=/etc/book_member_maker/app.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=REQUIRE_ORIGIN_AUTH=true
+ExecStart=/opt/book_member_maker/.venv/bin/gunicorn --worker-class gthread --workers 1 --threads 4 --timeout 120 --bind 127.0.0.1:5000 --error-logfile - app:app
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

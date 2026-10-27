@@ -2,10 +2,11 @@
 {% block content %}
 <section class="eg-hero"><div class="eg-kicker">책 추천</div><h1>함께 읽을 책 추천</h1><p class="eg-lead">함께 읽고 싶은 책을 추천해주세요.</p></section>
 <form class="eg-panel eg-form" method="post" enctype="multipart/form-data">
+<input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
   {% if member %}
   <div class="eg-identity"><strong>{{ member.name }}님으로 작성합니다.</strong><span class="eg-help">{{ member.department or '학과 미입력' }} · {{ member.student_id }}</span></div>
   {% else %}
-  <div class="eg-grid"><label>학번<input class="eg-input" name="student_id" inputmode="numeric" required></label><label>이름<input class="eg-input" name="member_name" required></label></div>
+  <p><a href="{{ url_for('kakao_login', next=request.path) }}">카카오 로그인 후 작성</a></p>
   {% endif %}
   <label>도서명<input class="eg-input" name="title" maxlength="200" required></label>
   <label>저자<input class="eg-input" name="author" maxlength="120" required></label>

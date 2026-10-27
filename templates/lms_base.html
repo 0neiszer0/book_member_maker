@@ -1,5 +1,6 @@
 {% from '_lms_icons.html' import icon %}
 <!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+{% if session.user_role %}<meta name="lms-csrf" content="{{ sensitive_csrf_token() }}">{% endif %}
 <meta name="app-layout" content="canvas"><meta name="color-scheme" content="light"><meta name="theme-color" content="#d20f17">
 <title>{% block title %}책 먹는 호반우{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static',filename='lms.css') }}">
