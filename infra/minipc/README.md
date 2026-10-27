@@ -15,6 +15,11 @@ Worker는 https://book-member-maker.alstj816.workers.dev 에 배포되어 현재
    현재 Render 원본 URL은 저장소 설정에서 확인했으며 실제 운영 대시보드와 대조 후 배포한다.
    주소가 발급되면 기록하고 PUBLIC_BASE_URL 및 Kakao 콜백을 승인 후 설정한다.
    Worker 주소가 준비되기 전 OAuth 성공을 기대하지 않는다.
+   Render 과도기에는 기존 KAKAO_REDIRECT_URI를 Render 콜백 그대로 유지한다.
+   Worker 콜백 등록 승인 후 KAKAO_PROXY_REDIRECT_URI를 Worker 콜백으로 추가하고,
+   PUBLIC_BASE_URL을 Worker origin, ADDITIONAL_ALLOWED_ORIGINS를 기존 Render origin으로 설정한다.
+   Render에도 Worker와 같은 ORIGIN_AUTH_SECRET을 설정하되 REQUIRE_ORIGIN_AUTH=false로 둔다.
+   인증된 Worker 요청만 새 콜백을 사용한다. 두 호스트의 로그인 쿠키는 서로 공유하지 않는다.
 4. Hyper-V 기능 활성화 승인 후 관리자 PowerShell에서 `Enable-HyperV.ps1` 실행.
    재부팅은 별도 승인. VM 생성도 별도 승인 후 `New-BookVm.ps1`에 검증된 Ubuntu 24.04 Server ISO와 VM 저장 경로 전달.
    기존 Windows Tailscale/RDP/개인 파일/스위치 변경 금지. VM 이름 bookmembers-ubuntu.
@@ -45,6 +50,22 @@ Worker는 https://book-member-maker.alstj816.workers.dev 에 배포되어 현재
 원본 비밀은 Gunicorn access log에 기록하지 않는다. 기본 access log는 꺼둔다.
 코드에서 별도 주기 scheduler는 발견하지 않았지만 Render 대시보드 외부 예약 작업/알림 설정은 아직 미확인이다.
 운영 전환 전에 중복 예약 작업을 확인한다.
+
+2026-10-27 추가 점검: Render My Workspace에는 웹 서비스 2개만 있고 Cron/Background Worker는 없다.
+Supabase에는 pg_cron 확장이 없고 Storage 객체는 0개다. 타사 예약 호출의 존재 여부는 이 조회로 확정하지 않는다.
+
+## 재부팅 전 실행 가능한 운영 반영 순서
+
+1. 최신 main이 91b7dd6인지 직전 다시 확인하고, 승인 후 보안 브랜치를 main에 fast-forward push한다.
+   다른 UI 사본의 미완료 변경은 포함하지 않는다. main이 바뀌었으면 강제 push하지 말고 재검토한다.
+2. Render의 main 자동 배포 결과와 실제 SHA를 확인한다. 별도 중복 deploy 호출은 하지 않는다.
+   이 첫 단계에서는 환경변수·Kakao 설정·회원 안내 주소를 바꾸지 않는다.
+3. 비회원 공개 GET과 keep-alive의 status/supabase 값을 확인한다. 운영 데이터로 POST 테스트를 하지 않는다.
+   실패하면 원인을 수정한 보안 커밋으로 재배포 승인을 받는다. 취약 버전으로 자동 rollback하지 않는다.
+4. Kakao 콘솔의 기존 앱·콜백 확인 후 정확한 Worker 콜백 추가를 별도 승인받는다.
+   이후 위의 Render 과도기 환경변수 변경을 승인받고 두 호스트 OAuth를 각각 확인한다.
+5. DB/Storage 백업은 복구키와 외부 저장소를 확정한 뒤 활성화하고 격리 복원을 확인한다.
+   현재 백업은 미설정이며, SQL 확장에 대한 기존 백업 예외 승인이 다른 DB 변경으로 확대되지 않는다.
 
 ## 공식 문서 확인 (2026-10-27)
 

@@ -10,7 +10,7 @@ import math
 from dotenv import load_dotenv
 from flask import (
     Flask, render_template, request, jsonify, session, redirect, url_for,
-    flash, Response, send_file, stream_with_context, abort,
+    flash, Response, send_file, stream_with_context, abort, g, has_request_context,
 )
 import json
 from supabase import create_client, Client
@@ -578,6 +578,10 @@ class KakaoOauth:
     def __init__(self):
         self.client_id = os.environ.get("KAKAO_OAUTH_CLIENT_ID")
         self.redirect_uri = os.environ.get("KAKAO_REDIRECT_URI")
+        # Render's direct URL keeps its own session cookie during the transition.
+        # Only the authenticated Worker may select the public callback.
+        if has_request_context() and getattr(g, 'trusted_app_proxy', False):
+            self.redirect_uri = app.config.get('KAKAO_PROXY_REDIRECT_URI') or self.redirect_uri
         self.token_url = "https://kauth.kakao.com/oauth/token"
         self.user_info_url = "https://kapi.kakao.com/v2/user/me"
 
@@ -719,9 +723,9 @@ def kakao_callback():
             return redirect(url_for("admin_dashboard"))
         return redirect(url_for("my_page"))
 
-    except Exception as e:
+    except Exception:
         flash("카카오 로그인 중 오류가 발생했습니다.", "danger")
-        app.logger.error(f"Kakao callback error: {e}", exc_info=True)
+        app.logger.error("Kakao callback failed")
         return redirect(url_for("login"))
 
 

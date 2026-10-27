@@ -4,6 +4,7 @@ import unittest
 from copy import deepcopy
 from types import SimpleNamespace
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlsplit
 from flask import Flask
 from testing._fake_supabase import FakeSupabase
 from engagement import init_engagement_routes
@@ -35,7 +36,8 @@ class SecurityRouteTests(unittest.TestCase):
 
     def tearDown(self):
         self.module.supabase = self.original
-        self.app.config.update(REQUIRE_ORIGIN_AUTH=False, ORIGIN_AUTH_SECRET='')
+        self.app.config.update(REQUIRE_ORIGIN_AUTH=False, ORIGIN_AUTH_SECRET='',
+                               KAKAO_PROXY_REDIRECT_URI='')
 
     def login(self, mid=2):
         with self.client.session_transaction() as state:
@@ -103,6 +105,53 @@ class SecurityRouteTests(unittest.TestCase):
             from flask import session
             session['user_id']=2
             self.assertIsNone(self.module.reject_cross_site_state_changes())
+
+    def test_proxy_and_direct_oauth_keep_their_callback_and_cookie_host(self):
+        direct = 'https://legacy.example/login/kakao/callback'
+        public = 'https://public.example/login/kakao/callback'
+        self.app.config.update(ORIGIN_AUTH_SECRET='s'*32, KAKAO_PROXY_REDIRECT_URI=public)
+        with patch.dict(os.environ, {'KAKAO_REDIRECT_URI': direct}):
+            for header, expected in [({}, direct), ({'X-App-Origin-Auth':'wrong',
+                                      'X-Forwarded-Host':'public.example'}, direct),
+                                     ({'X-App-Origin-Auth':'s'*32}, public)]:
+                client = self.app.test_client()
+                start = client.get('/login/kakao?next=/my_page', headers=header,
+                                   base_url='https://legacy.example')
+                params = parse_qs(urlsplit(start.location).query)
+                self.assertEqual(params['redirect_uri'], [expected])
+                self.assertNotIn('Domain=', start.headers['Set-Cookie'])
+                seen = []
+                def token(oauth, code):
+                    seen.append(oauth.redirect_uri)
+                    return {'access_token':'synthetic'}
+                with patch.object(self.module.KakaoOauth, 'get_token', token), \
+                     patch.object(self.module.KakaoOauth, 'get_user_info', return_value={
+                         'id':'fake-3', 'kakao_account':{}}):
+                    response = client.get('/login/kakao/callback',
+                        query_string={'state':params['state'][0], 'code':'synthetic'},
+                        headers=header, base_url='https://legacy.example')
+                self.assertEqual(response.status_code, 302)
+                self.assertEqual(seen, [expected])
+                with client.session_transaction(base_url='https://legacy.example') as state:
+                    self.assertEqual(state['user_id'], 3)
+
+    def test_proxy_callback_configuration_rejects_untrusted_destination(self):
+        with patch.dict(os.environ, {'ORIGIN_AUTH_SECRET':'s'*32,
+                'PUBLIC_BASE_URL':'https://public.example',
+                'KAKAO_PROXY_REDIRECT_URI':'https://attacker.example/login/kakao/callback'}):
+            with self.assertRaises(RuntimeError):
+                install_security(Flask('invalid-callback'), lambda:self.fake)
+
+    def test_oauth_failure_does_not_log_external_exception_secrets(self):
+        self.client.get('/login/kakao')
+        with self.client.session_transaction() as state:
+            oauth_state = state['oauth_state']
+        with patch.object(self.module.KakaoOauth, 'get_token',
+                          side_effect=RuntimeError('synthetic-private-token')), \
+             self.assertLogs(self.app.logger, level='ERROR') as logs:
+            self.client.get('/login/kakao/callback',
+                            query_string={'state':oauth_state, 'code':'synthetic'})
+        self.assertNotIn('synthetic-private-token', '\n'.join(logs.output))
 
 class EngagementIdentityTests(unittest.TestCase):
     def setUp(self):
