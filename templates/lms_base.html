@@ -11,7 +11,7 @@
 </head><body class="lms-page lms-nav-expanded {% if lms_course %}lms-course-page{% endif %} {% if lms_aside %}lms-has-aside{% endif %} {% if lms_page == 'dashboard' %}lms-dashboard-page{% endif %}" data-lms-page="{{ lms_page|default('content') }}">
 <a class="lms-skip" href="#lms-content">본문으로 건너뛰기</a>
 {% include '_lms_navigation.html' %}
-<div class="lms-mobile-header"><button type="button" data-lms-menu aria-label="전역 메뉴 열기">{{ icon('menu') }}</button><span>{{ lms_title|default('책 먹는 호반우') }}</span>{% if lms_course %}<button type="button" data-lms-course-toggle aria-label="강의실 메뉴 열기">{{ icon('chevron') }}</button>{% endif %}</div>
+<div class="lms-mobile-header"><button type="button" data-lms-menu aria-label="전역 메뉴 열기">{{ icon('menu') }}</button><div class="lms-mobile-heading">{% if lms_course %}<span class="lms-mobile-course-name">{{ course_breadcrumb_label|default(lms_course.name) }}</span>{% endif %}<span>{{ lms_title|default('책 먹는 호반우') }}</span></div>{% if lms_course %}<button type="button" data-lms-course-toggle aria-label="강의실 메뉴 열기">{{ icon('chevron') }}</button>{% endif %}</div>
 <div class="lms-wrapper">
 {% if lms_page != 'dashboard' %}<header class="lms-breadcrumb"><button type="button" data-lms-course-toggle aria-label="강의실 메뉴 접기" aria-expanded="true">{{ icon('menu') }}</button><nav aria-label="현재 위치"><a href="{{ course_breadcrumb_href|default(url_for('seminars',term_id=lms_course.id) if lms_course else url_for('main_index')) }}">{% if lms_course %}{{ course_breadcrumb_label|default(lms_course.name) }}{% else %}책 먹는 호반우{% endif %}</a><span aria-hidden="true">›</span><span>{{ lms_title|default('') }}</span></nav></header>{% endif %}
 <div class="lms-columns">
