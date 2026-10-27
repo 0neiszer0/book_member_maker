@@ -51,3 +51,9 @@ Supabase CLI migration new는 홈 설정 폴더 권한 오류로 실패하여 �
 - infra/worker에서 npx wrangler deploy --dry-run
 
 운영 실행 순서는 infra/minipc/README.md. outputs의 상태 문서·runbook·소스 ZIP·패치는 재개용 배포 사본이다.
+
+## 사용자 결정 갱신 (2026-10-27 KST)
+
+- Hyper-V 적용을 위한 재부팅 질문에 사용자가 '재부팅은 나중에'로 답함.
+- 재부팅 예약/실행하지 않음. 재부팅은 이후 사용자의 명시적 승인 또는 직접 실행 후 재개한다.
+- 따라서 VM 생성·Ubuntu 설치·Funnel 및 부팅 자동 복구 검증은 대기 상태다.
