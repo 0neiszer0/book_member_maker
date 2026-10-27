@@ -1,7 +1,7 @@
 # 미니 PC 설치·전환 실행 순서
 
 재개 기준: `docs/MINIPC_DEPLOY_STATUS.md`. 모든 운영 변경은 직전 사용자 승인 필요.
-실제 Worker/Funnel 주소는 아직 미발급. 설정 예시의 빈 값은 확정 주소로만 채운다.
+Worker는 https://book-member-maker.alstj816.workers.dev 에 배포되어 현재 Render를 가리킨다. Funnel은 아직 미발급. 운영 SQL 적용 완료; 상세 승인·검증 결과는 상태 문서를 따른다.
 
 1. 보안 SQL `supabase/migrations/*_minipc_account_security.sql`을 검토한다.
    운영 백업 및 Storage 보존을 확인하고 중복 social_id **그룹 수만** 읽기 조회한다.
@@ -40,7 +40,7 @@
    실패 시 승인 후 패치된 Render origin으로 되돌린다. 취약한 기준 main으로 롤백하지 않는다.
 9. 재부팅 승인 후 Windows 로그인 없이 VM→Gunicorn→Tailscale/Funnel→Worker 접속을 검증한다.
    전원 복구 후 자동 켜짐은 BIOS 설정 별도 확인 사항이다. 절전·최대절전 정책도 읽기 확인 후
-   서버 운영에 필요하면 별도 승인받아 조정한다. 현재 이를 확인/변경하지 않았다.
+   서버 운영에 필요하면 별도 승인받아 조정한다. 현재 AC/DC 절전·최대절전 timeout은 모두 0임을 읽기 확인했고 변경하지 않았다.
 
 원본 비밀은 Gunicorn access log에 기록하지 않는다. 기본 access log는 꺼둔다.
 코드에서 별도 주기 scheduler는 발견하지 않았지만 Render 대시보드 외부 예약 작업/알림 설정은 아직 미확인이다.
