@@ -14,10 +14,11 @@
   <div class="hidden" id="lookupResult" style="margin-top:14px">
     <div class="auth-result"><strong id="lookupResultName"></strong><span class="auth-help" id="lookupResultDetail"></span></div>
     <form action="{{ url_for('link_account_submit') }}" method="post" style="margin-top:10px">
+<input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
       <input type="hidden" name="action" value="link">
       <input type="hidden" name="existing_name" id="lookupNameHidden">
       <input type="hidden" name="student_id" id="lookupSidHidden">
-      <button class="auth-btn auth-btn-primary" type="submit">이 프로필로 연결</button>
+      <button class="auth-btn auth-btn-primary" type="submit">연결 신청</button>
     </form>
   </div>
 </section>
@@ -32,6 +33,7 @@
     {% if email %}<span class="auth-help">{{ email }}</span>{% endif %}
   </div>
   <form action="{{ url_for('link_account_submit') }}" method="post" style="margin-top:12px">
+<input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
     <input type="hidden" name="action" value="create">
     <button class="auth-btn auth-btn-primary" type="submit">가입 신청</button>
   </form>
@@ -49,12 +51,13 @@
 <section class="auth-section auth-highlight">
   <p class="auth-eyebrow">내 프로필 확인</p>
   <h2>{{ matched_member.name }} 님이 맞나요?</h2>
-  <p class="auth-section-lead">명부에서 같은 이름을 찾았습니다. 학번이 일치하면 바로 연결됩니다.</p>
+  <p class="auth-section-lead">명부에서 같은 이름을 찾았습니다. 이름과 학번으로 연결 신청 후 관리자 승인을 받아주세요.</p>
   <form class="auth-form" action="{{ url_for('link_account_submit') }}" method="post">
+<input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
     <input type="hidden" name="action" value="link">
     <input type="hidden" name="existing_name" value="{{ matched_member.name }}">
     <label class="auth-label">학번<input class="auth-input" name="student_id" inputmode="numeric" required autofocus placeholder="학번 입력"></label>
-    <button class="auth-btn auth-btn-primary" type="submit">본인 확인하고 연결</button>
+    <button class="auth-btn auth-btn-primary" type="submit">연결 신청</button>
   </form>
 </section>
 <details class="auth-details">
@@ -114,7 +117,7 @@
     try {
       const response = await fetch('{{ url_for("link_lookup") }}', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'X-App-CSRF': {{ sensitive_csrf_token()|tojson }}},
         body: JSON.stringify({name, student_id: studentId}),
       });
       const data = await response.json();

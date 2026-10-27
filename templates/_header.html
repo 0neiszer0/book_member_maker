@@ -526,7 +526,7 @@
           meta  = details.email || '';
         } else if (n.type === 'account_link_request'){
           title = (details.original_name || '') + ' 님 계정 연결 요청';
-          meta  = '소셜: ' + (details.social_name || '') + ' (' + (details.social_email || '') + ')';
+          meta = n.requires_manual_review ? '이전 연결 요청: 운영진 수동 점검 필요' : '연결 대상과 신청자를 확인한 뒤 승인해주세요.';
         } else if (n.type === 'absence_request'){
           title = (details.name || '') + ' 님 불참 요청';
           meta  = '사유: ' + (details.reason || '미입력');
@@ -639,3 +639,23 @@
 {% include '_app_feedback.html' %}
 {% include '_bug_report_widget.html' %}
 {% include '_icons.html' %}
+
+<script>
+(() => {
+  if (window.__sensitiveCsrfFetch) return;
+  window.__sensitiveCsrfFetch = true;
+  const token = {{ sensitive_csrf_token()|tojson }};
+  const original = window.fetch;
+  window.fetch = function(input, init) {
+    const url = new URL(input instanceof Request ? input.url : input, location.href);
+    const method = (init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
+    if (url.origin === location.origin && method === 'POST' &&
+        (/^\/api\/admin\/members\//.test(url.pathname) || /^\/api\/notifications\/\d+\/handle$/.test(url.pathname))) {
+      const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
+      headers.set('X-App-CSRF', token);
+      init = {...init, headers};
+    }
+    return original.call(this, input, init);
+  };
+})();
+</script>

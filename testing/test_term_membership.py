@@ -136,7 +136,10 @@ class SemesterMembershipTests(unittest.TestCase):
             self.assertIsNone(self.module._authenticated_topic_member('topic'))
 
     def test_term_roster_blocks_unsafe_legacy_member_merge_before_writes(self):
-        response = self.client.post('/api/admin/members/merge', json={'source_id':2, 'target_id':3})
+        with self.client.session_transaction() as state:
+            state['sensitive_csrf'] = 'sensitive-test'
+        response = self.client.post('/api/admin/members/merge', json={'source_id':2, 'target_id':3},
+                                    headers={'X-App-CSRF':'sensitive-test'})
         self.assertEqual(response.status_code, 409)
         self.assertFalse(any(call[0] in {'insert','update','delete'} for call in self.fake.calls))
 
