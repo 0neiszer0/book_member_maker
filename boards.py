@@ -107,7 +107,7 @@ def init_board_routes(app, supabase, login_required):
         if not session.get('user_role'):
             return {'nav_boards': []}
         try:
-            rows = supabase.table('boards').select('name, slug, read_role').eq('is_active', True) \
+            rows = supabase.table('boards').select('name, slug, read_role, board_type').eq('is_active', True) \
                 .order('display_order').order('name').execute().data or []
             return {'nav_boards': [row for row in rows if allowed(row['read_role'])]}
         except Exception:
@@ -130,6 +130,9 @@ def init_board_routes(app, supabase, login_required):
         page = max(1, request.args.get('page', 1, type=int))
         search = re.sub(r'[^0-9A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ\s-]', '', (request.args.get('q') or '').strip())[:80]
         query = supabase.table('posts').select('*').eq('board_id', board['id']).is_('deleted_at', 'null')
+        history_id = (request.args.get('history_id') or '').strip() if board.get('board_type') == 'seminar_review' else ''
+        if history_id:
+            query = query.eq('history_id', history_id)
         if search:
             query = query.or_(f"title.ilike.%{search}%,content.ilike.%{search}%")
         rows = query.order('is_pinned', desc=True).order('created_at', desc=True) \
@@ -139,7 +142,7 @@ def init_board_routes(app, supabase, login_required):
         for post in posts:
             post['author'] = members.get(post['author_id'], {'name': '알 수 없음'})
         return render_template('board_list.html', board=board, posts=posts, page=page,
-                               has_next=has_next, q=search, can_write=allowed(board['write_role']))
+                               has_next=has_next, q=search, history_id=history_id, can_write=allowed(board['write_role']))
 
     @bp.route('/board/<slug>/write', methods=['GET', 'POST'])
     @login_required()

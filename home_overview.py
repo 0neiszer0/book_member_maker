@@ -24,7 +24,7 @@ def load_seminar_context(db, term_id=None, today=None):
         return result
     sessions = db.table('seminar_sessions').select('*').eq('term_id', term['id']).order('meeting_date').execute().data or []
     sessions = [s for s in sessions if s.get('is_active', True)]
-    weeks = db.table('seminar_weeks').select('id,book_title,book_author,note').eq('term_id', term['id']).execute().data or []
+    weeks = db.table('seminar_weeks').select('*').eq('term_id', term['id']).execute().data or []
     week_ids = [w['id'] for w in weeks]
     topics = db.table('topic_events').select('id,seminar_week_id,seminar_session_id,meeting_date,is_active,share_token,created_at').in_('seminar_week_id', week_ids).order('created_at', desc=True).execute().data or [] if week_ids else []
     topics_by_week = {}
@@ -47,22 +47,44 @@ def session_summary(context, target):
             'topic': context['topics'].get(target.get('seminar_week_id'))}
 
 
+def decorate_topic_submission_states(db, member_id, events, today=None):
+    """Attach personal, read-only state without loading any submission text."""
+    today = today or datetime.now(KST).date()
+    ids = [event['id'] for event in events]
+    submitted = set()
+    if member_id is not None and ids:
+        rows = db.table('topic_submissions').select('id,event_id').in_('event_id', ids).eq('member_id', member_id).execute().data or []
+        submitted.update(row['event_id'] for row in rows)
+        members = db.table('members').select('student_id').eq('id', member_id).limit(1).execute().data or []
+        sid = str((members[0] if members else {}).get('student_id') or '').strip()
+        if sid:
+            rows = db.table('topic_submissions').select('id,event_id').in_('event_id', ids).eq('student_id', sid).is_('member_id', 'null').execute().data or []
+            submitted.update(row['event_id'] for row in rows)
+    for event in events:
+        event['submitted'] = event['id'] in submitted
+        event['open'] = topic_event_is_open(event, today=today)
+        deadline = topic_event_deadline(event)
+        event['deadline_label'] = date_label(deadline) + ' 00:00' if deadline else ''
+        event['status'] = 'submitted' if event['submitted'] else ('open' if event['open'] else 'closed')
+        event['status_label'] = '제출 완료' if event['submitted'] else ('미제출 · 접수 중' if event['open'] else '미제출 · 접수 마감')
+    return events
+
+
 def member_seminar_summary(db, member_id, today=None):
     today = today or datetime.now(KST).date()
     context = load_seminar_context(db, today=today)
+    events = decorate_topic_submission_states(db, member_id, list(context['topics'].values()), today)
     target = next((s for s in context['sessions'] if s['meeting_date'] >= today.isoformat()), None)
-    result = {'term': context['term'], 'seminar': session_summary(context, target), 'submitted': False}
-    event = result['seminar']['topic'] if target else None
-    if event:
-        mine = db.table('topic_submissions').select('id').eq('event_id', event['id']).eq('member_id', member_id).limit(1).execute().data or []
-        if not mine:
-            members = db.table('members').select('student_id').eq('id', member_id).limit(1).execute().data or []
-            sid = str((members[0] if members else {}).get('student_id') or '').strip()
-            if sid:
-                # Includes submissions through shared links; no other author's text is loaded.
-                mine = db.table('topic_submissions').select('id').eq('event_id', event['id']).eq('student_id', sid).limit(1).execute().data or []
-        result['submitted'] = bool(mine)
-    return result
+    seminar = session_summary(context, target)
+    tasks = []
+    for event in events:
+        if event['open'] and not event['submitted']:
+            week = context['weeks'].get(event.get('seminar_week_id'), {})
+            tasks.append({**event, 'book_title': week.get('book_title') or '도서 미정'})
+    tasks.sort(key=lambda event: (str(topic_event_deadline(event) or date.max), str(event['id'])))
+    return {'term': context['term'], 'seminar': seminar,
+            'submitted': bool(seminar and seminar['topic'] and seminar['topic']['submitted']),
+            'tasks': tasks, 'curriculum': list(context['weeks'].values())}
 
 
 def operations_summary(db, term_id=None, session_id=None, today=None):

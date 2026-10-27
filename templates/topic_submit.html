@@ -109,6 +109,10 @@
 </head>
 
 <body class="p-4 md:p-8">
+{% if classroom_term %}
+<div class="seminar-shell">{% with term=classroom_term %}{% include '_classroom_nav.html' %}{% endwith %}
+<p><a href="{{ url_for('seminars', term_id=classroom_term.id, week_id=event.seminar_week_id) }}#week-{{ event.seminar_week_id }}">이 주차 커리큘럼으로 돌아가기</a> · <span id="classroomSubmissionStatus" role="status" aria-live="polite">{{ event.status_label }}</span></p></div>
+{% endif %}
     <div class="max-w-3xl mx-auto">
         <!-- 헤더 -->
         <div class="topic-hero mb-6">
@@ -552,7 +556,9 @@
                     }),
                 });
                 const result = await res.json();
-                if (!res.ok) throw new Error(result.error || '제출 실패');
+                if (!res.ok || result.status !== 'success') throw new Error(result.error || '제출 실패');
+                const classroomStatus = document.getElementById('classroomSubmissionStatus');
+                if (classroomStatus) classroomStatus.textContent = '제출 완료';
                 savedTopics = JSON.stringify(topics);
                 pendingDraft = null; recovery.hidden = true;
                 const cleared = draftStore.remove(document.getElementById('eventId').value, verified.sid);

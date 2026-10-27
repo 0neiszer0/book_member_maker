@@ -1,5 +1,14 @@
 const assert = require('node:assert/strict');
-const {kst, shiftDate, weekStart, slotState, freeRanges} = require('../static/club_room.js');
+const {kst, shiftDate, weekStart, slotState, freeRanges, calendarTarget, targetMatches} = require('../static/club_room.js');
+const future = calendarTarget('?date=2027-01-03&booking=public-id', '2026-10-27');
+assert.equal(future.date, '2027-01-03');
+assert.equal(weekStart(future.date), '2026-12-28');
+assert.equal(targetMatches(future, {kind:'regular',id:'public-id'}, '2027-01-03'), true);
+assert.equal(targetMatches(future, {kind:'regular',id:'other'}, '2027-01-03'), false);
+assert.equal(calendarTarget('?date=2027-02-30&booking=public-id', '2026-10-27').date, '2026-10-27');
+const block = calendarTarget('?date=2027-01-03&at=11%3A00', '2026-10-27');
+assert.equal(targetMatches(block, {kind:'blocked',starts_at:'2027-01-03T02:00:00Z'}, block.date), true);
+assert.equal(block.booking, '');
 const now = Date.parse('2026-10-05T10:20:00+09:00');
 assert.equal(kst('2026-10-04T15:00:00Z'), '2026-10-05T00:00');
 assert.equal(shiftDate('2026-12-31', 1), '2027-01-01');

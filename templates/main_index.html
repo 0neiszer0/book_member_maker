@@ -11,11 +11,35 @@
 {% include '_header.html' %}
 
 <main class="home-shell flex-1">
-    {% if session.user_role %}<a href="{{ url_for('club_room') }}" class="cr-home-entry"><div><strong>동아리방, 언제 비어 있나요?</strong><span id="cr-home-status">오늘 빈 시간을 확인하고 있어요</span><br><span>로그인 없이 사용 신청</span></div><b aria-hidden="true">↗</b></a>{% endif %}
-    <script defer src="{{ url_for('static', filename='club_room.js') }}"></script>
     {% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}
     <div class="overview-flash {% if category != 'success' %}overview-flash-error{% endif %}" role="status">{{ message }}</div>
     {% endfor %}{% endwith %}
+    {% if session.user_role %}
+    <section class="home-section" aria-labelledby="dashboard-title">
+      <p class="home-eyebrow">대시보드 · {{ session.user_name or '회원' }}님</p>
+      <h1 id="dashboard-title">지금 해야 할 일</h1>
+      {% if home_error %}{% include '_load_error.html' %}
+      {% elif home and home.tasks %}
+      <div class="lms-task-list">
+      {% for task in home.tasks %}
+        <article class="lms-task-row" data-event-id="{{ task.id }}">
+          <div><span class="lms-status">{{ task.status_label }}</span><h2>{{ task.book_title }} 발제문</h2><p>마감 {{ task.deadline_label or '미정' }} (한국시간)</p></div>
+          {% if task.share_token %}<a class="home-btn home-btn-primary" href="{{ url_for('view_shared_topics', token=task.share_token) }}">발제문 작성</a>{% endif %}
+        </article>
+      {% endfor %}
+      </div>
+      {% else %}<p class="seminar-empty">현재 접수 중인 미완료 발제문이 없습니다.</p>{% endif %}
+    </section>
+    <section class="home-section" aria-labelledby="classroom-title">
+      <div class="home-section-head"><h2 id="classroom-title">나의 강의실</h2></div>
+      {% if home and home.term %}
+      <a class="home-card lms-classroom-card" href="{{ url_for('seminars', term_id=home.term.id) }}">
+        <p class="home-kicker">정기 세미나 · 공통 학기</p><strong>{{ home.term.name }}</strong>
+        <p>{{ home.curriculum|length }}개 주차 · 읽기, 발제문, 본·추가 모임과 기록</p><span class="home-card-link">전체 커리큘럼 열기 →</span>
+      </a>
+      {% elif not home_error %}<p>등록된 학기 강의실이 없습니다.</p>{% endif %}
+    </section>
+    {% endif %}
     {% if session.user_role in ['admin', 'officer'] %}
     <section class="home-hero" aria-labelledby="home-title">
         <p class="home-eyebrow">운영자 홈</p>
@@ -134,6 +158,8 @@
         </div>
     </section>
     {% endif %}
+    {% if session.user_role %}<a href="{{ url_for('club_room') }}" class="cr-home-entry"><div><strong>동아리방, 언제 비어 있나요?</strong><span id="cr-home-status">오늘 빈 시간을 확인하고 있어요</span><br><span>로그인 없이 사용 신청</span></div><b aria-hidden="true">↗</b></a>{% endif %}
+    <script defer src="{{ url_for('static', filename='club_room.js') }}"></script>
 </main>
 
 <footer class="home-footer">&copy; 2026 책 먹는 호반우</footer>
