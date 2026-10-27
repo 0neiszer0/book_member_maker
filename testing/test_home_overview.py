@@ -200,8 +200,23 @@ class OverviewRouteTests(unittest.TestCase):
         self.assertIn('data-session-id="wed"', html)
         self.assertIn('data-session-id="mon"', html)
         self.assertIn('data-event-id="event"', html)
+        self.assertEqual(html.count('id="topic-week"'), 1)
+        self.assertEqual(html.count('class="classroom-week-number '), 2)
+        self.assertIn('id="classroom-collapse-all"', html)
+        self.assertIn('<h1 class="lms-sr">', html)
         self.assertNotIn('href="/records/seminars', html)
         self.assertNotIn('202600002', html)
+
+    def test_classroom_assignment_and_resource_views_use_isolated_shell(self):
+        for section in ('topics', 'resources'):
+            response = self.client.get('/seminars?term_id=term&section=' + section)
+            self.assertEqual(response.status_code, 200)
+            html = response.get_data(as_text=True)
+            self.assertIn('name="app-layout" content="canvas"', html)
+            self.assertIn('id="' + section + '"', html)
+            self.assertIn('/static/lms_classroom.css', html)
+            self.assertNotIn('/static/theme.css', html)
+            self.assertNotIn('/static/tailwind.css', html)
 
     def test_closed_curriculum_topic_does_not_advertise_rejected_shared_link(self):
         self.db.rows['topic_events'][0]['is_active'] = False

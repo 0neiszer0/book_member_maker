@@ -1,12 +1,11 @@
 {% if term %}
 <nav class="lms-classroom-nav" aria-label="학기 강의실 메뉴">
-  <a href="{{ url_for('main_index') }}">대시보드</a><span aria-hidden="true"> / </span>
-  <a href="{{ url_for('seminars', term_id=term.id) }}">{{ term.name }} · 커리큘럼</a>
-  <a href="{{ url_for('seminars', term_id=term.id, section='topics') }}#topics">발제문</a>
-  <a href="{{ url_for('boards.index') }}">공통 공지</a>
-  <a href="/calendar?term_id={{ term.id }}">전체 일정</a>
-  <a href="{{ url_for('seminars', term_id=term.id) }}#resources">자료·기록</a>
-  <a href="{{ url_for('my_term_attendance', term_id=term.id) }}">내 출석</a>
-  {% if session.user_role in ['admin','officer'] %}<a href="{{ url_for('admin_seminars', term_id=term.id) }}">학기 운영</a>{% endif %}
-</nav>
-{% endif %}
+<p class="lms-term-name">{{ term.name }}</p>
+<a href="{{ url_for('seminars', term_id=term.id) }}" {% if lms_page|default('') == 'curriculum' %}aria-current="page"{% endif %}>커리큘럼</a>
+<a href="{{ url_for('boards.index') }}">공통 공지</a>
+<a href="{{ url_for('seminars', term_id=term.id, section='topics') }}#topics" {% if lms_page|default('') == 'assignments' %}aria-current="page"{% endif %}>발제문</a>
+<a href="{{ url_for('seminars', term_id=term.id, section='resources') }}#resources" {% if lms_page|default('') == 'resources' %}aria-current="page"{% endif %}>자료·기록</a>
+<a href="{{ url_for('my_term_attendance', term_id=term.id) }}">내 출석</a>
+<a href="{{ url_for('lms_calendar', term_id=term.id) }}">전체 일정</a>
+{% if session.user_role in ['admin','officer'] %}<a href="{{ url_for('admin_seminars', term_id=term.id) }}">학기 운영</a>{% endif %}
+</nav>{% endif %}

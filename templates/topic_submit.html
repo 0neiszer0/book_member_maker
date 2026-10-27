@@ -1,179 +1,72 @@
-<!DOCTYPE html>
-<html lang="ko">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ event.book_title }} - 발제문 제출</title>
-    {% include '_tailwind_head.html' %}
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap"
-        rel="stylesheet">
-<style>
-        :root {
-            --eva-purple: #7A5A3A;
-            --eva-green: #3D5C2E;
-            --bg-dark: #FAF6EC;
-            --card-dark: #FFFCF3;
-            --text-light: #2A241B;
-            --border-dark: #C9B38A;
-        }
-
-        body {
-            font-family: 'Noto Sans KR', sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-light);
-        }
-
-        h1, h2 { font-family: 'Noto Sans KR', sans-serif; }
-
-        .eva-card {
-            background-color: var(--card-dark);
-            border: 1px solid var(--border-dark);
-            border-radius: 18px !important;
-        }
-
-        .eva-input {
-            background-color: #FFFCF3;
-            border: 1px solid var(--border-dark);
-            color: var(--text-light);
-            min-height: 44px;
-        }
-
-        .eva-input:focus {
-            border-color: var(--eva-green);
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(61, 92, 46, 0.18);
-        }
-
-        .step-num {
-            display: inline-flex;
-            width: 1.5rem; height: 1.5rem;
-            border-radius: 9999px;
-            background: #3D5C2E;
-            color: #fff;
-            align-items: center; justify-content: center;
-            font-weight: 700; font-size: 0.85rem;
-            margin-right: 0.5rem;
-        }
-
-        .badge {
-            display: inline-block;
-            font-size: 0.65rem;
-            padding: 0.1rem 0.45rem;
-            border-radius: 999px;
-            font-weight: 700;
-            margin-left: 0.4rem;
-        }
-        .badge-member { background: #3D5C2E; color: #fff; }
-        .badge-guest { background: #d97706; color: #fff; }
-        .preview-card { border: 2px solid #8FAE6E; }
-        .preview-item { background: #FAF6EC; border: 1px solid #E5D7B8; }
-        label { color: #2A241B !important; font-weight: 700; }
-        summary { color: #2A241B !important; }
-        .topic-hero {
-            padding: 1.5rem;
-            border: 1px solid #C9B38A;
-            border-radius: 22px;
-            background: linear-gradient(145deg, #E8EFDD, #FFFCF3 70%);
-            text-align: left;
-        }
-        .topic-hero h1 { color: #2A241B !important; line-height: 1.25; }
-        .topic-hero .topic-author { color: #5C5142 !important; font-weight: 700; }
-        .topic-hero .topic-date { color: #5C5142 !important; }
-        .topic-kicker {
-            color: #3D5C2E;
-            font-size: .78rem;
-            font-weight: 800;
-            letter-spacing: .04em;
-        }
-        #verifyBtn, #submitBtn {
-            background: #3D5C2E !important;
-            color: #fff !important;
-            border: 1px solid #3D5C2E;
-            box-shadow: none !important;
-        }
-        #addTopicBtn {
-            background: #F2EBD8 !important;
-            color: #2A241B !important;
-            border-color: #C9B38A !important;
-        }
-        #writeCard { color: #2A241B; }
-        @media(max-width:767px) {
-            input.eva-input, textarea.eva-input, select.eva-input { font-size:16px; }
-            .preview-card > div:first-child { flex-direction:column; }
-            #existingTopicsTitle { word-break:keep-all; }
-            #existingTopicsTitle svg { flex-shrink:0; }
-        }
-    </style>
-    {% include '_app_theme_head.html' %}
-</head>
-
-<body class="p-4 md:p-8">
-{% if classroom_term %}
-<div class="seminar-shell">{% with term=classroom_term %}{% include '_classroom_nav.html' %}{% endwith %}
-<p><a href="{{ url_for('seminars', term_id=classroom_term.id, week_id=event.seminar_week_id) }}#week-{{ event.seminar_week_id }}">이 주차 커리큘럼으로 돌아가기</a> · <span id="classroomSubmissionStatus" role="status" aria-live="polite">{{ event.status_label }}</span></p></div>
-{% endif %}
-    <div class="max-w-3xl mx-auto">
+{% extends 'lms_base.html' %}
+{% set lms_page = 'topics' %}
+{% set lms_title = '발제문 제출' %}
+{% set lms_course = classroom_term if classroom_term else none %}
+{% block title %}{{ event.book_title }} - 발제문 제출{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_topics.css') }}">{% endblock %}
+{% block content %}
+<div class="lms-topics">
+{% if classroom_term %}<p class="topic-classroom-return"><a href="{{ url_for('seminars', term_id=classroom_term.id, week_id=event.seminar_week_id) }}#week-{{ event.seminar_week_id }}">이 주차 커리큘럼으로 돌아가기</a> · <span id="classroomSubmissionStatus" role="status" aria-live="polite">{{ event.status_label }}</span></p>{% endif %}
         <!-- 헤더 -->
-        <div class="topic-hero mb-6">
-            <p class="topic-kicker mb-2"><i data-lucide="book" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 발제문 제출</p>
-            <h1 class="text-2xl md:text-3xl font-bold text-eva-green">{{ event.book_title }}</h1>
+        <div class="topic-hero">
+            <p class="topic-kicker">{{ icon('book',18) }} 발제문 제출</p>
+            <h1 class="topic-strong">{{ event.book_title }}</h1>
             {% if event.book_author %}
-            <p class="topic-author text-sm mt-2">{{ event.book_author }}</p>
+            <p class="topic-author">{{ event.book_author }}</p>
             {% endif %}
-            <p class="topic-date mt-3 text-sm"><i data-lucide="calendar" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 모임 날짜: {{ event.meeting_date|seminar_date }}</p>
-            {% if event.seminar_week_id %}<p class="topic-date mt-2">본 세미나·추가 세미나가 같은 질문 목록을 공유합니다.</p>{% endif %}
-            {% if event.submission_deadline %}<p class="topic-date mt-2"><strong>제출·수정 마감: {{ event.submission_deadline }} 00:00 (한국시간)</strong>{% if event.submission_session_id %} · 선택한 회차 기준{% elif event.seminar_week_id %} · 마지막 회차 기준{% endif %}</p>{% endif %}
+            <p class="topic-date">{{ icon('calendar',18) }} 모임 날짜: {{ event.meeting_date|seminar_date }}</p>
+            {% if event.seminar_week_id %}<p class="topic-date">본 세미나·추가 세미나가 같은 질문 목록을 공유합니다.</p>{% endif %}
+            {% if event.submission_deadline %}<p class="topic-date"><strong>제출·수정 마감: {{ event.submission_deadline }} 00:00 (한국시간)</strong>{% if event.submission_session_id %} · 선택한 회차 기준{% elif event.seminar_week_id %} · 마지막 회차 기준{% endif %}</p>{% endif %}
         </div>
 
         <!-- 가이드 카드 -->
-        <details class="eva-card rounded-lg mb-6 overflow-hidden">
-            <summary class="cursor-pointer px-4 py-3 bg-gray-800/50 text-eva-green font-bold text-sm">
-                <i data-lucide="lightbulb" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 처음이신가요? 작성 방법 보기
+        <details class="topic-panel">
+            <summary class="topic-strong">
+                {{ icon('book',18) }} 처음이신가요? 작성 방법 보기
             </summary>
-            <div class="p-4 text-sm text-gray-300 space-y-2">
-                <p><strong class="text-eva-green">1단계.</strong> 명부에 등록된 회원도 로그인 없이 이 링크로 제출할 수 있습니다. 이름·소속·학번을 입력하세요. 로그인 중이면 계정 정보를 사용합니다. 처음 제출할 때는 수정 코드가 필요 없고, 로그인 없이 작성한 기존 글을 수정할 때만 발급받은 코드를 입력합니다.</p>
-                <p><strong class="text-eva-green">2단계.</strong> 인증되면 <strong>발제문 작성 폼</strong>이 나타납니다. 토론하고 싶은 주제·해당 페이지·참조 사항을 입력하세요. 발제문 1개는 필수이며, 원하면 1개를 더 추가할 수 있습니다.</p>
-                <p><strong class="text-eva-green">3단계.</strong> <strong>제출</strong> 버튼을 누르면 끝! 같은 정보로 다시 들어오면 작성한 내용을 수정할 수 있습니다.</p>
-                <div class="mt-3 p-3 bg-gray-900/50 rounded text-xs">
-                    <p class="text-eva-green font-bold mb-1">예시</p>
+            <div class="topic-muted topic-stack">
+                <p><strong>1단계.</strong> 명부에 등록된 회원도 로그인 없이 이 링크로 제출할 수 있습니다. 이름·소속·학번을 입력하세요. 로그인 중이면 계정 정보를 사용합니다. 처음 제출할 때는 수정 코드가 필요 없고, 로그인 없이 작성한 기존 글을 수정할 때만 발급받은 코드를 입력합니다.</p>
+                <p><strong>2단계.</strong> 인증되면 <strong>발제문 작성 폼</strong>이 나타납니다. 토론하고 싶은 주제·해당 페이지·참조 사항을 입력하세요. 발제문 1개는 필수이며, 원하면 1개를 더 추가할 수 있습니다.</p>
+                <p><strong>3단계.</strong> <strong>제출</strong> 버튼을 누르면 끝! 같은 정보로 다시 들어오면 작성한 내용을 수정할 수 있습니다.</p>
+                <div class="topic-example">
+                    <p class="topic-strong">예시</p>
                     <p>• 발제 내용: "주인공이 X를 선택한 동기는 무엇인가? 작가는 이를 통해 무엇을 말하고자 했는가?"</p>
                     <p>• 페이지: p.123~125</p>
                     <p>• 인용: "그 순간 그는 모든 것을 내려놓기로 했다. 더 이상 잃을 것이 없었기 때문이다." — 책에서 발제와 관련된 원문을 그대로 적어주세요.</p>
                 </div>
-                <p class="text-xs text-gray-500 mt-2">※ 로그인 없이 제출한 글의 수정 코드는 최초 제출 후 한 번 표시되며 DB에는 원문이 저장되지 않습니다. 현재 브라우저에 자동 보관되지만 다른 기기에서 수정하려면 코드를 따로 복사해 두세요. 나중에 로그인하더라도 이 글은 수정 코드로 확인합니다.</p>
+                <p class="topic-muted">※ 로그인 없이 제출한 글의 수정 코드는 최초 제출 후 한 번 표시되며 DB에는 원문이 저장되지 않습니다. 현재 브라우저에 자동 보관되지만 다른 기기에서 수정하려면 코드를 따로 복사해 두세요. 나중에 로그인하더라도 이 글은 수정 코드로 확인합니다.</p>
             </div>
         </details>
 
         <!-- 중복 방지: 작성자 개인정보를 제외한 기존 발제문 -->
-        <section class="eva-card preview-card rounded-lg mb-6 overflow-hidden" aria-labelledby="existingTopicsTitle">
-            <div class="px-4 py-4 flex items-start justify-between gap-3 bg-gray-800/50">
+        <section class="preview-card topic-panel" aria-labelledby="existingTopicsTitle">
+            <div class="topic-row topic-between">
                 <div>
-                    <h2 id="existingTopicsTitle" class="text-lg font-bold text-eva-green flex items-center gap-2">
-                        <i data-lucide="scan-search" style="width:1.05em;height:1.05em"></i>
+                    <h2 id="existingTopicsTitle" class="topic-row topic-strong">
+                        {{ icon('book',18) }}
                         먼저 나온 발제문 확인
                     </h2>
-                    <p class="text-xs text-gray-300 mt-1">비슷한 주제가 있는지 제출 전에 확인할 수 있습니다. 작성자의 이름·학과·학번은 공개되지 않습니다.</p>
+                    <p class="topic-muted">비슷한 주제가 있는지 제출 전에 확인할 수 있습니다. 작성자의 이름·학과·학번은 공개되지 않습니다.</p>
                 </div>
-                <span class="badge badge-member whitespace-nowrap">익명 {{ existing_topic_previews|length }}개</span>
+                <span class="badge badge-member">익명 {{ existing_topic_previews|length }}개</span>
             </div>
             {% if existing_topic_previews %}
             <details class="group">
-                <summary class="cursor-pointer px-4 py-3 font-bold text-sm flex items-center justify-between gap-3 hover:bg-gray-800/50">
+                <summary class="topic-row topic-between topic-strong">
                     <span>기존 발제문 {{ existing_topic_previews|length }}개 보기</span>
-                    <span class="text-xs text-gray-400 group-open:hidden">펼치기</span>
-                    <span class="text-xs text-gray-400 hidden group-open:inline">접기</span>
+                    <span class="topic-muted topic-when-closed">펼치기</span>
+                    <span class="topic-muted topic-when-open">접기</span>
                 </summary>
-                <div class="p-4 pt-1 space-y-3">
+                <div class="topic-stack">
                     {% for preview in existing_topic_previews %}
-                    <article class="preview-item rounded-lg p-4">
-                        <p class="text-xs text-eva-green font-bold mb-2">발제 {{ loop.index }}</p>
-                        <p class="text-sm leading-6 whitespace-pre-wrap">{{ preview.topic }}</p>
-                        {% if preview.page %}<p class="text-xs text-gray-400 mt-3">해당 페이지: {{ preview.page }}</p>{% endif %}
+                    <article class="preview-item">
+                        <p class="topic-strong">발제 {{ loop.index }}</p>
+                        <p class="topic-prewrap">{{ preview.topic }}</p>
+                        {% if preview.page %}<p class="topic-muted">해당 페이지: {{ preview.page }}</p>{% endif %}
                         {% if preview.reference %}
-                        <details class="mt-3">
-                            <summary class="cursor-pointer text-xs text-gray-400 hover:text-eva-green">관련 인용 보기</summary>
-                            <blockquote class="mt-2 pl-3 border-l-2 border-gray-600 text-xs text-gray-300 whitespace-pre-wrap">{{ preview.reference }}</blockquote>
+                        <details>
+                            <summary class="topic-muted">관련 인용 보기</summary>
+                            <blockquote class="topic-muted topic-prewrap">{{ preview.reference }}</blockquote>
                         </details>
                         {% endif %}
                     </article>
@@ -181,110 +74,112 @@
                 </div>
             </details>
             {% else %}
-            <div class="px-4 py-4 text-sm text-gray-300">
+            <div class="topic-muted">
                 아직 먼저 제출된 발제문이 없습니다. 첫 발제문을 작성해 주세요.
             </div>
             {% endif %}
         </section>
 
         <!-- 1단계: 본인 확인 -->
-        <div id="verifyCard" class="eva-card rounded-lg p-5 mb-6">
-            <h2 class="text-lg font-bold text-eva-green mb-1"><span class="step-num">1</span>본인 확인</h2>
-            <p class="text-xs text-gray-400 mb-4 ml-8">동명이인 구분 및 수정 권한을 위해 필요합니다.</p>
+        <div id="verifyCard" class="topic-panel">
+            <h2 class="topic-strong"><span class="step-num">1</span>본인 확인</h2>
+            <p class="topic-muted">동명이인 구분 및 수정 권한을 위해 필요합니다.</p>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div class="topic-grid">
                 <div>
-                    <label for="authorName" class="text-xs text-gray-400 block mb-1">이름</label>
-                    <input type="text" id="authorName" class="eva-input w-full rounded py-2 px-3 text-sm" required
+                    <label for="authorName" class="topic-muted">이름</label>
+                    <input type="text" id="authorName" class="topic-input" required
                         placeholder="홍길동"
                         {% if user_name %}value="{{ user_name }}" readonly style="cursor:not-allowed"{% endif %}>
                 </div>
                 <div>
-                    <label for="department" class="text-xs text-gray-400 block mb-1">소속 (학과 등)</label>
-                    <input type="text" id="department" class="eva-input w-full rounded py-2 px-3 text-sm" required
+                    <label for="department" class="topic-muted">소속 (학과 등)</label>
+                    <input type="text" id="department" class="topic-input" required
                         placeholder="예: 경영학과"
                         {% if user_department %}value="{{ user_department }}"{% endif %}>
                 </div>
                 <div>
-                    <label for="studentId" class="text-xs text-gray-400 block mb-1">
-                        학번 <span class="text-eva-green">*</span>
+                    <label for="studentId" class="topic-muted">
+                        학번 <span>*</span>
                     </label>
-                    <input type="text" id="studentId" class="eva-input w-full rounded py-2 px-3 text-sm"
+                    <input type="text" id="studentId" class="topic-input"
                         placeholder="2022XXXXXX" inputmode="numeric"
                         {% if user_student_id %}value="{{ user_student_id }}"{% endif %} required>
-                    <p class="text-[10px] text-gray-500 mt-1">입학년도 + 학번 (예: 2022123456)</p>
+                    <p class="topic-muted">입학년도 + 학번 (예: 2022123456)</p>
                 </div>
                 <div id="credentialField"{% if user_name %} class="hidden"{% endif %}>
-                    <label for="pinCode" class="text-xs text-gray-400 block mb-1">
-                        수정 코드 <span class="text-yellow-400">(기존 글을 수정할 때만)</span>
+                    <label for="pinCode" class="topic-muted">
+                        수정 코드 <span>(기존 글을 수정할 때만)</span>
                     </label>
-                    <input type="text" id="pinCode" class="eva-input w-full rounded py-2 px-3 text-sm"
+                    <input type="text" id="pinCode" class="topic-input"
                         maxlength="80" placeholder="처음 제출이라면 비워두세요" autocomplete="off">
-                    <p class="text-[10px] text-gray-500 mt-1">기존 4자리 PIN도 첫 수정까지 사용할 수 있으며, 수정 후 안전한 새 코드로 교체됩니다.</p>
+                    <p class="topic-muted">기존 4자리 PIN도 첫 수정까지 사용할 수 있으며, 수정 후 안전한 새 코드로 교체됩니다.</p>
                 </div>
             </div>
 
             <button type="button" id="verifyBtn"
-                class="mt-4 w-full bg-eva-green text-black font-bold py-2.5 rounded-lg hover:opacity-80 transition">
+                class="topic-strong">
                 ✓ 확인하기
             </button>
-            <p id="verifyMsg" class="text-xs mt-2 text-red-400 hidden"></p>
+            <p id="verifyMsg" class="hidden topic-error"></p>
         </div>
 
         <!-- 2단계: 발제문 작성 (인증 후 노출) -->
         <div id="writeCard" class="hidden">
-            <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-                <div class="text-sm">
-                    <span class="text-gray-400">인증:</span>
-                    <span id="verifiedName" class="text-eva-green font-bold"></span>
+            <div class="topic-row topic-between">
+                <div>
+                    <span class="topic-muted">인증:</span>
+                    <span id="verifiedName" class="topic-strong"></span>
                     <span id="verifiedBadge"></span>
-                    <button type="button" id="resetBtn" class="text-xs text-gray-400 hover:text-eva-green ml-2 underline">변경</button>
+                    <button type="button" id="resetBtn" class="topic-muted">변경</button>
                 </div>
-                <p id="loadedNote" class="text-xs text-eva-green hidden">✓ 이전에 작성한 발제문을 불러왔습니다.</p>
+                <p id="loadedNote" class="hidden">✓ 이전에 작성한 발제문을 불러왔습니다.</p>
             </div>
 
-            <form id="topicForm" class="space-y-4">
+            <form id="topicForm" class="topic-stack">
                 <input type="hidden" id="eventId" value="{{ event.id }}">
 
-                <h2 class="text-lg font-bold text-eva-green"><span class="step-num">2</span>발제문 작성</h2>
+                <h2 class="topic-strong"><span class="step-num">2</span>발제문 작성</h2>
 
                 <div class="topic-draft-panel">
                     <p id="topicSaveStatus" role="status" aria-live="polite">작성 후 제출 버튼을 눌러주세요.</p>
                     <p class="topic-draft-help">임시저장은 이 브라우저에만 7일간 보관되며 제출이 아닙니다. 다른 기기에서는 복구할 수 없어요. 공용 기기에서는 사용 후 임시저장을 삭제해주세요.</p>
                     <div id="topicDraftRecovery" hidden>
                         <p id="topicDraftFound"></p>
-                        <button type="button" id="restoreTopicDraft" class="home-btn home-btn-secondary">임시저장 복구</button>
+                        <button type="button" id="restoreTopicDraft">임시저장 복구</button>
                     </div>
                     <button type="button" id="discardTopicDraft" class="topic-draft-discard">임시저장 삭제</button>
                 </div>
 
-                <div id="topicsContainer" class="space-y-4"></div>
+                <div id="topicsContainer" class="topic-stack"></div>
 
-                <p class="text-xs text-gray-400">발제문 1개는 필수이고, 선택으로 1개를 더 제출할 수 있어요. 개인 한도는 회장이 조정할 수 있습니다.</p>
+                <p class="topic-muted">발제문 1개는 필수이고, 선택으로 1개를 더 제출할 수 있어요. 개인 한도는 회장이 조정할 수 있습니다.</p>
 
                 <button type="button" id="addTopicBtn"
-                    class="hidden w-full bg-gray-700 hover:bg-gray-600 font-bold py-3 rounded-lg border border-dashed border-gray-500 text-sm">
+                    class="hidden topic-strong">
                     + 발제문 추가하기
                 </button>
 
                 <button type="submit" id="submitBtn"
-                    class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-lg text-lg transition shadow-lg shadow-green-900/50">
+                    class="topic-strong">
                     제출 / 수정 완료
                 </button>
             </form>
 
-            <div id="credentialCard" class="hidden eva-card rounded-lg p-5 mt-5 border-2 border-green-600" role="status">
-                <h2 class="text-lg font-bold text-eva-green">수정 코드를 보관해주세요</h2>
-                <p class="text-sm text-gray-300 mt-2">이 코드는 다시 표시할 수 없습니다. 현재 브라우저에는 자동 저장했습니다.</p>
-                <div class="flex gap-2 mt-3 flex-wrap">
-                    <code id="issuedCredential" class="eva-input rounded py-2 px-3 text-sm break-all flex-1 min-w-0"></code>
-                    <button type="button" id="copyCredentialBtn" class="bg-eva-green text-black font-bold rounded px-4 py-2">복사</button>
+            <div id="credentialCard" class="hidden topic-panel" role="status">
+                <h2 class="topic-strong">수정 코드를 보관해주세요</h2>
+                <p class="topic-muted">이 코드는 다시 표시할 수 없습니다. 현재 브라우저에는 자동 저장했습니다.</p>
+                <div class="topic-row">
+                    <code id="issuedCredential" class="topic-input"></code>
+                    <button type="button" id="copyCredentialBtn" class="topic-strong">복사</button>
                 </div>
-                <p id="copyCredentialMsg" class="text-xs text-eva-green mt-2 hidden">복사했습니다.</p>
+                <p id="copyCredentialMsg" class="hidden">복사했습니다.</p>
             </div>
         </div>
-    </div>
 
+</div>
+{% endblock %}
+{% block scripts %}
     <script src="{{ url_for('static', filename='topic_drafts.js') }}"></script>
     <script>
         const IS_LOGGED_IN = {{ 'true' if user_name else 'false' }};
@@ -362,24 +257,24 @@
             }
             topicCount++;
             const div = document.createElement('div');
-            div.className = 'eva-card p-4 rounded-lg relative';
+            div.className = 'topic-panel topic-question';
             div.innerHTML = `
-                <button type="button" class="remove-btn absolute top-2 right-2 text-red-500 hover:text-red-400 font-bold text-xl px-2">&times;</button>
-                <h3 class="text-eva-green font-bold mb-3">#${topicCount} 발제</h3>
-                <div class="space-y-3">
+                <button type="button" class="remove-btn topic-error topic-strong">&times;</button>
+                <h3 class="topic-strong">#${topicCount} 발제</h3>
+                <div class="topic-stack">
                     <div>
-                        <label class="text-xs text-gray-400 block mb-1">발제 내용 *</label>
-                        <textarea class="topic-text eva-input w-full rounded py-2 px-3 h-24 resize-none" required
+                        <label class="topic-muted">발제 내용 *</label>
+                        <textarea class="topic-text topic-input" required
                             placeholder="논의하고 싶은 주제를 상세히 적어주세요"></textarea>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-[100px_1fr] gap-3">
+                    <div class="topic-grid topic-reference-grid">
                         <div>
-                            <label class="text-xs text-gray-400 block mb-1">해당 페이지</label>
-                            <input type="text" class="topic-page eva-input w-full rounded py-1.5 px-3 text-sm" placeholder="예: p.123~125">
+                            <label class="topic-muted">해당 페이지</label>
+                            <input type="text" class="topic-page topic-input" placeholder="예: p.123~125">
                         </div>
                         <div>
-                            <label class="text-xs text-gray-400 block mb-1">인용 <span class="text-eva-green">(원문)</span></label>
-                            <textarea class="topic-ref eva-input w-full rounded py-1.5 px-3 text-sm h-16 resize-none"
+                            <label class="topic-muted">인용 <span>(원문)</span></label>
+                            <textarea class="topic-ref topic-input"
                                 placeholder="발제와 관련된 책 본문을 그대로 인용해주세요 (한 문단 정도)"></textarea>
                         </div>
                     </div>
@@ -604,7 +499,5 @@
             }
         });
     </script>
-{% include '_icons.html' %}
-</body>
 
-</html>
+{% endblock %}

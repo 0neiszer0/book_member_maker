@@ -2,12 +2,28 @@ import unittest
 from datetime import date
 from functools import wraps
 from unittest.mock import patch
+from pathlib import Path
+from jinja2 import Environment, FileSystemLoader
 
 from flask import Flask, jsonify, session
 from integrated_calendar import init_calendar_routes, seminar_calendar_events
 
 
 class CalendarTests(unittest.TestCase):
+    def test_calendar_uses_isolated_shell_and_real_controls(self):
+        env = Environment(loader=FileSystemLoader(Path(__file__).resolve().parents[1] / 'templates'))
+        env.globals.update(url_for=lambda endpoint, **values: '/' + values.get('filename', endpoint),
+                           get_flashed_messages=lambda **kwargs: [])
+        html = env.get_template('integrated_calendar.html').render(
+            request={'endpoint': 'lms_calendar'}, session={}, calendar_today='2026-10-27', calendar_member=False, calendar_term='')
+        self.assertIn('data-lms-page="calendar"', html)
+        self.assertIn('lms_calendar.css', html)
+        self.assertNotIn('theme.css', html)
+        self.assertNotIn('tailwind', html)
+        self.assertEqual(html.count('data-calendar-view='), 3)
+        self.assertEqual(html.count('data-filter='), 4)
+        self.assertIn('role="tabpanel"', html)
+
     def context(self):
         return dict(term={'id': 't'}, sessions=[dict(id='s', meeting_date='2026-10-29', seminar_week_id='w', day_type='thu')],
                     weeks={'w': {'book_title': '<책>'}}, topics={'w': dict(id='e', seminar_week_id='w', session_dates=['2026-10-29', '2026-11-02'], share_token='safe', open=True, status_label='제출 완료')})
