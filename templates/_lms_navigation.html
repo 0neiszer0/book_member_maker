@@ -1,23 +1,21 @@
-{% set lms_endpoint = request.endpoint or '' %}
-{% macro lms_links() %}
-  <a href="{{ url_for('main_index') }}" {% if lms_endpoint == 'main_index' %}aria-current="page"{% endif %}><span aria-hidden="true">▦</span>대시보드</a>
-  {% if session.user_role %}<a href="{{ url_for('seminars') }}" {% if lms_endpoint in ['seminars', 'view_shared_topics'] %}aria-current="page"{% endif %}><span aria-hidden="true">▤</span>강의실</a>{% endif %}
-  <a href="{{ url_for('lms_calendar') }}" {% if lms_endpoint == 'lms_calendar' %}aria-current="page"{% endif %}><span aria-hidden="true">▦</span>캘린더</a>
-  <a href="{{ url_for('club_room') }}" {% if lms_endpoint == 'club_room' %}aria-current="page"{% endif %}><span aria-hidden="true">⌂</span>동아리방</a>
-  {% if session.user_role %}
-  <a href="{{ url_for('my_page') }}" {% if lms_endpoint == 'my_page' %}aria-current="page"{% endif %}><span aria-hidden="true">○</span>내 활동</a>
-  {% if session.user_role in ['admin', 'officer'] or session.get('member_preview') %}
-  <a href="{{ url_for('admin_dashboard') }}" {% if lms_endpoint.startswith('admin_') %}aria-current="page"{% endif %}><span aria-hidden="true">⚙</span>전체 운영</a>
-  {% endif %}
-  {% endif %}
-  <a href="{{ url_for('help_member') }}"><span aria-hidden="true">?</span>이용 안내</a>
-{% endmacro %}
-<nav class="lms-global" aria-label="전역 메뉴">
-  <a class="lms-brand" href="{{ url_for('main_index') }}">책 먹는<br>호반우</a>
-  {{ lms_links() }}
+{% from '_lms_icons.html' import icon %}
+{% set ep=request.endpoint or '' %}
+<nav class="lms-global" id="lms-global" aria-label="전역 메뉴">
+<a class="lms-logo" href="{{ url_for('main_index') }}" aria-label="책 먹는 호반우 대시보드"><svg viewBox="0 0 48 44" width="42" height="42" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M4 9c7-4 13-4 20 0 7-4 13-4 20 0v28c-7-4-13-4-20 0-7-4-13-4-20 0ZM24 9v28M9 14c4-2 8-2 11 0M29 14c4-2 8-2 11 0"/></svg><span class="lms-sr">책 먹는 호반우</span></a>
+<button type="button" class="lms-global-item lms-account-button" data-lms-panel="lms-account" aria-controls="lms-account" aria-expanded="false">{{ icon('account',32) }}<span>계정</span></button>
+<a class="lms-global-item" href="{{ url_for('main_index') }}" {% if ep=='main_index' %}aria-current="page"{% endif %}>{{ icon('dashboard') }}<span>대시보드</span></a>
+{% if session.user_role %}<a class="lms-global-item" href="{{ url_for('seminars') }}" {% if ep in ['seminars','view_shared_topics'] or ep.startswith('boards.') %}aria-current="page"{% endif %}>{{ icon('book') }}<span>강의실</span></a>{% endif %}
+<a class="lms-global-item" href="{{ url_for('lms_calendar') }}" {% if ep=='lms_calendar' %}aria-current="page"{% endif %}>{{ icon('calendar') }}<span>캘린더</span></a>
+<a class="lms-global-item" href="{{ url_for('club_room') }}">{{ icon('room') }}<span>동아리방</span></a>
+{% if session.user_role in ['admin','officer'] %}<button type="button" class="lms-global-item" data-lms-panel="lms-notifications" aria-controls="lms-notifications" aria-expanded="false">{{ icon('inbox') }}<span>알림</span></button><a class="lms-global-item" href="{{ url_for('admin_dashboard') }}">{{ icon('settings') }}<span>전체 운영</span></a>{% endif %}
+<a class="lms-global-item" href="{{ url_for('help_member') }}">{{ icon('help') }}<span>이용안내</span></a>
+<button type="button" class="lms-global-collapse" aria-label="메뉴 최소화" aria-expanded="true">{{ icon('arrow') }}</button>
 </nav>
-<dialog id="lms-menu-dialog" class="lms-menu-dialog" aria-labelledby="lms-menu-title">
-  <div class="lms-drawer-head"><strong id="lms-menu-title">책 먹는 호반우</strong><button type="button" id="lms-menu-close">닫기</button></div>
-  <nav aria-label="전체 메뉴">{{ lms_links() }}</nav>
-</dialog>
-<script defer src="{{ url_for('static', filename='lms_navigation.js') }}"></script>
+<div class="lms-mobile-backdrop" hidden></div>
+<section class="lms-tray" id="lms-account" aria-labelledby="lms-account-title" hidden>
+<button class="lms-tray-close" type="button" aria-label="계정 메뉴 닫기">×</button><h2 id="lms-account-title">계정</h2>
+{% if session.user_role %}<p>{{ session.user_name or '회원' }}</p><ul><li><button type="button" id="lms-feedback-open" class="lms-feedback-open" aria-haspopup="dialog" aria-controls="lms-feedback-dialog">버그·개선 제보</button></li><li><a href="{{ url_for('my_page') }}">내 활동</a></li><li><a href="{{ url_for('engagement_now') }}">지금 참여하기</a></li><li><a href="{{ notion_public_wiki_url }}" target="_blank" rel="noopener noreferrer">공식 위키</a></li>{% if session.user_role in ['admin','officer'] or session.get('member_preview') %}<li><a href="{{ url_for('admin_dashboard') }}">운영 관리</a></li>{% endif %}</ul>
+{% if session.user_role == 'admin' or session.get('member_preview') %}<form method="post" action="{{ url_for('toggle_member_preview') }}"><button class="lms-button" type="submit">{{ '관리자 화면으로 돌아가기' if session.get('member_preview') else '회원 화면으로 보기' }}</button></form>{% endif %}
+<a class="lms-button" href="{{ url_for('logout') }}">로그아웃</a>
+{% else %}<a class="lms-button" href="{{ url_for('login') }}">로그인</a>{% endif %}</section>
+{% if session.user_role in ['admin','officer'] %}<section class="lms-tray" id="lms-notifications" aria-labelledby="lms-notifications-title" hidden><button class="lms-tray-close" type="button" aria-label="알림 닫기">×</button><h2 id="lms-notifications-title">알림</h2><div id="lms-notification-list" role="status">알림을 불러오는 중입니다.</div></section>{% endif %}

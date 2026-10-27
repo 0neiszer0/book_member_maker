@@ -1,0 +1,33 @@
+Font provenance and redistribution notices
+Verified 2026-10-27 from official public distributions.
+
+Lato Extended
+Official source: https://github.com/instructure/canvas-lms/tree/master/public/fonts/lato/extended
+Regular source: https://raw.githubusercontent.com/instructure/canvas-lms/master/public/fonts/lato/extended/Lato-Regular.woff2
+Regular SHA256: 983b0caf336e8542214fc17019a4fc5e0360864b92806ca14d55c1fc1c2c5a0f
+Regular Git blob SHA1: 3bf9843328a6359b6bd06e50010319c63da0d717
+Bold source: https://raw.githubusercontent.com/instructure/canvas-lms/master/public/fonts/lato/extended/Lato-Bold.woff2
+Bold SHA256: ae88fc0d7a961832f809527d30bd3983a6866d42f66a56ade23f543681594db6
+Bold Git blob SHA1: bb195043cfc07fa52741c6144d7378b5ba8be4c5
+Both inspected with fontTools. Internal family Lato, version 2.015 (2015-08-06).
+Internal name records 0 and 13 identify copyright 2011-2015 tyPoland Lukasz Dziedzic, Reserved Font Name Lato, SIL Open Font License 1.1.
+The CSS family alias Lato Extended identifies the Canvas extended character repertoire; it is not a school-owned font family.
+License: Lato-OFL.txt. Full license text source: https://raw.githubusercontent.com/google/fonts/main/ofl/lato/OFL.txt
+Do not modify or rename the font software when bundling the original files.
+Public unauthenticated observed URLs were downloaded without browser session data and compared byte-for-byte against the official Canvas originals:
+https://canvas.knu.ac.kr/dist/fonts/lato/extended/Lato-Regular-bd03a2cc27.woff2
+https://canvas.knu.ac.kr/dist/fonts/lato/extended/Lato-Bold-cccb897485.woff2
+Both are byte-identical to the official Regular and Bold WOFF2 files above.
+Lato-Light.woff2 is also the unchanged official Canvas extended font, but no claim is made that it was observed in the live browser inventory.
+
+Noto Sans KR
+Official source: https://github.com/google/fonts/tree/main/ofl/notosanskr
+Font source: https://raw.githubusercontent.com/google/fonts/main/ofl/notosanskr/NotoSansKR%5Bwght%5D.ttf
+License source: https://raw.githubusercontent.com/google/fonts/main/ofl/notosanskr/OFL.txt
+License: NotoSansKR-OFL.txt (SIL Open Font License 1.1).
+Copyright 2014-2021 Adobe, Reserved Font Name Source.
+This is an independently obtained public font; it is not evidence of the exact revision of the school's rendered Korean glyphs.
+Bundled NotoSansKR.woff2 is a full-variable, weight 100-900 font (3,908,564 bytes), converted only from the official TTF container with fontTools 4.67.0 and Brotli 1.2.1. No glyph subsetting or name changes. Character map and glyph order verified equal after conversion. Source version 2.004-H2. Font SHA256 and source SHA256 are recorded in font-provenance.json.
+
+OFL permits bundling and embedding with software when copyright and license notices accompany the fonts. Font software remains under OFL and may not be sold by itself. Reserved Font Names restrict modified versions. These fonts do not imply endorsement by the font authors or any university.
+No school logos, private scripts, or school-specific font modifications are included by this provenance work.
