@@ -1,4 +1,5 @@
 {% extends 'engagement_base.html' %}
+{% set engagement_title = book.title %}
 {% block content %}
 <section class="eg-panel">
   <div class="eg-book">
@@ -14,7 +15,7 @@
 <input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
     {% if not member %}<p><a href="{{ url_for('kakao_login', next=request.path) }}">카카오 로그인 후 작성</a></p>{% endif %}
     <label>한마디 <span class="eg-help">선택</span><input class="eg-input" name="reason" maxlength="500" placeholder="왜 같이 읽고 싶은가요?"></label>
-    <button class="eg-btn {% if supported %}eg-btn-paper{% else %}eg-btn-primary{% endif %}" type="submit">{% if supported %}관심 표시 취소{% else %}같이 읽고 싶어요{% endif %}</button>
+    <button class="lms-button {% if not supported %}lms-button-primary{% endif %}" type="submit">{% if supported %}관심 표시 취소{% else %}같이 읽고 싶어요{% endif %}</button>
   </form>
 </section>
 
@@ -25,8 +26,8 @@
 <input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
     {% if not member %}<p><a href="{{ url_for('kakao_login', next=request.path) }}">카카오 로그인 후 작성</a></p>{% endif %}
     <label>댓글<textarea class="eg-textarea" name="content" maxlength="2000" required></textarea></label>
-    <button class="eg-btn eg-btn-primary" type="submit">댓글 남기기</button>
+    <button class="lms-button lms-button-primary" type="submit">댓글 남기기</button>
   </form>
 </section>
-<div class="eg-actions" style="margin-top:18px"><a class="eg-btn eg-btn-paper" href="{{ url_for('book_suggestions') }}">목록으로</a></div>
+<div class="eg-actions" style="margin-top:18px"><a class="lms-button" href="{{ url_for('book_suggestions') }}">목록으로</a></div>
 {% endblock %}

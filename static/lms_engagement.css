@@ -1,0 +1,63 @@
+/* Participation and book recommendations use the shared LMS shell and controls. */
+.eg-header{margin:0 0 24px}
+.eg-header .lms-toolbar h1{margin:0}
+.eg-kicker{color:#56616a;font-size:12px;line-height:18px;margin-bottom:4px}
+.eg-lead,.eg-muted{color:#56616a;font-size:14px;line-height:21px}
+.eg-lead{max-width:820px}
+.eg-panel{border:1px solid #c7cdd1;background:#fff;padding:20px}
+.eg-panel h2{font-size:20px;line-height:28px;margin:0 0 16px}
+.eg-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.eg-section{margin-top:28px}
+.eg-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid #c7cdd1;background:#f5f5f5}
+.eg-section-head h2{margin:0;font-size:16px;line-height:24px;font-weight:700}
+.eg-section-head>span{font-size:12px;line-height:18px;color:#56616a}
+.eg-activity-row{display:flex;align-items:center;gap:24px;justify-content:space-between;padding:18px 12px;border:1px solid #c7cdd1;border-top:0}
+.eg-activity-row>div{min-width:0;flex:1}
+.eg-activity-row h2,.eg-suggestion-row h2{font-size:16px;line-height:24px;font-weight:700;margin:4px 0}
+.eg-activity-row p{margin:0}
+.eg-activity-row:hover,.eg-suggestion-row:hover{background:#f5f5f5;text-decoration:none}
+.eg-activity-row:hover h2,.eg-suggestion-row:hover h2{text-decoration:underline}
+.eg-row-action{font-size:14px;line-height:21px;flex-shrink:0}
+.eg-chip{display:inline-block;border:1px solid #c7cdd1;padding:0 5px;color:#56616a;font-size:12px;line-height:18px}
+.eg-form{display:grid;gap:20px;max-width:900px}
+.eg-form label{display:grid;gap:6px;font-size:14px;line-height:21px}
+.eg-input,.eg-textarea,.eg-select{width:100%;min-width:0}
+.eg-form :is(input,textarea,select):disabled{background:#f5f5f5;color:#56616a}
+.eg-form>button{justify-self:start}
+.eg-help{display:block;font-size:12px;line-height:18px;color:#56616a}
+.eg-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.eg-identity{border:1px solid #c7cdd1;background:#f5f5f5;padding:12px 16px;font-size:14px;line-height:21px}
+.eg-identity strong{display:block;font-weight:700;margin-bottom:4px}
+.engagement-identity{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px}
+.eg-instructions{padding:12px;border:1px solid #c7cdd1;background:#f5f5f5;margin-top:16px;white-space:pre-wrap;font-size:14px;line-height:21px}
+.eg-divider{border:0;border-top:1px solid #c7cdd1;margin:20px 0}
+.eg-empty{padding:28px 20px;font-size:14px;line-height:21px}
+.eg-empty .eg-muted{margin:8px 0 16px}
+.eg-book{display:grid;grid-template-columns:80px minmax(0,1fr);gap:18px;align-items:start}
+.eg-cover{display:block;width:80px;height:108px;object-fit:cover;background:#f5f5f5;border:1px solid #c7cdd1}
+.eg-book-summary{margin-bottom:20px}
+.eg-book-summary h2{margin-bottom:6px}
+.eg-arrow{display:inline-block;font-size:14px;line-height:21px;margin-top:8px}
+.eg-checkboxes{display:flex;flex-wrap:wrap;gap:16px}
+.eg-form .eg-check{display:flex;align-items:center;gap:6px}
+.eg-check input{accent-color:#d20f17;margin:0}
+.eg-meta{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.eg-comment{padding:16px 0;border-top:1px solid #c7cdd1;font-size:14px;line-height:21px}
+.eg-comment:first-child{border-top:0}
+.eg-admin-link{margin-top:24px}
+.eg-suggestion-list{border-top:1px solid #c7cdd1}
+.eg-suggestion-row{display:flex;align-items:center;justify-content:space-between;gap:24px;border-bottom:1px solid #c7cdd1;padding:20px 12px}
+.eg-suggestion-row .eg-book{flex:1;min-width:0}
+.eg-suggestion-note{margin:8px 0 0;font-size:14px;line-height:21px;overflow-wrap:anywhere}
+.eg-admin-status{padding:12px;border:1px solid #c7cdd1;background:#f5f5f5;margin:20px 0;font-size:14px;line-height:21px}
+.eg-flash{padding:12px;border:1px solid #c7cdd1;background:#f5f5f5;margin-bottom:16px;font-size:14px;line-height:21px}
+.eg-flash-danger{border-color:#a82623;color:#a82623}
+@media(max-width:767px){
+  .eg-panel{padding:16px}
+  .eg-grid{grid-template-columns:1fr}
+  .engagement-identity,.eg-activity-row,.eg-suggestion-row{align-items:flex-start;flex-direction:column;gap:12px}
+  .eg-section-head{align-items:flex-start;flex-wrap:wrap}
+  .eg-book{grid-template-columns:64px minmax(0,1fr);gap:12px}
+  .eg-cover{width:64px;height:86px}
+  .eg-form{gap:18px}
+}

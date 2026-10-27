@@ -1,314 +1,61 @@
-<!DOCTYPE html>
-<html lang="ko">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>내 활동</title>
-    {% include '_tailwind_head.html' %}
-    <link
-        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap"
-        rel="stylesheet">
-    <style>
-        :root {
-            --eva-purple: #7A5A3A;
-            --eva-green: #3D5C2E;
-            --bg-dark: #FAF6EC;
-            --card-dark: #FFFCF3;
-            --text-light: #2A241B;
-            --border-dark: #C9B38A;
-        }
-
-        body {
-            font-family: 'Noto Sans KR', sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-light);
-        }
-
-        h1, h2, h3 { font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
-
-        .eva-card {
-            background-color: var(--card-dark);
-            border: 1px solid var(--border-dark);
-        }
-
-        .stat-card {
-            background-color: var(--card-dark);
-            border: 1px solid var(--border-dark);
-            border-radius: 0.75rem;
-            padding: 1rem 0.75rem;
-            text-align: center;
-        }
-        .stat-card .num {
-            font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
-            font-size: 1.75rem;
-            font-weight: 700;
-            color: var(--eva-green);
-            line-height: 1;
-        }
-        .stat-card .label {
-            font-size: 0.7rem;
-            color: #756A59;
-            margin-top: 0.4rem;
-        }
-
-        .section-title {
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: #756A59;
-
-            letter-spacing: 0.1em;
-            margin-bottom: 0.75rem;
-        }
-
-        .action-card {
-            background-color: var(--card-dark);
-            border: 1px solid var(--border-dark);
-            border-radius: 0.75rem;
-            padding: 1.25rem;
-            transition: border-color 0.2s;
-        }
-        .action-card:hover { border-color: var(--eva-green); }
-
-        .action-card .title {
-            font-weight: 700;
-            font-size: 1rem;
-            margin-bottom: 0.25rem;
-        }
-        .action-card .desc {
-            font-size: 0.78rem;
-            color: #756A59;
-            margin-bottom: 0.75rem;
-        }
-
-        .pill {
-            display: inline-flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.5rem;
-            padding: 0.55rem 0.85rem;
-            border-radius: 0.5rem;
-            font-size: 0.85rem;
-            font-weight: 600;
-            transition: all 0.15s;
-        }
-        .pill-green { background: var(--eva-green); color: #fff; }
-        .pill-green:hover { box-shadow: 0 0 12px rgba(61, 92, 46, 0.35); }
-        .pill-red { background: #b91c1c; color: #fff; }
-        .pill-yellow { background: #d97706; color: #fff; }
-        .pill-purple { background: var(--eva-purple); color: #fff; }
-        .pill-purple:hover { box-shadow: 0 0 12px rgba(122, 90, 58, 0.30); }
-        .pill-gray { background: var(--paper-2); color: var(--ink); border: 1px solid var(--line); }
-        .pill-gray:hover { background: var(--moss-tint); }
-
-        .chip {
-            display: inline-block;
-            font-size: 0.65rem;
-            padding: 0.1rem 0.45rem;
-            border-radius: 999px;
-            font-weight: 700;
-            margin-left: 0.4rem;
-            vertical-align: middle;
-        }
-        .chip-fac { background: var(--eva-purple); color: #fff; }
-    </style>
-    {% include '_app_theme_head.html' %}
-</head>
-
-<body class="min-h-screen">
-    {% include '_header.html' %}
-
-    <div class="container mx-auto max-w-5xl px-4 py-6">
-
-        <!-- 헤더 -->
-        <div class="mb-6 flex items-start justify-between gap-4 flex-wrap">
-            <div>
-                <h1 class="text-2xl md:text-3xl font-bold text-eva-green">{{ user.name }}님</h1>
-                <p class="text-gray-400 text-sm mt-1">
-                    {{ user.department or '소속 미입력' }}
-                    {% if user.student_id %}· 학번 {{ user.student_id }}{% endif %}
-                </p>
-            </div>
-            <a href="{{ url_for('help_member') }}"
-                class="text-xs bg-gray-700 hover:bg-eva-green hover:text-black border border-gray-600 px-3 py-1.5 rounded transition">
-                <i data-lucide="book-open" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 이용 안내
-            </a>
-        </div>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% for category, message in messages %}
-        <div class="p-3 mb-4 text-sm rounded-lg border bg-red-900/50 text-red-300 border-red-500/50">{{ message }}</div>
-        {% endfor %}
-        {% endwith %}
-
-        <!-- 활동 요약 통계 -->
-        <section class="mb-6">
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div class="stat-card">
-                    <div class="num">{{ activity.seminar_count or 0 }}</div>
-                    <div class="label">세미나 참여</div>
-                </div>
-                <div class="stat-card">
-                    <div class="num">{{ activity.facilitator_count or 0 }}</div>
-                    <div class="label">발제 횟수</div>
-                </div>
-                <div class="stat-card">
-                    <div class="num">{{ (activity.brick_sessions or [])|length }}</div>
-                    <div class="label">벽돌책 세션</div>
-                </div>
-                <div class="stat-card">
-                    <div class="num">{{ (activity.study_sessions or [])|length }}</div>
-                    <div class="label">소모임 세션</div>
-                </div>
-            </div>
-            <div class="text-right mt-2">
-                <a href="{{ url_for('records_member_profile', member_id=user.id) }}"
-                    class="text-xs text-gray-400 hover:text-eva-green underline">전체 활동 기록 →</a>
-            </div>
-        </section>
-
-        <!-- 지금 할 일 -->
-        <section class="mb-6">
-            <h2 class="section-title"><i data-lucide="zap" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 지금 할 일</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                <div class="action-card md:col-span-2">
-                    <div class="title"><i data-lucide="send" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 지금 참여하기</div>
-                    <div class="desc">현재 열려 있는 후기·벽돌책 모집·책 추천을 한곳에서 확인합니다.</div>
-                    <div class="flex flex-wrap gap-2">
-                        <a href="{{ url_for('engagement_now') }}" class="pill pill-green"><span>열린 활동 보기</span><span class="text-xs">바로가기 →</span></a>
-                        <span class="pill pill-gray">내 기록 · 후기 {{ engagement_activity.seminar_reviews + engagement_activity.brick_reviews }} · 추천 {{ engagement_activity.book_suggestions }} · 지원 {{ engagement_activity.brick_applications }}</span>
-                    </div>
-                </div>
-
-                <div class="action-card md:col-span-2">
-                    <div class="title">세미나 투표·학기 참석 현황</div>
-                    <div class="desc">목요일 불참과 월요일 참석은 카카오톡 단톡방에서 투표합니다. 정원·선착순 제한은 없습니다.</div>
-                    <div class="flex flex-wrap gap-2 mt-1">
-                        <a href="{{ url_for('seminars') }}" class="pill pill-green">세미나 일정</a>
-                        <a href="{{ url_for('my_term_attendance') }}" class="pill pill-yellow">내 학기 참석 현황</a>
-                    </div>
-                    <p class="text-sm text-gray-500 mt-2">OT·세미나·벽돌책 실제 참석을 합산합니다. 같은 주 목요일과 다음 월요일은 1회로 인정합니다.</p>
-                </div>
-
-                <!-- 발제문 제출 -->
-                <div class="action-card">
-                    <div class="title"><i data-lucide="notebook-pen" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 발제문 제출</div>
-                    <div class="desc">
-                        {% if active_topic_events %}진행 중 {{ active_topic_events|length }}건. 클릭해 작성·수정하세요.
-                        {% else %}현재 진행 중인 발제문 수집이 없습니다.{% endif %}
-                    </div>
-                    {% if active_topic_events %}
-                    <div class="flex flex-col gap-1.5">
-                        {% for evt in active_topic_events[:3] %}
-                        <a href="/shared_topics?token={{ evt.share_token }}" class="pill pill-green">
-                            <span>{{ evt.book_title }}</span>
-                            <span class="text-xs">{{ evt.meeting_date }}</span>
-                        </a>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    <button class="pill pill-gray w-full" disabled>접수 대기 중</button>
-                    {% endif %}
-                </div>
-
-                <!-- 위키 -->
-                <div class="action-card">
-                    <div class="title"><i data-lucide="book-open" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 독서모임 위키</div>
-                    <div class="desc">운영진이 정리한 회칙·이용 안내·동아리 자료를 Notion에서 확인합니다.</div>
-                    <a href="{{ notion_public_wiki_url }}" target="_blank" rel="noopener noreferrer" class="pill pill-purple w-full">공식 Notion 위키 열기</a>
-                </div>
-
-            </div>
-        </section>
-
-        <!-- 내 활동 기록 -->
-        <section class="mb-6">
-            <h2 class="section-title"><i data-lucide="book" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 내 최근 활동</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-
-                <!-- 최근 세미나 -->
-                <div class="eva-card rounded-xl p-4">
-                    <h3 class="text-sm font-bold text-eva-green mb-3">최근 세미나</h3>
-                    <div class="space-y-1.5 max-h-64 overflow-y-auto pr-1">
-                        {% for r in (activity.seminar_records or [])[:8] %}
-                        <a href="{{ url_for('records_seminar_detail', history_id=r.history_id) }}"
-                            class="block px-3 py-2 rounded bg-gray-800/50 hover:bg-gray-700 text-xs">
-                            <div class="font-bold text-gray-200">{{ r.date }}
-                                {% if r.is_facilitator %}<span class="chip chip-fac">발제</span>{% endif %}
-                            </div>
-                            <div class="text-gray-400 truncate">{{ r.book_title or '(제목 없음)' }}</div>
-                        </a>
-                        {% else %}
-                        <p class="text-xs text-gray-500 text-center py-4">참여 기록이 없습니다.</p>
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <!-- 벽돌책 -->
-                <div class="eva-card rounded-xl p-4">
-                    <h3 class="text-sm font-bold text-eva-green mb-3">참여 중 벽돌책</h3>
-                    <div class="space-y-1.5 max-h-64 overflow-y-auto pr-1">
-                        {% set bb_books = {} %}
-                        {% for s in (activity.brick_sessions or []) %}
-                            {% if s.book_id and s.book_id not in bb_books %}
-                                {% set _ = bb_books.update({s.book_id: s}) %}
-                            {% endif %}
-                        {% endfor %}
-                        {% for bid, s in bb_books.items() %}
-                        <a href="{{ url_for('records_brick_book_detail', book_id=s.book_id) }}"
-                            class="block px-3 py-2 rounded bg-gray-800/50 hover:bg-gray-700 text-xs">
-                            <div class="font-bold text-gray-200 truncate">{{ s.book_title or '(제목 없음)' }}</div>
-                            <div class="text-gray-400">최근 {{ s.meeting_date or '-' }}</div>
-                        </a>
-                        {% else %}
-                        <p class="text-xs text-gray-500 text-center py-4">참여 중인 책이 없습니다.</p>
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <!-- 스페셜 이벤트 -->
-                <div class="eva-card rounded-xl p-4">
-                    <h3 class="text-sm font-bold text-eva-green mb-3"><i data-lucide="sparkles" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 스페셜 이벤트</h3>
-                    <div class="space-y-1.5 max-h-64 overflow-y-auto pr-1">
-                        {% for ev in (my_special_events or []) %}
-                        <div class="block px-3 py-2 rounded bg-gray-800/50 text-xs">
-                            <div class="font-bold text-gray-200 truncate">{{ ev.name }}</div>
-                            <div class="text-gray-400">{{ ev.event_date }} · {{ ev.category }}</div>
-                        </div>
-                        {% else %}
-                        <p class="text-xs text-gray-500 text-center py-4">참여한 이벤트가 없습니다.</p>
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <!-- 소모임 -->
-                <div class="eva-card rounded-xl p-4">
-                    <h3 class="text-sm font-bold text-eva-green mb-3">참여 중 소모임</h3>
-                    <div class="space-y-1.5 max-h-64 overflow-y-auto pr-1">
-                        {% set sg_groups = {} %}
-                        {% for s in (activity.study_sessions or []) %}
-                            {% if s.group_id and s.group_id not in sg_groups %}
-                                {% set _ = sg_groups.update({s.group_id: s}) %}
-                            {% endif %}
-                        {% endfor %}
-                        {% for gid, s in sg_groups.items() %}
-                        <a href="{{ url_for('records_study_group_detail', group_id=s.group_id) }}"
-                            class="block px-3 py-2 rounded bg-gray-800/50 hover:bg-gray-700 text-xs">
-                            <div class="font-bold text-gray-200 truncate">{{ s.group_name or '(이름 없음)' }}</div>
-                            <div class="text-gray-400">최근 {{ s.meeting_date or '-' }}</div>
-                        </a>
-                        {% else %}
-                        <p class="text-xs text-gray-500 text-center py-4">참여 중인 소모임이 없습니다.</p>
-                        {% endfor %}
-                    </div>
-                </div>
-
-            </div>
-        </section>
-
+{% extends 'lms_base.html' %}
+{% set lms_page = 'member' %}
+{% set lms_title = '내 활동' %}
+{% block title %}내 활동 - 책 먹는 호반우{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_member.css') }}">{% endblock %}
+{% block content %}
+<div class="lms-member-page">
+  <header class="lms-member-heading">
+    <div><h1>{{ user.name }}님</h1><p class="lms-member-muted">{{ user.department or '소속 미입력' }}{% if user.student_id %} · 학번 {{ user.student_id }}{% endif %}</p></div>
+    <a href="{{ url_for('help_member') }}" class="lms-button">이용 안내</a>
+  </header>
+  <section aria-label="활동 요약" class="lms-member-section">
+    <dl class="lms-member-stats">
+      <div><dt>세미나 참여</dt><dd>{{ activity.seminar_count or 0 }}</dd></div>
+      <div><dt>발제 횟수</dt><dd>{{ activity.facilitator_count or 0 }}</dd></div>
+      <div><dt>벽돌책 세션</dt><dd>{{ (activity.brick_sessions or [])|length }}</dd></div>
+      <div><dt>소모임 세션</dt><dd>{{ (activity.study_sessions or [])|length }}</dd></div>
+    </dl>
+    <a class="lms-member-text-link" href="{{ url_for('records_member_profile', member_id=user.id) }}">전체 활동 기록 →</a>
+  </section>
+  <section class="lms-member-section">
+    <h2>지금 할 일</h2>
+    <div class="lms-member-task-grid">
+      <article class="lms-member-task lms-member-task-wide">
+        <h3>지금 참여하기</h3><p>현재 열려 있는 후기·벽돌책 모집·책 추천을 한곳에서 확인합니다.</p>
+        <div class="lms-member-actions"><a href="{{ url_for('engagement_now') }}" class="lms-button lms-button-primary">열린 활동 보기</a><span class="lms-member-muted">내 기록 · 후기 {{ engagement_activity.seminar_reviews + engagement_activity.brick_reviews }} · 추천 {{ engagement_activity.book_suggestions }} · 지원 {{ engagement_activity.brick_applications }}</span></div>
+      </article>
+      <article class="lms-member-task lms-member-task-wide">
+        <h3>세미나 투표·학기 참석 현황</h3><p>목요일 불참과 월요일 참석은 카카오톡 단톡방에서 투표합니다. 정원·선착순 제한은 없습니다.</p>
+        <div class="lms-member-actions"><a href="{{ url_for('seminars') }}" class="lms-button">세미나 일정</a><a href="{{ url_for('my_term_attendance') }}" class="lms-button">내 학기 참석 현황</a></div>
+        <p class="lms-member-muted">OT·세미나·벽돌책 실제 참석을 합산합니다. 같은 주 목요일과 다음 월요일은 1회로 인정합니다.</p>
+      </article>
+      <article class="lms-member-task">
+        <h3>발제문 제출</h3><p>{% if active_topic_events %}진행 중 {{ active_topic_events|length }}건. 클릭해 작성·수정하세요.{% else %}현재 진행 중인 발제문 수집이 없습니다.{% endif %}</p>
+        {% if active_topic_events %}<ul class="lms-member-link-list">{% for evt in active_topic_events[:3] %}<li><a href="/shared_topics?token={{ evt.share_token }}"><span>{{ evt.book_title }}</span><span class="lms-member-muted">{{ evt.meeting_date }}</span></a></li>{% endfor %}</ul>{% else %}<button type="button" class="lms-button" disabled>접수 대기 중</button>{% endif %}
+      </article>
+      <article class="lms-member-task">
+        <h3>독서모임 위키</h3><p>운영진이 정리한 회칙·이용 안내·동아리 자료를 Notion에서 확인합니다.</p><a href="{{ notion_public_wiki_url }}" target="_blank" rel="noopener noreferrer" class="lms-button">공식 Notion 위키 열기</a>
+      </article>
     </div>
-
-</body>
-
-</html>
+  </section>
+  <section class="lms-member-section">
+    <h2>내 최근 활동</h2><div class="lms-member-record-grid">
+      <article class="lms-member-record"><h3>최근 세미나</h3><ul class="lms-member-link-list">
+        {% for r in (activity.seminar_records or [])[:8] %}<li><a href="{{ url_for('records_seminar_detail', history_id=r.history_id) }}"><span>{{ r.date }} {% if r.is_facilitator %}<span class="lms-member-badge">발제</span>{% endif %}</span><span class="lms-member-muted">{{ r.book_title or '(제목 없음)' }}</span></a></li>{% else %}<li class="lms-empty">참여 기록이 없습니다.</li>{% endfor %}
+      </ul></article>
+      <article class="lms-member-record"><h3>참여 중 벽돌책</h3><ul class="lms-member-link-list">
+        {% set bb_books = {} %}{% for s in (activity.brick_sessions or []) %}{% if s.book_id and s.book_id not in bb_books %}{% set _ = bb_books.update({s.book_id: s}) %}{% endif %}{% endfor %}
+        {% for bid, s in bb_books.items() %}<li><a href="{{ url_for('records_brick_book_detail', book_id=s.book_id) }}"><span>{{ s.book_title or '(제목 없음)' }}</span><span class="lms-member-muted">최근 {{ s.meeting_date or '-' }}</span></a></li>{% else %}<li class="lms-empty">참여 중인 책이 없습니다.</li>{% endfor %}
+      </ul></article>
+      <article class="lms-member-record"><h3>스페셜 이벤트</h3><ul class="lms-member-link-list">
+        {% for ev in (my_special_events or []) %}<li class="lms-member-event"><span>{{ ev.name }}</span><span class="lms-member-muted">{{ ev.event_date }} · {{ ev.category }}</span></li>{% else %}<li class="lms-empty">참여한 이벤트가 없습니다.</li>{% endfor %}
+      </ul></article>
+      <article class="lms-member-record"><h3>참여 중 소모임</h3><ul class="lms-member-link-list">
+        {% set sg_groups = {} %}{% for s in (activity.study_sessions or []) %}{% if s.group_id and s.group_id not in sg_groups %}{% set _ = sg_groups.update({s.group_id: s}) %}{% endif %}{% endfor %}
+        {% for gid, s in sg_groups.items() %}<li><a href="{{ url_for('records_study_group_detail', group_id=s.group_id) }}"><span>{{ s.group_name or '(이름 없음)' }}</span><span class="lms-member-muted">최근 {{ s.meeting_date or '-' }}</span></a></li>{% else %}<li class="lms-empty">참여 중인 소모임이 없습니다.</li>{% endfor %}
+      </ul></article>
+    </div>
+  </section>
+</div>
+{% endblock %}
