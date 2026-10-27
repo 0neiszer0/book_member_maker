@@ -1,0 +1,5 @@
+{% extends 'lms_base.html' %}
+{% set lms_course = {'name':'운영 관리'} %}
+{% set course_breadcrumb_href = url_for('admin_dashboard') %}
+{% set course_breadcrumb_label = '운영 관리' %}
+{% block course_navigation %}{% include '_lms_admin_nav.html' %}{% endblock %}

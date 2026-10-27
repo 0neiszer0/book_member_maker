@@ -1,15 +1,12 @@
-<!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>동아리방 · 책 먹는 호반우</title>
-{% include '_tailwind_head.html' %}{% include '_app_theme_head.html' %}
-<link rel="stylesheet" href="{{ url_for('static', filename='club_room.css') }}">
-<script defer src="{{ url_for('static', filename='club_room.js') }}"></script></head>
-<body>{% include '_header.html' %}
-<main class="cr-shell" id="club-room" data-today="{{ room_today }}" data-csrf="{{ room_csrf }}" data-staff="{{ 'true' if room_staff else 'false' }}">
+{% extends 'lms_base.html' %}
+{% set lms_title='동아리방' %}{% set lms_page='room' %}
+{% block title %}동아리방 · 책 먹는 호반우{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_room.css') }}">{% endblock %}
+{% block content %}<div class="cr-shell" id="club-room" data-today="{{ room_today }}" data-csrf="{{ room_csrf }}" data-staff="{{ 'true' if room_staff else 'false' }}">
   <header class="cr-hero">
-    <div><p class="cr-eyebrow">OUR SHARED SPACE</p><h1>동아리방 사용하기</h1>
+    <div><h1>동아리방 사용하기</h1>
       <p>오전 9시부터 밤 12시까지, 원하는 시간을 골라주세요.<br>로그인 없이 신청하고 여러 팀이 함께 사용할 수 있어요.</p></div>
-    <div class="cr-hero-actions"><button class="cr-primary" id="cr-new" disabled>사용 신청하기 <span aria-hidden="true">↗</span></button><a href="#cr-my">내 예약 수정·취소</a></div>
+    <div class="cr-hero-actions"><button class="cr-primary" id="cr-new" disabled>사용 신청하기</button><a href="#cr-my">내 예약 수정·취소</a></div>
   </header>
   <section class="cr-availability" aria-labelledby="cr-free-title"><div><p class="cr-eyebrow" id="cr-summary-date">선택한 날짜</p><h2 id="cr-free-title">예약 없는 시간</h2></div><div id="cr-free" role="status">시간표를 확인하고 있어요.</div></section>
   <p class="cr-footnote">위 시간은 빈 구간 안내예요. 구간을 누른 뒤 원하는 시작·종료 시간을 1시간 단위로 선택하면, 여러 시간도 한 번에 신청할 수 있어요.</p>
@@ -27,11 +24,11 @@
     <details id="cr-staff-panel"><summary>선택한 주의 예약·참여자 관리</summary><div id="cr-staff-list"></div></details>
   </section>
   {% endif %}
-  <section class="cr-my" id="cr-my"><div><p class="cr-eyebrow">YOUR BOOKING</p><h2>내 예약 수정·취소</h2><p>신청할 때 받은 개인 관리 코드로 불러오세요.<br>공용 신청 코드나 회원 로그인은 필요하지 않아요.</p></div>
+  <section class="cr-my" id="cr-my"><div><h2>내 예약 수정·취소</h2><p>신청할 때 받은 개인 관리 코드로 불러오세요.<br>공용 신청 코드나 회원 로그인은 필요하지 않아요.</p></div>
     <div><form id="cr-lookup"><label for="cr-code">개인 관리 코드</label><div class="cr-lookup-row"><input id="cr-code" autocomplete="off" spellcheck="false" placeholder="예약 완료 후 받은 코드를 붙여넣으세요" required><button class="cr-secondary">불러오기</button></div></form><p id="cr-lookup-error" class="cr-error" role="alert" hidden></p><div id="cr-saved"></div><p class="cr-footnote">공용 기기에서는 사용 후 저장된 코드를 지워주세요. 코드를 잃어버렸다면 운영진에게 문의해주세요.</p><button class="cr-text-button" id="cr-forget">이 브라우저의 관리 코드 지우기</button></div>
   </section>
   <details class="cr-help"><summary>처음 이용한다면</summary><p>① 사용 신청하기 → 날짜·시작·종료 시간 선택 → ② 대표자·참여자 입력 → ③ 신청 완료 확인. 다른 팀과 겹치면 한 번 확인 후 신청할 수 있어요. 대표자 이름과 사용 시간은 누구나 볼 수 있고, 참여자 명단·사용 목적은 신청자와 임원만 확인할 수 있습니다.</p><p>동아리방 사용은 학기 출석 횟수에 포함되지 않습니다.</p></details>
-</main>
+</div>
 <dialog class="cr-dialog" id="cr-dialog" aria-labelledby="cr-dialog-title">
   <div class="cr-dialog-heading"><div><p class="cr-eyebrow" id="cr-dialog-eyebrow">BOOK THE ROOM</p><h2 id="cr-dialog-title">동아리방 사용 신청</h2></div><button type="button" id="cr-close" aria-label="예약 창 닫기">×</button></div>
   <form id="cr-form"><fieldset id="cr-fields"><input type="hidden" id="cr-kind" value="regular">
@@ -47,4 +44,6 @@
   <details id="cr-code-details" class="cr-code-details"><summary>개인 관리 코드 · 수정·취소할 때 필요해요</summary><input id="cr-issued-code" readonly aria-label="발급된 개인 관리 코드"><button type="button" class="cr-secondary" id="cr-copy">코드 복사</button><p id="cr-storage-note" class="cr-footnote">이 브라우저에 저장됩니다. 다른 기기에서는 코드를 입력해주세요. 타인에게 공유하지 마세요.</p></details>
   <div class="cr-form-actions"><button type="button" class="cr-danger" id="cr-cancel" hidden>예약 취소</button><button type="submit" class="cr-primary" id="cr-save">사용 신청 완료</button></div></form>
 </dialog>
-</body></html>
+
+{% endblock %}
+{% block scripts %}<script defer src="{{ url_for('static', filename='club_room.js') }}"></script>{% endblock %}
