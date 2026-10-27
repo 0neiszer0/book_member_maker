@@ -191,8 +191,11 @@ class PersistentLoginTests(unittest.TestCase):
 
     def test_unavailable_authorization_never_uses_cached_role(self):
         self.oauth()
+        with self.client.session_transaction() as state:
+            state['sensitive_csrf'] = 'sensitive-test'
         with patch.object(self.fake, 'table', side_effect=RuntimeError('offline')):
-            self.assertEqual(self.client.post('/api/admin/members/create', json={}).status_code, 503)
+            self.assertEqual(self.client.post('/api/admin/members/create', json={},
+                            headers={'X-App-CSRF':'sensitive-test'}).status_code, 503)
 
     def test_new_oauth_request_clears_previous_identity(self):
         self.oauth()

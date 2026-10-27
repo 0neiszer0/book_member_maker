@@ -15,8 +15,9 @@
 <div class="eg-panel eg-book" style="margin-bottom:16px">{% if book.cover_path %}<img class="eg-cover" src="{{ engagement_image_url(book.cover_path) }}" alt="{{ book.title }} 표지">{% else %}<div class="eg-cover"></div>{% endif %}<div><h2>{{ book.title }}</h2><p class="eg-muted">{{ book.author }}</p><a class="eg-arrow" href="{{ book.kyobo_url }}" target="_blank" rel="noopener noreferrer">교보문고에서 보기 ↗</a></div></div>
 {% endif %}
 <form class="eg-panel eg-form" method="post" enctype="multipart/form-data">
+<input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
   {% if member %}<div class="eg-identity"><strong>{{ member.name }}님으로 {% if existing %}기존 내용을 불러왔습니다.{% else %}작성합니다.{% endif %}</strong><span class="eg-help">{{ member.department or '학과 미입력' }} · {{ member.student_id }}</span></div>
-  {% else %}<div class="eg-grid"><label>학번<input class="eg-input" name="student_id" inputmode="numeric" required></label><label>이름<input class="eg-input" name="member_name" required></label></div>{% endif %}
+  {% else %}<p><a href="{{ url_for('kakao_login', next=request.path) }}">카카오 로그인 후 작성</a></p>{% endif %}
   {% if not is_open %}<div class="eg-flash eg-flash-danger">현재 입력이 마감되어 내용을 볼 수만 있습니다.</div>{% endif %}
   {% if form_kind == 'seminar_review' %}
     <label>세미나 후기<textarea class="eg-textarea" name="review_content" maxlength="5000" required {% if not is_open %}disabled{% endif %}>{{ existing.review_content if existing else '' }}</textarea></label>
