@@ -1,0 +1,12 @@
+# TEMPLATE ONLY: install/enable after one backup and isolated restore succeed.
+[Unit]
+Description=Daily encrypted book members backup
+
+[Timer]
+OnCalendar=*-*-* 03:15:00 Asia/Seoul
+RandomizedDelaySec=10min
+Persistent=true
+Unit=bookmembers-backup.service
+
+[Install]
+WantedBy=timers.target

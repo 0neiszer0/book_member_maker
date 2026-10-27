@@ -67,6 +67,58 @@ Supabase에는 pg_cron 확장이 없고 Storage 객체는 0개다. 타사 예약
 5. DB/Storage 백업은 복구키와 외부 저장소를 확정한 뒤 활성화하고 격리 복원을 확인한다.
    현재 백업은 미설정이며, SQL 확장에 대한 기존 백업 예외 승인이 다른 DB 변경으로 확대되지 않는다.
 
+## 백업 준비 상태와 활성화 조건
+
+`backup.py`, `backup.env.example`, `bookmembers-backup.service/.timer`는 로컬 준비본이다.
+설치·예약 활성화·실제 데이터 추출·클라우드 업로드는 아직 하지 않았다. 별도 ZIP도 만들지 않는다.
+현재는 공용 Gmail/Drive 연결을 요청하지 않는다. 실제 구축 시 승인된 외부 저장소를 지정한다.
+
+- Ubuntu에 PostgreSQL 클라이언트(원본 15 이상을 읽을 수 있는 버전), age, rclone이 필요하다.
+  기존 Python venv의 storage3/python-dotenv를 재사용한다. Docker나 로컬 DB 서버는 필요 없다.
+- `backup.env`와 `backup.pgpass`, `rclone.conf`, `app.env`는 Git 밖 root:root 0600.
+  Supabase Connect 화면의 실제 session pooler 호스트·사용자와 기존 DB 비밀번호를 사용한다.
+  서비스 키는 DB 비밀번호를 대체하지 않는다. 비밀번호를 모르더라도 임의 재설정하지 않는다.
+- 서버에는 age **공개키만** 둔다. 복구용 개인키는 PC 밖에 안전하게 보관하고 실제 복호화로 확인한다.
+  현재 DPAPI 파일은 다른 PC에서 바로 복호화할 수 있는 백업이 아니다.
+- rclone remote가 승인된 외부 저장소를 가리키는지 확인한다. local/alias로 같은 디스크를 지정하면
+  오프사이트 백업이 아니다. 해당 OAuth와 첫 업로드 범위를 승인받는다.
+- `/var/lib/bookmembers-backup`을 root:root 0700으로 준비한다. 첫 실행 전 용량과 보관 기간을 정한다.
+  이 준비본은 로컬/원격 백업을 자동 삭제하지 않는다. 계속 실행하면 용량이 증가하므로
+  보존 정책·삭제 승인·실패 알림 방법이 정해지기 전 timer를 활성화하지 않는다.
+
+승인 후 먼저 `sudo .venv/bin/python infra/minipc/backup.py`로 로컬 설정만 검사한다.
+`--run`을 붙여야 원본 읽기와 업로드를 수행한다. 스크립트는 DB INSERT/UPDATE/DELETE를 하지 않는다.
+표준 PostgreSQL custom dump(public + supabase_migrations, 데이터·함수·RLS·ACL 포함),
+Storage 버킷 설정·파일 내용·원래 경로 매핑과 SHA256, 확장 버전 목록을 암호화 TAR에 담는다.
+Storage 관리 스키마의 DDL도 참고용으로 보존하지만 새 Supabase에 그대로 덮어쓰지 않는다.
+Supabase 프로젝트 설정, Auth 사용자, 글로벌 역할 비밀번호, 앱/Worker 비밀은 이 백업에 포함하지 않는다.
+현재 앱은 자체 카카오 세션과 public 회원 테이블을 사용한다. 사용 범위가 늘면 백업 범위도 검토한다.
+
+DB dump는 일관된 스냅샷이지만 Storage와 하나의 원자적 스냅샷은 아니다. 삭제·크기 변경·조회 실패는
+백업을 실패 처리하나 동시 수정 전체를 검출한다고 보장하지 않는다. 최종 이전용 백업은 승인된
+쓰기 중지 구간에 수행한다. 임시 평문 dump는 0700 폴더에서만 생성하고 정상/예외 종료 시 정리한다.
+정전·강제 종료 후 남은 `.plain-*` 폴더는 상태 확인 후 별도 정리한다.
+업로드 뒤 rclone download 비교가 성공해야 `COMPLETE.json`을 올린다. 완료 표시 없는 원격 폴더는
+성공한 복구 지점으로 쓰지 않는다. 업로드 검증은 실제 DB 복원 성공을 뜻하지 않는다.
+
+첫 실행 후의 격리 복원 검증:
+
+1. 암호문과 COMPLETE.json을 별도 작업 위치에 내려받아 SHA256을 비교하고, 외부 보관 개인키로
+   `age --decrypt`하여 접근 제한된 임시 위치에 복호화한다. manifest와 파일 hash를 대조한다.
+2. 신규 격리 Supabase 또는 필요한 역할·확장을 준비한 폐기 가능한 PostgreSQL만 대상으로 한다.
+   운영 연결 문자열 사용 금지. `pg_restore --list`로 내용을 검토한 뒤
+   `pg_restore --exit-on-error --single-transaction --no-owner --dbname=<격리 DB> database.dump` 실행.
+   ACL을 생략하지 않는다. 익명 역할의 새 보안 RPC 실행 금지, service_role 실행 가능을 확인한다.
+3. manifest의 버킷 공개 여부·MIME/크기 제한을 재현하고, 파일을 원래 경로에 복원해 hash를 비교한다.
+   Storage 테이블에 직접 INSERT하지 않고 Storage API를 쓴다. 공개 버킷에 회원 사진을 옮기지 않는다.
+4. 회원/주요 테이블 건수, 시퀀스, 보안 함수·인덱스, 첨부 파일 하나를 비교한다.
+   실제 계정으로 운영 쓰기 테스트하지 않는다. 증거·복구 시각만 상태 문서에 기록한다.
+5. 성공·보존/알림 정책 승인 뒤에만 systemd 파일을 설치하고 timer를 enable한다.
+   준비된 일정은 한국 시각 매일 03:15(+최대 10분), Persistent=true. 지금 활성화된 일정이 아니다.
+
+합성 검증: `python -m unittest testing.test_minipc_backup -v`.
+네이티브 pg_dump/age/rclone 및 실제 암호화 왕복·외부 저장소·복원은 Ubuntu 준비 후 확인해야 한다.
+
 ## 공식 문서 확인 (2026-10-27)
 
 - https://developers.cloudflare.com/workers/platform/limits/ : Free 100,000/day, CPU 10ms, 요청 body Free 100MB.

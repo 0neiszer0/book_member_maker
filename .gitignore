@@ -12,3 +12,13 @@ data/*.csv
 
 # Frontend build dependencies are reproducible from package-lock.json.
 node_modules/
+
+# Backups and local operations credentials must never be committed.
+*.dump
+*.age
+*.dpapi
+*.pgpass
+rclone.conf
+backup.env
+app.env
+/backups/

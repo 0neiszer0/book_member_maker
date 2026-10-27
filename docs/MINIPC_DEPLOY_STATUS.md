@@ -3,7 +3,7 @@
 갱신: 2026-10-27 KST. 재부팅/세션 중단 후 이 파일부터 읽는다.
 작업 사본: C:/Users/HOME/Documents/Codex/2026-10-27/markdown-0neiszer0-book-member-maker-pc/work/book_member_maker
 브랜치: codex/minipc-security. 기준 main: 91b7dd6d9d0c6771a1e07c1ea977396f72dae4ce.
-보안 코드 커밋: c44220d, 085141b. 원격 push 및 Render 코드 배포 없음.
+현재 GitHub main 및 Render live: bda8a82e66ac828dd3bfe1971c37e7e98cca356f. 사용자 승인 후 보안 배포 완료. 이후 백업 준비 변경은 로컬에만 있다.
 다른 UI 세션의 별도 사본(zip-canvas-lms-00-start-here)은 수정하지 않았다.
 통합 시 app.py, engagement.py, _header.html 및 관련 폼 변경을 대조한다.
 
@@ -19,7 +19,7 @@
 - Cloudflare 제한 OAuth(account:read,user:read,workers_scripts:write) 인증 성공, Windows 키링 보호 저장. 사용자 승인 후 Worker 생성·Secret 저장·공개 GET 검증 완료.
 - Worker 주소: https://book-member-maker.alstj816.workers.dev . 원본은 https://book-member-maker.onrender.com . GET 200, keep-alive status=ok/supabase=alive, no-store, 응답에 원본 비밀 없음.
 - 원본 비밀은 작업 폴더 work/origin-auth-secret.dpapi에 Windows DPAPI 암호화 저장. 절대 출력/커밋하지 말 것. 향후 VM에 같은 값을 안전하게 전달. Flask/Supabase 기존 키 재사용 안 함.
-- Render My Workspace 읽기 승인 후 확인: srv-d06thnjuibrs73eu1r4g, free/docker/singapore, main 자동 배포 활성. 현재 live SHA는 기준 main 91b7dd6. healthCheckPath 비어 있음. 설정 변경 없음.
+- Render My Workspace 읽기 승인 후 확인: srv-d06thnjuibrs73eu1r4g, free/docker/singapore, main 자동 배포 활성. 현재 live SHA는 bda8a82. healthCheckPath 비어 있음. Render 환경변수 변경 없음.
 - Hyper-V 기능 활성화만 승인받아 완료: work/hyperv-enable-result.json의 Success=true/State=Enabled/RestartNeeded=true. 재부팅 아직 안 함.
 - Ubuntu 24.04.5 Server ISO 다운로드 완료: work/ubuntu/ubuntu-24.04.5-live-server-amd64.iso. 공식 SHA256 일치(97f3d7ffb032c3eb3b23d2c8be9cc76e60c2c1f2c0146ba5ba9fe01cafae0fd8).
 - VM 생성·systemd·Funnel·검증 실행 스크립트 및 runbook 준비. Python 3.12.16/venv는 작업 폴더에 격리 설치.
@@ -28,8 +28,8 @@
 
 1. 사용자 재부팅 승인 후 Windows 재시작. 다른 세션 작업 저장 확인. 강제 종료 금지. 재접속 후 Hyper-V 실제 상태 확인.
 2. 별도 VM 생성·Ubuntu 설치 승인 후 New-BookVm.ps1 실행. bookmembers-ubuntu, Gen2, 2CPU, 동적 RAM 1/1.5/3GiB, 30GiB, Default Switch, 자동 시작/정상 종료. VM 아직 없음.
-3. 다른 UI 변경과 충돌 검토 후 보안 코드 운영 배포 승인. main push는 Render 자동 배포를 일으키므로 승인 전 금지. 현재 공개 Worker도 아직 구형 Render 코드를 사용하므로 보안 전환 완료 상태가 아님.
-4. PUBLIC_BASE_URL/허용 Origin 및 Kakao 콜백 설정 변경 각각 승인 후 적용. Worker 주소를 회원 안내 URL로 아직 전환하지 않음.
+3. 보안 코드 bda8a82는 Render 운영 배포 완료. 다른 UI 작업은 포함하지 않음. UI 통합 시 최신 main을 기준으로 보안 코드와 CSRF를 보존한다. 추가 main push는 새 배포를 일으키므로 승인 필요.
+4. Kakao Worker 콜백 추가 완료. Render의 PUBLIC_BASE_URL/허용 Origin/프록시 콜백/원본 비밀 변경은 필요성 질문 후 보류. 현재 Worker 로그인 시작은 Render 콜백을 사용하므로 Worker OAuth 완료로 표시하지 않는다. VM에서 직접 검증하고 최종 전환 때 복구용 Render 유지 여부를 결정한다.
 5. Ubuntu 서비스 설치·비밀 환경 설정·별도 Tailscale 노드 인증. Funnel 공개 및 필요 정책 변경은 별도 승인. 원본 인증 필수, 직접 Funnel 접근은 403이어야 함.
 6. 동일 보안 버전 양쪽 원본 검증 후 Worker→Funnel 전환 승인. 외부 예약 잡·알림 중복 여부 확인 필요.
 7. 재부팅/로그인 전 자동 복구와 실제 사이트 접근 검증. BIOS 정전 후 자동 켜짐 미확인. Tailscale 노드 인증 만료 정책 확인 필요.
@@ -38,7 +38,7 @@
 ## 승인 경계와 검증 한계
 
 승인 완료: Hyper-V 기능만, Wrangler 권한·키링, Worker 생성·Secret·공개 GET, My Workspace 읽기, 백업 없이 해당 확장 SQL만.
-미승인: 호스트 재부팅, VM 생성·설치, Render 운영 코드·환경 변경, Kakao 설정, Funnel 공개, Worker 원본 전환, Render 중지.
+미승인/보류: 호스트 재부팅, VM 생성·설치, Render 추가 코드·환경 변경, 추가 Kakao 설정, Funnel 공개, Worker 원본 전환, Render 중지. bda8a82 보안 코드 배포와 Worker 콜백 1개 추가는 승인받아 완료.
 SQL 합성 검증은 PGlite이며 실제 다중 연결 동시성 시험은 하지 않았다. 운영에서는 정의·권한·인덱스 읽기 검증만 했다.
 Supabase CLI migration new는 홈 설정 폴더 권한 오류로 실패하여 로컬 timestamp 파일을 작성했다.
 최초 Wrangler 권한 요청은 자동 승인 검토가 차단했으나 이후 명시적 사용자 승인으로 해소됐다.
@@ -82,3 +82,35 @@ Supabase CLI migration new는 홈 설정 폴더 권한 오류로 실패하여 �
 - Kakao 콘솔 로그인 요청 중. 아직 콜백 설정을 읽거나 변경하지 못함.
 - 다음 승인 대상: 보안 코드 main fast-forward push로 Render 자동 배포. 이번 단계에서는 환경변수/Kakao/회원 안내 주소를 바꾸지 않음. 이후 Worker 콜백과 과도기 환경 설정은 별도 승인.
 - 새 배포 ZIP/패치/인수인계 묶음은 만들지 않는다. 기존 outputs의 ZIP/패치는 이번 수정 전 상태이며 최신 실행 소스는 작업 사본에 있다.
+
+
+## 실행 결과 갱신 (2026-10-27 KST 22시 이후)
+
+- 사용자 승인: 보안 코드 main 반영·Render 배포. Git Credential Manager 로그인은 사용자 직접 수행.
+- main에 bda8a82e66ac828dd3bfe1971c37e7e98cca356f fast-forward push 완료(강제 push 아님).
+- Render 배포 dep-dbgaaiqjnfac739rtol0 live 확인. Render·Worker 공개 홈 200,
+  /keep-alive status=ok/supabase=alive, 로그인 시작 302 확인. 운영 POST/회원 변경 테스트 없음.
+- GitHub Actions tests run 40511290940 completed/success 확인(배포 커밋 자동 CI).
+  https://github.com/0neiszer0/book_member_maker/actions/runs/40511290940
+- 카카오 운영 앱 독서동아리 ID 1288463 / REST 플랫폼 키 설정 4468347을 현행 로그인 client_id와
+  원문 출력 없는 SHA256 비교로 확인. 사용자가 새 Worker 콜백 한 개 추가 승인.
+  기존 4개 URI를 유지하고 https://book-member-maker.alstj816.workers.dev/login/kakao/callback 추가,
+  저장 후 설정 재조회로 총 5개 확인. 앱 키/시크릿/동의항목 변경 안 함.
+- 주의: 카카오 콘솔은 플랫폼 키 편집 화면에서 시크릿을 함께 표시하므로 이후 전체 화면 텍스트를
+  출력하지 말고 필요한 URI/필드만 선택 조회한다. 비밀을 저장소/상태 문서에 복사하지 않는다.
+- Render 환경변수 변경 승인은 받지 않았다. 사용자가 필요성을 질문하여 목적을 설명하고 보류함.
+  PUBLIC_BASE_URL/ADDITIONAL_ALLOWED_ORIGINS/KAKAO_PROXY_REDIRECT_URI/ORIGIN_AUTH_SECRET/
+  REQUIRE_ORIGIN_AUTH는 아직 운영 Render에 추가·변경하지 않음. 두 공개 주소 모두 로그인 시작의
+  redirect_uri가 기존 Render 콜백임을 확인. Worker의 로그인 전환·실계정 smoke는 미완료.
+- Render 환경변수는 이름만 확인했고 기존 값은 내보내지 않았다. VM 예시에 사용 중인 Telegram
+  설정 이름을 추가했다. 기타 레거시 환경변수는 현재 앱 사용 여부를 구분하여 이전할 것.
+- 백업 실행 준비본을 로컬 추가: infra/minipc/backup.py, backup.env.example,
+  bookmembers-backup.service/.timer. public+supabase_migrations custom dump, Storage 데이터/설정,
+  참고용 Storage DDL을 age 암호화 후 rclone 외부 업로드/다운로드 비교하는 흐름.
+  평문 임시파일은 접근 제한하고 완료 마커는 검증 성공 후 업로드. 삭제/보존 자동화는 없음.
+- 합성 백업 테스트 3개 통과(페이지네이션·중첩/빈 버킷·파일 내용·실패 처리·오류값 미노출).
+  최초 Windows 샌드박스 임시폴더 권한 오류 후 작업 폴더 전용 임시 경로에서 검증.
+- 실제 DB 백업/외부 업로드/복구키 생성/예약 설치는 아직 하지 않음. DB 연결 자격증명,
+  외부 저장소와 복구키 보관, 보존 정책·실패 알림, 첫 실행 승인과 격리 복원이 선행 조건.
+  Ubuntu pg_dump/age/rclone 설치와 실제 왕복 검증은 재부팅·VM 준비 이후 진행.
+- 재부팅 및 VM/Funnel 구축은 계속 대기. 새 ZIP/패치/인수인계 묶음은 생성하지 않았다.
