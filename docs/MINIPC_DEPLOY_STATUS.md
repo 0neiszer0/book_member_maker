@@ -57,3 +57,28 @@ Supabase CLI migration new는 홈 설정 폴더 권한 오류로 실패하여 �
 - Hyper-V 적용을 위한 재부팅 질문에 사용자가 '재부팅은 나중에'로 답함.
 - 재부팅 예약/실행하지 않음. 재부팅은 이후 사용자의 명시적 승인 또는 직접 실행 후 재개한다.
 - 따라서 VM 생성·Ubuntu 설치·Funnel 및 부팅 자동 복구 검증은 대기 상태다.
+
+## 향후 이전성을 위한 설계 요구사항 (2026-10-27 사용자 의도 확인)
+
+사용자 의도: 지금 인수인계 구성·배포 묶음·공용 계정 전환을 만들라는 요청이 아니다. 이후 서버 구축 과정에서 다음 원칙을 반영한다. 이번 대화에서는 새 배포 묶음 생성, 계정 초대·이전, 백업 업로드·예약 활성화를 하지 않는다.
+
+- 특정 Windows PC·사용자 경로·개인 계정을 앱 실행의 필수 조건으로 만들지 않는다. Linux 서비스 설치와 설정을 재현할 수 있게 유지한다.
+- 회원 공개 URL과 서버 위치를 분리한다. 다른 PC로 이동할 때 새 원본을 검증한 후 Worker의 UPSTREAM_ORIGIN을 바꾸는 구조를 유지한다.
+- 서버 교체 시 기존 Supabase 프로젝트와 카카오 앱을 유지하여 DB·회원 식별자·로그인 설정의 불필요한 변경을 피한다. DB 로컬 이전은 현재 실행 범위에 추가하지 않는다.
+- 비밀은 코드와 분리한다. 현재 Windows DPAPI 보관본은 임시 로컬 보관 수단이며 다른 PC에서 그대로 복호화할 수 있는 인수인계 백업으로 취급하지 않는다. 실제 이전 시 안전한 별도 전달/교체 절차를 준비한다.
+- DB와 Storage의 외부 암호화 백업·복원 검증은 후속 구축 작업에 포함한다. 저장소·복구키 보관 방식 확정 및 실제 연결/활성화 승인은 나중에 받는다. 자동 백업이 이미 동작한다고 표시하지 않는다.
+- 향후 운영자 변경은 서비스가 지원하는 조직·멤버 권한을 활용한다. 동아리 공용 Gmail은 그때 선택 가능한 관리 연락처이며, 지금 주소 수집·가입·초대는 하지 않는다.
+- Cloudflare 기존 계정/Worker 유지 시 공개 주소 보존을 우선한다. Gmail 기반 Tailscale tailnet의 소유자 변경 제한을 고려하여 필요하면 새 운영자의 tailnet에 새 서버를 등록하고 Worker 원본만 전환한다. 기존 개인 Windows Tailscale 설정은 유지한다.
+- 재부팅은 계속 보류. UI 작업 사본은 계속 분리한다.
+
+공식 근거 확인: https://developers.cloudflare.com/fundamentals/manage-members/manage/ , https://tailscale.com/docs/features/sharing/how-to/change-role , https://supabase.com/docs/guides/platform/access-control , https://developers.kakao.com/docs/ko/app-setting/app . 실제 이전 시 당시 정책을 다시 확인한다.
+
+## 재부팅 보류 중 추가 작업 (2026-10-27 KST)
+
+- 원격 main fetch 성공: 91b7dd6 유지. Render live도 같은 SHA. 다른 UI 세션은 codex/lms-v3-navigation 별도 사본에서 계속 작업 중이며 app.py/_header.html 등이 겹친다. 그 사본은 수정·병합하지 않았다.
+- Render My Workspace 서비스 목록: book_member_maker와 chatbot_bookclub 웹 서비스 2개. Cron/Background Worker 없음. Supabase pg_cron 미설치, Storage 객체 0개. 타사 예약 호출은 미확인.
+- Worker/Render 쿠키 분리를 고려해 선택형 KAKAO_PROXY_REDIRECT_URI 구현. 올바른 원본 인증 헤더가 있는 요청에만 Worker 콜백을 사용하고, 직접 Render 요청은 기존 콜백 유지. 설정하지 않으면 기존 동작 유지. 목적지·공개 주소·원본 비밀 검증 포함.
+- OAuth 예외 세부내용을 로그에 남기지 않도록 변경. 관련 보안/로그인 테스트 30개 통과(합성 데이터, 실제 OAuth 호출 없음). 전체 스위트 반복 안 함.
+- Kakao 콘솔 로그인 요청 중. 아직 콜백 설정을 읽거나 변경하지 못함.
+- 다음 승인 대상: 보안 코드 main fast-forward push로 Render 자동 배포. 이번 단계에서는 환경변수/Kakao/회원 안내 주소를 바꾸지 않음. 이후 Worker 콜백과 과도기 환경 설정은 별도 승인.
+- 새 배포 ZIP/패치/인수인계 묶음은 만들지 않는다. 기존 outputs의 ZIP/패치는 이번 수정 전 상태이며 최신 실행 소스는 작업 사본에 있다.

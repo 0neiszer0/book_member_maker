@@ -3,6 +3,7 @@ import hmac
 import os
 import secrets
 from flask import abort, g, request, session, redirect, url_for, flash
+from urllib.parse import urlsplit
 from security_utils import safe_internal_next_url
 
 MEMBER_POSTS = {
@@ -31,9 +32,18 @@ def authenticated_member(db):
 def install_security(app, get_db):
     required = os.environ.get('REQUIRE_ORIGIN_AUTH', '').lower() in ('true', '1', 'yes')
     secret = os.environ.get('ORIGIN_AUTH_SECRET', '')
+    proxy_callback = os.environ.get('KAKAO_PROXY_REDIRECT_URI', '').strip()
+    public_base = os.environ.get('PUBLIC_BASE_URL', '').rstrip('/')
+    parsed = urlsplit(public_base)
+    if proxy_callback and (len(secret) < 32 or parsed.scheme != 'https'
+                           or not parsed.hostname or parsed.username or parsed.password
+                           or parsed.path or parsed.query or parsed.fragment
+                           or proxy_callback != public_base + '/login/kakao/callback'):
+        raise RuntimeError('Proxy OAuth requires an origin secret and the configured public callback')
     if required and (len(secret) < 32 or not os.environ.get('PUBLIC_BASE_URL', '').startswith('https://')):
         raise RuntimeError('Origin protection requires a secret and HTTPS PUBLIC_BASE_URL')
-    app.config.update(REQUIRE_ORIGIN_AUTH=required, ORIGIN_AUTH_SECRET=secret)
+    app.config.update(REQUIRE_ORIGIN_AUTH=required, ORIGIN_AUTH_SECRET=secret,
+                      KAKAO_PROXY_REDIRECT_URI=proxy_callback)
 
     def csrf_token():
         if not session.get('sensitive_csrf'):
