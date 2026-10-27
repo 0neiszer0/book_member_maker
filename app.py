@@ -10,7 +10,7 @@ import math
 from dotenv import load_dotenv
 from flask import (
     Flask, render_template, request, jsonify, session, redirect, url_for,
-    flash, Response, send_file, stream_with_context, abort,
+    flash, Response, send_file, stream_with_context, abort, g, has_request_context,
 )
 import json
 from supabase import create_client, Client
@@ -53,6 +53,8 @@ from recruitment_results import (
 from topic_lifecycle import topic_event_deadline, topic_event_is_expired
 from home_overview import date_label, member_seminar_summary, operations_summary, decorate_topic_submission_states
 from security_utils import forwarded_client_address, safe_internal_next_url
+from minipc_security import install_security
+from flask import g
 from topic_credentials import (
     generate_topic_edit_token,
     legacy_pin_matches,
@@ -105,6 +107,7 @@ EXTERNAL_HTTP_TIMEOUT = (5, 15)
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("Supabase URL과 Key가 .env 파일에 설정되지 않았습니다.")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+install_security(app, lambda: supabase)
 
 
 @app.context_processor
@@ -217,7 +220,10 @@ def reject_cross_site_state_changes():
         return None
     fetch_site = (request.headers.get("Sec-Fetch-Site") or "").lower()
     origin = request.headers.get("Origin")
-    origin_mismatch = bool(origin and urlsplit(origin).netloc != request.host)
+    allowed_origins = {PUBLIC_BASE_URL}
+    allowed_origins.update(value.strip().rstrip('/') for value in
+                           os.environ.get('ADDITIONAL_ALLOWED_ORIGINS', '').split(',') if value.strip())
+    origin_mismatch = bool(origin and origin not in allowed_origins)
     if fetch_site == "cross-site" or origin_mismatch:
         if request.path.startswith("/api/"):
             return jsonify({"error": "허용되지 않은 요청 출처입니다."}), 403
@@ -573,6 +579,10 @@ class KakaoOauth:
     def __init__(self):
         self.client_id = os.environ.get("KAKAO_OAUTH_CLIENT_ID")
         self.redirect_uri = os.environ.get("KAKAO_REDIRECT_URI")
+        # Render's direct URL keeps its own session cookie during the transition.
+        # Only the authenticated Worker may select the public callback.
+        if has_request_context() and getattr(g, 'trusted_app_proxy', False):
+            self.redirect_uri = app.config.get('KAKAO_PROXY_REDIRECT_URI') or self.redirect_uri
         self.token_url = "https://kauth.kakao.com/oauth/token"
         self.user_info_url = "https://kapi.kakao.com/v2/user/me"
 
@@ -615,7 +625,7 @@ def _start_member_session(member):
     session.clear()
     session.update(user_id=member['id'], user_role=member.get('role') or 'member',
                    user_name=member['name'], profile_pic=member.get('profile_pic') or '',
-                   remember_login=remember)
+                   remember_login=remember, auth_provider='kakao')
     session.permanent = remember
     return next_url
 
@@ -714,9 +724,9 @@ def kakao_callback():
             return redirect(url_for("admin_dashboard"))
         return redirect(url_for("my_page"))
 
-    except Exception as e:
+    except Exception:
         flash("카카오 로그인 중 오류가 발생했습니다.", "danger")
-        app.logger.error(f"Kakao callback error: {e}", exc_info=True)
+        app.logger.error("Kakao callback failed")
         return redirect(url_for("login"))
 
 
@@ -729,24 +739,8 @@ def link_account_page():
     social_data = session['temp_social_data']
     auth_mode = session.get('auth_mode', 'login')
 
-    # [신규] 카카오 닉네임으로 미연결 멤버 자동 매칭
-    # 동명이인 가능성 고려해 결과 0건 / 1건 / 2건 이상으로 분기
     matched_member = None
     multiple_matches = []
-    nickname = (social_data.get('social_name') or '').strip()
-    if nickname:
-        try:
-            res = supabase.table("members").select("id,name,student_id,profile_pic")\
-                .eq("name", nickname)\
-                .or_("social_id.is.null,social_id.eq.").execute()
-            rows = res.data or []
-            if len(rows) == 1:
-                matched_member = rows[0]
-            elif len(rows) > 1:
-                multiple_matches = rows
-        except Exception as e:
-            app.logger.warning(f"link_account auto-match failed: {e}")
-
     return render_template('link_account.html',
                            **social_data,
                            auth_mode=auth_mode,
@@ -804,72 +798,26 @@ def link_account_submit():
 
     member = None
     if action == 'link':
-        existing_name = form.get('existing_name', '').strip()
+        name = form.get('existing_name', '').strip()
         student_id = form.get('student_id', '').strip()
-
-        if existing_name and student_id:
-            # 자동 승인 경로는 이름과 학번을 서버에서 다시 함께 검증합니다.
-            member_res = supabase.table("members").select("*").eq("name", existing_name)\
-                .eq("student_id", student_id)\
-                .or_("social_id.is.null,social_id.eq.").execute()
-        elif existing_name:
-            member_res = supabase.table("members").select("*").eq("name", existing_name)\
-                .or_("social_id.is.null,social_id.eq.").execute()
-        else:
-            flash("기존 활동명을 입력해주세요.", "danger")
+        if not name or not valid_member_student_id(student_id) or not student_id:
+            flash('이름과 학번을 정확히 입력해주세요.', 'danger')
             return redirect(url_for('link_account_page'))
-        member_to_link = member_res.data[0] if member_res.data else None
-
-        if member_to_link:
-            # 이름과 학번이 모두 DB 값과 정확히 일치할 때만 자동 승인합니다.
-            db_student_id = str(member_to_link.get('student_id') or '').strip()
-            db_name = str(member_to_link.get('name') or '').strip()
-            auto_approve = bool(
-                existing_name and student_id
-                and existing_name == db_name
-                and student_id == db_student_id
-                and member_to_link.get('member_status') != 'inactive'
-            )
-
-            update_data = {
-                "social_id": social_info['social_id'],
-                "profile_pic": social_info['profile_pic'],
-                "account_status": 'active' if auto_approve else 'pending',
-                "is_active": member_to_link.get('is_active', False)
-            }
-            # 이메일이 있고, 현재 멤버가 사용 중인 이메일이 아닌 경우에만 업데이트
-            # (다른 멤버가 이미 같은 이메일을 사용 중이면 UNIQUE 제약 위반 방지)
-            kakao_email = social_info.get('email')
-            if kakao_email:
-                email_conflict = supabase.table("members").select("id").eq("email", kakao_email).neq("id", member_to_link['id']).execute()
-                if not email_conflict.data:
-                    update_data["email"] = kakao_email
-                else:
-                    app.logger.warning(f"이메일 {kakao_email}이 이미 다른 멤버에게 사용 중 — 이메일 업데이트 생략")
-            updated_member_response = supabase.table("members").update(update_data).eq("id", member_to_link['id']).execute()
-            member = updated_member_response.data[0]
-
-            if auto_approve:
-                # 세션 설정 및 자동 로그인
-                next_url = _start_member_session(member)
-                flash(f"학번 확인이 완료되었습니다. {member['name']}님, 환영합니다!", "success")
-                return redirect(next_url or url_for('my_page'))
-            else:
-                # notifications 테이블에 알림 생성
-                supabase.table('notifications').insert({
-                    'type': 'account_link_request',
-                    'related_member_id': member['id'],
-                    'details': {
-                        'original_name': member['name'],
-                        'social_name': social_info['social_name'],
-                        'social_email': social_info['email']
-                    }
-                }).execute()
-                flash("기존 계정 연결 요청이 완료되었습니다. 관리자 승인 후 로그인 가능합니다.", "success")
-                return redirect(url_for('login'))
-        else:
-            flash("해당 이름의 기존 계정을 찾을 수 없습니다. 신규 회원으로 가입해주세요.", "danger")
+        try:
+            result = supabase.rpc('account_request_mutate', {
+                'p_action': 'request', 'p_actor_id': None, 'p_notification_id': None,
+                'p_name': name, 'p_student_id': student_id,
+                'p_social_id': social_info.get('social_id'),
+            }).execute().data or {}
+        except Exception:
+            app.logger.error('Account link request unavailable')
+            return jsonify(error='연결 신청을 처리하지 못했습니다. 운영진에게 문의해주세요.'), 503
+        if not result.get('accepted'):
+            flash('연결할 수 없는 계정입니다. 운영진에게 문의해주세요.', 'warning')
             return redirect(url_for('link_account_page'))
+        session.pop('temp_social_data', None)
+        flash('연결 신청이 접수되었습니다. 관리자 승인 후 카카오로 다시 로그인해주세요.', 'success')
+        return redirect(url_for('login'))
 
     elif action == 'create':
         new_member_data = {
@@ -1083,7 +1031,7 @@ def admin_dashboard():
                 counts[row['term_id']] = counts.get(row['term_id'], 0) + 1
             for t in seminar_terms:
                 t['session_count'] = counts.get(t['id'], 0)
-                t['share_url'] = f"{request.host_url}seminar_vote?token={t['share_token']}"
+                t['share_url'] = f"{PUBLIC_BASE_URL}/seminar_vote?token={t['share_token']}"
 
         overview = operations_summary(supabase, request.args.get('term_id'), request.args.get('session_id'))
 
@@ -1114,7 +1062,7 @@ def _recruitment_campaign(campaign_id):
 
 def _applicant_request_hash():
     address = forwarded_client_address(
-        request.headers.get("X-Forwarded-For"), request.remote_addr
+        request.headers.get("X-App-Client-IP") if g.get("trusted_app_proxy") else None, request.remote_addr
     )
     secret = str(app.secret_key or "")
     return hashlib.sha256(f"{secret}|{address}".encode("utf-8")).hexdigest()
@@ -1424,6 +1372,31 @@ def admin_recruitment_result_delete_applicant(campaign_id, applicant_id):
 
 
 
+def _guard_member_change(member_id, action, payload=None):
+    rows = supabase.table('members').select('*').in_('id', [session.get('user_id'), member_id]).execute().data or []
+    actor = next((r for r in rows if r['id'] == session.get('user_id')), None)
+    target = next((r for r in rows if r['id'] == member_id), None)
+    if not actor or actor.get('role') not in ('admin', 'officer') or actor.get('is_active') is not True or actor.get('account_status') != 'active':
+        return jsonify(error='권한이 없습니다.'), 403
+    if not target:
+        return jsonify(error='회원을 찾을 수 없습니다.'), 404
+    if target.get('role') == 'admin' and (actor['role'] != 'admin' or action in ('delete', 'merge')):
+        return jsonify(error='관리자 계정은 이 작업으로 변경할 수 없습니다.'), 403
+    if action == 'merge' and member_id == actor['id']:
+        return jsonify(error='자기 계정을 병합할 수 없습니다.'), 403
+    return None
+
+
+def _mutate_member(member_id, action, payload):
+    result = supabase.rpc('protected_member_mutate', {
+        'p_actor_id': session['user_id'], 'p_member_id': member_id,
+        'p_action': action, 'p_payload': payload,
+    }).execute().data or {}
+    if not result.get('accepted'):
+        return jsonify(error='계정 보호 조건 또는 최신 상태가 변경되어 작업을 중단했습니다.'), 409
+    return jsonify(status='success', message='멤버 정보가 변경되었습니다.')
+
+
 @app.route('/api/admin/members/<int:member_id>/set_status', methods=['POST'])
 @login_required(role="admin")
 def set_member_status(member_id):
@@ -1433,13 +1406,12 @@ def set_member_status(member_id):
     if new_status not in ('active', 'dormant', 'inactive'):
         return jsonify({"status": "error", "message": "유효하지 않은 상태입니다."}), 400
     try:
+        denied = _guard_member_change(member_id, 'status')
+        if denied:
+            return denied
         if member_id == session.get('user_id') and new_status == 'inactive':
             return jsonify({"status": "error", "message": "자기 자신을 비활성화할 수 없습니다."}), 403
-        supabase.table('members').update({
-            'member_status': new_status,
-            'is_active': new_status == 'active'  # 하위 호환성 유지
-        }).eq('id', member_id).execute()
-        return jsonify({"status": "success", "message": "멤버 상태가 변경되었습니다."})
+        return _mutate_member(member_id, 'status', {'member_status': new_status})
     except Exception as e:
         app.logger.error(f"Error setting member status for {member_id}: {e}")
         return jsonify({"status": "error", "message": "상태 변경 중 오류 발생"}), 500
@@ -1499,6 +1471,9 @@ def edit_member(member_id):
     """관리자가 멤버 정보를 편집합니다."""
     data = request.json
     try:
+        denied = _guard_member_change(member_id, 'edit')
+        if denied:
+            return denied
         current_rows = supabase.table('members').select('role, student_id').eq('id', member_id).limit(1).execute().data or []
         if not current_rows:
             return jsonify({"status": "error", "message": "회원을 찾을 수 없습니다."}), 404
@@ -1535,8 +1510,7 @@ def edit_member(member_id):
             update_fields['student_id'] = student_id or None
         if not update_fields:
             return jsonify({"status": "error", "message": "변경할 내용이 없습니다."}), 400
-        supabase.table('members').update(update_fields).eq('id', member_id).execute()
-        return jsonify({"status": "success", "message": "멤버 정보가 수정되었습니다."})
+        return _mutate_member(member_id, 'edit', update_fields)
     except Exception as e:
         app.logger.error(f"Error editing member {member_id}: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -1547,10 +1521,12 @@ def edit_member(member_id):
 def delete_member(member_id):
     """관리자가 멤버를 삭제합니다."""
     try:
+        denied = _guard_member_change(member_id, 'delete')
+        if denied:
+            return denied
         if member_id == session.get('user_id'):
             return jsonify({"status": "error", "message": "자기 자신을 삭제할 수 없습니다."}), 403
-        supabase.table('members').delete().eq('id', member_id).execute()
-        return jsonify({"status": "success", "message": "멤버가 삭제되었습니다."})
+        return _mutate_member(member_id, 'delete', {})
     except Exception as e:
         app.logger.error(f"Error deleting member {member_id}: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -1571,6 +1547,11 @@ def merge_members():
             return jsonify({"status": "error", "message": "같은 멤버입니다."}), 400
         if source_id == session.get('user_id'):
             return jsonify({"status": "error", "message": "자기 자신을 source 로 지정할 수 없습니다."}), 403
+
+        for member_id in (source_id, target_id):
+            denied = _guard_member_change(member_id, 'merge')
+            if denied:
+                return denied
 
         # 두 멤버 모두 존재해야 함
         both = supabase.table('members').select('id, name, social_id, email').in_('id', [source_id, target_id]).execute().data or []
@@ -1664,6 +1645,14 @@ def get_notifications():
             .eq('status', 'pending') \
             .order('created_at', desc=True) \
             .execute().data
+        for notification in notifications or []:
+            details = notification.get('details') or {}
+            notification['requires_manual_review'] = (
+                notification.get('type') == 'account_link_request'
+                and (details.get('request_version') != 1 or not details.get('pending_social_id'))
+            )
+            notification['details'] = {k: v for k, v in details.items()
+                                       if k in {'name', 'email', 'original_name', 'social_name', 'reason', 'meeting_date'}}
         return jsonify(notifications)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1682,7 +1671,7 @@ def handle_notification(notif_id):
 
     try:
         # 1. 알림 정보를 먼저 조회
-        notification_to_handle_res = supabase.table('notifications').select('related_member_id, type') \
+        notification_to_handle_res = supabase.table('notifications').select('related_member_id, type, status') \
             .eq('id', notif_id).single().execute()
 
         notification_to_handle = notification_to_handle_res.data
@@ -1692,6 +1681,17 @@ def handle_notification(notif_id):
         member_id = notification_to_handle.get('related_member_id')
         notif_type = notification_to_handle.get('type')
 
+        if notification_to_handle.get('status') != 'pending':
+            return jsonify(error='이미 처리된 요청입니다.'), 409
+        if notif_type in ('account_link_request', 'new_user_request'):
+            result = supabase.rpc('account_request_mutate', {
+                'p_action': action, 'p_actor_id': session['user_id'],
+                'p_notification_id': notif_id,
+            }).execute().data or {}
+            if not result.get('accepted'):
+                return jsonify(error='승인 조건이 변경되었거나 수동 점검이 필요한 요청입니다.'), 409
+            return jsonify(status='success')
+
         # 2. 알림의 상태를 'approved' 또는 'denied'로 업데이트
         supabase.table('notifications').update({
             'status': 'approved' if action == 'approve' else 'denied'
@@ -1699,23 +1699,7 @@ def handle_notification(notif_id):
 
         # 3. 알림 유형에 따라 후속 조치 실행
         if member_id:
-            # 가입 또는 계정 연결 요청 처리
-            if notif_type in ['new_user_request', 'account_link_request']:
-                if action == 'approve':
-                    supabase.table('members').update({'account_status': 'active'}).eq('id', member_id).execute()
-                elif action == 'deny':
-                    if notif_type == 'account_link_request':
-                        # 연결 거절 시: 다시 시도할 수 있도록 social_id 해제 및 상태 원복
-                        supabase.table('members').update({
-                            'social_id': None, 
-                            'account_status': 'active'
-                        }).eq('id', member_id).execute()
-                    elif notif_type == 'new_user_request':
-                        # 신규 가입 거절 시: 임시로 생성된 pending 멤버 레코드 자체를 삭제하여 재가입 가능하도록 함
-                        supabase.table('members').delete().eq('id', member_id).execute()
-
-            # 불참 요청 처리
-            elif notif_type == 'absence_request':
+            if notif_type == 'absence_request':
                 next_monday = get_next_monday()
 
                 # [핵심 수정] update_data를 정의하고, where 절을 명확하게 지정하여 업데이트
@@ -1741,8 +1725,8 @@ def handle_notification(notif_id):
         return jsonify({"status": "success", "message": f"요청이 {action}되었습니다."})
 
     except Exception as e:
-        app.logger.error(f"Error handling notification {notif_id}: {e}")
-        return jsonify({"error": str(e)}), 500
+        app.logger.error("Notification processing failed")
+        return jsonify({"error": "요청 처리에 실패했습니다. 운영진에게 문의해주세요."}), 503
 
 
 # --- 4.2. 독서 모임 조 편성 (관리자 전용) ---
@@ -3353,7 +3337,7 @@ def create_topic_event():
             event, created = _open_topic_event_for_session(data['seminar_session_id'])
             return jsonify({
                 "status": "success", "created": created, "event": event,
-                "share_url": f"{request.host_url}shared_topics?token={event['share_token']}"
+                "share_url": f"{PUBLIC_BASE_URL}/shared_topics?token={event['share_token']}"
             })
         token = str(uuid.uuid4())
         supabase.table('topic_events').insert({
@@ -3374,7 +3358,7 @@ def seminar_session_open_topics(session_id):
         event, created = _open_topic_event_for_session(session_id)
         return jsonify({
             'status': 'success', 'created': created, 'event': event,
-            'share_url': f"{request.host_url}shared_topics?token={event['share_token']}"
+            'share_url': f"{PUBLIC_BASE_URL}/shared_topics?token={event['share_token']}"
         })
     except ValueError as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -3394,7 +3378,7 @@ def seminar_week_open_topics(week_id):
         event, created = _open_topic_event_for_session(sessions[0]['id'])
         return jsonify({
             'status': 'success', 'created': created, 'event': event,
-            'share_url': f"{request.host_url}shared_topics?token={event['share_token']}"
+            'share_url': f"{PUBLIC_BASE_URL}/shared_topics?token={event['share_token']}"
         })
     except ValueError as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -3490,7 +3474,7 @@ TOPIC_EDIT_FAILURE_WINDOW_MINUTES = 15
 
 def _topic_edit_request_hash(event_id):
     address = forwarded_client_address(
-        request.headers.get('X-Forwarded-For'), request.remote_addr
+        request.headers.get('X-App-Client-IP') if g.get('trusted_app_proxy') else None, request.remote_addr
     )
     return topic_request_fingerprint(address, event_id, app.secret_key)
 
@@ -4359,7 +4343,7 @@ def seminar_term_create():
         term['roster_revision'] = roster_result['revision']
         term['roster_initialized_at'] = datetime.now(timezone.utc).isoformat()
 
-        share_url = f"{request.host_url}seminar_vote?token={term['share_token']}"
+        share_url = f"{PUBLIC_BASE_URL}/seminar_vote?token={term['share_token']}"
         return jsonify({
             'status': 'success',
             'term': term,
@@ -4499,7 +4483,7 @@ def admin_seminar_term(term_id):
                     submission_counts[eid] = submission_counts.get(eid, 0) + 1
             for topic in topic_rows:
                 topic['submission_count'] = submission_counts.get(topic['id'], 0)
-                topic['share_url'] = f"{request.host_url}shared_topics?token={topic['share_token']}"
+                topic['share_url'] = f"{PUBLIC_BASE_URL}/shared_topics?token={topic['share_token']}"
                 topic_map[topic['seminar_session_id']] = topic
 
         today_kst = datetime.now(KST).date()
@@ -4545,7 +4529,7 @@ def admin_seminar_term(term_id):
         all_members = supabase.table('members').select('id,name,student_id,department,is_active').order('name').execute().data or []
         all_members = [m for m in scope_members(supabase, all_members, term=term) if m.get('is_active')]
 
-        share_url = f"{request.host_url}seminar_vote?token={term['share_token']}"
+        share_url = f"{PUBLIC_BASE_URL}/seminar_vote?token={term['share_token']}"
         return render_template('admin_seminar_term.html', term=term, sessions=sessions,
                                upcoming_sessions=upcoming_sessions, past_sessions=past_sessions,
                                share_url=share_url, all_members=all_members)
@@ -4634,7 +4618,7 @@ def _load_weekly_seminar_view(term_id=None):
             key=lambda item: item.get('updated_at') or item.get('created_at') or '',
             reverse=True,
         )
-        row['share_url'] = f"{request.host_url}review/seminar/{row['share_token']}"
+        row['share_url'] = f"{PUBLIC_BASE_URL}/review/seminar/{row['share_token']}"
         review_by_session[row['seminar_session_id']] = row
     votes_by_session = defaultdict(list)
     for row in votes:
@@ -4696,7 +4680,7 @@ def _load_weekly_seminar_view(term_id=None):
         topic = topic_by_week.get(week['id'])
         if topic:
             topic['submission_count'] = submission_count[topic['id']]
-            topic['share_url'] = f"{request.host_url}shared_topics?token={topic['share_token']}"
+            topic['share_url'] = f"{PUBLIC_BASE_URL}/shared_topics?token={topic['share_token']}"
         week['topic_event'] = topic
         week['is_past'] = bool(week['sessions']) and all(row['is_past'] for row in week['sessions'])
     return terms, term, weeks, active_members
@@ -4708,7 +4692,7 @@ def admin_seminars():
     try:
         terms, term, weeks, active_members = _load_weekly_seminar_view(request.args.get('term_id'))
         weeks = [row for row in weeks if not row['is_past']] + list(reversed([row for row in weeks if row['is_past']]))
-        share_url = f"{request.host_url}seminar_vote?token={term['share_token']}" if term else ''
+        share_url = f"{PUBLIC_BASE_URL}/seminar_vote?token={term['share_token']}" if term else ''
         schedule_rows = [{
             'id': row['id'], 'book_title': row.get('book_title') or '',
             'book_author': row.get('book_author') or '', 'note': row.get('note') or '',
@@ -4739,8 +4723,9 @@ def seminars():
         decorate_topic_submission_states(supabase, session['user_id'], topics)
         current_week = next((row for row in weeks if not row['is_past'] and row['sessions']), None)
         current_week_id = request.args.get('week_id') or (current_week or {}).get('id')
-        vote_url = f"{request.host_url}seminar_vote?token={term['share_token']}" if term else ''
+        vote_url = f"{PUBLIC_BASE_URL}/seminar_vote?token={term['share_token']}" if term else ''
         return render_template('seminars.html', terms=terms, term=term, weeks=weeks, vote_url=vote_url, current_week_id=current_week_id)
+
     except Exception as e:
         app.logger.error(f"seminars error: {e}", exc_info=True)
         return render_template('page_load_error.html', page_title='세미나 일정', is_admin=False), 503

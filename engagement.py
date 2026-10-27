@@ -7,6 +7,7 @@ from io import BytesIO
 from flask import (
     abort, flash, jsonify, redirect, render_template, request, session, url_for,
 )
+from minipc_security import authenticated_member
 from PIL import Image, ImageOps, UnidentifiedImageError
 from engagement_utils import clean_text as _clean_text
 from engagement_utils import form_is_open as _form_is_open
@@ -41,7 +42,7 @@ def _social_meta(title, description, canonical=None, image=None, noindex=False):
     return {
         "title": title,
         "description": description,
-        "canonical": canonical or request.base_url,
+        "canonical": canonical or f"{_public_base()}{request.path}",
         "image": image or f"{_public_base()}/static/og/club-preview.png",
         "noindex": noindex,
     }
@@ -49,54 +50,14 @@ def _social_meta(title, description, canonical=None, image=None, noindex=False):
 
 def init_engagement_routes(app, supabase, login_required, voting_window_for=None,
                            topic_event_lifecycle=None):
-    def current_member(allow_remembered=True):
-        member_id = session.get("user_id")
-        if not member_id and allow_remembered:
-            member_id = session.get("participation_member_id")
-        if not member_id:
-            return None
-        rows = (
-            supabase.table("members")
-            .select("id,name,student_id,department,is_active,role")
-            .eq("id", member_id)
-            .limit(1)
-            .execute()
-            .data
-            or []
-        )
-        member = rows[0] if rows else None
-        if not member or member.get("is_active") is False:
-            session.pop("participation_member_id", None)
-            return None
-        return member
+    def current_member(allow_remembered=False):
+        return authenticated_member(supabase)
 
     def resolve_member(form):
-        logged_in = current_member(allow_remembered=False)
-        if logged_in:
-            return logged_in
-        student_id = re.sub(r"\s+", "", form.get("student_id", ""))
-        name = re.sub(r"\s+", "", form.get("member_name", ""))
-        if not student_id or not name:
-            remembered = current_member()
-            if remembered:
-                return remembered
-            raise ValueError("학번과 이름을 입력해주세요.")
-        rows = (
-            supabase.table("members")
-            .select("id,name,student_id,department,is_active,role")
-            .eq("student_id", student_id)
-            .eq("name", name)
-            .eq("is_active", True)
-            .limit(2)
-            .execute()
-            .data
-            or []
-        )
-        if len(rows) != 1:
-            raise ValueError("활성 회원 명단에서 학번과 이름이 일치하는 회원을 찾지 못했습니다.")
-        session["participation_member_id"] = rows[0]["id"]
-        session.permanent = True
-        return rows[0]
+        member = current_member()
+        if not member:
+            abort(401)
+        return member
 
     def upload_optional_image(file, folder, bucket="engagement-photos"):
         if not file or not file.filename:
@@ -573,7 +534,7 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
             social_meta=_social_meta(
                 f"{seminar.get('book_title') or '세미나'} 후기",
                 f"{seminar.get('meeting_date')} 세미나 후기를 남겨주세요.",
-                request.base_url,
+                f"{_public_base()}{request.path}",
                 noindex=True,
             ),
         )
@@ -632,7 +593,7 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
             social_meta=_social_meta(
                 f"{project['title']} · 벽돌책 모집",
                 _clean_text(project.get("description"), 140),
-                request.base_url,
+                f"{_public_base()}{request.path}",
                 noindex=True,
             ),
         )
@@ -693,7 +654,7 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
             social_meta=_social_meta(
                 f"{project['title']} · 벽돌책 후기",
                 "완독 경험과 기억에 남은 내용을 기록해주세요.",
-                request.base_url,
+                f"{_public_base()}{request.path}",
                 noindex=True,
             ),
         )
