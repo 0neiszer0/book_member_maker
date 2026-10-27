@@ -1,0 +1,76 @@
+/* Independent club layout; no Canvas assets or captured CSS. */
+:root,html {
+  --lms-brand:#a52a32; --lms-brand-dark:#842129; --lms-rail:96px;
+  --paper:#fff; --paper-2:#f5f6f7; --surface:#fff; --ink:#26323b;
+  --ink-soft:#4b5963; --ink-faint:#65727c; --line:#d4dbe0; --line-soft:#e7ebee;
+  --moss:#a52a32; --moss-deep:#842129; --moss-tint:#faf0f1;
+  --walnut:#4b5963; --walnut-tint:#f3f5f7; --oak:#d4dbe0;
+  background:#fff; color-scheme:light;
+}
+body:has(.lms-global){font-size:16px;line-height:1.5;padding-left:var(--lms-rail);padding-bottom:0!important}
+.lms-global{position:fixed;inset:0 auto 0 0;width:var(--lms-rail);overflow-y:auto;background:var(--lms-brand);z-index:70;display:flex;flex-direction:column;color:white}
+.lms-global a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:78px;padding:12px 5px;color:#fff;text-decoration:none;font-size:13px;font-weight:600;text-align:center;border-bottom:1px solid #ffffff20}
+.lms-global a>span{font-size:25px;line-height:1}
+.lms-global .lms-brand{min-height:98px;font-size:18px;line-height:1.4;letter-spacing:-.04em}
+.lms-global a:hover{background:var(--lms-brand-dark)}
+.lms-global a[aria-current=page]{background:#fff;color:var(--lms-brand-dark)}
+body:has(.lms-global) .wd-top-nav,body:has(.lms-global) .wd-tabbar,body:has(.lms-global) .wd-public-nav{display:none!important}
+body:has(.lms-global) .wd-topbar{background:#fff;border-bottom:1px solid var(--line);box-shadow:none;backdrop-filter:none}
+body:has(.lms-global) .wd-topbar-inner{max-width:none;height:64px}
+body:has(.lms-global) .wd-brand-mark{background:var(--lms-brand);box-shadow:none;border-radius:3px}
+body:has(.lms-global) .wd-brand-text{display:inline-block;font-size:16px}
+.lms-menu-open{display:none;border:1px solid var(--line);border-radius:4px;padding:8px 11px;min-height:44px;background:white;color:var(--ink)}
+.lms-menu-dialog{position:fixed;inset:0 auto 0 0;width:min(320px,88vw);height:100dvh;max-height:100dvh;margin:0;padding:20px;border:0;border-radius:0;background:#fff;color:var(--ink)}
+.lms-menu-dialog::backdrop{background:#1c273b66}
+.lms-drawer-head{display:flex;align-items:center;justify-content:space-between;padding-bottom:16px;border-bottom:1px solid var(--line)}
+.lms-drawer-head button{min-height:44px;padding:8px 12px;border:1px solid var(--line);border-radius:4px}
+.lms-menu-dialog nav{display:grid;margin-top:12px;gap:4px}
+.lms-menu-dialog nav a{display:flex;gap:16px;align-items:center;min-height:50px;padding:12px;color:var(--ink);text-decoration:none;border-radius:3px}
+.lms-menu-dialog nav a[aria-current=page]{background:var(--moss-tint);color:var(--lms-brand-dark);font-weight:700}
+:where(a,button,input,select,textarea,summary):focus-visible{outline:3px solid #2672ab;outline-offset:3px}
+body:has(.lms-global) :is(.home-shell,.seminar-shell){max-width:1220px;padding:28px 36px;margin:0 auto;width:100%;box-sizing:border-box}
+body:has(.lms-global) :is(.home-hero,.seminar-card,.overview-card,.home-card){box-shadow:none;border-radius:4px;background:#fff}
+body:has(.lms-global) .home-hero{padding:0 0 24px;border:0;border-bottom:1px solid var(--line)}
+body:has(.lms-global) h1{font-size:28px;font-weight:500;line-height:1.4}
+body:has(.lms-global) :is(.home-btn,.seminar-btn){border-radius:4px;box-shadow:none}
+.lms-task-list{display:grid;border:1px solid var(--line);border-top:3px solid var(--lms-brand);border-radius:4px}
+.lms-task-row{display:flex;gap:20px;justify-content:space-between;align-items:center;padding:20px;border-bottom:1px solid var(--line-soft)}
+.lms-task-row:last-child{border-bottom:0}.lms-task-row p{color:var(--ink-soft);margin:6px 0 0}
+.lms-classroom-card{display:block;border:1px solid var(--line);border-top:8px solid var(--lms-brand);border-radius:4px;padding:24px;color:var(--ink);text-decoration:none;max-width:440px}
+.lms-classroom-card h2{font-size:21px;margin-bottom:12px}.lms-classroom-card:hover{background:#fafbfc}
+.lms-status{display:inline-flex;align-items:center;padding:4px 9px;border:1px solid var(--line);border-radius:3px;font-size:13px;white-space:normal}
+.lms-curriculum{display:grid;gap:18px}.lms-week{border:1px solid var(--line);border-radius:4px;scroll-margin-top:86px}
+.lms-week>summary{padding:18px 20px;background:#f5f6f7;cursor:pointer;font-weight:700}
+.lms-week[open]>summary{border-bottom:1px solid var(--line)}
+.lms-week .seminar-card{border:0;margin:0}.lms-week:target{outline:2px solid var(--lms-brand)}
+.lms-classroom-nav{display:flex;gap:10px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:16px}
+.lms-classroom-nav a{padding:8px;color:var(--lms-brand-dark);text-decoration:none}
+.lms-classroom-nav a:hover{text-decoration:underline;background:var(--paper-2)}
+.lms-classroom-content{min-width:0;display:grid;gap:18px}
+body:has(.lms-global) .seminar-shell.lms-curriculum{display:grid;grid-template-columns:180px minmax(0,1fr);gap:32px;max-width:1440px}
+.lms-curriculum>.lms-classroom-nav{position:sticky;top:88px;align-self:start;display:flex;flex-direction:column;align-items:stretch;border:0;border-right:1px solid var(--line);padding:0 16px 0 0;gap:5px;font-size:15px}
+.lms-curriculum>.lms-classroom-nav>span{display:none}
+.lms-curriculum .lms-week{padding:0;overflow:hidden}.lms-week>summary{display:flex;align-items:center;flex-wrap:wrap;gap:12px;min-height:64px;list-style:revert}
+.lms-week>summary:before{content:'▸';font-size:16px}.lms-week[open]>summary:before{content:'▾'}
+.lms-week>summary strong{flex:1}.lms-week>:not(summary){margin:18px 20px}
+.lms-week .home-topic-status{border-bottom:1px solid var(--line);padding-bottom:20px}
+.lms-week .home-topic-status h2{font-size:18px;margin-bottom:10px}
+.lms-week .home-topic-status p{margin-bottom:12px}
+.lms-task-row h2{font-size:20px;font-weight:600;margin-top:10px}
+.lms-classroom-card>strong{display:block;font-size:23px;margin:16px 0}
+@media(min-width:1280px){
+ body:has(.lms-global) .wd-admin-sidebar{left:calc(var(--lms-rail) + 16px);top:84px;border-radius:4px;box-shadow:none}
+ body.wd-admin-layout:has(.lms-global)>:is(main,.container,.work-header,.workspace){margin-left:241px!important}
+}
+@media(max-width:900px){
+ body:has(.lms-global){padding-left:0}.lms-global{display:none}.lms-menu-open{display:inline-flex;align-items:center}
+ body:has(.lms-global) .wd-topbar-inner{padding:0 12px;gap:10px;height:60px}
+ body:has(.lms-global) :is(.home-shell,.seminar-shell){padding:22px 16px}
+ body:has(.lms-global) h1{font-size:24px}.lms-task-row{align-items:flex-start;flex-direction:column;gap:12px;padding:16px}
+ body:has(.lms-global) .wd-brand-text{font-size:14px}.lms-classroom-card{max-width:none}
+ body:has(.lms-global) .seminar-shell.lms-curriculum{display:block}
+ .lms-curriculum>.lms-classroom-nav{position:static;flex-direction:row;flex-wrap:wrap;border:1px solid var(--line);padding:8px;gap:0;font-size:14px}
+ .lms-week>summary{gap:8px;padding:14px}.lms-week>summary .seminar-kicker{flex-basis:100%}
+ .lms-week>:not(summary){margin:16px}.lms-classroom-content{gap:16px}
+}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
