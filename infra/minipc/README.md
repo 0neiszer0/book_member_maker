@@ -40,6 +40,8 @@ Worker는 https://book-member-maker.alstj816.workers.dev 에 배포되어 현재
    기존 키는 안전한 로컬 입력으로 이전. 원본 비밀은 Worker와 같은 별도 값.
    PUBLIC_BASE_URL=실제 Worker HTTPS origin, KAKAO_REDIRECT_URI=그 origin + /login/kakao/callback.
 6. VM에 공식 Ubuntu 24.04 Tailscale 패키지 설치. 사용자 인증으로 별도 노드 가입.
+   `install-tailscale.sh`는 패키지·tailscaled 자동 시작만 수행한다. 현재 패키지 설치가 완료돼도
+   NeedsLogin이면 아직 네트워크 가입 전이다. 노드 가입은 명시 승인 후 `tailscale up`으로 시작한다.
    기존 Windows 노드는 그대로 둔다. `systemctl enable --now tailscaled`.
    공개 승인 전 `tailscale funnel --help` 확인. 승인 후 `tailscale funnel --bg 5000` 및 상태 확인.
    MagicDNS, HTTPS, funnel node attribute 필요. 서버 노드 키 만료/인증 만료 정책도 사용자 계정에서 확인한다.

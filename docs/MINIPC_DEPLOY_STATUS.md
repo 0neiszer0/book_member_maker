@@ -1,11 +1,12 @@
 # 미니 PC 이전 진행 상태
 
-갱신: 2026-10-27 KST. 재부팅/세션 중단 후 이 파일부터 읽는다.
+갱신: 2026-10-28 KST. 재부팅/세션 중단 후 이 파일부터 읽는다.
 최신 재개: 사용자가 직접 재부팅한 뒤 계속 진행 요청. 아래 과거 '재부팅 보류' 기록은 이 항목으로 대체한다.
 Windows 부팅 시각 2026-10-27 23:05:09 KST. Hyper-V Enabled, HypervisorPresent=true,
 vmms Running/Automatic, 기존 VM 0개, Default Switch 확인. 결과: work/hyperv-postboot.json.
 원격 main 재조회 bda8a82 유지. 사용자 VM 생성·Ubuntu 설치·SSH 키 등록 승인 후 VM 생성 완료.
-현재 Ubuntu 설치 확인 프롬프트에서 사용자 yes/Enter 입력 대기. 설치 완료로 간주하지 않는다.
+Ubuntu 24.04.5·SSH·앱 실행 환경·보호된 비밀 설정·로컬 앱 가동 완료. Tailscale 패키지 설치 완료,
+BackendState=NeedsLogin. 노드 가입/Funnel 공개/Worker 원본 전환/호스트 자동 복구 검증은 미완료.
 작업 사본: C:/Users/HOME/Documents/Codex/2026-10-27/markdown-0neiszer0-book-member-maker-pc/work/book_member_maker
 브랜치: codex/minipc-security. 기준 main: 91b7dd6d9d0c6771a1e07c1ea977396f72dae4ce.
 현재 GitHub main 및 Render live: bda8a82e66ac828dd3bfe1971c37e7e98cca356f. 사용자 승인 후 보안 배포 완료. 이후 백업 준비 변경은 로컬에만 있다.
@@ -32,8 +33,8 @@ vmms Running/Automatic, 기존 VM 0개, Default Switch 확인. 결과: work/hype
 ## 다음 순서 / 미완료
 
 1. 완료: 사용자 직접 Windows 재부팅 후 Hyper-V 실제 상태 확인. 서비스 자동 복구 검증용 재부팅은 별도 후속 단계.
-2. VM 생성·Ubuntu 설치·관리 SSH 키 등록 승인됨. bookmembers-ubuntu 생성 완료,
-   설치 확인 프롬프트 대기. 아래 최신 VM 기록부터 재개한다. 설치 후 디스크 부팅·SSH 검증 필요.
+2. 완료: VM 생성·Ubuntu 설치·관리 SSH 키 등록, ISO 분리·디스크 부팅·SSH 검증.
+   아래 최신 VM 기록부터 재개한다. 다음은 앱 실행 환경 및 Tailscale 패키지 설치.
 3. 보안 코드 bda8a82는 Render 운영 배포 완료. 다른 UI 작업은 포함하지 않음. UI 통합 시 최신 main을 기준으로 보안 코드와 CSRF를 보존한다. 추가 main push는 새 배포를 일으키므로 승인 필요.
 4. Kakao Worker 콜백 추가 완료. Render의 PUBLIC_BASE_URL/허용 Origin/프록시 콜백/원본 비밀 변경은 필요성 질문 후 보류. 현재 Worker 로그인 시작은 Render 콜백을 사용하므로 Worker OAuth 완료로 표시하지 않는다. VM에서 직접 검증하고 최종 전환 때 복구용 Render 유지 여부를 결정한다.
 5. Ubuntu 서비스 설치·비밀 환경 설정·별도 Tailscale 노드 인증. Funnel 공개 및 필요 정책 변경은 별도 승인. 원본 인증 필수, 직접 Funnel 접근은 403이어야 함.
@@ -155,3 +156,76 @@ Supabase CLI migration new는 홈 설정 폴더 권한 오류로 실패하여 �
 - work/Confirm-ApprovedUbuntuInstall.ps1은 개별 키 코드로 수정돼 있으나 해당 버전은 미실행.
   사용자가 관리자 요청 재시도를 요청하면 새 화면을 확인한 뒤에만 실행한다.
 - 현재 운영 사이트/DB/Worker 원본에는 이번 재개 작업으로 변경 없음.
+- 사용자 직접 yes/Enter 입력 완료 후 설치 종료 감시용 UAC도 사용자 확인 완료.
+  work/Monitor-ApprovedVmInstall.ps1 실행 중(당시 PID 2024). 이 작업은 최대 30분간 새 VM의
+  설치 종료를 기다린 뒤 승인 범위 내에서 DVD 분리/시스템 디스크 우선/시작 RAM 1536MiB/부팅을
+  수행하고 최대 5분간 게스트 IP를 읽는다. 예약 작업·상시 관리자 서비스는 만들지 않음.
+  진행은 work/vm-install-progress.json, 후처리 결과는 work/vm-install-finalize.json.
+  Stage=InstalledDiskStarted여도 SSH로 OS·설치 로그·키 인증을 확인해야 설치 완료 판정 가능.
+- 화면 제어는 관리자 입력 Access Denied, 이후 화면 캡처가 검은 화면을 반환하여 신뢰할 수 없음.
+  VM 상태 및 후속 SSH 검증을 우선한다. 게스트 설치 중 강제 종료/호스트 재부팅 금지.
+- VM 전용 install-tailscale.sh 준비 및 bash 구문 검사 완료. 공식 noble 서명 저장소 사용,
+  패키지 설치와 tailscaled 자동 시작만 수행하며 노드 가입/Funnel 공개는 포함하지 않는다.
+  아직 실행하지 않음. 공식 문서: https://pkgs.tailscale.com/stable/#ubuntu-noble .
+
+### Ubuntu 설치 완료 및 SSH 검증 (2026-10-27 23:40 KST 이후)
+
+- 설치 로그 subiquity/Install/install SUCCESS, state DONE 및 error null 확인.
+- 최초 후처리는 디스크 정확 경로 검사에서 중단됨. 실제 원인은 Windows Hyper-V의 첫 시작
+  자동 검사점: system_15F28D67-2C34-4F27-86E0-0BA3489E943A.avhdx → system.vhdx.
+  두 경로 모두 승인된 VM 디렉터리 내부이고 동일 원본 디스크임을 Get-VHD로 확인 후 진행.
+  이후 자동 검사점은 껐고, 기존 자동 검사점 2e82f3ee-1f05-4ea6-843a-39d5804f956b는 보존됨.
+  새 VM 스크립트도 자동 검사점 비활성화를 기본 적용. AVHDX를 직접 삭제/이동하지 말 것.
+- DVD 0개, 시스템 디스크 우선, 시작 RAM 1536MiB(최소1GiB/최대3GiB), 디스크 부팅 성공.
+- Hyper-V 확인 게스트 IPv4: 172.25.178.73 (Default Switch DHCP, 재부팅 후 바뀔 수 있음).
+- bookadmin SSH 키 인증·sudo 동작, Ubuntu 24.04.5 LTS, ssh active, 실패한 systemd unit 없음.
+  루트 디스크 29GiB 중 4.4GiB 사용/23GiB 여유, 게스트 RAM 약340MiB 사용(초기 확인값).
+- 작업별 SSH 설정: work/vm-access/ssh-config, 별칭 bookmembers-vm.
+  최초 호스트 키를 별도 known_hosts에 고정함. 개인키/호스트 설정은 Git 밖 ACL 제한 폴더.
+  명령 예: ssh.exe -F ./work/vm-access/ssh-config bookmembers-vm <읽기 명령>.
+- cloud-init은 installer의 marker에 의해 disabled, errors/recoverable_errors 없음.
+  OS 설치 실패가 아니며 설치 결과는 SSH·설치 성공 로그로 별도 확인함.
+- 후처리 감시 프로세스 정상 완료. 추가 호스트 재부팅 없음.
+- SSH 설정 추가 확인: passwordauthentication no, pubkeyauthentication yes,
+  permitrootlogin without-password. ssh 서비스는 socket activation 사용(ssh active이나 서비스
+  enable 상태 자체는 disabled); ssh.socket enable 여부는 다음 런타임 설치 검증에서 확인.
+  Asia/Seoul, NTP synchronized, Ubuntu 커널 6.8.0-147-generic.
+
+### 앱 실행 환경 설치 승인 후 진행
+
+- 사용자 승인: VM 앱·Tailscale 설치 및 기존 비밀 설정 이전·로컬 가동.
+  기존 Render Flask/Supabase/Kakao/Telegram 설정과 Worker 원본 비밀을 VM root 전용
+  app.env에 전달하는 범위. Tailscale 가입/Funnel 공개/Worker 전환/Render 변경은 제외.
+- work/bootstrap-guest.sh를 관리 SSH로 실행 중. 공식 GitHub 저장소에서 정확한 bda8a82를
+  detached checkout하고 Python3.12/venv/고정 requirements/systemd 및 Tailscale 패키지 설치.
+  앱 환경 파일이 없으면 서비스는 시작하지 않음. 로그: work/vm-runtime-install.log.
+- Render 연결 도구는 기존 환경값 읽기 기능이 없어 브라우저로 승인된 값만 읽어 이전할 예정.
+  재부팅 후 Chrome 연결이 없고 native launch가 GetCursorPos access denied이므로 사용자에게
+  기존 로그인 Chrome의 Render env 화면 열기를 요청함. 비밀값을 채팅에 요청하지 않음.
+
+### VM 로컬 앱 가동 완료
+
+- Render 환경 화면에서 승인된 7개 설정만 읽음: FLASK_SECRET_KEY, SUPABASE_URL,
+  SUPABASE_SERVICE_KEY, KAKAO_OAUTH_CLIENT_ID/SECRET, TELEGRAM_BOT_TOKEN/CHAT_IDS.
+  나머지 비사용 레거시 비밀번호는 이전하지 않음. Render 값/배포 자체는 변경하지 않음.
+- 브라우저 도구 자식 SSH는 읽기 전용 hostname도 exit255/출력없음으로 실패. 실제 값 문제는
+  아님을 확인. Windows DPAPI 임시 암호문으로 승인된 shell 실행 경로에 전달해 SSH 성공.
+  Windows 평문 임시파일 없음, 브라우저 화면 다시 숨김, 메모리 참조 정리, 임시 DPAPI 삭제.
+  Worker 원본 비밀 DPAPI 원본은 계속 work/origin-auth-secret.dpapi에 보존.
+- VM /etc/book_member_maker/app.env root:root 0600, 부모 0700. 기존 Flask 키 보존.
+  PUBLIC_BASE_URL=Worker, KAKAO_REDIRECT_URI=Worker 콜백, REQUIRE_ORIGIN_AUTH=true,
+  SESSION_COOKIE_SECURE=true. 이전 설정값 원문은 출력/커밋하지 않음.
+- VM 소스 bda8a82 detached, Python 3.12.3(Ubuntu 배포판 보안 패치), 의존성 pip check 통과.
+  새 Linux 환경에서 합성 보안 테스트 13개 통과. 전체 테스트 반복 없음.
+- bookmembers.service enabled/active/running, bookapp 사용자, 127.0.0.1:5000만 수신,
+  NRestarts=0, 서비스 메모리 약105MiB(첫 확인). ssh.socket enabled.
+- Tailscale 1.104.2 공식 패키지 설치, tailscaled enabled/active, NeedsLogin. 아직 tailnet 가입 안 함.
+- 실제 GET 검증: 원본 헤더 없음/오류 403, 올바른 헤더 홈200·status=ok/supabase=alive,
+  카카오 로그인 시작302·Worker 콜백·state, Secure/HttpOnly/SameSite=Lax 세션 쿠키 모두 통과.
+  work/vm-local-verification.json에 boolean만 기록. 실계정 OAuth 완료/운영 POST는 수행하지 않음.
+- 공개 Worker는 계속 Render를 가리킴. VM 원본은 아직 인터넷에 공개하지 않음.
+- 기존 Windows Tailscale 읽기: Running, MagicDNS enabled, tail97bc40.ts.net.
+- tailscale up 시작 요청은 자동 승인 검토가 차단함: 기존 승인은 패키지 설치까지이며
+  노드 가입은 제외됐으므로 지속적 네트워크 접근 추가의 명시 승인 필요. 실제 명령 미실행.
+  사용자에게 bookmembers-ubuntu를 기존 tail97bc40.ts.net에 별도 노드로 가입하는 승인을 요청 중.
+  가입 승인 후에도 Funnel 공개/Worker 전환은 별도 승인 유지.
