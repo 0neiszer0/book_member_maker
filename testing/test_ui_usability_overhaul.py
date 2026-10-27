@@ -21,11 +21,14 @@ class UiUsabilityOverhaulTest(unittest.TestCase):
 
     def test_home_is_role_aware_and_has_direct_actions(self):
         home = self.read("templates/main_index.html")
-        self.assertIn("session.user_role in ['admin', 'officer']", home)
-        self.assertIn("운영 개요 열기", home)
+        self.assertRegex(home, r"session\.user_role in \['admin',\s*'officer'\]")
+        self.assertIn("url_for('admin_dashboard')", home)
         self.assertIn("지금 참여하기", home)
         self.assertIn("세미나 일정 보기", home)
-        self.assertIn("내 활동 기록", home)
+        navigation = self.read("templates/_lms_navigation.html")
+        self.assertIn("url_for('my_page')", navigation)
+        self.assertIn("extends 'lms_base.html'", home)
+        self.assertNotIn("_app_theme_head.html", home)
         self.assertNotIn("text-7xl", home)
 
     def test_admin_overview_follows_five_step_workflow(self):
