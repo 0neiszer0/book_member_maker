@@ -5,6 +5,19 @@
   const kst = value => new Date(new Date(value).getTime() + 9 * hourMs).toISOString().slice(0, 16);
   const shiftDate = (day, delta) => new Date(Date.parse(day + 'T00:00:00Z') + delta * 24 * hourMs).toISOString().slice(0, 10);
   const weekStart = day => shiftDate(day, -(new Date(day + 'T00:00:00Z').getUTCDay() + 6) % 7);
+  function calendarTarget(search, today) {
+    const params = new URLSearchParams(search), value = params.get('date') || '';
+    const parsed = /^\d{4}-\d{2}-\d{2}$/.test(value) ? Date.parse(value + 'T00:00:00Z') : NaN;
+    const valid = Number.isFinite(parsed) && new Date(parsed).toISOString().slice(0,10) === value;
+    return {date: valid ? value : today,
+      booking: valid && /^[a-zA-Z0-9-]{1,80}$/.test(params.get('booking') || '') ? params.get('booking') : '',
+      at: valid && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(params.get('at') || '') ? params.get('at') : ''};
+  }
+  function targetMatches(target, row, selected) {
+    if (target.date !== selected) return false;
+    return row.kind === 'blocked' ? !!target.at && kst(row.starts_at).slice(11) === target.at
+      : !!target.booking && row.id === target.booking;
+  }
   const overlaps = (booking, start, end) => Date.parse(booking.starts_at) < end && Date.parse(booking.ends_at) > start;
   function slotState(bookings, day, hour, now) {
     const start = Date.parse(day + 'T' + pad(hour) + ':00:00+09:00');
@@ -24,7 +37,7 @@
     return ranges;
   }
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {kst, shiftDate, weekStart, slotState, freeRanges}; return;
+    module.exports = {kst, shiftDate, weekStart, slotState, freeRanges, calendarTarget, targetMatches}; return;
   }
   const root = document.getElementById('club-room');
   const homeStatus = document.getElementById('cr-home-status');
@@ -43,7 +56,8 @@
   const staff = root.dataset.staff === 'true';
   const dialog = $('cr-dialog'), form = $('cr-form');
   const localKey = 'club-room:receipts:v1';
-  let selected = root.dataset.today, bookings = [], now = Date.now(), current = null;
+  const calendarLink = calendarTarget(window.location.search, root.dataset.today);
+  let selected = calendarLink.date, bookings = [], now = Date.now(), current = null, calendarFocused = false;
   let busy = false, dirty = false, ready = false, requestNumber = 0, staffRequest = 0;
   function node(tag, text, className) {
     const element = document.createElement(tag);
@@ -108,6 +122,11 @@
           node('span', row.kind === 'blocked' ? '이용 불가 · 동아리 일정' : row.representative),
           node('small', row.kind === 'blocked' ? '이 시간 외에 신청해주세요' : '함께 사용 가능'));
         $('cr-grid').append(item);
+        if (targetMatches(calendarLink, row, selected)) {
+          item.classList.add('cr-calendar-target'); item.tabIndex = -1;
+          item.setAttribute('aria-label', '캘린더에서 선택한 일정');
+          if (!calendarFocused) {calendarFocused = true; item.focus({preventScroll:true}); item.scrollIntoView({block:'center'});}
+        }
       }
       if (!rows.length) $('cr-grid').append(node('p', '등록된 예약이 없어요. 원하는 시간으로 신청하세요.', 'cr-empty'));
     }

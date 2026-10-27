@@ -1,94 +1,47 @@
-{% macro seminar_card(week, featured=false) -%}
-  {% set mon=week.sessions_by_day.get('mon') %}
-  {% set thu=week.sessions_by_day.get('thu') %}
-  <article class="seminar-card {% if featured %}seminar-card-featured{% endif %}">
-    <div class="seminar-card-top">
-      <div>
-        {% if featured %}<p class="seminar-kicker">가장 가까운 세미나</p>{% endif %}
-        <div class="seminar-chips">
-          {% if thu %}<span class="seminar-chip">본 세미나 · {{ thu.meeting_date|seminar_date }}</span>{% endif %}
-          {% if mon %}<span class="seminar-chip">추가 세미나 · {{ mon.meeting_date|seminar_date }}</span>{% endif %}
-          {% if week.topic_event %}<span class="seminar-chip {% if week.topic_event.is_active %}seminar-chip-open{% endif %}">발제문 {{ '접수 중' if week.topic_event.is_active else '마감' }}</span>{% endif %}
-        </div>
-        <h2>{{ week.book_title or '도서 미정' }}</h2>
-        {% if week.book_author %}<p class="seminar-author">{{ week.book_author }}</p>{% endif %}
-      </div>
-      {% if week.is_past %}<span class="seminar-state">지난 세미나</span>{% else %}<span class="seminar-state seminar-state-upcoming">예정</span>{% endif %}
-    </div>
-
-    {% if week.note %}<p class="seminar-note">{{ week.note }}</p>{% endif %}
-
-    <div class="seminar-session-grid">
-      <section>
-        <p class="seminar-session-label">본 세미나</p>
-        {% if thu %}
-          <strong>{{ thu.meeting_date|seminar_date }}</strong>
-          <p>이 학기 활동 회원은 기본 참석 대상입니다. 참석이 어렵다면 카카오톡 단톡방의 해당 회차 불참 투표에 참여해주세요.</p>
-        {% else %}<p>이 주차에는 본 세미나가 없습니다.</p>{% endif %}
-      </section>
-      <section>
-        <p class="seminar-session-label">추가 세미나</p>
-        {% if mon %}
-          <strong>{{ mon.meeting_date|seminar_date }}</strong>
-          <p>카카오톡 단톡방의 해당 회차 참석 투표에 참여해주세요. 정원·선착순 제한은 없습니다. 사이트 반영 {{ mon.expected_count }}명.</p>
-        {% else %}<p>이 주차에는 추가 세미나가 없습니다.</p>{% endif %}
-      </section>
-    </div>
-
-    {% if not week.is_past %}
-    <div class="seminar-actions">
-      {% if week.topic_event and week.topic_event.is_active %}
-        {% if week.topic_event.share_url %}
-          <a class="seminar-btn seminar-btn-primary" href="{{ week.topic_event.share_url }}">발제문 작성하기</a>
-        {% elif week.topic_event.share_token %}
-          <a class="seminar-btn seminar-btn-primary" href="{{ url_for('view_shared_topics', token=week.topic_event.share_token) }}">발제문 작성하기</a>
-        {% endif %}
-      {% endif %}
-      {% if mon %}<span class="seminar-chip">추가 세미나 참석 투표는 카카오톡에서</span>{% endif %}
-    </div>
-    {% endif %}
-  </article>
-{%- endmacro %}
 <!doctype html>
-<html lang="ko">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>세미나</title>
-  {% include '_tailwind_head.html' %}
-  {% include '_app_theme_head.html' %}
-</head>
-<body>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>학기 강의실 · 커리큘럼</title>
+{% include '_tailwind_head.html' %}{% include '_app_theme_head.html' %}</head><body>
 {% include '_header.html' %}
-{% set counts=namespace(upcoming=0,past=0) %}
-{% for week in weeks %}{% if week.is_past %}{% set counts.past=counts.past+1 %}{% else %}{% set counts.upcoming=counts.upcoming+1 %}{% endif %}{% endfor %}
-<main class="seminar-shell">
-  <header class="seminar-page-head">
-    <div><p class="seminar-kicker">일정</p><h1>세미나</h1><p>가장 가까운 세미나와 지금 가능한 신청·발제문을 먼저 확인하세요.</p></div>
-    <a class="seminar-btn seminar-btn-primary" href="{{ url_for('my_term_attendance') }}">내 학기 참석 현황</a>
-  </header>
-
-  {% if not term %}
-    <div class="seminar-empty"><strong>현재 등록된 세미나 일정이 없습니다.</strong><p>새 일정이 등록되면 이 화면에 표시됩니다.</p></div>
-  {% else %}
-    <section class="seminar-upcoming" aria-labelledby="upcoming-title">
-      <div class="seminar-section-head"><h2 id="upcoming-title">예정된 세미나</h2><span>{{ counts.upcoming }}개</span></div>
-      <div class="seminar-stack">
-        {% set upcoming=namespace(index=0) %}
-        {% for week in weeks %}{% if not week.is_past %}{% set upcoming.index=upcoming.index+1 %}{{ seminar_card(week, upcoming.index == 1) }}{% endif %}{% endfor %}
-        {% if counts.upcoming == 0 %}<div class="seminar-empty"><strong>예정된 세미나가 없습니다.</strong><p>지난 세미나는 아래에서 확인할 수 있습니다.</p></div>{% endif %}
-      </div>
-    </section>
-
-    {% if counts.past %}
-    <details class="seminar-past">
-      <summary><span>지난 세미나</span><span>{{ counts.past }}개 보기</span></summary>
-      <div class="seminar-stack">
-        {% for week in weeks %}{% if week.is_past %}{{ seminar_card(week) }}{% endif %}{% endfor %}
-      </div>
-    </details>
-    {% endif %}
-  {% endif %}
-</main>
-</body>
-</html>
+<main class="seminar-shell lms-curriculum">
+{% set review_board = (nav_boards|default([])|selectattr('board_type', 'defined')|selectattr('board_type', 'equalto', 'seminar_review')|list|first) %}
+{% include '_classroom_nav.html' %}
+<div class="lms-classroom-content">
+<header class="seminar-page-head"><div><p class="seminar-kicker">정기 세미나 · 공통 강의실</p><h1>{{ term.name if term else '학기 강의실' }}</h1><p>한 학기의 읽기와 발제문, 본·추가 모임을 주차별로 확인하세요.</p></div></header>
+{% if terms|length > 1 %}<form method="get" class="home-actions"><label for="classroom-term">다른 학기</label><select name="term_id" id="classroom-term">{% for item in terms %}<option value="{{ item.id }}" {% if term and item.id == term.id %}selected{% endif %}>{{ item.name }}</option>{% endfor %}</select><button class="seminar-btn" type="submit">학기 이동</button></form>{% endif %}
+{% if not term %}<div class="seminar-empty"><strong>현재 등록된 세미나 일정이 없습니다.</strong><p>새 일정이 등록되면 이 화면에 표시됩니다.</p></div>
+{% else %}
+{% if not term.is_active %}<p class="overview-flash">보관된 학기입니다. 지난 커리큘럼과 기록을 확인할 수 있습니다.</p>{% endif %}
+<div class="seminar-section-head"><h2>전체 학기 커리큘럼</h2><span>{{ weeks|length }}개 주차</span>{% if current_week_id %}<a href="#week-{{ current_week_id }}">현재 주차로 이동</a>{% endif %}</div>
+{% if not weeks %}<p class="seminar-empty">아직 등록된 주차가 없습니다.</p>{% endif %}
+{% for week in weeks %}
+<details class="seminar-card lms-week" id="week-{{ week.id }}" data-week-id="{{ week.id }}" {% if week.id|string == current_week_id|string or request.args.get('section') == 'topics' %}open{% endif %}>
+<summary><span class="seminar-kicker">{{ loop.index }}주차{% if week.week_start %} · {{ week.week_start|seminar_date }}{% endif %}</span><strong>{{ week.book_title or '도서 미정' }}</strong><span class="seminar-state">{{ '지난 주차' if week.is_past else '예정' }}{% if week.id|string == current_week_id|string %} · 현재 주차{% endif %}</span></summary>
+{% if week.book_author %}<p class="seminar-author">읽기 · {{ week.book_author }}</p>{% endif %}{% if week.note %}<p class="seminar-note">{{ week.note }}</p>{% endif %}
+<section id="topic-{{ week.id }}" class="home-topic-status">
+<h2>발제문</h2>{% set topic=week.topic_event %}
+{% if topic %}<p data-event-id="{{ topic.id }}"><strong>{{ topic.status_label }}</strong>{% if topic.deadline_label %} · 마감 {{ topic.deadline_label }} (한국시간){% endif %}</p>
+{% if topic.open and topic.share_token %}<a class="seminar-btn {% if topic.open %}seminar-btn-primary{% endif %}" href="{{ url_for('view_shared_topics', token=topic.share_token) }}">{{ ('제출한 발제문 수정' if topic.submitted else '발제문 작성하기') if topic.open else '발제문 확인' }}</a>{% endif %}
+{% if session.user_role in ['admin','officer'] %}<a class="seminar-btn" href="{{ url_for('view_admin_topics', event_id=topic.id) }}">제출 관리</a>{% endif %}
+{% else %}<p>발제문 수집이 아직 열리지 않았습니다.</p>{% endif %}
+</section>
+<div class="seminar-session-grid">
+{% for item in week.sessions %}
+<section id="session-{{ item.id }}" data-session-id="{{ item.id }}"><p class="seminar-session-label">{{ '본 세미나' if item.day_type == 'thu' else '추가 세미나' }}</p><strong>{{ item.meeting_date|seminar_date }}</strong><p>사회자 · {{ item.moderator_name or '미정' }}</p>
+<p>{{ '카카오톡 불참 투표' if item.day_type == 'thu' else '카카오톡 참석 투표' }}는 외부 투표입니다. 참석 예정 명단과 확정 출석은 별도로 반영됩니다.</p>
+{% if item.history and review_board %}<a class="seminar-btn" href="{{ url_for('boards.board_list', slug=review_board.slug, history_id=item.history.id) }}">공유 후기·자료</a>{% endif %}
+{% if item.history and session.user_role in ['admin','officer'] %}<a class="seminar-btn" href="{{ url_for('records_seminar_detail', history_id=item.history.id) }}">자료·진행 기록</a>{% endif %}
+{% if item.review_form and item.review_form.share_token %}<a class="seminar-btn" href="/review/seminar/{{ item.review_form.share_token }}">세미나 후기</a>{% endif %}
+{% if session.user_role in ['admin','officer'] %}<div class="seminar-actions"><a class="seminar-btn" href="{{ url_for('admin_seminar_roster', session_id=item.id) }}">참석 명단·출석 확정</a><a class="seminar-btn" href="{{ url_for('bookclub_index', session_id=item.id) }}">조 편성</a>{% if topic %}<a class="seminar-btn" href="{{ url_for('download_topics_word', event_id=topic.id, session_id=item.id) }}">이 회차 발제문 Word</a>{% endif %}</div>{% endif %}
+</section>{% else %}<p>아직 등록된 회차가 없습니다.</p>{% endfor %}
+</div></details>{% endfor %}
+<section id="topics" class="home-section"><h2>학기 발제문 목록</h2><div class="lms-task-list">{% for week in weeks if week.topic_event %}{% set topic=week.topic_event %}<div class="lms-task-row" data-event-id="{{ topic.id }}"><div><strong>{{ week.book_title or '도서 미정' }}</strong><p>{{ topic.status_label }} · {{ topic.deadline_label or '마감 미정' }}</p></div>{% if topic.open and topic.share_token %}<a href="{{ url_for('view_shared_topics', token=topic.share_token) }}">발제문 열기</a>{% endif %}</div>{% else %}<p>등록된 발제문이 없습니다.</p>{% endfor %}</div></section>
+<section id="resources" class="home-section"><h2>자료·기록</h2><p>공개 범위가 허용된 게시판의 회차별 후기·자료를 확인하세요.</p>
+{% set resources = namespace(count=0) %}
+{% for week in weeks %}{% for item in week.sessions %}{% if item.history %}
+{% if review_board or session.user_role in ['admin','officer'] %}{% set resources.count=resources.count+1 %}
+<div class="lms-task-row"><div><strong>{{ week.book_title or '도서 미정' }}</strong><p>{{ item.meeting_date|seminar_date }} · {{ '본 세미나' if item.day_type == 'thu' else '추가 세미나' }}</p></div>
+{% if review_board %}<a href="{{ url_for('boards.board_list', slug=review_board.slug, history_id=item.history.id) }}">공유 후기·자료</a>{% endif %}
+{% if session.user_role in ['admin','officer'] %}<a href="{{ url_for('records_seminar_detail', history_id=item.history.id) }}">운영 진행 기록</a>{% endif %}</div>
+{% endif %}{% endif %}{% endfor %}{% endfor %}
+{% if not resources.count %}<p class="seminar-empty">이 학기에 연결된 자료·기록이 없습니다.</p>{% endif %}</section>
+{% endif %}</div></main></body></html>

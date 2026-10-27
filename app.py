@@ -51,7 +51,7 @@ from recruitment_results import (
     parse_applicant_rows,
 )
 from topic_lifecycle import topic_event_deadline, topic_event_is_expired
-from home_overview import date_label, member_seminar_summary, operations_summary
+from home_overview import date_label, member_seminar_summary, operations_summary, decorate_topic_submission_states
 from security_utils import forwarded_client_address, safe_internal_next_url
 from topic_credentials import (
     generate_topic_edit_token,
@@ -551,7 +551,7 @@ def keep_alive_endpoint():
 def main_index():
     home = attendance = None
     home_error = attendance_error = False
-    if session.get('user_id') and session.get('user_role') not in (None, 'admin', 'officer'):
+    if session.get('user_id') and session.get('user_role'):
         try:
             home = member_seminar_summary(supabase, session['user_id'])
         except Exception:
@@ -3589,8 +3589,15 @@ def view_shared_topics():
         user_name = member.get('name') if member else None
         user_department = member.get('department') if member else None
         user_student_id = member.get('student_id') if member else None
+        classroom_term = None
+        if member and event_data.get('seminar_week_id'):
+            week_rows = supabase.table('seminar_weeks').select('term_id').eq('id', event_data['seminar_week_id']).limit(1).execute().data or []
+            if week_rows:
+                term_rows = supabase.table('seminar_terms').select('id,name').eq('id', week_rows[0]['term_id']).limit(1).execute().data or []
+                classroom_term = term_rows[0] if term_rows else None
+            decorate_topic_submission_states(supabase, member['id'], [event_data])
         return render_template('topic_submit.html',
-                               event=event_data,
+                               event=event_data, classroom_term=classroom_term,
                                user_name=user_name,
                                user_department=user_department,
                                user_student_id=user_student_id,
@@ -4563,7 +4570,7 @@ def _load_weekly_seminar_view(term_id=None):
     if week_ids:
         sessions = supabase.table('seminar_sessions').select('*').in_('seminar_week_id', week_ids) \
             .order('meeting_date').execute().data or []
-        topics = supabase.table('topic_events').select('*').in_('seminar_week_id', week_ids).execute().data or []
+        topics = supabase.table('topic_events').select('*').in_('seminar_week_id', week_ids).order('created_at', desc=True).execute().data or []
         topics = _auto_close_topic_events(topics)
 
     session_ids = [row['id'] for row in sessions]
@@ -4599,7 +4606,10 @@ def _load_weekly_seminar_view(term_id=None):
         .order('name').execute().data or []
     active_members = [row for row in scope_members(supabase, all_members, term=term) if row.get('is_active')]
     member_by_id = {row['id']: row for row in all_members}
-    topic_by_week = {row['seminar_week_id']: row for row in topics if row.get('seminar_week_id')}
+    topic_by_week = {}
+    for row in topics:
+        if row.get('seminar_week_id'):
+            topic_by_week.setdefault(row['seminar_week_id'], row)
     submission_count = defaultdict(int)
     for row in submissions:
         submission_count[row['event_id']] += 1
@@ -4720,9 +4730,16 @@ def admin_seminars():
 def seminars():
     try:
         terms, term, weeks, _ = _load_weekly_seminar_view(request.args.get('term_id'))
-        weeks = [row for row in weeks if not row['is_past']] + list(reversed([row for row in weeks if row['is_past']]))
+        topics = []
+        for week in weeks:
+            if week.get('topic_event'):
+                week['topic_event']['session_dates'] = [row['meeting_date'] for row in week['sessions'] if row.get('is_active', True)]
+                topics.append(week['topic_event'])
+        decorate_topic_submission_states(supabase, session['user_id'], topics)
+        current_week = next((row for row in weeks if not row['is_past'] and row['sessions']), None)
+        current_week_id = request.args.get('week_id') or (current_week or {}).get('id')
         vote_url = f"{request.host_url}seminar_vote?token={term['share_token']}" if term else ''
-        return render_template('seminars.html', terms=terms, term=term, weeks=weeks, vote_url=vote_url)
+        return render_template('seminars.html', terms=terms, term=term, weeks=weeks, vote_url=vote_url, current_week_id=current_week_id)
     except Exception as e:
         app.logger.error(f"seminars error: {e}", exc_info=True)
         return render_template('page_load_error.html', page_title='세미나 일정', is_admin=False), 503
@@ -6528,6 +6545,8 @@ from attendance_routes import init_attendance_routes
 _term_attendance_report = init_attendance_routes(app, lambda: supabase, login_required, _rebuild_matrix_for_session)
 from club_room import init_club_room_routes
 init_club_room_routes(app, lambda: supabase, login_required)
+from integrated_calendar import init_calendar_routes
+init_calendar_routes(app, lambda: supabase, login_required)
 from term_membership_routes import init_term_membership_routes
 init_term_membership_routes(app, lambda: supabase, login_required, create_member, seminar_term_create)
 
