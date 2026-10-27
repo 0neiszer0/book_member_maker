@@ -1,7 +1,7 @@
 {% extends 'engagement_base.html' %}
 {% block content %}
-{% include '_admin_sidebar.html' %}
-<section class="eg-hero"><div class="eg-kicker">운영 관리</div><h1>벽돌책·도서 추천</h1><p class="eg-lead">추천 도서를 벽돌책 모집과 후기로 이어서 관리합니다.</p><div class="eg-actions"><a class="eg-btn eg-btn-primary" href="{{ url_for('engagement_now') }}">지금 참여하기 보기</a></div></section>
+
+<section class="eg-header"><div class="eg-kicker">운영 관리</div><h1>벽돌책·도서 추천</h1><p class="eg-lead">추천 도서를 벽돌책 모집과 후기로 이어서 관리합니다.</p><div class="eg-actions"><a class="lms-button lms-button-primary" href="{{ url_for('engagement_now') }}">지금 참여하기 보기</a></div></section>
 
 <section class="eg-panel" style="margin-top:16px">
   <h2>추천에서 벽돌책 모집 만들기</h2>
@@ -11,21 +11,24 @@
     <label>설명<textarea class="eg-textarea" name="description" required></textarea></label>
     <div class="eg-grid"><label>정원<input class="eg-input" name="capacity" type="number" min="1" max="100" value="10"></label><label>모집 마감 <span class="eg-help">선택</span><input class="eg-input" name="close_at" type="datetime-local"></label></div>
     <div class="eg-grid"><label>예정 시작일<input class="eg-input" name="planned_start_date" type="date"></label><label>예정 종료일<input class="eg-input" name="planned_end_date" type="date"></label></div>
-    <button class="eg-btn eg-btn-primary" type="submit">모집 열고 링크 복사</button>
+    <button class="lms-button lms-button-primary" type="submit">모집 열고 링크 복사</button>
   </form>
 </section>
 
 <section class="eg-panel" style="margin-top:16px">
   <h2>벽돌책 진행 현황</h2>
-  {% for row in projects %}<div class="eg-comment"><strong>{{ row.title }}</strong><p class="eg-muted">{{ row.book.title }} · 상태 {{ row.status }}{% if row.application_count is defined %} · 지원 {{ row.application_count }}명{% endif %}</p><div class="eg-actions">{% if row.recruitment %}<button class="eg-btn eg-btn-soft copy" data-url="{{ row.recruitment.share_url }}">모집 링크</button>{% endif %}{% if row.review_form %}<button class="eg-btn eg-btn-soft copy" data-url="{{ row.review_form.share_url }}">후기 링크</button>{% endif %}{% if row.status=='recruiting' %}<button class="eg-btn eg-btn-primary project-status" data-id="{{ row.id }}" data-status="active">모집 확정·시작</button>{% elif row.status=='active' %}<button class="eg-btn eg-btn-primary project-status" data-id="{{ row.id }}" data-status="completed">종료·후기 열기</button>{% endif %}</div>
-  {% if row.applications %}<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:800">지원자 {{ row.applications|length }}명 보기</summary>{% for application in row.applications %}<div class="eg-comment"><strong>{{ application.member.name }}</strong><span class="eg-muted"> · {{ application.member.department or '학과 미입력' }} {{ application.member.student_id or '' }} · {{ application.status }}</span><p style="white-space:pre-wrap">{{ application.motivation }}</p><div class="eg-actions"><button class="eg-btn eg-btn-primary application-status" data-id="{{ application.id }}" data-status="accepted">선정</button><button class="eg-btn eg-btn-paper application-status" data-id="{{ application.id }}" data-status="rejected">미선정</button></div></div>{% endfor %}</details>{% endif %}
+  {% for row in projects %}<div class="eg-comment"><strong>{{ row.title }}</strong><p class="eg-muted">{{ row.book.title }} · 상태 {{ row.status }}{% if row.application_count is defined %} · 지원 {{ row.application_count }}명{% endif %}</p><div class="eg-actions">{% if row.recruitment %}<button class="lms-button copy" data-url="{{ row.recruitment.share_url }}">모집 링크</button>{% endif %}{% if row.review_form %}<button class="lms-button copy" data-url="{{ row.review_form.share_url }}">후기 링크</button>{% endif %}{% if row.status=='recruiting' %}<button class="lms-button lms-button-primary project-status" data-id="{{ row.id }}" data-status="active">모집 확정·시작</button>{% elif row.status=='active' %}<button class="lms-button lms-button-primary project-status" data-id="{{ row.id }}" data-status="completed">종료·후기 열기</button>{% endif %}</div>
+  {% if row.applications %}<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:800">지원자 {{ row.applications|length }}명 보기</summary>{% for application in row.applications %}<div class="eg-comment"><strong>{{ application.member.name }}</strong><span class="eg-muted"> · {{ application.member.department or '학과 미입력' }} {{ application.member.student_id or '' }} · {{ application.status }}</span><p style="white-space:pre-wrap">{{ application.motivation }}</p><div class="eg-actions"><button class="lms-button lms-button-primary application-status" data-id="{{ application.id }}" data-status="accepted">선정</button><button class="lms-button application-status" data-id="{{ application.id }}" data-status="rejected">미선정</button></div></div>{% endfor %}</details>{% endif %}
   </div>{% else %}<p class="eg-muted">아직 벽돌책 프로젝트가 없습니다.</p>{% endfor %}
 </section>
+<p id="engagement-admin-status" class="eg-admin-status" role="status" hidden></p>
 <script>
-async function sendForm(url, data){const r=await fetch(url,{method:'POST',body:data});const j=await r.json();if(!r.ok)throw new Error(j.error||'처리하지 못했습니다.');return j}
-document.querySelectorAll('.copy').forEach(b=>b.onclick=async()=>{try{await navigator.clipboard.writeText(b.dataset.url);b.textContent='복사됨';window.wdToast?.('링크를 복사했습니다.')}catch(x){window.wdToast?.('링크를 복사하지 못했습니다.','error')}});
-document.querySelector('#brick-form')?.addEventListener('submit',async e=>{e.preventDefault();try{const j=await sendForm('/api/admin/brick-projects',new FormData(e.target));await navigator.clipboard.writeText(j.url);window.wdReloadWithToast('모집을 열고 링크를 복사했습니다.')}catch(x){window.wdToast?.(x.message,'error')}});
-document.querySelectorAll('.project-status').forEach(b=>b.onclick=async()=>{try{const f=new FormData();f.set('status',b.dataset.status);await sendForm(`/api/admin/brick-projects/${b.dataset.id}/status`,f);window.wdReloadWithToast('프로젝트 상태를 변경했습니다.')}catch(x){window.wdToast?.(x.message,'error')}});
-document.querySelectorAll('.application-status').forEach(b=>b.onclick=async()=>{try{const f=new FormData();f.set('status',b.dataset.status);await sendForm(`/api/admin/brick-applications/${b.dataset.id}/status`,f);window.wdReloadWithToast('지원자 상태를 변경했습니다.')}catch(x){window.wdToast?.(x.message,'error')}});
+function engagementNotice(message, reload=false){if(reload){sessionStorage.setItem('engagement-admin-status',message);location.reload();return}const status=document.getElementById('engagement-admin-status');status.textContent=message;status.hidden=false;status.scrollIntoView({block:'nearest'})}
+const previousNotice=sessionStorage.getItem('engagement-admin-status');if(previousNotice){sessionStorage.removeItem('engagement-admin-status');engagementNotice(previousNotice)}
+async function sendForm(url, data){const r=await fetch(url,{method:'POST',headers:{'X-App-CSRF':document.querySelector('meta[name="lms-csrf"]').content},body:data});const j=await r.json();if(!r.ok)throw new Error(j.error||'처리하지 못했습니다.');return j}
+document.querySelectorAll('.copy').forEach(b=>b.onclick=async()=>{try{await navigator.clipboard.writeText(b.dataset.url);b.textContent='복사됨';engagementNotice('링크를 복사했습니다.')}catch(x){engagementNotice('링크를 복사하지 못했습니다.')}});
+document.querySelector('#brick-form')?.addEventListener('submit',async e=>{e.preventDefault();try{const j=await sendForm('/api/admin/brick-projects',new FormData(e.target));await navigator.clipboard.writeText(j.url);engagementNotice('모집을 열고 링크를 복사했습니다.',true)}catch(x){engagementNotice(x.message)}});
+document.querySelectorAll('.project-status').forEach(b=>b.onclick=async()=>{try{const f=new FormData();f.set('status',b.dataset.status);await sendForm(`/api/admin/brick-projects/${b.dataset.id}/status`,f);engagementNotice('프로젝트 상태를 변경했습니다.',true)}catch(x){engagementNotice(x.message)}});
+document.querySelectorAll('.application-status').forEach(b=>b.onclick=async()=>{try{const f=new FormData();f.set('status',b.dataset.status);await sendForm(`/api/admin/brick-applications/${b.dataset.id}/status`,f);engagementNotice('지원자 상태를 변경했습니다.',true)}catch(x){engagementNotice(x.message)}});
 </script>
 {% endblock %}

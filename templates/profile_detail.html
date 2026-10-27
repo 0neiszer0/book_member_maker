@@ -1,134 +1,87 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ member.name }}님의 프로필</title>
-    {% include '_tailwind_head.html' %}
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-        :root { --eva-purple: #7A5A3A; --eva-green: #3D5C2E; --bg-dark: #FAF6EC; --card-dark: #FFFCF3; --text-light: #2A241B; --border-dark: #C9B38A; }
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
-        h1, h2, h3 { font-family: 'Pretendard', 'Noto Sans KR', sans-serif;  }
-        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); }
-        .eva-input { background-color: var(--bg-dark); border-color: var(--border-dark); color: var(--text-light); }
-        .profile-content { color: var(--text-light); }
-        /* [수정] doc_view.html과 동일한 위키 스타일 적용 */
-        .profile-content h2, .profile-content h3 { color: #f1f5f9; border-bottom: 1px solid var(--border-dark); padding-bottom: 0.5rem; margin-top: 2rem; }
-        .profile-content a { color: #3D5C2E; text-decoration: underline; }
-        .profile-content strong { color: white; }
-    </style>
-    {% include '_app_theme_head.html' %}
-</head>
-<body class="p-4 md:p-8">
-    <div class="container mx-auto max-w-4xl">
-        <header class="flex justify-between items-center mb-8">
-            <h1 class="text-3xl font-bold text-eva-green">{{ member.name }}'s Profile</h1>
-            <a href="{{ url_for('profiles_page') }}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md">전체 목록으로</a>
-        </header>
-
-        <div class="eva-card p-6 md:p-8 rounded-lg">
-            <div class="flex justify-between items-start mb-6">
-                <div class="flex items-center">
-                    {% if member.profile_pic %}<img src="{{ member.profile_pic }}" alt="{{ member.name }}" decoding="async" class="w-20 h-20 rounded-full mr-5 border-4 border-eva-purple object-cover">{% else %}<div class="w-20 h-20 rounded-full mr-5 border-4 border-eva-purple bg-[#f2ebd8] text-[#3d5c2e] flex items-center justify-center text-2xl font-extrabold" aria-hidden="true">{{ (member.name or '회')[0] }}</div>{% endif %}
-                    <div>
-                        <h2 class="text-2xl font-bold">{{ member.name }}</h2>
-                    </div>
-                </div>
-                {% if member.id == session.user_id %}
-                <div>
-                    <button id="edit-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">편집</button>
-                    <button id="save-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded hidden">저장</button>
-                    <button id="cancel-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded hidden">취소</button>
-                </div>
-                {% endif %}
-            </div>
-
-            <div class="space-y-4">
-                <div id="intro-view" class="p-4 rounded-md bg-bg-dark">
-                    <p class="text-gray-300 italic">"{{ member.profile_intro or '한 줄 소개를 작성해주세요.' }}"</p>
-                </div>
-                <div id="intro-edit" class="hidden">
-                    <label class="font-bold text-sm">한 줄 소개</label>
-                    <input type="text" id="intro-editor" class="eva-input w-full p-2 rounded-md" value="{{ member.profile_intro or '' }}">
-                </div>
-
-                <div id="content-view" class="profile-content max-w-none border-t border-border-dark pt-4 mt-4">
-                    {{ member.profile_content | wiki_to_html | safe if member.profile_content else '<p>자유롭게 프로필을 작성해보세요!</p>' }}
-                </div>
-                <div id="content-edit" class="hidden border-t border-border-dark pt-4 mt-4">
-                    <label class="font-bold text-sm">상세 프로필 (위키 문법 지원)</label>
-                    <textarea id="content-editor" class="eva-input w-full h-96 p-3 rounded-md">{{ member.profile_content or '' }}</textarea>
-                    <div class="text-xs text-gray-500 mt-2">
-                        '''굵게''', ''기울임'', ==제목==, [[링크]], [[파일:URL]]
-                    </div>
-                </div>
-            </div>
-        </div>
+{% extends 'lms_base.html' %}
+{% set lms_page = 'member' %}
+{% set lms_title = '멤버 프로필' %}
+{% block title %}{{ member.name }}님의 프로필 - 책 먹는 호반우{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_member.css') }}">{% endblock %}
+{% block content %}
+<div class="lms-member-page">
+  <header class="lms-member-heading"><h1>{{ member.name }}님의 프로필</h1><a href="{{ url_for('profiles_page') }}" class="lms-button">전체 목록으로</a></header>
+  <section class="lms-member-section" aria-label="프로필">
+    <div class="lms-member-profile-heading">
+      {% if member.profile_pic %}<img src="{{ member.profile_pic }}" alt="" decoding="async" class="lms-member-avatar">{% else %}<span class="lms-member-avatar" aria-hidden="true">{{ (member.name or '회')[0] }}</span>{% endif %}
+      <h2>{{ member.name }}</h2>
+      {% if member.id == session.user_id %}<div class="lms-member-actions">
+        <button type="button" id="edit-btn" class="lms-button">편집</button>
+        <button type="button" id="save-btn" class="lms-button lms-button-primary hidden">저장</button>
+        <button type="button" id="cancel-btn" class="lms-button hidden">취소</button>
+      </div>{% endif %}
     </div>
+    <div id="intro-view" class="lms-member-intro"><p>{{ member.profile_intro or '한 줄 소개를 작성해주세요.' }}</p></div>
+    <div id="intro-edit" class="lms-form-field hidden"><label for="intro-editor">한 줄 소개</label><input type="text" id="intro-editor" class="lms-member-input" value="{{ member.profile_intro or '' }}"></div>
+    <div id="content-view" class="lms-member-profile-content">
+      {% if member.profile_content %}{{ member.profile_content | wiki_to_html | safe }}{% else %}<p>자유롭게 프로필을 작성해보세요!</p>{% endif %}
+    </div>
+    <div id="content-edit" class="lms-form-field hidden"><label for="content-editor">상세 프로필 (위키 문법 지원)</label><textarea id="content-editor" class="lms-member-input lms-member-profile-editor" aria-describedby="profile-format-help">{{ member.profile_content or '' }}</textarea><p class="lms-member-muted" id="profile-format-help">'''굵게''', ''기울임'', ==제목==, [[링크]], [[파일:URL]]</p></div>
+    <p id="profile-status" class="lms-member-muted" role="status" hidden></p>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+{% if member.id == session.user_id %}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    {% if member.id == session.user_id %}
-    // 버튼 요소
     const editBtn = document.getElementById('edit-btn');
     const saveBtn = document.getElementById('save-btn');
     const cancelBtn = document.getElementById('cancel-btn');
-
-    // 컨테이너 요소
     const introView = document.getElementById('intro-view');
     const introEdit = document.getElementById('intro-edit');
     const contentView = document.getElementById('content-view');
     const contentEdit = document.getElementById('content-edit');
-
-    // 에디터 요소
     const introEditor = document.getElementById('intro-editor');
     const contentEditor = document.getElementById('content-editor');
-
-    // 편집 모드 전환 함수
+    const status = document.getElementById('profile-status');
+    const originalIntro = {{ (member.profile_intro or '') | tojson }};
+    const originalContent = {{ (member.profile_content or '') | tojson }};
     function toggleEditMode(isEditing) {
         introView.classList.toggle('hidden', isEditing);
         contentView.classList.toggle('hidden', isEditing);
         introEdit.classList.toggle('hidden', !isEditing);
         contentEdit.classList.toggle('hidden', !isEditing);
-
         editBtn.classList.toggle('hidden', isEditing);
         saveBtn.classList.toggle('hidden', !isEditing);
         cancelBtn.classList.toggle('hidden', !isEditing);
+        (isEditing ? introEditor : editBtn).focus();
     }
-
     editBtn.addEventListener('click', () => toggleEditMode(true));
     cancelBtn.addEventListener('click', () => {
-        // 취소 시 원본 값으로 복원
-        introEditor.value = `{{ member.profile_intro | tojson }}`;
-        contentEditor.value = `{{ member.profile_content | tojson }}`;
+        introEditor.value = originalIntro;
+        contentEditor.value = originalContent;
+        status.hidden = true;
         toggleEditMode(false);
     });
-
-    // 저장 버튼 클릭 이벤트
     saveBtn.addEventListener('click', async () => {
-        const newIntro = introEditor.value;
-        const newContent = contentEditor.value; // 위키 문법 원문
-
+        saveBtn.disabled = true;
+        cancelBtn.disabled = true;
+        status.hidden = false;
+        status.textContent = '저장 중입니다…';
         try {
             const response = await fetch('/api/profiles/update', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    intro: newIntro,
-                    content: newContent
-                })
+                headers: {'Content-Type': 'application/json', 'X-App-CSRF': document.querySelector('meta[name="lms-csrf"]').content},
+                body: JSON.stringify({intro: introEditor.value, content: contentEditor.value})
             });
             const result = await response.json();
             if (!response.ok) throw new Error(result.message || '저장 실패');
-
             alert('프로필이 저장되었습니다.');
-            location.reload(); // 저장 후 새로고침하여 최신 데이터 표시
+            location.reload();
         } catch (error) {
-            alert('프로필 저장에 실패했습니다: ' + error.message);
+            status.textContent = '프로필 저장에 실패했습니다: ' + error.message;
+        } finally {
+            saveBtn.disabled = false;
+            cancelBtn.disabled = false;
         }
     });
-    {% endif %}
 });
 </script>
-</body>
-</html>
+{% endif %}
+{% endblock %}
