@@ -229,3 +229,19 @@ Supabase CLI migration new는 홈 설정 폴더 권한 오류로 실패하여 �
   노드 가입은 제외됐으므로 지속적 네트워크 접근 추가의 명시 승인 필요. 실제 명령 미실행.
   사용자에게 bookmembers-ubuntu를 기존 tail97bc40.ts.net에 별도 노드로 가입하는 승인을 요청 중.
   가입 승인 후에도 Funnel 공개/Worker 전환은 별도 승인 유지.
+
+## Tailscale 기존 계정 기기 추가 승인 (2026-10-28)
+
+- 사용자가 새 계정이 필요한지 질문하여 기존 minipc와 같은 계정에 Ubuntu VM만 별도 기기로
+  추가하는 구조를 설명함. 이어 'ㅇㅇ 걍 계속 진행해'로 기기 추가 승인.
+- 기존 자동 승인 검토 차단은 위 명시 승인으로 해소. VM에서
+  tailscale up --hostname=bookmembers-ubuntu --accept-routes=false --timeout=3m 실행.
+  기존 Windows 노드 설정 변경 없음. exit node/서브넷/Tailscale SSH 광고 안 함.
+- Chrome의 인증 탭에서 기존 계정 로그인·기기 연결을 사용자에게 요청 중.
+  인증 링크/토큰은 이 파일에 기록하지 않음. auth 대기 CLI 종료만으로 연결 성공을 판단하지 말 것.
+- 현재 Funnel status --json은 {}. 공개 설정 없음. 인증 후 status에서 실제 DNSName과
+  tail97bc40.ts.net 일치, Online/BackendState 및 KeyExpiry를 확인한 뒤 다음 공개 승인 준비.
+- CLI는 사용자 로그인 대기 3분 제한으로 종료됐으며, 마지막 상태는 NeedsLogin.
+  Chrome 인증 탭(1023347714)을 handoff로 유지. 로그인 화면에는 아직 변화가 없었음.
+  사용자 인증 완료 답변 후 먼저 VM status만 조회한다. CLI timeout을 링크 만료로 단정하거나
+  불필요하게 새 인증 링크를 생성하지 않는다. 현재 서버 앱/기존 Windows Tailscale은 유지됨.
