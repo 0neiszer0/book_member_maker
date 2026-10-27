@@ -1,0 +1,37 @@
+#cloud-config
+# Replace SSH_PUBLIC_KEY before creating the private, local CIDATA installer ISO.
+# This installs only onto the new VM's virtual disk. Do not attach host disks.
+autoinstall:
+  version: 1
+  refresh-installer:
+    update: false
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+  source:
+    id: ubuntu-server-minimal
+    search_drivers: false
+  identity:
+    hostname: bookmembers-ubuntu
+    username: bookadmin
+    password: '!'
+  ssh:
+    install-server: true
+    allow-pw: false
+    authorized-keys:
+      - SSH_PUBLIC_KEY
+  storage:
+    layout:
+      name: direct
+      match:
+        path: /dev/sda
+  updates: security
+  timezone: Asia/Seoul
+  packages:
+    - linux-tools-virtual
+    - linux-cloud-tools-virtual
+  late-commands:
+    - curtin in-target -- sh -c 'printf "%s\n" "bookadmin ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/90-bookadmin'
+    - curtin in-target -- chmod 0440 /etc/sudoers.d/90-bookadmin
+    - curtin in-target -- visudo -cf /etc/sudoers.d/90-bookadmin
+  shutdown: poweroff
