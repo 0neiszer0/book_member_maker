@@ -1,7 +1,45 @@
 # knu-read.xyz / Cloudflare Tunnel 연결 준비
 
 2026-10-28. 사용자: hosting.kr에서 knu-read.xyz를 1년 구매했다고 알림. 페이지 이동 약 4초 지연을 호소.
-상태: **hosting.kr 등록 및 Cloudflare 무료 zone 확인 완료. 네임서버 변경·Tunnel 설치 직전 승인 대기. 기존 운영 변경 없음.**
+상태: **사용자 승인 후 네임서버 변경 저장, Tunnel 생성 및 Ubuntu 자동 시작 설치 완료. origin 라우트/공개 DNS 확인 중. 기존 회원용 Worker 경로는 유지.**
+
+## 승인 실행 기록 (2026-10-28 15:58 KST)
+
+- 사용자 `DNS 변경·Tunnel 설치·원본 연결 승인` 수신. 아래 과거 승인 대기 표시는 이 기록으로 대체한다.
+- hosting.kr 네임서버를 `ian.ns.cloudflare.com` / `riya.ns.cloudflare.com` 두 개로 저장하고 조회 화면에서 확인했다.
+- Tunnel `bookmembers-minipc`, ID `0be092ee-05e5-4177-afc5-68d47bd2368b` 생성. Ubuntu 커넥터 `4a011031-02ac-424f-abb0-dfdd034d3a9f`, Cloudflare Healthy 확인.
+- 공식 cloudflared 2026.10.5 패키지 설치, `bookmembers-cloudflared.service` active/enabled. 4개 서울(ICN) 연결, 재시작 횟수 0. 기존 bookmembers 앱/DB health 정상.
+- 전용 토큰은 계정/Tunnel ID를 검증하여 SSH stdin으로 `/etc/cloudflared/bookmembers.token`에 root:root 0600 저장. 디렉터리0700. Windows 평문 파일·로그·Git·프로세스 인자에 남기지 않았으며 일회성 localhost 전달 서버 종료/클립보드 비움.
+- 서비스는 DynamicUser, systemd LoadCredential 및 token-file 사용. metrics는 127.0.0.1:20001. 인증 토큰을 직접 출력하지 않는다.
+- 15:58 KST 공개 DNS 1.1.1.1은 등록 당시 hosting.co.kr NS를 반환. 등록 자체의 NXDOMAIN은 해소됐지만 새 NS 전파는 대기 중.
+- 기존 Worker 버전69847a91/원본 Funnel, 앱8e290f7, 공개 기준 URL 및 카카오 설정은 유지. Render/main/DB/Windows 재부팅 없음.
+
+## origin 연결 완료 / DNS 전파 대기 (2026-10-28 16:04 KST)
+
+- Cloudflare Published application 저장 완료: `origin.knu-read.xyz` → `http://127.0.0.1:5000`. DNS CNAME이 `0be092ee-05e5-4177-afc5-68d47bd2368b.cfargotunnel.com`으로 생성됐음을 UI에서 확인.
+- Ubuntu cloudflared가 내려받은 ingress 설정도 동일. 마지막 규칙은 `http_status:404`, `warp-routing.enabled=false`. 전체 LAN/SSH를 공개하지 않는다.
+- 공식 .xyz RDAP에 새 Cloudflare NS 2개 반영 확인. `secureDNS.delegationSigned=false` 확인; DNSSEC 설정을 임의 변경하지 않았다.
+- Google/Cloudflare 공개 DNS는 여전히 hosting.co.kr NS, origin 조회 NXDOMAIN. Cloudflare zone은 `Waiting for your registrar to propagate your new nameservers`. `Check nameservers now` 요청 완료.
+- 따라서 새 원본의 **공개 HTTPS·403 보호·속도 비교는 아직 미검증**. DNS/certificate 검증을 우회하거나 비밀키를 다른 호스트에 보내지 않았다.
+- 기존 사이트 https://www.knu-read.workers.dev 는 계속 기존 Funnel 경로를 사용한다. 새 도메인 apex 및 Worker Custom Domain은 아직 연결하지 않았다.
+
+### 재개 순서
+
+1. 공개 DNS의 NS가 ian/riya로 바뀌었는지, origin A/AAAA가 생겼는지 확인한다. Cloudflare zone Active와 Universal SSL 발급 확인. 새 승인 없이 이미 승인된 설치 검증을 계속할 수 있다.
+2. 작업 폴더 `work/domain-migration/Verify-Origin.ps1` 실행. 기존 원본 키를 DPAPI에서 메모리로만 복호화하고 Python stdin으로 전달한다. 원본 비밀을 명령줄·콘솔에 직접 넣지 않는다.
+3. 이 스크립트는 공개 DNS IP를 사용하여 Tailscale MagicDNS의 사설 경로를 피하고 정상 TLS 호스트 검증을 유지한다. 새 원본 missing/wrong key 403, 공개 home/DB health 3회 교차 측정, 기존 카카오 callback 유지 여부만 GET으로 검증한다. 실제 로그인 회원 페이지 체감 속도와는 구분한다.
+4. 결과는 `work/domain-migration/origin-verification.json`에 저장. 새 원본이 검증되기 전 현재 Worker를 변경하지 않는다.
+5. 최종 전환안은 Worker 원본→origin, knu-read.xyz Custom Domain, VM PUBLIC_BASE_URL/카카오 callback, 카카오 앱 Redirect URI 추가를 구체화한 뒤 별도 승인받는다. 기존 workers.dev에서 로그인 시작 후 새 도메인으로 callback하면 세션 쿠키가 달라 state가 깨질 수 있으므로 기존 링크를 새 canonical 호스트로 보내는 전환 방식을 함께 준비한다. 기존 callback 목록은 보존한다.
+6. 마지막에 실제 호스트 재부팅/자동 복구 시험은 별도 승인받는다. enable 상태 확인만으로 재부팅 검증 완료라고 기록하지 않는다.
+
+### 저장된 서비스와 점검
+
+- 재현 가능한 비밀 없는 서비스 파일: `infra/minipc/bookmembers-cloudflared.service`.
+- 설치파일/설치스크립트/검증스크립트/상태: 작업 폴더 `work/domain-migration/`. 이 폴더의 토큰 전달용 Python 파일에는 토큰 자체가 없다.
+- `sudo systemctl is-active bookmembers-cloudflared`, `sudo systemctl is-enabled bookmembers-cloudflared`.
+- `curl -fsS http://127.0.0.1:20001/ready`는 연결 수를 반환하며 공개 포트가 아니다.
+- 일반 Tunnel 연결만 중단해야 하는 경우 `sudo systemctl stop bookmembers-cloudflared`. 현 단계에서는 기존 Worker/Funnel이 독립적으로 유지돼 기존 사이트에 영향이 없다. 운영 중단 실행은 사용자 승인 경계를 따른다.
+- 자동 업데이트는 꺼져 있다. 향후 공식 cloudflared 보안/호환 업데이트를 검증하고 계획 적용한다. 토큰 회전 시 Cloudflare와 root 파일을 함께 갱신해야 한다.
 
 ## 최신 진행 / 승인 요청안
 

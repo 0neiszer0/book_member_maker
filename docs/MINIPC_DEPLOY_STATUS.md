@@ -2,8 +2,10 @@
 
 최신 요청: 사용자가 hosting.kr에서 knu-read.xyz 구매 후 연결 요청. 일반 Cloudflare Tunnel 전환 준비 중.
 hosting.kr 로그인·정상 등록·DNS 레코드 0개 확인. Cloudflare Free zone 준비, 공개 DNS 게시 반영 대기.
-Cloudflare 네임서버 ian.ns.cloudflare.com / riya.ns.cloudflare.com 배정. hosting.kr 저장 직전 준비, 아직 적용하지 않음. Tunnel 설치/공개 연결 승인 대기. 기존 운영 변경 없음.
-로컬 자동 시작 서비스·설치 초안 문법 검사, 공식 패키지 다운로드·SHA256 검증 완료. 1Password 일반 자동 로그인 허용 선호 반영. 상세 docs/MINIPC_DOMAIN_TUNNEL.md.
+사용자 승인 후 Cloudflare 네임서버 ian.ns.cloudflare.com / riya.ns.cloudflare.com을 hosting.kr에 저장 완료.
+Tunnel bookmembers-minipc(0be092ee-05e5-4177-afc5-68d47bd2368b) 생성, Ubuntu cloudflared2026.10.5 설치 및 서비스 active/enabled, Cloudflare Healthy/서울4연결 확인. 토큰 root600/LoadCredential 보관.
+origin.knu-read.xyz→127.0.0.1:5000 라우트/CNAME 생성 및 catch-all404 확인. 공식 등록부 NS 변경 반영, 공개 DNS는 아직 hosting.co.kr 값. 새 원본 공개 HTTPS/403/속도 검증은 DNS 전파 대기. 재개 검증 스크립트 work/domain-migration/Verify-Origin.ps1 준비.
+기존 Worker 트래픽/공개 기준 URL/카카오/앱/Render/main/DB는 유지. 최종 전환은 별도 승인 필요. 1Password 일반 자동 로그인 허용 선호 반영. 상세 docs/MINIPC_DOMAIN_TUNNEL.md.
 
 최신 완료(2026-10-28 15:08 KST): 사용자 승인 후 새 UI 정적 CDN/캐시를 운영에 적용했다.
 VM 앱 8e290f7 (UI 내용 f946824 유지), Worker 69847a91-0a3f-49fd-850e-13d35b4410a4.
