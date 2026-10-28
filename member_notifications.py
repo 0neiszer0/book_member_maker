@@ -126,18 +126,31 @@ def init_member_notifications(app, get_db, login_required):
         response.headers['Service-Worker-Allowed'] = '/'
         return response
 
+    def past_courses_for_current_member():
+        db = get_db()
+        members = all_rows(db.table('members').select('id,name').order('id'))
+        histories = all_rows(db.table('history').select('id,date,book_title,present,actual_member_ids,attendance_confirmed_at,seminar_session_id').order('id'))
+        terms = db.table('seminar_terms').select('id,name,start_date,end_date').execute().data or []
+        sessions = all_rows(db.table('seminar_sessions').select('id,term_id').order('id'))
+        return historical_courses(members, histories, terms, session['user_id'], datetime.now(KST).date(), sessions)
+
     @app.get('/api/my/courses')
     @login_required(role='ANY')
     def my_past_courses():
-        db = get_db()
-        members = all_rows(db.table('members').select('id,name').order('id'))
-        histories = all_rows(db.table('history').select('id,date,present,actual_member_ids,attendance_confirmed_at,seminar_session_id').order('id'))
-        terms = db.table('seminar_terms').select('id,name,start_date,end_date').execute().data or []
-        courses = historical_courses(members, histories, terms, session['user_id'], datetime.now(KST).date())
+        courses = past_courses_for_current_member()
         hidden = prefs().get('hidden_courses') or []
         for course in courses:
             course['hidden'] = course['key'] in hidden
+            course.pop('records')
         return jsonify(courses=courses)
+
+    @app.get('/my/seminars/archive/<course_key>')
+    @login_required(role='ANY')
+    def my_seminar_archive(course_key):
+        course = next((c for c in past_courses_for_current_member() if c['key'] == course_key), None)
+        if not course:
+            abort(404)
+        return render_template('member_course_archive.html', course=course)
 
     @app.post('/api/my/courses/visibility')
     @login_required(role='ANY')

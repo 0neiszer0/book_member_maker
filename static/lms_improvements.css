@@ -3,7 +3,11 @@
 .lms-topic-reading h2{font-size:16px}.lms-topic-reading p,.lms-topic-reading blockquote{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8}
 .lms-topic-reading blockquote{margin:16px 0;padding:8px 16px;border-left:3px solid #ddd;color:#555}
 .lms-section-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.lms-past-course .lms-course-card-body{border-top:5px solid #aaa}.lms-past-course h3{margin:0;font-size:16px}
+.lms-past-course .lms-course-card-color{background:#ac2930}.lms-past-course h3{margin:0}
+.lms-past-course .lms-course-card-actions{justify-content:space-between;gap:10px;padding-bottom:10px;height:48px;font-size:13px}
+.lms-past-course .lms-course-card-actions button{font-size:12px;padding:5px 9px}
+.lms-archive-list{margin-top:24px}.lms-archive-list h2{margin:0;font-size:17px}.lms-archive-list .lms-item-body>a{font-size:13px;margin-right:14px}
+.lms-admin-term-links{display:flex;flex-wrap:wrap;gap:16px;margin:16px 0 28px}.lms-admin-term-links article{flex:1 1 220px;border:1px solid #d8dcdf;padding:16px;max-width:350px}.lms-admin-term-links h3{font-size:16px;margin:0 0 6px}.lms-admin-term-links nav{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;font-size:14px}
 .lms-right-panel .lms-next-seminar{border-top:3px solid #d20f17;padding-top:16px}
 .lms-right-panel section{padding-bottom:20px;margin-bottom:20px;border-bottom:1px solid #e5e5e5}
 .lms-right-panel h2{font-size:15px;color:#555;margin-bottom:10px}.lms-right-panel .lms-next-seminar>p:first-of-type{font-size:19px;font-weight:700;color:#222}
@@ -22,3 +26,6 @@
 @media(max-width:767px){.lms-push-settings{padding:16px}#post-editor .ql-editor{min-height:220px}.lms-right-panel .lms-next-seminar>p:first-of-type{font-size:17px}}
 
 .lms-attendance-number strong{font-size:28px;color:#252525}.lms-attendance-summary progress{width:100%;height:7px;accent-color:#d20f17}
+.lms-notice-filter{margin:0 0 24px;padding:16px;border:1px solid #d8dcdf;background:#fafafa}.lms-notice-filter form{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.lms-notice-filter select{padding:8px;max-width:100%;border:1px solid #c7cdd1;background:#fff}.lms-notice-scope{display:inline-block;padding:3px 7px;background:#f7e9e9;color:#8e2026;font-size:12px;border-radius:3px}
+.ops-topic-book{font-size:20px;font-weight:700;margin-bottom:8px}.lms-operation-view:not([data-operation-view="topics"]) .ops-topic-book{display:none}
+.lms-operation-view[data-operation-view="topics"] .ops-session-tools,.lms-operation-view[data-operation-view="topics"] #schedule-tool,.lms-operation-view[data-operation-view="attendance"] .ops-topic-actions{display:none}

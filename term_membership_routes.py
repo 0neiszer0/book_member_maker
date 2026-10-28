@@ -35,7 +35,7 @@ def init_term_membership_routes(app, get_db, login_required, create_member, crea
         return render_template('admin_term_members.html', terms=terms, term=term, members=members,
                                memberships=memberships, audit=audit, csrf_token=csrf(),
                                statuses=STATUSES, entry_types=ENTRY_TYPES,
-                               source_terms=source_terms)
+                               source_terms=source_terms, term_scope=bool(request.args.get('term_id')))
 
     @app.post('/api/admin/term_members/<term_id>')
     @login_required(role='admin')

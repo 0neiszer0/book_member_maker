@@ -84,8 +84,8 @@
     byId('term-picker').submit();
   });
   const newTerm = byId('new-term');
-  newTerm.elements.year.value = new Date().getFullYear();
-  newTerm.addEventListener('submit', async event => {
+  if(newTerm)newTerm.elements.year.value = new Date().getFullYear();
+  newTerm?.addEventListener('submit', async event => {
     event.preventDefault();
     if (busy) return;
     if (draft?.dirty && !await ask('현재 학기의 저장하지 않은 변경을 버리고 새 학기를 만들까요?')) return;

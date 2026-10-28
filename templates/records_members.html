@@ -1,9 +1,9 @@
 {% extends 'lms_admin_base.html' %}
 {% from '_records_base.html' import records_nav %}
 {% from '_lms_icons.html' import icon %}
-{% set lms_title = '회원 관리' %}
+{% set lms_title = '전체 회원 관리' %}
 {% set lms_page = 'records' %}
-{% block title %}회원 관리{% endblock %}
+{% block title %}전체 회원 관리{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='lms_records.css') }}">
 
@@ -13,7 +13,7 @@
 {% set ns=namespace(active=0,dormant=0,inactive=0,incomplete=0) %}{% for m in members %}{% set st=m.member_status or 'active' %}{% if st=='active' %}{% set ns.active=ns.active+1 %}{% elif st=='dormant' %}{% set ns.dormant=ns.dormant+1 %}{% else %}{% set ns.inactive=ns.inactive+1 %}{% endif %}{% if not m.student_id or not m.department or not m.recruiting_class %}{% set ns.incomplete=ns.incomplete+1 %}{% endif %}{% endfor %}
 <div class="records-content">
 {{ records_nav('members') }}
-  <div class="records-flex records-flex-wrap records-items-end records-justify-between records-gap-4 records-mb-6"><div><p class="records-text-sm records-font-bold records-muted">운영 관리</p><h1 class="">회원 관리</h1><p class="records-muted records-mt-2">회원 정보와 로그인 권한을 관리합니다. 학기별 활동·휴식은 학기 회원 명단에서 변경해주세요.</p></div><div class="records-flex records-flex-wrap records-gap-2"><a class="lms-button" href="{{ url_for('admin_term_members') }}">학기 회원 명단</a><button class="lms-button" id="merge-open">중복 회원 합치기</button><button class="lms-button lms-button-primary" id="member-add">회원 추가</button></div></div>
+  <div class="records-flex records-flex-wrap records-items-end records-justify-between records-gap-4 records-mb-6"><div><p class="records-text-sm records-font-bold records-muted">운영 관리</p><h1 class="">전체 회원 관리</h1><p class="records-muted records-mt-2">회원 정보와 로그인 권한을 관리합니다. 학기별 활동·휴식은 학기 회원 명단에서 변경해주세요.</p></div><div class="records-flex records-flex-wrap records-gap-2"><a class="lms-button" href="{{ url_for('admin_term_members') }}">학기 회원 명단</a><button class="lms-button" id="merge-open">중복 회원 합치기</button><button class="lms-button lms-button-primary" id="member-add">회원 추가</button></div></div>
 
   <div class="records-panel records-p-4 records-mb-4 records-border-l-4"><p class="records-font-extrabold">상태를 바꾸려면 회원 행의 ‘활성 · 휴면 · 비활성’ 버튼을 누르세요.</p><p class="records-muted records-text-sm records-mt-1">누르는 즉시 저장됩니다. 활성은 조 편성에 포함, 휴면은 기록을 유지한 채 명단에서 제외, 비활성은 졸업·탈퇴 등 장기 미활동 상태입니다.</p></div>
 

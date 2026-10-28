@@ -35,7 +35,7 @@ def init_board_routes(app, supabase, login_required):
             values.setdefault('term_id', term['id'])
         # Keep the originating list's search/page/history when viewing or editing its post.
         if values.get('slug') and values['slug'] == (request.view_args or {}).get('slug'):
-            for key in ('q', 'page', 'history_id'):
+            for key in ('q', 'page', 'history_id', 'all_terms'):
                 if request.args.get(key):
                     values.setdefault(key, request.args[key])
         return url_for(endpoint, **values)
@@ -46,6 +46,33 @@ def init_board_routes(app, supabase, login_required):
 
     def allowed(required):
         return ROLE_LEVEL.get(session.get('user_role') or '', -1) >= ROLE_LEVEL.get(required, 99)
+
+    def is_notice(board):
+        return board.get('slug') == 'notices' or board.get('name') == '공지사항'
+
+    def notice_terms(board):
+        if not is_notice(board):
+            return []
+        if not hasattr(g, 'notice_terms'):
+            g.notice_terms = supabase.table('seminar_terms').select('id,name').order('start_date', desc=True).execute().data or []
+        return g.notice_terms
+
+    def notice_context(board):
+        terms = notice_terms(board)
+        return {'is_notice': is_notice(board), 'notice_terms': terms,
+                'notice_term_names': {str(t['id']): t['name'] for t in terms}}
+
+    def align_notice_context(board, post):
+        """A direct link to a term notice keeps that term's navigation."""
+        if not is_notice(board) or not post.get('term_id'):
+            return
+        term = next((t for t in notice_terms(board) if str(t['id']) == str(post['term_id'])), None)
+        if not term:
+            abort(404)
+        current = getattr(g, 'board_classroom_term', None)
+        if current and str(current['id']) != str(term['id']):
+            abort(404)
+        g.board_classroom_term = term
 
     def load_board(slug, include_inactive=False):
         query = supabase.table('boards').select('*').eq('slug', slug)
@@ -107,7 +134,7 @@ def init_board_routes(app, supabase, login_required):
             return supabase.table('brick_books').select('id, title').order('created_at', desc=True).execute().data or []
         return []
 
-    def validate_post(board, form):
+    def validate_post(board, form, existing=None):
         title = (form.get('title') or '').strip()
         content = (form.get('content') or '').strip()
         if not title or len(title) > 200:
@@ -117,6 +144,12 @@ def init_board_routes(app, supabase, login_required):
         content_format = form.get('content_format', 'plain')
         content = validate_content(content, content_format)
         payload = {'title': title, 'content': content, 'content_format': content_format, 'history_id': None, 'brick_book_id': None}
+        if is_notice(board):
+            # Old clients editing a notice must not silently widen its scope.
+            scope = form.get('notice_term_id', (existing or {}).get('term_id') or '')
+            if scope and scope not in {str(t['id']) for t in notice_terms(board)}:
+                raise ValueError('공지를 게시할 학기를 다시 선택해주세요.')
+            payload['term_id'] = scope or None
         if board['board_type'] == 'seminar_review':
             target_id = (form.get('history_id') or '').strip()
             if not target_id or not (supabase.table('history').select('id').eq('id', target_id).execute().data or []):
@@ -160,11 +193,25 @@ def init_board_routes(app, supabase, login_required):
         page = max(1, request.args.get('page', 1, type=int))
         search = re.sub(r'[^0-9A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ\s-]', '', (request.args.get('q') or '').strip())[:80]
         query = supabase.table('posts').select('*').eq('board_id', board['id']).is_('deleted_at', 'null')
+        context = notice_context(board)
+        all_terms = is_notice(board) and request.args.get('all_terms') == '1' and not getattr(g, 'board_classroom_term', None)
+        if all_terms and not allowed('officer'):
+            abort(403)
+        scope_filter = None
+        if is_notice(board) and not all_terms:
+            term = getattr(g, 'board_classroom_term', None)
+            if term:
+                scope_filter = f"term_id.is.null,term_id.eq.{term['id']}"
+            else:
+                query = query.is_('term_id', 'null')
         history_id = (request.args.get('history_id') or '').strip() if board.get('board_type') == 'seminar_review' else ''
         if history_id:
             query = query.eq('history_id', history_id)
-        if search:
-            query = query.or_(f"title.ilike.%{search}%,content.ilike.%{search}%")
+        search_filter = f"title.ilike.%{search}%,content.ilike.%{search}%" if search else None
+        if scope_filter and search_filter:
+            query = query.or_(f'and(or({scope_filter}),or({search_filter}))')
+        elif scope_filter or search_filter:
+            query = query.or_(scope_filter or search_filter)
         rows = query.order('is_pinned', desc=True).order('created_at', desc=True) \
             .range((page - 1) * 20, page * 20).execute().data or []
         has_next, posts = len(rows) > 20, rows[:20]
@@ -172,7 +219,8 @@ def init_board_routes(app, supabase, login_required):
         for post in posts:
             post['author'] = members.get(post['author_id'], {'name': '알 수 없음'})
         return render_template('board_list.html', board=board, posts=posts, page=page,
-                               has_next=has_next, q=search, history_id=history_id, can_write=allowed(board['write_role']))
+                               has_next=has_next, q=search, history_id=history_id, can_write=allowed(board['write_role']),
+                               all_terms=all_terms, **context)
 
     @bp.route('/board/<slug>/write', methods=['GET', 'POST'])
     @login_required()
@@ -191,13 +239,14 @@ def init_board_routes(app, supabase, login_required):
                 created = supabase.table('posts').insert(payload).execute().data[0]
                 upload_images(created['id'], images)
                 flash('글을 등록했습니다.', 'success')
-                return redirect(board_url('boards.post_detail', slug=slug, post_id=created['id']))
+                values = {'term_id': payload.get('term_id')} if is_notice(board) else {}
+                return redirect(board_url('boards.post_detail', slug=slug, post_id=created['id'], **values))
             except Exception as exc:
                 if created:
                     supabase.table('posts').update({'deleted_at': datetime.now(timezone.utc).isoformat()}) \
                         .eq('id', created['id']).execute()
                 flash(str(exc), 'danger')
-        return render_template('board_form.html', board=board, post=None, targets=target_rows)
+        return render_template('board_form.html', board=board, post=None, targets=target_rows, **notice_context(board))
 
     @bp.route('/board/<slug>/<post_id>')
     @login_required()
@@ -211,6 +260,7 @@ def init_board_routes(app, supabase, login_required):
             flash('글을 찾을 수 없습니다.', 'danger')
             return redirect(board_url('boards.board_list', slug=slug))
         post = rows[0]
+        align_notice_context(board, post)
         comments = supabase.table('post_comments').select('*').eq('post_id', post_id) \
             .is_('deleted_at', 'null').order('created_at').execute().data or []
         attachments = supabase.table('post_attachments').select('*').eq('post_id', post_id) \
@@ -231,8 +281,10 @@ def init_board_routes(app, supabase, login_required):
             if target:
                 target_label = target[0]['title']
         can_edit = int(post['author_id']) == int(session['user_id']) or session.get('user_role') == 'admin'
+        if is_notice(board):
+            can_edit = can_edit and allowed(board['write_role'])
         return render_template('board_post.html', board=board, post=post, comments=comments,
-                               attachments=attachments, target_label=target_label, can_edit=can_edit)
+                               attachments=attachments, target_label=target_label, can_edit=can_edit, **notice_context(board))
 
     @bp.route('/board/<slug>/<post_id>/edit', methods=['GET', 'POST'])
     @login_required()
@@ -245,12 +297,15 @@ def init_board_routes(app, supabase, login_required):
         if not rows:
             return redirect(board_url('boards.board_list', slug=slug))
         post = rows[0]
+        if is_notice(board) and not allowed(board['write_role']):
+            abort(403)
+        align_notice_context(board, post)
         if int(post['author_id']) != int(session['user_id']) and session.get('user_role') != 'admin':
             flash('수정할 권한이 없습니다.', 'danger')
             return redirect(board_url('boards.post_detail', slug=slug, post_id=post_id))
         if request.method == 'POST':
             try:
-                payload = validate_post(board, request.form)
+                payload = validate_post(board, request.form, existing=post)
                 payload['updated_at'] = datetime.now(timezone.utc).isoformat()
                 existing = supabase.table('post_attachments').select('id').eq('post_id', post_id).execute().data or []
                 new_files = [file for file in request.files.getlist('images') if file and file.filename]
@@ -260,13 +315,14 @@ def init_board_routes(app, supabase, login_required):
                 upload_images(post_id, images, len(existing))
                 supabase.table('posts').update(payload).eq('id', post_id).execute()
                 flash('글을 수정했습니다.', 'success')
-                return redirect(board_url('boards.post_detail', slug=slug, post_id=post_id))
+                values = {'term_id': payload.get('term_id')} if is_notice(board) else {}
+                return redirect(board_url('boards.post_detail', slug=slug, post_id=post_id, **values))
             except Exception as exc:
                 flash(str(exc), 'danger')
         attachments = supabase.table('post_attachments').select('*').eq('post_id', post_id).order('display_order').execute().data or []
         for attachment in attachments:
             attachment['signed_url'] = signed_url(attachment['storage_path'])
-        return render_template('board_form.html', board=board, post=post, targets=targets(board['board_type']), attachments=attachments)
+        return render_template('board_form.html', board=board, post=post, targets=targets(board['board_type']), attachments=attachments, **notice_context(board))
 
     @bp.route('/api/board/posts/<post_id>/delete', methods=['POST'])
     @login_required()

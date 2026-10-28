@@ -1,11 +1,14 @@
-{% extends 'lms_admin_base.html' %}
-{% set lms_title='학기별 회원 관리' %}
+{% extends 'lms_base.html' if term_scope else 'lms_admin_base.html' %}
+{% set lms_title='회원 관리' if term_scope else '학기별 회원 관리' %}
+{% set lms_page='term_members' %}{% set lms_course=term if term_scope else none %}
 {% block title %}학기별 회원 관리 · 책 먹는 호반우{% endblock %}
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_attendance.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='lms_term_membership.css') }}">{% endblock %}
 {% block content %}<div class="attendance-shell" id="term-members" data-csrf="{{ csrf_token }}">
-  <h1>학기별 회원 관리</h1><p>이 학기에 활동할 사람만 따로 관리합니다. 휴식·종료로 바꿔도 이전 학기 명단과 출석 기록, 로그인 권한은 유지됩니다.</p>
+  <h1>{{ term.name ~ ' 회원 관리' if term_scope else '학기별 회원 관리' }}</h1><p>이 학기에 활동할 사람만 따로 관리합니다. 휴식·종료로 바꿔도 이전 학기 명단과 출석 기록, 로그인 권한은 유지됩니다.</p>
   <form method="get" id="term-picker"><label for="term-id">관리할 학기</label><select name="term_id" id="term-id"><option value="">학기 선택</option>{% for item in terms %}<option value="{{ item.id }}" {% if term and item.id == term.id %}selected{% endif %}>{{ item.name }} · {{ item.start_date }} ~ {{ item.end_date }}</option>{% endfor %}</select></form>
+  {% if not term_scope %}
   <details class="attendance-panel" {% if not term %}open{% endif %}><summary>새 학기 만들기</summary><p>첫·마지막 세미나 날짜를 정하면 월·목 일정이 생성되고, 직전 활동 명단도 자동으로 들어옵니다.</p><form id="new-term" class="term-form"><label>연도<input name="year" type="number" min="2020" max="2100" required></label><label>학기<select name="season"><option>1학기</option><option>여름학기</option><option>2학기</option><option>겨울학기</option></select></label><label>첫 세미나 날짜<input name="start_date" type="date" required></label><label>마지막 세미나 날짜<input name="end_date" type="date" required></label><button type="submit">새 학기 생성</button></form><p id="new-term-status" role="status"></p></details>
+  {% else %}<p class="lms-small"><a href="{{ url_for('records_members') }}">전체 회원 정보·계정 관리</a> · <a href="{{ url_for('admin_term_members') }}">전체 학기·새 학기 만들기</a></p>{% endif %}
   {% if term %}
   {% if not term.roster_initialized_at %}<p class="attendance-notice">이 학기의 명단을 아직 확정하지 않았습니다. 현재는 기존 ‘활성 회원’ 기준을 사용합니다. 아래에서 명단을 확인하고 저장하면 이 학기 명단으로 전환됩니다. 과거 명단은 당시 자료를 확인하여 입력해주세요.</p>{% endif %}
   <section class="attendance-panel"><h2>자동 명단 승계</h2>{% if source_terms %}<p><strong>{{ source_terms|map(attribute='name')|join('·') }}</strong>의 활동 회원이 이 학기의 기본 명단입니다. 1학기·여름학기, 2학기·겨울학기는 각각 한 묶음으로 이어집니다.</p>{% elif term.roster_initialized_at %}<p>이 학기의 시작 명단이 저장되어 있습니다. 다음 학기를 만들 때 여기서 활동 중인 회원이 자동으로 이어집니다.</p>{% else %}<p>자동으로 이어받을 확정 명단이 없습니다. 현재 명단을 확인하고 필요한 사람만 추가해주세요.</p>{% endif %}<details class="term-more-members"><summary>다른 과거 학기에서 추가하기</summary><div class="attendance-actions"><label for="copy-source">과거 학기</label><select id="copy-source"><option value="">불러올 학기 선택</option>{% for item in terms %}{% if item.id != term.id and item.start_date < term.start_date %}<option value="{{ item.id }}">{{ item.name }}{% if not item.roster_initialized_at %} (명단 미확정){% endif %}</option>{% endif %}{% endfor %}</select><button type="button" id="copy-term">활동 회원 추가</button></div><p>현재 명단에 없는 활동 회원만 추가하며, 이미 정한 휴식·종료 상태는 바꾸지 않습니다.</p></details></section>

@@ -3,6 +3,7 @@
 {% block content %}
 <a href="{{ board_url('boards.board_list', slug=board.slug) }}" class="lms-board-meta">← {{ board.name }}</a>
 <article class="lms-board-article">
+    {% if is_notice %}<p class="lms-notice-scope">{{ notice_term_names.get(post.term_id|string,'학기 공지') if post.term_id else '전체 공지 · 모든 학기' }}</p>{% endif %}
     {% if target_label %}<div class="lms-board-target">{{ target_label }}</div>{% endif %}
     <header class="lms-board-article-header"><span class="lms-board-avatar" aria-hidden="true">{{ icon('account',40) }}</span><div><h1 class="lms-board-title">{{ post.title }}</h1><div class="lms-board-meta">{{ post.author.name }} · {{ post.created_at|datetime('%Y.%m.%d %H:%M') }}</div></div></header>
     <div class="lms-board-body {{ 'is-rich' if post.content_format == 'html' else '' }}">{{ post.content|board_content(post.content_format|default('plain')) }}</div>

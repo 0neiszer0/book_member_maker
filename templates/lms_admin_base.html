@@ -1,7 +1,9 @@
 {% extends 'lms_base.html' %}
-{% set lms_admin_context = true %}
+{% set scoped_endpoints=['admin_seminars','admin_seminar_term','admin_term_attendance','admin_seminar_roster','bookclub_index','view_admin_topics','topic_document_setup','seminar_session_moderator'] %}
+{% set scoped_term=(term if term is defined and term else operation_term_for(seminar if seminar is defined else (selected_session if selected_session is defined and selected_session else (seminar_sessions[0] if seminar_sessions is defined and seminar_sessions else none)))) if request.endpoint in scoped_endpoints else none %}
+{% set lms_admin_context = not scoped_term %}
 {% set lms_admin_term_id = seminar.term_id if seminar is defined and seminar else (term.id if term is defined and term else (overview.term.id if overview is defined and overview and overview.term else (seminar_sessions[0].term_id if seminar_sessions is defined and seminar_sessions else none))) %}
-{% set lms_course = {'name':'운영 관리'} %}
-{% set course_breadcrumb_href = url_for('admin_dashboard', term_id=lms_admin_term_id) %}
-{% set course_breadcrumb_label = '운영 관리' %}
-{% block course_navigation %}{% include '_lms_admin_nav.html' %}{% endblock %}
+{% set lms_course = scoped_term or {'name':'운영 관리'} %}
+{% set course_breadcrumb_href = url_for('seminars',term_id=scoped_term.id) if scoped_term else url_for('admin_dashboard') %}
+{% set course_breadcrumb_label = scoped_term.name if scoped_term else '운영 관리' %}
+{% block course_navigation %}{% if scoped_term %}{% with term=scoped_term %}{% include '_classroom_nav.html' %}{% endwith %}{% else %}{% include '_lms_admin_nav.html' %}{% endif %}{% endblock %}

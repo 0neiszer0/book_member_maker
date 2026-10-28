@@ -5,6 +5,7 @@
 <a href="{{ board_url('boards.board_list', slug=board.slug) }}" class="lms-board-meta">← {{ board.name }}</a>
 <h1 class="lms-board-title">{{ '글 수정' if post else '새 글 작성' }}</h1>
 <form method="post" enctype="multipart/form-data" class="lms-board-form"><input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
+    {% if is_notice %}{% set notice_scope=request.form.get('notice_term_id', (post.term_id or '') if post else (board_classroom_term.id if board_classroom_term else '')) %}<label class="lms-form-field">공지 적용 범위<select name="notice_term_id" class="lms-board-input"><option value="" {% if not notice_scope %}selected{% endif %}>전체 공지 · 모든 학기에 표시</option>{% for item in notice_terms %}<option value="{{ item.id }}" {% if notice_scope|string == item.id|string %}selected{% endif %}>{{ item.name }} 공지</option>{% endfor %}</select></label><p class="lms-small">전체 공지는 모든 강의실에, 학기 공지는 선택한 강의실에 표시됩니다. 회원의 열람 권한을 제한하는 비공개 설정은 아닙니다.</p>{% endif %}
     {% if board.board_type == 'seminar_review' %}
     <label class="lms-form-field">세미나 선택<select name="history_id" required class="lms-board-input"><option value="">선택해주세요</option>{% for target in targets %}<option value="{{ target.id }}" {% if post and post.history_id == target.id %}selected{% endif %}>{{ target.date }} · {{ target.book_title or '도서 미입력' }}</option>{% endfor %}</select></label>
     {% elif board.board_type == 'brick_book_review' %}
