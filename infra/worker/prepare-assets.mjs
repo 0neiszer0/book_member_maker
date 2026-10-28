@@ -9,7 +9,7 @@ const root = dirname(fileURLToPath(import.meta.url));
 const repo = join(root, '../..');
 const config = JSON.parse(await readFile(join(root, 'asset-release.json'), 'utf8'));
 const revisions = [...new Set([config.revision, ...(config.retainedRevisions || [])])];
-const allowed = /^(?:[\w-]+\.(?:css|js)|fonts\/[\w-]+\.woff2|fonts\/(?:Lato|NotoSansKR)-OFL\.txt|og\/club-preview(?:-v2)?\.png)$/;
+const allowed = /^(?:[\w-]+\.(?:css|js)|fonts\/[\w-]+\.woff2|fonts\/(?:Lato|NotoSansKR)-OFL\.txt|icons\/favicon(?:\.svg|-32\.png)|og\/club-preview(?:-v2)?\.png)$/;
 const metadata = new Set(['fonts/PROVENANCE.txt', 'fonts/font-provenance.json']);
 const sha = content => createHash('sha256').update(content).digest('hex');
 const git = (...args) => execFileSync('git', args, {cwd: repo, windowsHide: true, maxBuffer: 16 * 1024 * 1024});

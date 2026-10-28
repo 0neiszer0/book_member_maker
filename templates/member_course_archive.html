@@ -5,7 +5,7 @@
 {% block course_navigation %}<nav class="lms-classroom-nav" aria-label="과거 세미나 메뉴"><p class="lms-term-name">{{ course.name }}</p><a href="{{ url_for('my_seminar_archive',course_key=course.key) }}" aria-current="page">내 참여 내역</a>{% if course.term_id %}<a href="{{ url_for('seminars',term_id=course.term_id) }}">학기 강의실</a>{% endif %}<a href="{{ url_for('main_index') }}">대시보드로 돌아가기</a></nav>{% endblock %}
 {% block content %}
 <h1>{{ course.name }}</h1><p class="lms-small">{{ course.first_date }} ~ {{ course.last_date }} · 내 확정 참여 {{ course.count }}회</p>
-<p>기존 출석 기록에서 확인한 내 참여 내역입니다.</p>
+
 {% set review_board=(nav_boards|default([])|selectattr('board_type','defined')|selectattr('board_type','equalto','seminar_review')|list|first) %}
 <ul class="lms-assignment-list lms-archive-list">{% for row in course.records %}<li class="lms-item"><span class="lms-item-icon">{{ icon('book',20) }}</span><div class="lms-item-body"><h2 class="lms-item-title">{{ row.book_title }}</h2><p class="lms-item-meta">{{ row.date|seminar_date }} · 출석 확인</p>{% if review_board %}<a href="{{ url_for('boards.board_list',slug=review_board.slug,history_id=row.id) }}">이 세미나의 공유 후기</a>{% endif %}{% if session.user_role in ['admin','officer'] %} <a href="{{ url_for('records_seminar_detail',history_id=row.id) }}">운영 기록</a>{% endif %}</div></li>{% endfor %}</ul>
 {% endblock %}

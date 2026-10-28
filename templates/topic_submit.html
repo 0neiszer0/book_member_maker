@@ -402,8 +402,8 @@
             const stored = draftStore.read(document.getElementById('eventId').value, verified.sid);
             pendingDraft = stored.draft && JSON.stringify(stored.draft.topics) !== savedTopics ? stored.draft : null;
             recovery.hidden = !pendingDraft;
-            if (pendingDraft) document.getElementById('topicDraftFound').textContent = new Date(pendingDraft.savedAt).toLocaleString('ko-KR') + '에 임시저장한 내용이 있어요. 서버에 제출된 내용은 자동으로 덮어쓰지 않습니다.';
-            saveStatus.textContent = !stored.ok ? '브라우저 임시저장을 사용할 수 없어요. 작성한 내용을 따로 보관해주세요.' : topics.length ? '서버에 제출된 발제문을 불러왔어요.' : '아직 제출되지 않았어요. 작성 후 제출 버튼을 눌러주세요.';
+            if (pendingDraft) document.getElementById('topicDraftFound').textContent = new Date(pendingDraft.savedAt).toLocaleString('ko-KR') + '에 임시저장한 내용이 있어요. 제출한 내용은 자동으로 덮어쓰지 않습니다.';
+            saveStatus.textContent = !stored.ok ? '브라우저 임시저장을 사용할 수 없어요. 작성한 내용을 따로 보관해주세요.' : topics.length ? '제출한 발제문을 불러왔어요.' : '아직 제출되지 않았어요. 작성 후 제출 버튼을 눌러주세요.';
         }
 
         document.getElementById('addTopicBtn').addEventListener('click', () => { addTopicField(); changed(); });
