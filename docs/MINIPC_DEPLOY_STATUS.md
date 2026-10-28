@@ -1,6 +1,9 @@
 # 미니 PC 이전 진행 상태
 
 갱신: 2026-10-28 KST. 재부팅/세션 중단 후 이 파일부터 읽는다.
+최신 추가: 응답 속도 진단 완료. 공개 Funnel 지연과 정적 파일 no-store 확인.
+Worker 정적 파일 CDN 제공 최적화는 로컬 검증까지 완료, 공개 배포 승인 대기.
+상세 수치와 재개 절차: docs/MINIPC_PERFORMANCE.md. 운영 Worker·VM 코드는 아직 그대로다.
 최신 재개: 사용자가 직접 재부팅한 뒤 계속 진행 요청. 아래 과거 '재부팅 보류' 기록은 이 항목으로 대체한다.
 Windows 부팅 시각 2026-10-27 23:05:09 KST. Hyper-V Enabled, HypervisorPresent=true,
 vmms Running/Automatic, 기존 VM 0개, Default Switch 확인. 결과: work/hyperv-postboot.json.
@@ -383,3 +386,14 @@ Supabase CLI migration new는 홈 설정 폴더 권한 오류로 실패하여 �
   이어 새 Worker의 공개 8항목 검증을 수행하고 자동 복구 결과를 기록한다.
 - 자동 로그인 환경의 정상 복구가 확인돼도 '로그인 전'을 별도로 입증했다고 기록하지 않는다.
   BIOS 정전 후 전원 복구와 외부 백업·격리 복원도 여전히 미확인/미활성 상태다.
+
+## 성능 진단·최소 최적화 준비 (2026-10-28 13시 KST)
+
+- 사용자 느린 반응 문의에 공개/loopback GET3회, 비인증 Funnel403 경로 비교, 자원 상태 읽기.
+  운영 데이터·로그인 세션 변경 없음. 공개 네트워크 구간이 주요 지연; CPU/메모리 부족 증거 없음.
+- 원격 main/VM bda8a82 유지 확인. 공개 홈 중앙값2,683ms vs loopback4ms,
+  tailwind.css1,280ms vs3ms. 공개 Funnel 작은403도 반복879~1,156ms, 내부6ms 수준.
+- infra/worker에 ASSETS binding·운영 릴리스 고정 공개 파일18개 준비. UI 원본 파일 수정 없음.
+  HTML/API/OAuth/SSE no-store 유지. 관련 테스트6·dry-run·로컬 런타임6항목 통과.
+- 아직 공개 배포하지 않음. Worker 변경 승인을 받은 뒤 배포/재측정. VM 재시작·DB/Kakao 변경 없음.
+- 재부팅 자동 복구 검증 승인 대기와 백업 미활성 등 기존 남은 항목은 그대로다.
