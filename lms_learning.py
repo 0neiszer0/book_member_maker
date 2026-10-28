@@ -81,11 +81,16 @@ def personal_attendance_columns(report, member_id, weeks, today):
     return columns
 
 
-def historical_courses(members, histories, terms, member_id, today):
+def historical_courses(members, histories, terms, member_id, today, sessions=()):
     """Infer participation from confirmed evidence, never synthesize membership rows."""
     from collections import Counter
     names = Counter(m.get('name') for m in members)
     member = next((m for m in members if str(m['id']) == str(member_id)), {})
+    if not member:
+        return []
+    session_terms = {str(s['id']): str(s['term_id']) for s in sessions}
+    term_by_id = {str(t['id']): t for t in terms}
+    legacy_dates = {}
     found = {}
     for h in histories:
         day = str(h.get('date') or '')[:10]
@@ -95,20 +100,34 @@ def historical_courses(members, histories, terms, member_id, today):
             continue
         if not h.get('attendance_confirmed_at') or parsed > today:
             continue
-        ids = h.get('actual_member_ids')
-        attended = str(member_id) in {str(i) for i in ids} if ids is not None else (
-            names[member.get('name')] == 1 and member.get('name') in (h.get('present') or []))
-        if not attended:
-            continue
-        term = next((t for t in terms if t['start_date'] <= day <= t['end_date']), None)
+        linked_term_id = session_terms.get(str(h.get('seminar_session_id')))
+        matches = [t for t in terms if t['start_date'] <= day <= t['end_date']]
+        term = term_by_id.get(linked_term_id) if linked_term_id else (matches[0] if len(matches) == 1 else None)
         if term and term['end_date'] >= today.isoformat():
             continue
         if term:
             key, name, term_id = str(term['id']), term['name'], term['id']
         else:
             half = 1 if parsed.month < 7 else 2
-            key, name, term_id = f'legacy-{parsed.year}-{half}', f'{parsed.year}년 {half}학기 기록', None
-        course = found.setdefault(key, {'key': key, 'name': name, 'term_id': term_id, 'count': 0, 'last_date': day})
+            key, name, term_id = f'legacy-{parsed.year}-{half}', '', None
+            legacy_dates.setdefault(key, []).append(day)
+        ids = h.get('actual_member_ids')
+        attended = str(member_id) in {str(i) for i in ids} if ids is not None else (
+            bool(member.get('name')) and names[member['name']] == 1 and member['name'] in (h.get('present') or []))
+        if not attended:
+            continue
+        course = found.setdefault(key, {'key': key, 'name': name, 'term_id': term_id, 'count': 0,
+                                        'first_date': day, 'last_date': day, 'records': []})
         course['count'] += 1
+        course['first_date'] = min(course['first_date'], day)
         course['last_date'] = max(course['last_date'], day)
+        # This view contains only the signed-in member's confirmed participation.
+        course['records'].append({'id': h['id'], 'date': day, 'book_title': h.get('book_title') or '도서명 미기록'})
+    for course in found.values():
+        if not course['term_id']:
+            dates = legacy_dates[course['key']]
+            first, last = min(dates), max(dates)
+            months = str(int(first[5:7])) if first[5:7] == last[5:7] else f"{int(first[5:7])}–{int(last[5:7])}"
+            course['name'] = f'{first[:4]}년 {months}월 세미나'
+        course['records'].sort(key=lambda row: (row['date'], str(row['id'])))
     return sorted(found.values(), key=lambda c: c['last_date'], reverse=True)

@@ -115,7 +115,12 @@ install_static_assets(app)
 
 @app.context_processor
 def public_navigation_context():
-    return {"notion_public_wiki_url": NOTION_PUBLIC_WIKI_URL}
+    def operation_term_for(seminar):
+        if not seminar or not seminar.get('term_id'):
+            return None
+        rows = supabase.table('seminar_terms').select('id,name').eq('id', seminar['term_id']).limit(1).execute().data or []
+        return rows[0] if rows else None
+    return {"notion_public_wiki_url": NOTION_PUBLIC_WIKI_URL, 'operation_term_for': operation_term_for}
 
 
 @app.after_request
@@ -166,9 +171,10 @@ def add_default_social_preview(response):
         return response
     title_match = re.search(r"<title[^>]*>(.*?)</title>", page, flags=re.I | re.S)
     title = re.sub(r"<[^>]+>", "", title_match.group(1)).strip() if title_match else "책 먹는 호반우"
+    title = "책반우 | 경북대학교 독서동아리" if request.endpoint in ("main_index", "login") else title
     title = html.escape(title or "책 먹는 호반우", quote=True)
     description = html.escape(
-        "책 먹는 호반우의 세미나, 발제문, 후기와 독서 활동에 참여하세요.",
+        "경북대학교 독서동아리 책 먹는 호반우 · 세미나와 독서 활동",
         quote=True,
     )
     canonical = html.escape(f"{PUBLIC_BASE_URL}{request.full_path}".rstrip("?"), quote=True)
@@ -182,9 +188,9 @@ def add_default_social_preview(response):
   <meta property="og:description" content="{description}">
   <meta property="og:url" content="{canonical}">
   <meta property="og:image" content="{image}">
-  <meta property="og:image:width" content="1730">
-  <meta property="og:image:height" content="909">
-  <meta property="og:image:alt" content="책반우 사이트">
+  <meta property="og:image:width" content="1774">
+  <meta property="og:image:height" content="887">
+  <meta property="og:image:alt" content="KNU 책반우">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="{title}">
   <meta name="twitter:description" content="{description}">

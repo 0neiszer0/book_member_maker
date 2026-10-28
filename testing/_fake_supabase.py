@@ -70,6 +70,31 @@ class FakeQuery:
         self.filters.append(lambda row: row.get(column) is expected)
         return self._record("is_", column, value)
 
+    def or_(self, expression):
+        # Interpret PostgREST's Boolean filter grammar for scoped list tests.
+        import re
+        def parts(text):
+            depth, start, values = 0, 0, []
+            for i, char in enumerate(text):
+                depth += (char == '(') - (char == ')')
+                if char == ',' and depth == 0:
+                    values.append(text[start:i]); start = i + 1
+            return values + [text[start:]]
+        def predicate(text, row):
+            for op, combine in (('and(', all), ('or(', any)):
+                if text.startswith(op) and text.endswith(')'):
+                    return combine(predicate(item, row) for item in parts(text[len(op):-1]))
+            column, op, value = text.split('.', 2)
+            actual = row.get(column)
+            if op == 'is' and value == 'null': return actual is None
+            if op == 'eq': return str(actual) == value
+            if op == 'ilike':
+                pattern = re.escape(value).replace('%', '.*').replace('_', '.')
+                return bool(re.fullmatch(pattern, str(actual or ''), re.I))
+            raise NotImplementedError(text)
+        self.filters.append(lambda row: any(predicate(item, row) for item in parts(expression)))
+        return self._record('or_', expression)
+
     def order(self, column, desc=False, **kwargs):
         self.orders.append((column, desc))
         return self._record("order", column, desc=desc, **kwargs)

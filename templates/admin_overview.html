@@ -25,6 +25,11 @@
   {% if load_error %}
     {% include '_load_error.html' %}
   {% else %}
+  <section aria-labelledby="member-management-title">
+    <div class="lms-section-toolbar"><h2 id="member-management-title">회원 관리</h2><a class="lms-button" href="{{ url_for('records_members') }}">전체 회원 정보·계정 관리</a></div>
+    <p class="lms-small">활동·휴식·종료는 해당 학기에서, 회원 정보와 로그인 권한은 전체 회원에서 관리합니다.</p>
+    <div class="lms-admin-term-links">{% for item in seminar_terms %}<article><h3>{{ item.name }}</h3><p class="lms-small">{{ item.start_date }} ~ {{ item.end_date }}</p><nav aria-label="{{ item.name }} 관리"><a href="{{ url_for('admin_term_members',term_id=item.id) }}">회원 관리</a><a href="{{ url_for('seminars',term_id=item.id) }}">강의실</a></nav></article>{% endfor %}</div>
+  </section>
   {% if overview %}
   <section class="operations-current" aria-labelledby="operations-current-title">
     <div class="operations-pickers">

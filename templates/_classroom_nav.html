@@ -2,11 +2,11 @@
 <nav class="lms-classroom-nav" aria-label="학기 강의실 메뉴">
 <p class="lms-term-name">{{ term.name }}</p>
 <a href="{{ url_for('seminars', term_id=term.id) }}" {% if lms_page|default('') == 'curriculum' %}aria-current="page"{% endif %}>커리큘럼</a>
-<a href="{{ url_for('boards.board_list', slug=notice_board.slug, term_id=term.id) if notice_board else url_for('boards.index', term_id=term.id) }}" {% if lms_page|default('') == 'notices' %}aria-current="page"{% endif %}>공통 공지</a>
+<a href="{{ url_for('boards.board_list', slug=notice_board.slug, term_id=term.id) if notice_board else url_for('boards.index', term_id=term.id) }}" {% if lms_page|default('') == 'notices' %}aria-current="page"{% endif %}>공지사항</a>
 <a href="{{ url_for('seminars', term_id=term.id, section='topics') }}#topics" {% if lms_page|default('') == 'assignments' %}aria-current="page"{% endif %}>발제문</a>
 <a href="{{ url_for('seminars', term_id=term.id, section='resources') }}#resources" {% if lms_page|default('') == 'resources' %}aria-current="page"{% endif %}>자료·기록</a>
 <a href="{{ url_for('boards.index', term_id=term.id) }}" {% if lms_page|default('') == 'boards' %}aria-current="page"{% endif %}>전체 게시판</a>
 <a href="{{ url_for('my_term_attendance', term_id=term.id) }}" {% if lms_page|default('') == 'attendance' %}aria-current="page"{% endif %}>내 출석</a>
 <a href="{{ url_for('lms_calendar', term_id=term.id) }}">전체 일정</a>
-{% if session.user_role in ['admin','officer'] %}<a href="{{ url_for('admin_seminars', term_id=term.id) }}">학기 운영</a>{% endif %}
+{% if session.user_role in ['admin','officer'] %}<a href="{{ url_for('admin_term_members', term_id=term.id) }}" {% if lms_page|default('') == 'term_members' %}aria-current="page"{% endif %}>회원 관리</a><a href="{{ url_for('admin_seminars', term_id=term.id, schedule=1, _anchor='schedule-tool') }}" {% if request.endpoint in ['admin_seminars','seminar_session_moderator'] and request.args.get('section') not in ['topics','attendance'] %}aria-current="page"{% endif %}>도서·일정·사회자</a><a href="{{ url_for('admin_seminars', term_id=term.id, section='topics') }}" {% if (request.endpoint=='admin_seminars' and request.args.get('section')=='topics') or request.endpoint in ['view_admin_topics','topic_document_setup'] %}aria-current="page"{% endif %}>발제문 관리</a><a href="{{ url_for('admin_seminars', term_id=term.id, section='attendance') }}" {% if (request.endpoint=='admin_seminars' and request.args.get('section')=='attendance') or request.endpoint in ['admin_seminar_roster','bookclub_index'] %}aria-current="page"{% endif %}>출석·조 편성</a><a href="{{ url_for('admin_term_attendance', term_id=term.id) }}" {% if request.endpoint=='admin_term_attendance' %}aria-current="page"{% endif %}>학기 참석 현황</a>{% endif %}
 </nav>{% endif %}

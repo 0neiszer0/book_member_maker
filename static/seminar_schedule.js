@@ -177,7 +177,13 @@
         const termSelect = document.getElementById('seminar-term-select'), originalTerm = termSelect?.value;
         termSelect?.addEventListener('change', () => {
             if (saving || !confirmLeave()) { termSelect.value = originalTerm; return; }
-            allowLeave = true; scope.location.href = '/admin/seminars?term_id=' + encodeURIComponent(termSelect.value);
+            const params = new URLSearchParams({term_id: termSelect.value});
+            const current = new URLSearchParams(scope.location.search);
+            const section = current.get('section');
+            if (['topics', 'attendance'].includes(section)) params.set('section', section);
+            else if (current.has('schedule')) params.set('schedule', '1');
+            allowLeave = true;
+            scope.location.href = '/admin/seminars?' + params + (params.has('schedule') ? '#schedule-tool' : '');
         });
         document.getElementById('term-create')?.addEventListener('submit', async event => {
             event.preventDefault();

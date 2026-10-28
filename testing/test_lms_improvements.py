@@ -88,8 +88,8 @@ class LearningTests(unittest.TestCase):
 
     def test_historical_participation_requires_confirmed_unambiguous_identity(self):
         members=[{'id':1,'name':'동명'},{'id':2,'name':'동명'}]
-        histories=[{'date':'2025-04-01','present':['동명'],'attendance_confirmed_at':'ok'},
-                   {'date':'2025-04-02','present':['동명'],'actual_member_ids':[1],'attendance_confirmed_at':'ok'},
+        histories=[{'id':'one','date':'2025-04-01','present':['동명'],'attendance_confirmed_at':'ok'},
+                   {'id':'two','date':'2025-04-02','present':['동명'],'actual_member_ids':[1],'attendance_confirmed_at':'ok'},
                    {'date':'2024-04-02','actual_member_ids':[1]}]
         courses=historical_courses(members,histories,[],1,date(2026,10,28))
         self.assertEqual(len(courses),1);self.assertEqual(courses[0]['count'],1)

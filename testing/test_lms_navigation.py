@@ -74,7 +74,7 @@ class LmsNavigationTests(unittest.TestCase):
         self.login('member')
         html = self.assert_lms_response('/my/term_attendance?term_id=term')
         self.assertIn('2026-09-17', html)
-        self.assertIn('확정 출석', html)
+        self.assertIn('내 전체 참석 내역', html)
         self.assertNotIn('다른 회원 비공개', html)
         self.assertIn('name="term_id"', html)
         self.assertIn('aria-current="page">내 출석', html)
@@ -91,17 +91,24 @@ class LmsNavigationTests(unittest.TestCase):
         self.fake.rows['seminar_terms'].append(dict(id='archive', name='2025-2학기', start_date='2025-09-01', end_date='2025-12-31', is_active=False, share_token='archive-test'))
         self.fake.rows['seminar_weeks'].append(dict(id='archive-week', term_id='archive', week_start='2025-10-20', book_title='지난 학기 도서'))
         self.fake.rows['seminar_sessions'].append(dict(id='archive-session', term_id='archive', seminar_week_id='archive-week', day_type='thu', meeting_date='2025-10-23'))
-        for source in ('/admin/term_attendance?term_id=archive', '/admin/seminars?term_id=archive', '/admin/term_members?term_id=archive', '/admin/dashboard?term_id=archive', '/admin/seminar_sessions/archive-session/roster', '/admin/seminar_sessions/archive-session/moderator'):
+        for source in ('/admin/term_attendance?term_id=archive', '/admin/seminars?term_id=archive', '/admin/term_members?term_id=archive', '/admin/seminar_sessions/archive-session/roster', '/admin/seminar_sessions/archive-session/moderator'):
             html = self.client.get(source).get_data(as_text=True)
             nav = re.search(r'<nav class="lms-classroom-nav".*?</nav>', html, re.S).group()
+            links = [urlsplit(unescape(href)) for href in re.findall(r'href="([^"]+)"', nav)]
             for destination in ('seminars', 'term_members', 'term_attendance'):
                 with self.subTest(source=source, destination=destination):
                     href = '/admin/' + destination + '?term_id=archive'
-                    self.assertIn('href="' + href + '"', nav)
+                    matching = [link for link in links if link.path == '/admin/' + destination]
+                    self.assertTrue(matching)
+                    self.assertTrue(all(parse_qs(link.query).get('term_id') == ['archive'] for link in matching))
                     response = self.client.get(href)
                     self.assertEqual(response.status_code, 200)
                     self.assertRegex(response.get_data(as_text=True), r'<option[^>]*value="archive"[^>]*selected')
             self.assertNotIn('/making_team?term_id=', nav)
+        overview = self.client.get('/admin/dashboard?term_id=archive').get_data(as_text=True)
+        self.assertIn('aria-label="운영 관리 메뉴"', overview)
+        self.assertIn('href="/admin/term_members?term_id=archive"', overview)
+        self.assertIn('href="/admin/dashboard"', overview)
         with self.client.session_transaction() as state:
             csrf = state['topic_moderator_csrf']
         saved = self.client.post('/admin/seminar_sessions/archive-session/moderator',
@@ -152,10 +159,11 @@ class LmsNavigationTests(unittest.TestCase):
         self.assertIn('<strong>1/3회</strong>', html)
         self.assertIn('data-session-id="thu"', html)
         self.assertIn('data-session-id="mon"', html)
-        self.assertNotIn('data-session-id="planned"', html)
-        self.assertIn('rowspan="2"', html)
+        self.assertIn('data-session-id="planned"', html)
+        self.assertIn('확정 대기', html)
+        self.assertIn('rowspan="3"', html)
         self.assertIn('href="/seminars?term_id=term#week-week"', html)
-        self.assertEqual(html.count('data-attendance-key='), 2)
+        self.assertEqual(html.count('data-attendance-key='), 3)
         self.assertNotIn('다른 회원 비공개', html)
 
     def test_guest_login_and_room_keep_lms_shell(self):
@@ -175,14 +183,10 @@ class LmsNavigationTests(unittest.TestCase):
                 self.assertIn('href="/seminars?term_id=archive"', html)
                 self.assertNotIn('aria-label="게시판 메뉴"', html)
                 if '/boards?' not in path:
-                    self.assertIn('aria-current="page">공통 공지', html)
-                    self.assertIn('테스트 공지', html)  # Common notices are not filtered by semester.
+                    self.assertIn('aria-current="page">공지사항', html)
+                    self.assertIn('테스트 공지', html)  # Global notices appear in every semester.
         self.fake.rows['posts'] = [dict(self.fake.rows['posts'][0], id='post-'+str(i)) for i in range(21)]
-        def search(query, expression):
-            query.filters.append(lambda row: '테스트' in row.get('title', '') or '테스트' in row.get('content', ''))
-            return query
-        with patch.object(FakeQuery, 'or_', search, create=True):
-            listing = self.client.get('/board/notices?term_id=archive&q=테스트').get_data(as_text=True)
+        listing = self.client.get('/board/notices?term_id=archive&q=테스트').get_data(as_text=True)
         self.assertIn('name="term_id" value="archive"', listing)
         next_url = unescape(re.search(r'href="([^"]+)"[^>]*>다음</a>', listing).group(1))
         self.assertEqual(parse_qs(urlsplit(next_url).query)['term_id'], ['archive'])
@@ -201,17 +205,19 @@ class LmsNavigationTests(unittest.TestCase):
             self.assertIn('aria-label="학기 강의실 메뉴"', html)
             self.assertIn('href="/board/notices?term_id=term"', html)
         original_insert = FakeQuery.insert
+        with self.client.session_transaction() as state:
+            csrf = state['sensitive_csrf']
         with patch.object(FakeQuery, 'insert', lambda query, payload: original_insert(query, {'id':'created-post', **payload})):
-            created = self.client.post('/board/notices/write?term_id=term', data={'title':'새 공지', 'content':'공통 안내'})
+            created = self.client.post('/board/notices/write?term_id=term', data={'title':'새 공지', 'content':'학기 안내', 'notice_term_id':'term', 'csrf_token':csrf})
         self.assertEqual(created.status_code, 302)
         self.assertEqual(parse_qs(urlsplit(created.location).query)['term_id'], ['term'])
-        edited = self.client.post('/board/notices/post/edit?term_id=term', data={'title':'수정 공지', 'content':'수정 안내'})
+        edited = self.client.post('/board/notices/post/edit?term_id=term', data={'title':'수정 공지', 'content':'수정 안내', 'notice_term_id':'term', 'csrf_token':csrf})
         self.assertEqual(edited.status_code, 302)
         self.assertEqual(edited.location, '/board/notices/post?term_id=term')
         self.assertNotEqual(self.client.get('/admin/boards').status_code, 200)
         self.login('member')
         self.assertEqual(self.client.get('/board/notices/write?term_id=term').status_code, 302)
-        self.assertEqual(self.client.get('/board/notices/post/edit?term_id=term').status_code, 302)
+        self.assertEqual(self.client.get('/board/notices/post/edit?term_id=term').status_code, 403)
 
     def test_officer_tools_keep_shell_and_narrower_admin_permissions(self):
         self.fake.rows['members'][1]['role'] = 'officer'
