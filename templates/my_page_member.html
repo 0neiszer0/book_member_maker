@@ -1,5 +1,6 @@
 {% extends 'lms_base.html' %}
 {% set lms_page = 'member' %}
+{% set staff_records = session.user_role in ['admin','officer'] %}
 {% set lms_title = '내 활동' %}
 {% block title %}내 활동 - 책 먹는 호반우{% endblock %}
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_member.css') }}">{% endblock %}
@@ -42,18 +43,18 @@
   <section class="lms-member-section">
     <h2>내 최근 활동</h2><div class="lms-member-record-grid">
       <article class="lms-member-record"><h3>최근 세미나</h3><ul class="lms-member-link-list">
-        {% for r in (activity.seminar_records or [])[:8] %}<li><a href="{{ url_for('records_seminar_detail', history_id=r.history_id) }}"><span>{{ r.date }} {% if r.is_facilitator %}<span class="lms-member-badge">발제</span>{% endif %}</span><span class="lms-member-muted">{{ r.book_title or '(제목 없음)' }}</span></a></li>{% else %}<li class="lms-empty">참여 기록이 없습니다.</li>{% endfor %}
+        {% for r in (activity.seminar_records or [])[:8] %}<li><a href="{{ url_for('records_seminar_detail', history_id=r.history_id) if staff_records else url_for('records_member_profile', member_id=user.id, _anchor='seminar-activity') }}"><span>{{ r.date }} {% if r.is_facilitator %}<span class="lms-member-badge">발제</span>{% endif %}</span><span class="lms-member-muted">{{ r.book_title or '(제목 없음)' }}</span></a></li>{% else %}<li class="lms-empty">참여 기록이 없습니다.</li>{% endfor %}
       </ul></article>
       <article class="lms-member-record"><h3>참여 중 벽돌책</h3><ul class="lms-member-link-list">
         {% set bb_books = {} %}{% for s in (activity.brick_sessions or []) %}{% if s.book_id and s.book_id not in bb_books %}{% set _ = bb_books.update({s.book_id: s}) %}{% endif %}{% endfor %}
-        {% for bid, s in bb_books.items() %}<li><a href="{{ url_for('records_brick_book_detail', book_id=s.book_id) }}"><span>{{ s.book_title or '(제목 없음)' }}</span><span class="lms-member-muted">최근 {{ s.meeting_date or '-' }}</span></a></li>{% else %}<li class="lms-empty">참여 중인 책이 없습니다.</li>{% endfor %}
+        {% for bid, s in bb_books.items() %}<li><a href="{{ url_for('records_brick_book_detail', book_id=s.book_id) if staff_records else url_for('records_member_profile', member_id=user.id, _anchor='brick-activity') }}"><span>{{ s.book_title or '(제목 없음)' }}</span><span class="lms-member-muted">최근 {{ s.meeting_date or '-' }}</span></a></li>{% else %}<li class="lms-empty">참여 중인 책이 없습니다.</li>{% endfor %}
       </ul></article>
       <article class="lms-member-record"><h3>스페셜 이벤트</h3><ul class="lms-member-link-list">
         {% for ev in (my_special_events or []) %}<li class="lms-member-event"><span>{{ ev.name }}</span><span class="lms-member-muted">{{ ev.event_date }} · {{ ev.category }}</span></li>{% else %}<li class="lms-empty">참여한 이벤트가 없습니다.</li>{% endfor %}
       </ul></article>
       <article class="lms-member-record"><h3>참여 중 소모임</h3><ul class="lms-member-link-list">
         {% set sg_groups = {} %}{% for s in (activity.study_sessions or []) %}{% if s.group_id and s.group_id not in sg_groups %}{% set _ = sg_groups.update({s.group_id: s}) %}{% endif %}{% endfor %}
-        {% for gid, s in sg_groups.items() %}<li><a href="{{ url_for('records_study_group_detail', group_id=s.group_id) }}"><span>{{ s.group_name or '(이름 없음)' }}</span><span class="lms-member-muted">최근 {{ s.meeting_date or '-' }}</span></a></li>{% else %}<li class="lms-empty">참여 중인 소모임이 없습니다.</li>{% endfor %}
+        {% for gid, s in sg_groups.items() %}<li><a href="{{ url_for('records_study_group_detail', group_id=s.group_id) if staff_records else url_for('records_member_profile', member_id=user.id, _anchor='study-activity') }}"><span>{{ s.group_name or '(이름 없음)' }}</span><span class="lms-member-muted">최근 {{ s.meeting_date or '-' }}</span></a></li>{% else %}<li class="lms-empty">참여 중인 소모임이 없습니다.</li>{% endfor %}
       </ul></article>
     </div>
   </section>
