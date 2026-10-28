@@ -24,7 +24,7 @@
       <a class="lms-button lms-button-primary" href="{{ url_for('seminars') }}">세미나 일정 확인</a>
       <a class="lms-button lms-button-primary" href="{{ url_for('my_term_attendance') }}">내 학기 참석 현황</a>
       <a class="lms-button" href="{{ url_for('my_page') }}">내 활동·진행 중 링크</a>
-      {% if session.user_role == 'admin' %}<a class="lms-button" href="{{ url_for('help_admin') }}">관리자 운영 가이드</a>{% endif %}
+      {% if session.user_role in ['admin','officer'] %}<a class="lms-button" href="{{ url_for('help_admin') }}">운영진 안내</a>{% endif %}
     </div>
   </section>
 
@@ -65,7 +65,7 @@
 
       <section id="faq" class="lms-member-section">
         <h2>자주 묻는 질문</h2>
-        <div class="lms-member-faq"><details class="lms-member-question"><summary>참석을 취소하고 싶어요.</summary><p class="lms-member-muted">카카오톡 투표를 수정하고 운영진에게 알려주세요. 이미 사이트 명단에 반영된 뒤라면 운영진의 재반영이 필요합니다.</p></details><details class="lms-member-question"><summary>발제문 제출자가 내 이름으로 연결되지 않았어요.</summary><p class="lms-member-muted">학번과 이름이 회원 명부와 같은지 확인하고 운영진에게 알려주세요.</p></details><details class="lms-member-question"><summary>참석 기록이 잘못됐어요.</summary><p class="lms-member-muted">날짜와 잘못된 내용을 적어 운영진에게 알려주면 과거 기록도 수정할 수 있습니다.</p></details><details class="lms-member-question"><summary>사이트에서 문제가 생겼어요.</summary><p class="lms-member-muted">화면 아래의 버그 제보 버튼에 어떤 화면에서 무엇을 눌렀는지 적어주세요.</p></details></div>
+        <div class="lms-member-faq"><details class="lms-member-question"><summary>참석을 취소하고 싶어요.</summary><p class="lms-member-muted">카카오톡 투표를 수정하고 운영진에게 알려주세요. 이미 사이트 명단에 반영된 뒤라면 운영진의 재반영이 필요합니다.</p></details><details class="lms-member-question"><summary>발제문 제출자가 내 이름으로 연결되지 않았어요.</summary><p class="lms-member-muted">학번과 이름이 회원 명부와 같은지 확인하고 운영진에게 알려주세요.</p></details><details class="lms-member-question"><summary>참석 기록이 잘못됐어요.</summary><p class="lms-member-muted">날짜와 잘못된 내용을 적어 운영진에게 알려주면 과거 기록도 수정할 수 있습니다.</p></details><details class="lms-member-question"><summary>사이트에서 문제가 생겼어요.</summary><p class="lms-member-muted">계정 메뉴의 ‘버그·개선 제보’에 어떤 화면에서 무엇을 눌렀는지 적어주세요.</p></details></div>
       </section>
     </div>
   </div>

@@ -27,14 +27,13 @@
 - Linux와 같은 LF 바이트로 추출한 로컬 소스에 정적 파일 설치·manifest 검증 통과. Windows 기본 `git archive`의 CRLF 변환으로 첫 예행연습이 실패하여 `git -c core.autocrlf=false archive`로 다시 추출해 해결했다. 실제 배포는 Git 객체의 LF 원본을 사용한다.
 - 준비물: 작업 루트 `work/site-copy-review/{app-source.zip,server-assets.zip,install-assets.py,wiki-changes.json,validation.json}`.
 
-## Claude 검토
+## Claude 검토 — 2026-10-29 완료
 
-사용자는 Claude에 전체 사이트 검토 요청을 전달하라고 요청했다. 기존과 같은 Claude Code / Opus 5.5 High를 사용하려고 프롬프트와 선별 소스 사본을 준비했다.
+사용자가 소스 검토를 승인하여 Claude Opus 5.5 High에 개선본 0782edf의 소스 194개를 전달했다. 실제 모델/canonicalModel 일치, 정상 종료. 추가 문구 오류를 확인해 보완했으며 관련 테스트 30개와 오류 안내·officer 도움말 접근을 검증했다.
 
-- 프롬프트: 작업 루트 `outputs/CLAUDE_SITE_REVIEW_PROMPT.md`.
-- 사본: `work/site-copy-review/claude-source/`, 기준 `3d6bb0d` (운영 앱 이후 문서 기록만 추가한 버전).
-- 회원 데이터·DB·환경 파일·비밀키·Git 인증 제외. Read/Glob/Grep만 허용하며 Bash/Edit/Write/외부 도구를 금지하도록 구성했다.
-- **자동 승인 검토에서 비공개 소스의 외부 전달 범위에 대한 구체적인 승인 부족으로 실행이 거절됐다. 사용자에게 선별 소스+프롬프트 전달 승인을 요청했으며 응답 대기 중이다. 아직 Claude에 전달하거나 답변을 받은 것이 아니다.**
+세부 판단과 보류한 기능 문제는 `docs/CLAUDE_SITE_REVIEW_20261029.md`에 기록했다. 원문은 작업 루트 `outputs/CLAUDE_SITE_REVIEW_20261029.md`다. 소스 검토 한계를 구분했으며 검토 결과를 곧바로 사실로 확정하지 않았다.
+
+위 배포 사전 검사의 0782edf는 1차 문구 정리분이다. Claude 후속 보완을 포함한 최종 소스와 배포 상태는 작업 루트 `outputs/site-copy-review-state.json`을 기준으로 확인한다. 파비콘·정적 파일 바이트는 동일하며 앱 템플릿/안내 문구를 추가 보완했다.
 
 ## 승인 후 반영 원칙
 

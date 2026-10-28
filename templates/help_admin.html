@@ -1,11 +1,11 @@
 {% extends 'lms_admin_base.html' %}
 {% set lms_page = 'member' %}
-{% set lms_title = '관리자 운영 가이드' %}
-{% block title %}관리자 운영 가이드 - 책 먹는 호반우{% endblock %}
+{% set lms_title = '운영진 안내' %}
+{% block title %}운영진 안내 - 책 먹는 호반우{% endblock %}
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_member.css') }}">{% endblock %}
 {% block content %}
 <div class="lms-member-page lms-member-guide">
-<header class="lms-member-heading"><div><p class="lms-member-muted">운영진 전용</p><h1>관리자 운영 가이드</h1><p class="lms-member-muted">학기 명단, 세미나 진행, 출석과 활동 기록을 관리하는 방법입니다.</p></div><a class="lms-button" href="{{ url_for('help_member') }}">회원에게 보이는 이용 안내</a></header>
+<header class="lms-member-heading"><div><p class="lms-member-muted">운영진 전용</p><h1>운영진 안내</h1><p class="lms-member-muted">학기 명단, 세미나 진행, 출석과 활동 기록을 관리하는 방법입니다.</p></div><a class="lms-button" href="{{ url_for('help_member') }}">회원에게 보이는 이용 안내</a></header>
 
  <section class="lms-member-section">
    <h2>지금 운영해야 한다면 이것부터</h2>
@@ -15,13 +15,13 @@
 
  <section class="lms-member-section"><h2>학기가 바뀔 때: 회원 명단부터</h2><p class="lms-member-muted"><a  href="{{ url_for('admin_term_members') }}">학기별 회원 관리 열기</a> → 새 학기 생성 → 자동으로 들어온 직전 활동자 확인 → 쉬거나 그만둔 사람만 상태 변경 → 신규·복귀 회원 추가 → 저장 순서입니다.</p><p class="lms-member-muted">1학기와 여름학기, 2학기와 겨울학기는 각각 한 묶음으로 봅니다. 2학기를 만들면 같은 해 1학기·여름학기 활동자가 합쳐져 자동으로 들어오고, 다음 1학기는 직전 2학기·겨울학기 활동자를 이어받습니다. 명단 구분(계속 활동·신규·복귀)은 직접 수정할 수 있습니다.</p><p class="lms-member-muted">화면에는 해당 학기 명단만 먼저 보입니다. 빠진 기존 회원이 있을 때만 ‘직전 활동자 중 미포함’이나 ‘다른 회원 찾기’를 누르세요. 학기 명단 변경은 이미 반영한 카카오톡 투표·확정 출석을 덮어쓰지 않습니다.</p><p class="lms-member-muted">카카오 로그인은 같은 브라우저에서 마지막 접속 후 90일간 유지됩니다. 공용 기기는 로그인 화면에서 유지 체크를 해제하고 사용 후 로그아웃하세요. 카카오톡 안의 브라우저와 Chrome·Safari는 로그인 상태를 따로 보관할 수 있습니다.</p></section>
  <div class="lms-member-guide-layout">
-  <nav class="lms-member-guide-nav" aria-label="관리자 가이드 목차"><a href="#weekly">매주 하는 일</a><a href="#seminar">세미나 당일</a><a href="#members">회원 관리</a><a href="#term-start">학기 시작</a><a href="#term-end">학기 종료</a><a href="#yearly">연 1회·인수인계</a><a href="#records">기록 수정</a><a href="#system">문제 발생 시</a></nav>
+  <nav class="lms-member-guide-nav" aria-label="운영진 안내 목차"><a href="#weekly">매주 하는 일</a><a href="#seminar">세미나 당일</a><a href="#members">회원 관리</a><a href="#term-start">학기 시작</a><a href="#term-end">학기 종료</a><a href="#yearly">연 1회·인수인계</a><a href="#records">기록 수정</a><a href="#system">문제 발생 시</a></nav>
   <div class="lms-member-stack">
    <section id="weekly" class="lms-member-section"><h2>매주 하는 일</h2><div class="lms-member-stack"><div class="lms-member-step"><b>1</b><div><strong>도서·저자·안내 저장</strong><p class="lms-member-muted">세미나 운영 → 학기·도서 일정 도구에서 날짜를 고르고 도서·저자·안내와 회차별 사회자를 입력합니다. 도서는 같은 주차의 회차·발제문·연결된 기록에 공유되고, 사회자는 회차별로 저장됩니다. 날짜를 바꿔도 작성 중인 내용은 유지되며, 변경한 일정 모두 저장도 가능합니다.</p></div></div><div class="lms-member-step"><b>2</b><div><strong>발제문 수집 열기</strong><p class="lms-member-muted">링크를 카톡방에 공유하고 제출 인원을 확인합니다. 같은 주차의 회차는 발제문을 공유합니다. 작성 화면의 제출·수정 마감을 확인해 안내하세요. Word 다운로드 전 회차별 사회자를 확인합니다.</p></div></div><div class="lms-member-step"><b>3</b><div><strong>카카오톡 투표 명단 반영</strong><p class="lms-member-muted">본 세미나는 불참 투표자, 개설한 추가 세미나는 참석 투표자를 입력합니다. 붙여넣기·엑셀·직접 선택 후 미리보기에서 이름과 추가·제외 인원을 확인하고 반영합니다.</p></div></div><div class="lms-member-step"><b>4</b><div><strong>조 편성 후 저장</strong><p class="lms-member-muted">전체 인원, 미배정 인원, 발제자와 만나면 안 되는 조합을 확인하고 결과를 저장합니다.</p></div></div><div class="lms-member-step"><b>5</b><div><strong>실제 출석 확정</strong><p class="lms-member-muted">세미나 후 명단 반영 화면에서 실제 참석자를 선택해 확정합니다. 조 편성 저장만으로는 학기 참석 횟수가 올라가지 않습니다. 미연락 불참 기록도 확인합니다.</p></div></div></div></section>
 
    <section id="seminar" class="lms-member-section"><h2>세미나 당일·직후</h2><ul class="lms-member-checklist"><li>실제 참석자와 조 편성 결과가 맞는지 확인</li><li>연락 없이 빠진 사람은 해당 회차의 <strong>무단 불참</strong>으로 등록</li><li>결과 화면 캡처 후 공지하고, 저장된 진행 기록 열기</li><li>후기를 받을 때만 후기 링크를 만들고 공유</li></ul><div class="lms-member-note">무단 불참자는 그 회차에서 “서로 만난 날짜·횟수” 계산에서도 자동 제외됩니다. 잘못 등록했다면 취소하면 만남 기록도 다시 계산됩니다.</div></section>
 
-   <section id="members" class="lms-member-section"><h2>회원 관리</h2><p class="lms-member-muted"><a  href="{{ url_for('records_members') }}">회원 관리</a>의 각 회원 행에서 활성·휴면·비활성 버튼을 누르면 즉시 저장됩니다.</p><div class="lms-member-guide-overview"><div class="lms-member-summary"><strong>활성</strong><p class="lms-member-muted">기본 계정 상태. 학기를 확정하면 참석 대상은 학기 명단으로 관리</p></div><div class="lms-member-summary"><strong>휴면</strong><p class="lms-member-muted">기록은 유지, 기본 명단 제외</p></div><div class="lms-member-summary"><strong>비활성</strong><p class="lms-member-muted">졸업·탈퇴 등 장기 미활동</p></div></div><p class="lms-member-note lms-member-warning">관리자 지정과 “만나면 안 되는 조합”은 권한이 있는 소수 관리자만 다룹니다. 관리자 변경은 다음 권한 확인 요청부터 반영됩니다. 학기 명단의 휴식·종료는 로그인 권한을 바꾸지 않습니다.</p></section>
+   <section id="members" class="lms-member-section"><h2>회원 관리</h2><p class="lms-member-muted"><a  href="{{ url_for('records_members') }}">회원 관리</a>의 각 회원 행에서 활성·휴면·비활성 버튼을 누르면 즉시 저장됩니다.</p><div class="lms-member-guide-overview"><div class="lms-member-summary"><strong>활성</strong><p class="lms-member-muted">기본 계정 상태. 학기를 확정하면 참석 대상은 학기 명단으로 관리</p></div><div class="lms-member-summary"><strong>휴면</strong><p class="lms-member-muted">기록은 유지, 기본 명단 제외</p></div><div class="lms-member-summary"><strong>비활성</strong><p class="lms-member-muted">로그인·위키 이용 차단, 활동 기록은 유지</p></div></div><p class="lms-member-note lms-member-warning">관리자 지정과 “만나면 안 되는 조합”은 권한이 있는 소수 관리자만 다룹니다. 권한 변경은 해당 회원이 다음 화면을 열 때부터 반영됩니다. 학기 명단의 휴식·종료는 로그인 권한을 바꾸지 않습니다.</p></section>
 
    <section id="term-start" class="lms-member-section"><h2>학기 시작에 한 번</h2><ul class="lms-member-checklist"><li>새 학기를 만들고 커리큘럼의 날짜·휴강 여부 확인. 추가 세미나는 필요할 때 개설</li><li>학기별 회원에서 자동 승계된 직전 활동자를 확인하고, 쉬는 사람만 휴식·종료로 변경한 뒤 명단 저장</li><li>신입 회원의 이름·학번·학과·기수 입력 및 중복 계정 확인</li><li>생성된 날짜를 선택해 도서·사회자 입력 후 저장 (여러 일정 붙여넣기도 가능)</li><li><a  href="{{ url_for('admin_seminar_rooms') }}">세미나실 예약 현황</a> 확인</li><li><a  href="{{ url_for('admin_term_attendance') }}">학기 참석 현황</a>에서 해당 학기 참석 기준을 확인하고 공지 문구 복사</li><li>OT 실제 참석 명단을 행사 관리에 등록한 후 학기 참석 현황에서 OT 인정 설정</li><li>운영진이 직접 로그인해 세미나 운영·회원 관리 권한 확인</li></ul><p class="lms-member-muted">같은 주차의 본 세미나와 추가 세미나는 모두 참석해도 학기 기준에서 1회입니다. 벽돌책 가입이 아니라 실제 모임 참석 기록만 합산합니다.</p><p class="lms-member-muted"><strong>붙여넣기 예시</strong> · 2026-09-03 | 도서 제목 | 저자명 | 1~4장 읽기<br>입력 내용 확인·채우기로 날짜를 검증한 뒤 저장합니다. 빈 칸은 기존 값을 유지합니다.</p></section>
 
@@ -31,7 +31,7 @@
 
    <section id="records" class="lms-member-section"><h2>과거 기록을 수정할 때</h2><ol class="lms-member-stack"><li><a  href="{{ url_for('records_seminars') }}">세미나 진행 현황</a>에서 <strong>날짜·도서 편집</strong> 또는 <strong>상세</strong>를 선택합니다.</li><li>상세 화면에서는 이름을 잡고 끌어 옮깁니다. 모바일은 길게 누르면 이름 카드가 손가락을 따라옵니다. 이름을 한 번 눌러 이동할 조를 고를 수도 있습니다. 이어서 발제자를 지정하고, 공지 이미지를 다시 만들 수 있습니다. 빼놓은 사람은 미배정 목록에서 확인하고, 완전히 제외하려면 사유를 남깁니다.</li><li>일정에 연결된 기록의 도서명을 바꾸면 같은 주차의 회차와 발제문에도 반영됩니다.</li><li>만남 기록과 학기 참석 횟수에는 확정된 실제 참석만 반영됩니다. 조 편성에서 사람을 빼는 것과 무단 불참 처리는 별개입니다.</li></ol><p class="lms-member-muted">그날 저장하지 못한 회차만 “과거 세미나 수동 추가”를 사용하세요. 이미 있는 회차를 다시 만들면 중복 기록이 생깁니다.</p></section>
 
-   <section id="system" class="lms-member-section"><h2>문제가 생겼을 때</h2><ol class="lms-member-stack"><li>새 회차를 만들거나 기존 기록을 삭제하지 말고, 먼저 새로고침 후 같은 문제가 반복되는지 확인합니다.</li><li>화면 아래 버그 제보에 날짜, 화면 이름, 누른 버튼, 기대한 결과를 적습니다.</li><li><a  href="{{ url_for('admin_bug_reports') }}">버그 제보 관리</a>에서 접수 내용을 확인합니다.</li><li>배포 후에는 세미나 운영 화면과 공개 발제문 링크를 각각 확인합니다.</li></ol><div class="lms-member-note">삭제·계정 합치기는 되돌리기 어려우므로 대상과 관련 기록을 한 번 더 확인하세요.</div></section>
+   <section id="system" class="lms-member-section"><h2>문제가 생겼을 때</h2><ol class="lms-member-stack"><li>새 회차를 만들거나 기존 기록을 삭제하지 말고, 먼저 새로고침 후 같은 문제가 반복되는지 확인합니다.</li><li>계정 메뉴의 ‘버그·개선 제보’에 날짜, 화면 이름, 누른 버튼, 기대한 결과를 적습니다.</li><li><a  href="{{ url_for('admin_bug_reports') }}">버그 제보 관리</a>에서 접수 내용을 확인합니다.</li></ol><div class="lms-member-note">삭제·계정 합치기는 되돌리기 어려우므로 대상과 관련 기록을 한 번 더 확인하세요.</div></section>
   </div>
  </div>
 </div>

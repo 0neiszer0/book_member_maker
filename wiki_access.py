@@ -30,7 +30,7 @@ def wiki_access(db, identity, today=None):
         'id,name,start_date,end_date,is_active,roster_initialized_at'
     ).eq('is_active', True).lte('start_date', today.isoformat()).gte('end_date', today.isoformat()).limit(2).execute().data or []
     if len(terms) != 1:
-        return WikiAccess(member['id'], False, '', '현재 학기를 하나로 확인할 수 없어 읽기만 가능합니다.')
+        return WikiAccess(member['id'], False, '', '편집할 학기 확인이 필요합니다. 읽기는 가능하며, 편집하려면 운영진에게 문의해 주세요.')
     term = terms[0]
     if not term.get('roster_initialized_at'):
         return WikiAccess(member['id'], False, term['name'], '이번 학기 활동 명단이 확정되면 편집할 수 있습니다.')

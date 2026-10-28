@@ -2,7 +2,7 @@
 
 **다음 작업: 사이트 문구·위키 안내·탭 로고 로컬 검증 완료, 운영 미반영.**
 `docs/SITE_COPY_REVIEW_20261028.md`와 작업 루트 `outputs/site-copy-review-state.json` 참조.
-Claude 비공개 소스 전달은 자동 승인 검토가 차단하여 구체적인 사용자 승인 대기 중이다.
+2026-10-29 사용자 승인 후 Claude Opus 5.5 High 검토 완료. 후속 문구 보완과 기능 후보는 `docs/CLAUDE_SITE_REVIEW_20261029.md` 참조. 운영 배포 승인은 아직 대기 중이다.
 
 
 **최신 완료: 2026-10-28 위키 운영 배포.** https://knu-read.xyz/wiki/ 에서 사용할 수 있다.
