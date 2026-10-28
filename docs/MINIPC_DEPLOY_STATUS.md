@@ -6,6 +6,7 @@ Worker 정적 파일 CDN 제공 최적화는 로컬 검증까지 완료했으나
 곧 UI가 바뀔 예정이므로 전체 구조를 먼저 검토했다. 실제 Claude Opus5.5 High 자문 완료.
 docs/MINIPC_ARCHITECTURE_REVIEW.md: 기존 Workers 주소+단일 VPC Service+비공개 Tunnel 평가 권고,
 UI 릴리스에 정적 자산 해시/manifest 통합 검토. 모두 설계안이며 새 설치·배포·전환은 하지 않았다.
+사용자가 VPC 베타 종료 후 비용을 우려함. 베타 이후 가격 미공개 확인; 영구 무료 전제로 채택하지 않는다.
 상세 수치와 재개 절차: docs/MINIPC_PERFORMANCE.md. 운영 Worker·VM 코드는 아직 그대로다.
 최신 재개: 사용자가 직접 재부팅한 뒤 계속 진행 요청. 아래 과거 '재부팅 보류' 기록은 이 항목으로 대체한다.
 Windows 부팅 시각 2026-10-27 23:05:09 KST. Hyper-V Enabled, HypervisorPresent=true,
