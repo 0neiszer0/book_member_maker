@@ -72,3 +72,13 @@ PGlite에서 기존 글/전체 범위, FK·삭제 제한·인덱스, 기존 RLS/
 - 공유 이미지: 첨부 KNU 산학협력단 예시의 빨간 배너만 참조해 `KNU 책반우`로 이미지 생성 편집. 1774×887 PNG, 첨부의 하단 글/URL은 제외.
   원본 생성 경로: `C:/Users/HOME/.codex/generated_images/01a17d47-514e-70a2-b11b-d3d134809307/exec-bb43ae1f-2c88-4882-bf7f-6119cec00c01.png`.
 - 위키는 사용자가 다른 세션에서 진행한다. 이 릴리스는 기존 위키 연결을 바꾸지 않는다.
+
+## 검증된 배포 후보 — 승인 대기
+
+- 앱 커밋: `1e1caed3acb3eb5410e87fed0f8f8bc106fe582d`.
+- 정적 파일 digest: `bfc1eadfb4f52d6347374602d8043e372d3a405bc9585521cca3cfdfa977da58`. 현재 51개, 이전 버전 포함 CDN 파일 191개.
+- Wrangler 4.153.0 dry-run 통과. 커밋 원본 바이트로 설치기 해시/manifest 검증 통과. Windows CRLF 변환본을 배포 원본으로 사용하지 않는다.
+- `work/semester-release`: HEAD 고정 bundle, 현재 자산 ZIP, SQL, 설치·복구 스크립트, 공개 GET 검증기, SHA256SUMS.
+- `outputs/semester-ui-state.json`: 기계 판독 재개 상태. `production_sql_applied=false`, `production_deployed=false`.
+- 배포 승인 범위: 공지 열/FK/인덱스 추가, 새 CDN+앱 재시작, KNU 책반우 미리보기 및 홈페이지 카카오 캐시 갱신.
+- Render·GitHub main·도메인·카카오 로그인 설정·위키·Windows 재부팅은 변경하지 않는다.
