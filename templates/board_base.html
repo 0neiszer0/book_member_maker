@@ -1,9 +1,10 @@
 {% extends 'lms_base.html' %}
-{% set lms_page = 'boards' %}
+{% set classroom_board = board_classroom_term|default(none) %}
+{% set lms_page = 'notices' if classroom_board and board is defined and (board.slug == 'notices' or board.name == '공지사항') else 'boards' %}
 {% set lms_title = board.name if board is defined else '게시판' %}
-{% set course_breadcrumb_label = '동아리 게시판' %}
-{% set lms_course = board if board is defined else none %}
-{% set course_breadcrumb_href = url_for('boards.board_list', slug=board.slug) if board is defined else url_for('boards.index') %}
+{% set course_breadcrumb_label = classroom_board.name if classroom_board else '동아리 게시판' %}
+{% set lms_course = classroom_board or (board if board is defined else none) %}
+{% set course_breadcrumb_href = url_for('seminars', term_id=classroom_board.id) if classroom_board else (url_for('boards.board_list', slug=board.slug) if board is defined else url_for('boards.index')) %}
 {% block title %}게시판{% endblock %}
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_boards.css') }}">{% endblock %}
-{% block course_navigation %}<nav class="lms-classroom-nav" aria-label="게시판 메뉴"><p class="lms-term-name">동아리 게시판</p><a href="{{ url_for('boards.index') }}">전체 게시판</a>{% for nav_board in nav_boards %}<a href="{{ url_for('boards.board_list', slug=nav_board.slug) }}" {% if board is defined and nav_board.slug == board.slug %}aria-current="page"{% endif %}>{{ nav_board.name }}</a>{% else %}{% if board is defined %}<a href="{{ url_for('boards.board_list', slug=board.slug) }}" aria-current="page">{{ board.name }}</a>{% endif %}{% endfor %}{% if session.user_role == 'admin' %}<a href="{{ url_for('boards.admin_index') }}">게시판 관리</a>{% endif %}</nav>{% endblock %}
+{% block course_navigation %}{% if classroom_board %}{% with term=classroom_board %}{% include '_classroom_nav.html' %}{% endwith %}{% else %}<nav class="lms-classroom-nav" aria-label="게시판 메뉴"><p class="lms-term-name">동아리 게시판</p><a href="{{ url_for('boards.index') }}">전체 게시판</a>{% for nav_board in nav_boards %}<a href="{{ url_for('boards.board_list', slug=nav_board.slug) }}" {% if board is defined and nav_board.slug == board.slug %}aria-current="page"{% endif %}>{{ nav_board.name }}</a>{% else %}{% if board is defined %}<a href="{{ url_for('boards.board_list', slug=board.slug) }}" aria-current="page">{{ board.name }}</a>{% endif %}{% endfor %}{% if session.user_role == 'admin' %}<a href="{{ url_for('boards.admin_index') }}">게시판 관리</a>{% endif %}</nav>{% endif %}{% endblock %}

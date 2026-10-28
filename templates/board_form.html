@@ -1,7 +1,7 @@
 {% extends 'board_base.html' %}
 {% block title %}{{ '글 수정' if post else '글쓰기' }}{% endblock %}
 {% block content %}
-<a href="{{ url_for('boards.board_list', slug=board.slug) }}" class="lms-board-meta">← {{ board.name }}</a>
+<a href="{{ board_url('boards.board_list', slug=board.slug) }}" class="lms-board-meta">← {{ board.name }}</a>
 <h1 class="lms-board-title">{{ '글 수정' if post else '새 글 작성' }}</h1>
 <form method="post" enctype="multipart/form-data" class="lms-board-form">
     {% if board.board_type == 'seminar_review' %}
@@ -13,7 +13,7 @@
     <label class="lms-form-field">본문<textarea id="post-content" name="content" maxlength="50000" required rows="14" class="lms-board-input">{{ post.content if post else '' }}</textarea></label>
     <label id="image-drop" class="lms-board-drop"><strong>이미지 추가</strong><span class="lms-board-upload-help">드래그하거나 붙여넣기 가능 · 최대 5개 · 파일당 10MB</span><input id="images" type="file" name="images" accept="image/jpeg,image/png,image/webp,image/gif" multiple class="hidden"></label>
     <div id="preview" class="lms-board-previews"></div>
-    <div class="lms-board-actions"><a href="{{ url_for('boards.board_list', slug=board.slug) }}" class="lms-button">취소</a><button class="lms-button lms-button-primary">저장</button></div>
+    <div class="lms-board-actions"><a href="{{ board_url('boards.board_list', slug=board.slug) }}" class="lms-button">취소</a><button class="lms-button lms-button-primary">저장</button></div>
 </form>
 {% endblock %}
 {% block scripts %}

@@ -1,13 +1,13 @@
 {% extends 'board_base.html' %}
 {% block title %}{{ post.title }}{% endblock %}
 {% block content %}
-<a href="{{ url_for('boards.board_list', slug=board.slug) }}" class="lms-board-meta">← {{ board.name }}</a>
+<a href="{{ board_url('boards.board_list', slug=board.slug) }}" class="lms-board-meta">← {{ board.name }}</a>
 <article class="lms-board-article">
     {% if target_label %}<div class="lms-board-target">{{ target_label }}</div>{% endif %}
     <header class="lms-board-article-header"><span class="lms-board-avatar" aria-hidden="true">{{ icon('account',40) }}</span><div><h1 class="lms-board-title">{{ post.title }}</h1><div class="lms-board-meta">{{ post.author.name }} · {{ post.created_at|datetime('%Y.%m.%d %H:%M') }}</div></div></header>
     <div class="lms-board-body">{{ post.content }}</div>
     {% if attachments %}<div class="lms-board-attachments">{% for item in attachments %}{% if item.signed_url %}<a href="{{ item.signed_url }}" target="_blank"><img src="{{ item.signed_url }}" alt="{{ item.original_name }}" loading="lazy" decoding="async" class="lms-board-image"></a>{% endif %}{% endfor %}</div>{% endif %}
-    {% if can_edit %}<div class="lms-board-actions"><a href="{{ url_for('boards.edit', slug=board.slug, post_id=post.id) }}" class="lms-button">수정</a><button onclick="deletePost()" class="lms-button lms-board-danger">삭제</button></div>{% endif %}
+    {% if can_edit %}<div class="lms-board-actions"><a href="{{ board_url('boards.edit', slug=board.slug, post_id=post.id) }}" class="lms-button">수정</a><button onclick="deletePost()" class="lms-button lms-board-danger">삭제</button></div>{% endif %}
 </article>
 {% if board.allow_comments %}
 <section class="lms-board-comments"><h2 class="lms-board-comments-title">댓글 {{ comments|length }}</h2><div class="lms-board-comment-list" id="comments">{% for comment in comments %}<div class="lms-board-comment"><div class="lms-board-comment-header"><strong>{{ comment.author.name }}</strong>{% if comment.author_id == session.user_id or session.user_role == 'admin' %}<button onclick="deleteComment('{{ comment.id }}')" class="lms-board-delete-comment">삭제</button>{% endif %}</div><p class="lms-board-comment-body">{{ comment.content }}</p></div>{% else %}<p class="lms-board-meta">첫 댓글을 남겨보세요.</p>{% endfor %}</div><div class="lms-board-comment-form"><textarea id="comment-content" rows="2" maxlength="5000" class="lms-board-comment-input" placeholder="댓글 입력"></textarea><button onclick="addComment()" class="lms-button lms-button-primary">등록</button></div></section>
@@ -16,5 +16,5 @@
 {% block scripts %}<script>
 async function addComment(){const content=document.getElementById('comment-content').value.trim();if(!content)return;const r=await fetch('{{ url_for('boards.create_comment', post_id=post.id) }}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content})});const d=await r.json();if(!r.ok)return alert(d.message);location.reload();}
 async function deleteComment(id){if(!confirm('댓글을 삭제할까요?'))return;await fetch(`/api/board/comments/${id}/delete`,{method:'POST'});location.reload();}
-async function deletePost(){if(!confirm('글을 삭제할까요? 관리자는 복구할 수 있습니다.'))return;const r=await fetch('{{ url_for('boards.delete_post', post_id=post.id) }}',{method:'POST'});const d=await r.json();if(!r.ok)return alert(d.message);location.href='{{ url_for('boards.board_list', slug=board.slug) }}';}
+async function deletePost(){if(!confirm('글을 삭제할까요? 관리자는 복구할 수 있습니다.'))return;const r=await fetch('{{ url_for('boards.delete_post', post_id=post.id) }}',{method:'POST'});const d=await r.json();if(!r.ok)return alert(d.message);location.href={{ board_url('boards.board_list', slug=board.slug)|tojson }};}
 </script>{% endblock %}

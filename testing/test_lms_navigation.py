@@ -4,11 +4,13 @@ import sys
 from pathlib import Path
 import os
 import re
+from html import unescape
+from urllib.parse import urlsplit, parse_qs
 from datetime import date
 import unittest
 from unittest.mock import patch
 
-from testing._fake_supabase import FakeSupabase
+from testing._fake_supabase import FakeSupabase, FakeQuery
 from testing.test_home_overview import fixture
 from home_overview import operations_summary
 
@@ -160,6 +162,81 @@ class LmsNavigationTests(unittest.TestCase):
         self.assert_lms_response('/login')
         self.assert_lms_response('/club-room')
         self.assertIn('/login', self.client.get('/my/term_attendance').location)
+
+    def test_classroom_notice_list_detail_and_search_keep_term_context(self):
+        self.login('member')
+        self.fake.rows['seminar_terms'].append(dict(id='archive', name='2025-2학기', start_date='2025-09-01', end_date='2025-12-31', is_active=False, share_token='archive'))
+        classroom = self.client.get('/seminars?term_id=archive').get_data(as_text=True)
+        self.assertIn('href="/board/notices?term_id=archive"', classroom)
+        for path in ('/board/notices?term_id=archive', '/board/notices/post?term_id=archive', '/boards?term_id=archive'):
+            with self.subTest(path=path):
+                html = self.assert_lms_response(path)
+                self.assertIn('aria-label="학기 강의실 메뉴"', html)
+                self.assertIn('href="/seminars?term_id=archive"', html)
+                self.assertNotIn('aria-label="게시판 메뉴"', html)
+                if '/boards?' not in path:
+                    self.assertIn('aria-current="page">공통 공지', html)
+                    self.assertIn('테스트 공지', html)  # Common notices are not filtered by semester.
+        self.fake.rows['posts'] = [dict(self.fake.rows['posts'][0], id='post-'+str(i)) for i in range(21)]
+        def search(query, expression):
+            query.filters.append(lambda row: '테스트' in row.get('title', '') or '테스트' in row.get('content', ''))
+            return query
+        with patch.object(FakeQuery, 'or_', search, create=True):
+            listing = self.client.get('/board/notices?term_id=archive&q=테스트').get_data(as_text=True)
+        self.assertIn('name="term_id" value="archive"', listing)
+        next_url = unescape(re.search(r'href="([^"]+)"[^>]*>다음</a>', listing).group(1))
+        self.assertEqual(parse_qs(urlsplit(next_url).query)['term_id'], ['archive'])
+        self.assertEqual(parse_qs(urlsplit(next_url).query)['q'], ['테스트'])
+        detail = self.client.get('/board/notices/post-0?term_id=archive&q=테스트&page=2').get_data(as_text=True)
+        back_url = unescape(re.search(r'<a href="([^"]+)" class="lms-board-meta">', detail).group(1))
+        self.assertEqual(parse_qs(urlsplit(back_url).query), {'term_id':['archive'], 'q':['테스트'], 'page':['2']})
+        self.assertEqual(self.client.get('/board/notices?term_id=missing').status_code, 404)
+
+    def test_officer_notice_write_edit_redirect_and_permissions(self):
+        self.fake.rows['members'][1]['role'] = 'officer'
+        with self.client.session_transaction() as state:
+            state.update(user_id=2, user_role='officer')
+        for path in ('/board/notices/write?term_id=term', '/board/notices/post/edit?term_id=term'):
+            html = self.assert_lms_response(path)
+            self.assertIn('aria-label="학기 강의실 메뉴"', html)
+            self.assertIn('href="/board/notices?term_id=term"', html)
+        original_insert = FakeQuery.insert
+        with patch.object(FakeQuery, 'insert', lambda query, payload: original_insert(query, {'id':'created-post', **payload})):
+            created = self.client.post('/board/notices/write?term_id=term', data={'title':'새 공지', 'content':'공통 안내'})
+        self.assertEqual(created.status_code, 302)
+        self.assertEqual(parse_qs(urlsplit(created.location).query)['term_id'], ['term'])
+        edited = self.client.post('/board/notices/post/edit?term_id=term', data={'title':'수정 공지', 'content':'수정 안내'})
+        self.assertEqual(edited.status_code, 302)
+        self.assertEqual(edited.location, '/board/notices/post?term_id=term')
+        self.assertNotEqual(self.client.get('/admin/boards').status_code, 200)
+        self.login('member')
+        self.assertEqual(self.client.get('/board/notices/write?term_id=term').status_code, 302)
+        self.assertEqual(self.client.get('/board/notices/post/edit?term_id=term').status_code, 302)
+
+    def test_officer_tools_keep_shell_and_narrower_admin_permissions(self):
+        self.fake.rows['members'][1]['role'] = 'officer'
+        with self.client.session_transaction() as state:
+            state.update(user_id=2, user_role='officer')
+        for path in ('/admin/dashboard', '/admin/seminars?term_id=term', '/admin/seminar_sessions/wed/roster', '/admin/term_members?term_id=term', '/admin/term_attendance?term_id=term', '/admin/members', '/making_team', '/records', '/records/seminars', '/admin/engagement', '/admin/recruitment-results', '/admin/special_events', '/admin/seminar_rooms', '/admin/bug-reports', '/help/admin'):
+            with self.subTest(path=path):
+                self.assert_lms_response(path)
+        html = self.client.get('/admin/members').get_data(as_text=True)
+        self.assertNotIn('<select id="m-role"', html)
+        self.assertNotIn('href="/records/members/1"', html)
+        self.assertNotEqual(self.client.get('/admin/boards').status_code, 200)
+
+    def test_member_activity_uses_personal_records_without_staff_links(self):
+        self.login('member')
+        html = self.assert_lms_response('/mypage')
+        self.assertIn('href="/records/members/1#seminar-activity"', html)
+        self.assertIn('href="/profiles"', html)
+        profile = self.assert_lms_response('/records/members/1')
+        self.assertIn('id="seminar-activity"', profile)
+        self.assertIn('2026-09-17', profile)
+        for endpoint in ('/records/seminars/', '/records/brick_books/', '/records/study_groups/'):
+            self.assertNotIn('href="' + endpoint, html)
+            self.assertNotIn('href="' + endpoint, profile)
+        self.assertEqual(self.client.get('/records/seminars/history').status_code, 302)
 
 
 if __name__ == '__main__':

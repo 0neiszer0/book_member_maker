@@ -3,6 +3,7 @@
 {% from '_lms_icons.html' import icon %}
 {% set lms_title = '회원 활동 기록' %}
 {% set lms_page = 'records' %}
+{% set staff_records = session.user_role in ['admin','officer'] %}
 {% block title %}{{ member.name }} - 활동 기록{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='lms_records.css') }}">
@@ -42,12 +43,11 @@
         <div class="records-grid records-grid-cols-1 records-lg-grid-cols-2 records-gap-6">
             <!-- 세미나 참여 이력 -->
             <div class="records-panel records-p-5 records-rounded-lg">
-                <h2 class="records-accent records-mb-4">{{ icon('book', 18) }} 세미나 참여 ({{ seminar_count }}회)</h2>
+                <h2 id="seminar-activity" class="records-accent records-mb-4">{{ icon('book', 18) }} 세미나 참여 ({{ seminar_count }}회)</h2>
                 {% if seminar_records %}
                 <div class="records-overflow-y-auto records-max-h-96 records-space-y-1-5">
                     {% for s in seminar_records %}
-                    <a href="{{ url_for('records_seminar_detail', history_id=s.history_id) }}"
-                        class="records-flex records-justify-between records-items-center records-p-3 records-rounded records-text-sm  lms-button">
+                    {% if staff_records %}<a href="{{ url_for('records_seminar_detail', history_id=s.history_id) }}" class="records-flex records-justify-between records-items-center records-p-3 records-rounded records-text-sm  lms-button">{% else %}<div class="records-flex records-justify-between records-items-center records-p-3 records-rounded records-text-sm">{% endif %}
                         <div>
                             <span class="records-font-mono records-muted records-mr-2">{{ s.date }}</span>
                             {% if s.book_title %}<span class="records-accent">{{ s.book_title }}</span>{% endif %}
@@ -55,7 +55,7 @@
                         <div class="records-flex records-gap-2">
                             {% if s.is_facilitator %}<span class="records-accent-fill records-ink records-text-xs records-font-bold records-px-2 records-py-0-5 records-rounded records-border records-line">발제</span>{% endif %}
                         </div>
-                    </a>
+                    {% if staff_records %}</a>{% else %}</div>{% endif %}
                     {% endfor %}
                 </div>
                 {% else %}
@@ -66,15 +66,14 @@
             <div class="records-space-y-6">
                 <!-- 벽돌책 -->
                 <div class="records-panel records-p-5 records-rounded-lg">
-                    <h2 class="records-accent records-mb-4">{{ icon('folder', 18) }} 벽돌책 세션 ({{ brick_sessions|length }})</h2>
+                    <h2 id="brick-activity" class="records-accent records-mb-4">{{ icon('folder', 18) }} 벽돌책 세션 ({{ brick_sessions|length }})</h2>
                     {% if brick_sessions %}
                     <div class="records-space-y-1-5 records-max-h-48 records-overflow-y-auto">
                         {% for s in brick_sessions %}
-                        <a href="{{ url_for('records_brick_book_detail', book_id=s.book_id) }}"
-                            class="records-flex records-justify-between records-items-center records-p-2 records-rounded records-text-sm  lms-button">
+                        {% if staff_records %}<a href="{{ url_for('records_brick_book_detail', book_id=s.book_id) }}" class="records-flex records-justify-between records-items-center records-p-2 records-rounded records-text-sm  lms-button">{% else %}<div class="records-flex records-justify-between records-items-center records-p-2 records-rounded records-text-sm">{% endif %}
                             <span class="records-font-semibold records-accent">{{ s.book_title or '제목 없음' }}</span>
                             <span class="records-font-mono records-muted records-text-xs">{{ s.meeting_date }}</span>
-                        </a>
+                        {% if staff_records %}</a>{% else %}</div>{% endif %}
                         {% endfor %}
                     </div>
                     {% else %}
@@ -84,15 +83,14 @@
 
                 <!-- 소모임 -->
                 <div class="records-panel records-p-5 records-rounded-lg">
-                    <h2 class="records-accent records-mb-4">{{ icon('account', 18) }} 소모임 세션 ({{ study_sessions|length }})</h2>
+                    <h2 id="study-activity" class="records-accent records-mb-4">{{ icon('account', 18) }} 소모임 세션 ({{ study_sessions|length }})</h2>
                     {% if study_sessions %}
                     <div class="records-space-y-1-5 records-max-h-48 records-overflow-y-auto">
                         {% for s in study_sessions %}
-                        <a href="{{ url_for('records_study_group_detail', group_id=s.group_id) }}"
-                            class="records-flex records-justify-between records-items-center records-p-2 records-rounded records-text-sm  lms-button">
+                        {% if staff_records %}<a href="{{ url_for('records_study_group_detail', group_id=s.group_id) }}" class="records-flex records-justify-between records-items-center records-p-2 records-rounded records-text-sm  lms-button">{% else %}<div class="records-flex records-justify-between records-items-center records-p-2 records-rounded records-text-sm">{% endif %}
                             <span class="records-font-semibold records-accent">{{ s.group_name or '이름 없음' }}</span>
                             <span class="records-font-mono records-muted records-text-xs">{{ s.meeting_date }}</span>
-                        </a>
+                        {% if staff_records %}</a>{% else %}</div>{% endif %}
                         {% endfor %}
                     </div>
                     {% else %}
