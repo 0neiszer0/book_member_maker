@@ -1,0 +1,13 @@
+{% extends 'wiki/base.html' %}
+{% block wiki_content %}
+<header class="wiki-heading"><h1>{{ doc.title }} <small>편집</small></h1><a href="{{ url_for('wiki.document',title=doc.title) }}">최신 문서 보기</a></header>
+<p class="wiki-help">나무마크로 작성합니다. 저장하면 회원들이 읽을 수 있으며 수정 이력에 남습니다. <a href="{{ url_for('wiki.document',title='위키 편집 안내') }}">편집 안내</a></p>
+{% if notice %}<p class="lms-alert" role="alert">{{ notice }}</p>{% endif %}
+<form method="post" class="wiki-editor">
+<input type="hidden" name="wiki_csrf" value="{{ wiki_csrf }}"><input type="hidden" name="version" value="{{ doc.version }}">
+<label for="wiki-content">문서 내용</label><textarea id="wiki-content" name="content" rows="23" required spellcheck="false">{{ doc.source }}</textarea>
+<label for="wiki-summary">편집 요약</label><input id="wiki-summary" name="summary" maxlength="300" value="{{ summary }}" placeholder="무엇을 바꿨는지 짧게 남겨 주세요">
+<div class="wiki-editor-actions"><button class="lms-button lms-button-primary" name="action" value="save" type="submit">저장</button><button class="lms-button" name="action" value="preview" type="submit">미리보기</button><a class="lms-button" href="{{ url_for('wiki.document',title=doc.title) }}">취소</a><span class="lms-small">기준 버전 r{{ doc.version }}</span></div>
+</form>
+{% if preview is not none %}<section class="wiki-preview"><h2>미리보기</h2><article class="wiki-prose">{{ preview }}</article></section>{% endif %}
+{% endblock %}

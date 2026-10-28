@@ -19,14 +19,14 @@
         <a href="{{ url_for('seminars') }}" class="wd-link">세미나</a>
         <a href="{{ url_for('engagement_now') }}" class="wd-link">지금 참여하기</a>
         <a href="{{ url_for('my_page') }}" class="wd-link">내 활동</a>
-        <a href="{{ notion_public_wiki_url }}" target="_blank" rel="noopener noreferrer" class="wd-link">위키</a>
+        <a href="{{ wiki_url }}" class="wd-link">위키</a>
         {% if session.user_role in ['admin', 'officer'] or session.get('member_preview') %}
           <a href="{{ url_for('admin_dashboard') }}" class="wd-link wd-link-staff">운영 관리</a>
         {% endif %}
       {% else %}
         <a href="{{ url_for('engagement_now') }}" class="wd-link">지금 참여하기</a>
         <a href="{{ url_for('book_suggestions') }}" class="wd-link">책 추천</a>
-        <a href="{{ notion_public_wiki_url }}" target="_blank" rel="noopener noreferrer" class="wd-link">위키</a>
+        <a href="{{ wiki_url }}" class="wd-link">위키</a>
       {% endif %}
     </nav>
 
@@ -60,7 +60,7 @@
             <a href="{{ url_for('engagement_now') }}" class="wd-menu-item">
               <span class="wd-menu-ico"><i data-lucide="send" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>지금 참여하기
             </a>
-            <a href="{{ notion_public_wiki_url }}" target="_blank" rel="noopener noreferrer" class="wd-menu-item">
+            <a href="{{ wiki_url }}" class="wd-menu-item">
               <span class="wd-menu-ico"><i data-lucide="book-open" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i></span>공식 위키
             </a>
             {% if session.user_role == 'admin' or session.get('member_preview') %}

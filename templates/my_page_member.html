@@ -36,7 +36,7 @@
         {% if active_topic_events %}<ul class="lms-member-link-list">{% for evt in active_topic_events[:3] %}<li><a href="/shared_topics?token={{ evt.share_token }}"><span>{{ evt.book_title }}</span><span class="lms-member-muted">{{ evt.meeting_date }}</span></a></li>{% endfor %}</ul>{% else %}<button type="button" class="lms-button" disabled>접수 대기 중</button>{% endif %}
       </article>
       <article class="lms-member-task">
-        <h3>독서모임 위키</h3><p>운영진이 정리한 회칙·이용 안내·동아리 자료를 Notion에서 확인합니다.</p><a href="{{ notion_public_wiki_url }}" target="_blank" rel="noopener noreferrer" class="lms-button">공식 Notion 위키 열기</a>
+        <h3>독서모임 위키</h3><p>운영진이 정리한 회칙·이용 안내·동아리 자료를 확인하고 함께 정리합니다.</p><a href="{{ wiki_url }}" class="lms-button">회원 위키 열기</a>
       </article>
     </div>
   </section>
