@@ -1,0 +1,124 @@
+<div class="border ops-border rounded-lg p-4 {% if s.is_past %}bg-gray-900/30 opacity-90{% else %}bg-gray-800/30{% endif %}" data-session-id="{{ s.id }}">
+    <div class="flex flex-wrap items-center gap-3 mb-3">
+        <span class="font-mono font-bold">{{ s.meeting_date }}</span>
+        <span class="text-sm {% if s.day_type == 'mon' %}text-blue-300{% else %}text-purple-300{% endif %}">
+            ({% if s.day_type == 'mon' %}월{% else %}목{% endif %})
+        </span>
+        <span class="text-xs px-2 py-0.5 rounded
+            {% if s.vote_status == 'open' %}bg-green-800 text-green-200
+            {% elif s.vote_status == 'upcoming' %}bg-yellow-800 text-yellow-200
+            {% else %}bg-gray-700 text-gray-300{% endif %}">
+            {% if s.vote_status == 'open' %}투표 중
+            {% elif s.vote_status == 'upcoming' %}투표 대기 ({{ s.voting_open_at }} 오픈)
+            {% else %}투표 마감{% endif %}
+        </span>
+
+        {# 진행 기록 연동 표시 #}
+        {% if s.history_id %}
+        <a href="{{ url_for('records_seminar_detail', history_id=s.history_id) }}"
+            class="text-xs px-2 py-0.5 rounded bg-blue-800 text-blue-100 hover:bg-blue-700">
+            {{ icon('dashboard',18) }} 진행 기록 보기
+        </a>
+        {% elif s.is_past %}
+        <a href="{{ url_for('manual_entry') }}?date={{ s.meeting_date }}{% if s.book_title %}&book_title={{ s.book_title|urlencode }}{% endif %}"
+            class="text-xs px-2 py-0.5 rounded ops-primary text-white hover:opacity-80">
+            {{ icon('document',18) }} 진행 기록 추가
+        </a>
+        {% endif %}
+
+        <button onclick="toggleSession('{{ s.id }}', this)"
+            class="text-xs px-2 py-1 rounded {% if s.is_active %}bg-green-700 hover:bg-green-600{% else %}bg-gray-700 hover:bg-gray-600{% endif %}">
+            {% if s.is_active %}활성{% else %}비활성{% endif %}
+        </button>
+        <span class="ml-auto ops-accent font-bold">참석 {{ s.yes_count }} / {{ term.max_capacity }}</span>
+        <span class="text-gray-400 text-sm">불참 {{ s.no_count }}</span>
+    </div>
+
+    <div class="flex flex-wrap gap-2 mb-3 text-xs">
+        <span class="px-2 py-1 rounded bg-gray-700">1. 투표 {{ s.yes_count }}명</span>
+        <span class="px-2 py-1 rounded {% if s.topic_event %}bg-green-800 text-green-100{% else %}bg-gray-700{% endif %}">2. 발제문 {% if s.topic_event %}{{ s.topic_event.submission_count }}명{% else %}미개설{% endif %}</span>
+        <span class="px-2 py-1 rounded {% if s.history_id %}bg-green-800 text-green-100{% else %}bg-gray-700{% endif %}">3. 조 편성·기록 {% if s.history_id %}완료{% else %}대기{% endif %}</span>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+        <div class="md:col-span-2">
+            <label class="block text-xs text-gray-400 mb-1">{{ icon('book',18) }} 이번 회차 도서</label>
+            <input type="text" value="{{ s.book_title or '' }}" data-book-title
+                onblur="updateBook('{{ s.id }}', this.closest('[data-session-id]'))"
+                placeholder="예: 데미안"
+                class="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-sm focus:ops-border focus:outline-none">
+        </div>
+        <div>
+            <label class="block text-xs text-gray-400 mb-1">저자</label>
+            <input type="text" value="{{ s.book_author or '' }}" data-book-author
+                onblur="updateBook('{{ s.id }}', this.closest('[data-session-id]'))" placeholder="예: 헤르만 헤세"
+                class="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-sm focus:ops-border focus:outline-none">
+        </div>
+    </div>
+
+    <div class="flex flex-wrap gap-2 mb-3">
+        {% if s.topic_event %}
+        <button type="button" onclick="copyText('{{ s.topic_event.share_url }}')" class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded">발제문 링크 복사</button>
+        <a href="{{ url_for('view_admin_topics', event_id=s.topic_event.id) }}" class="text-xs ops-primary text-white px-3 py-1.5 rounded">제출 {{ s.topic_event.submission_count }}명 관리</a>
+        <a href="{{ url_for('download_topics_word', event_id=s.topic_event.id) }}" class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded">Word 다운로드</a>
+        <button type="button" onclick="toggleTopics('{{ s.topic_event.id }}')" class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded">{{ '수집 마감' if s.topic_event.is_active else '수집 다시 열기' }}</button>
+        {% else %}
+        <button type="button" onclick="openTopics('{{ s.id }}', this)" class="text-xs ops-primary text-white px-3 py-1.5 rounded">발제문 수집 열기</button>
+        {% endif %}
+        <a href="{{ url_for('bookclub_index') }}?session_id={{ s.id }}" class="text-xs ops-primary text-black font-bold px-3 py-1.5 rounded">이 회차 조 편성</a>
+    </div>
+
+    <details class="text-sm mb-3" {% if s.voting_custom %}open{% endif %}>
+        <summary class="cursor-pointer text-gray-300 hover:text-white">
+            {{ icon('account',18) }} 투표 시간 편집
+            {% if s.voting_custom %}<span class="text-xs text-yellow-400 ml-1">(직접 지정됨)</span>{% else %}<span class="text-xs text-gray-500 ml-1">(기본 규칙)</span>{% endif %}
+        </summary>
+        <div class="mt-3 p-3 bg-gray-900/50 border border-gray-700 rounded">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">오픈 시각 (KST)</label>
+                    <input type="datetime-local" class="vote-open-input w-full bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-sm focus:ops-border focus:outline-none"
+                        value="{{ s.voting_open_at_input }}">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">마감 시각 (KST)</label>
+                    <input type="datetime-local" class="vote-close-input w-full bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-sm focus:ops-border focus:outline-none"
+                        value="{{ s.voting_close_at_input }}">
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">기본값은 <strong>전주 금 18:00 ~ 전주 일 23:59</strong>입니다. 값을 바꾸면 이 회차에만 적용돼요.</p>
+            <div class="flex gap-2 mt-3 justify-end">
+                <button type="button" onclick="resetVoteWindow('{{ s.id }}', this)"
+                    class="text-xs bg-gray-700 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded">기본값으로 되돌리기</button>
+                <button type="button" onclick="saveVoteWindow('{{ s.id }}', this)"
+                    class="text-xs ops-primary text-black font-bold py-1 px-3 rounded hover:opacity-80">{{ icon('document',18) }} 저장</button>
+            </div>
+        </div>
+    </details>
+
+    <details class="text-sm">
+        <summary class="cursor-pointer text-gray-300 hover:text-white">참석자 관리 ({{ s.attendees|length }}명)</summary>
+        <div class="mt-3 space-y-2">
+            <div class="flex flex-wrap gap-2" id="attendees-{{ s.id }}">
+                {% for a in s.attendees %}
+                <span class="inline-flex items-center gap-1 bg-green-900/50 border border-green-700 text-green-200 px-2 py-1 rounded text-xs"
+                    data-member-id="{{ a.id }}">
+                    {{ a.name }}
+                    <button onclick="removeAttendee('{{ s.id }}', {{ a.id }}, this)" class="text-red-400 hover:text-red-300 ml-1">×</button>
+                </span>
+                {% else %}
+                <span class="text-gray-500 text-xs">참석자 없음</span>
+                {% endfor %}
+            </div>
+            <div class="flex gap-2">
+                <select class="add-attendee-select bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs flex-1">
+                    <option value="">+ 멤버 선택해서 추가...</option>
+                    {% for m in all_members %}
+                    <option value="{{ m.id }}">{{ m.name }} ({{ m.student_id or '학번 없음' }}{% if m.department %} · {{ m.department }}{% endif %})</option>
+                    {% endfor %}
+                </select>
+                <button onclick="addAttendee('{{ s.id }}', this)" class="ops-primary text-black font-bold py-1 px-3 rounded text-xs hover:opacity-80">추가</button>
+            </div>
+        </div>
+    </details>
+</div>

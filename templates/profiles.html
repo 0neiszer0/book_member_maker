@@ -1,44 +1,18 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>멤버 프로필</title>
-    {% include '_tailwind_head.html' %}
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-        :root { --eva-purple: #7A5A3A; --eva-green: #3D5C2E; --bg-dark: #FAF6EC; --card-dark: #FFFCF3; --text-light: #2A241B; --border-dark: #C9B38A; }
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: var(--bg-dark); color: var(--text-light); }
-        h1, h2 { font-family: 'Pretendard', 'Noto Sans KR', sans-serif;  }
-        .eva-card { background-color: var(--card-dark); border: 1px solid var(--border-dark); transition: all 0.2s; }
-        .eva-card:hover { transform: translateY(-4px); border-color: var(--eva-green); }
-    </style>
-    {% include '_app_theme_head.html' %}
-</head>
-<body class="p-4 md:p-8">
-    <div class="container mx-auto max-w-5xl">
-        <header class="flex justify-between items-center mb-8">
-            <h1 class="text-3xl font-bold text-eva-green">Member Profiles</h1>
-            <a href="{{ url_for('main_index') }}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md">메인으로</a>
-        </header>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {% for member in all_members %}
-            <a href="{{ url_for('profile_detail_page', member_id=member.id) }}" class="block">
-                <div class="eva-card p-6 rounded-lg h-full flex flex-col">
-                    <div class="flex items-center mb-4">
-                        {% if member.profile_pic %}<img src="{{ member.profile_pic }}" alt="{{ member.name }}" loading="lazy" decoding="async" class="w-16 h-16 rounded-full mr-4 border-2 border-eva-purple object-cover">{% else %}<div class="w-16 h-16 rounded-full mr-4 border-2 border-eva-purple bg-[#f2ebd8] text-[#3d5c2e] flex items-center justify-center text-xl font-extrabold" aria-hidden="true">{{ (member.name or '회')[0] }}</div>{% endif %}
-                        <div>
-                            <h2 class="text-xl font-bold">{{ member.name }}</h2>
-                        </div>
-                    </div>
-                    <div class="flex-grow">
-                        <p class="text-sm text-gray-300 italic">"{{ member.profile_intro or '한 줄 소개가 없습니다.' }}"</p>
-                    </div>
-                </div>
-            </a>
-            {% endfor %}
-        </div>
-    </div>
-</body>
-</html>
+{% extends 'lms_base.html' %}
+{% set lms_page = 'member' %}
+{% set lms_title = '멤버 프로필' %}
+{% block title %}멤버 프로필 - 책 먹는 호반우{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_member.css') }}">{% endblock %}
+{% block content %}
+<div class="lms-member-page">
+  <header class="lms-member-heading"><h1>멤버 프로필</h1><a href="{{ url_for('main_index') }}" class="lms-button">메인으로</a></header>
+  <ul class="lms-member-profiles">
+    {% for member in all_members %}
+    <li><a class="lms-member-profile-link" href="{{ url_for('profile_detail_page', member_id=member.id) }}">
+      {% if member.profile_pic %}<img src="{{ member.profile_pic }}" alt="" loading="lazy" decoding="async" class="lms-member-avatar">{% else %}<span class="lms-member-avatar" aria-hidden="true">{{ (member.name or '회')[0] }}</span>{% endif %}
+      <div><h2>{{ member.name }}</h2><p class="lms-member-muted">{{ member.profile_intro or '한 줄 소개가 없습니다.' }}</p></div>
+    </a></li>
+    {% else %}<li class="lms-empty">등록된 멤버 프로필이 없습니다.</li>{% endfor %}
+  </ul>
+</div>
+{% endblock %}

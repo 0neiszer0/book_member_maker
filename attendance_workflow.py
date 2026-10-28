@@ -5,6 +5,17 @@ import re
 from seminar_cycle import cycle_monday
 
 
+def confirmed_history_session_ids(histories):
+    """Legacy confirmation is valid even before the session snapshot was added."""
+    return {str(row['seminar_session_id']) for row in histories
+            if row.get('seminar_session_id') and row.get('attendance_confirmed_at')}
+
+
+def attendance_is_confirmed(seminar, confirmed_history_ids=()):
+    return bool(seminar.get('attendance_confirmed_at')
+                or str(seminar.get('id')) in confirmed_history_ids)
+
+
 def match_roster_rows(rows, members):
     """Match IDs/names exactly. Never choose the first ambiguous member."""
     by_name, by_student = defaultdict(list), defaultdict(list)
@@ -92,11 +103,15 @@ def build_term_attendance(members, histories, sessions, events, event_attendees,
     def in_range(day):
         return bool(day and start <= str(day)[:10] <= end and str(day)[:10] <= today_iso)
 
-    def add(key, day, title, kind, ids, credit_key):
+    def add(key, day, title, kind, ids, credit_key, seminar=None):
         if not in_range(day) or key in seen_columns:
             return
         seen_columns.add(key)
-        columns.append({'key': key, 'date': str(day)[:10], 'title': title, 'kind': kind})
+        column = {'key': key, 'date': str(day)[:10], 'title': title, 'kind': kind}
+        if seminar:
+            column.update(session_id=seminar.get('id'), week_id=seminar.get('seminar_week_id'),
+                          day_type=seminar.get('day_type'))
+        columns.append(column)
         for mid in set(ids):
             if mid not in by_id:
                 continue
@@ -108,7 +123,7 @@ def build_term_attendance(members, histories, sessions, events, event_attendees,
             day = item.get('meeting_date')
             if in_range(day):
                 add('session:' + str(item['id']), day, item.get('book_title') or '세미나', 'seminar',
-                    [int(i) for i in item['actual_member_ids'] if int(i) not in excluded_by_session[str(item['id'])]], 'week:' + cycle_monday(day).isoformat())
+                    [int(i) for i in item['actual_member_ids'] if int(i) not in excluded_by_session[str(item['id'])]], 'week:' + cycle_monday(day).isoformat(), item)
     for row in histories:
         if not row.get('attendance_confirmed_at') or not in_range(row.get('date')):
             continue
@@ -125,7 +140,7 @@ def build_term_attendance(members, histories, sessions, events, event_attendees,
                 elif len(matches) > 1:
                     warnings.add(f'{name}: 과거 기록의 동명이인을 확인해주세요.')
         add('history:' + str(row['id']), row['date'], row.get('book_title') or '세미나', 'seminar',
-            ids, 'week:' + cycle_monday(row['date']).isoformat())
+            ids, 'week:' + cycle_monday(row['date']).isoformat(), linked)
     event_ids = defaultdict(list)
     for row in event_attendees:
         event_ids[str(row['event_id'])].append(int(row['member_id']))

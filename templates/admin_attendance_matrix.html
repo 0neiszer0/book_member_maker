@@ -1,68 +1,25 @@
-<!DOCTYPE html>
-<html lang="ko">
+{% extends 'lms_admin_base.html' %}
+{% from '_lms_icons.html' import icon %}
+{% set lms_page = 'operations' %}
+{% set lms_title = '출석 매트릭스' %}
+{% block title %}출석 매트릭스{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_operations.css') }}">{% endblock %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>출석 매트릭스</title>
-    {% include '_tailwind_head.html' %}
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
-    <style>
-        :root { --eva-purple:#7A5A3A; --eva-green:#3D5C2E; --bg-dark:#FAF6EC; --card-dark:#FFFCF3; --text-light:#2A241B; --border-dark:#C9B38A; }
-        body { font-family:'Noto Sans KR', sans-serif; background:var(--bg-dark); color:var(--text-light); }
-        h1, h2 { font-family:'Pretendard', 'Noto Sans KR', sans-serif; }
-        .eva-card { background:var(--card-dark); border:1px solid var(--border-dark); }
-        .eva-input { background:var(--bg-dark); border:1px solid var(--border-dark); color:var(--text-light); }
-        .eva-input:focus { border-color:var(--eva-green); outline:none; }
-        .text-eva-green { color:var(--eva-green); }
-        .bg-eva-green { background:var(--eva-green); }
-
-        .matrix-table { border-collapse: collapse; font-size: 0.78rem; }
-        .matrix-table th, .matrix-table td {
-            border: 1px solid var(--line);
-            padding: 0.35rem 0.45rem;
-            text-align: center;
-            white-space: nowrap;
-        }
-        .matrix-table th {
-            background: var(--walnut-tint);
-            color: var(--ink);
-            position: sticky;
-            top: 0;
-            z-index: 5;
-        }
-        .matrix-table th.row-header,
-        .matrix-table td.row-header {
-            position: sticky;
-            left: 0;
-            z-index: 6;
-            background: var(--card-dark);
-            text-align: left;
-        }
-        .matrix-table th.row-header { z-index: 7; background:var(--walnut-tint); }
-        .cell-O { color: var(--eva-green); font-weight: 700; }
-        .cell-X { color: #756A59; }
-    </style>
-    {% include '_app_theme_head.html' %}
-</head>
-
-<body class="min-h-screen">
-    {% include '_header.html' %}
-    {% include '_admin_sidebar.html' %}
-
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-full">
+{% block content %}
+<div class="lms-operations">
+<div class="lms-operations-body">
         <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
-            <h1 class="text-2xl sm:text-3xl font-bold text-eva-green"><i data-lucide="chart-column" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 출석 매트릭스</h1>
-            <a href="{{ url_for('admin_dashboard') }}" class="text-sm text-gray-400 hover:text-eva-green">← 관리자 대시보드</a>
+            <h1 class="text-2xl sm:text-3xl font-bold ops-accent">{{ icon('dashboard',18) }} 출석 매트릭스</h1>
+            <a href="{{ url_for('admin_dashboard') }}" class="text-sm text-gray-400 hover:ops-accent">← 관리자 대시보드</a>
         </div>
 
         <!-- 필터 -->
-        <form method="get" class="eva-card rounded-lg p-4 mb-4">
+        <form method="get" class="ops-panel rounded-lg p-4 mb-4">
             <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
                 <div class="md:col-span-2">
                     <label class="block text-xs text-gray-400 mb-1">학기 선택 (자동으로 기간 채움)</label>
                     <div class="flex gap-2">
-                        <select name="term_id" class="eva-input flex-1 rounded px-3 py-2 text-sm">
+                        <select name="term_id" class="ops-field flex-1 rounded px-3 py-2 text-sm">
                             <option value="">직접 기간 지정</option>
                             {% for t in terms %}
                             <option value="{{ t.id }}" {% if t.id == term_id %}selected{% endif %}>{{ t.name }} ({{ t.start_date }}~{{ t.end_date }})</option>
@@ -75,18 +32,18 @@
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">시작일</label>
                     <input type="date" name="start_date" value="{{ start_date }}"
-                        class="eva-input w-full rounded px-3 py-2 text-sm">
+                        class="ops-field w-full rounded px-3 py-2 text-sm">
                 </div>
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">종료일</label>
                     <input type="date" name="end_date" value="{{ end_date }}"
-                        class="eva-input w-full rounded px-3 py-2 text-sm">
+                        class="ops-field w-full rounded px-3 py-2 text-sm">
                 </div>
                 <div class="flex gap-2">
                     <button type="submit"
-                        class="bg-eva-green text-black font-bold py-2 px-3 rounded text-sm hover:opacity-80 flex-1">조회</button>
+                        class="ops-primary text-black font-bold py-2 px-3 rounded text-sm hover:opacity-80 flex-1">조회</button>
                     <a href="{{ url_for('admin_attendance_matrix_export', term_id=term_id, start_date=start_date, end_date=end_date) }}"
-                        class="bg-blue-600 text-white font-bold py-2 px-3 rounded text-sm hover:bg-blue-700 text-center"><i data-lucide="download" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 엑셀</a>
+                        class="bg-blue-600 text-white font-bold py-2 px-3 rounded text-sm hover:bg-blue-700 text-center">{{ icon('document',18) }} 엑셀</a>
                 </div>
             </div>
             <p class="text-xs text-gray-500 mt-2">
@@ -102,7 +59,7 @@
             </label>
             <label class="flex items-center gap-2 text-gray-300">
                 정렬:
-                <select id="sortMode" class="eva-input rounded px-2 py-1 text-sm">
+                <select id="sortMode" class="ops-field rounded px-2 py-1 text-sm">
                     <option value="name">이름순</option>
                     <option value="count">출석수순</option>
                 </select>
@@ -110,7 +67,7 @@
         </div>
 
         <!-- 매트릭스 -->
-        <div class="eva-card rounded-lg p-3 overflow-auto" style="max-height:75vh;">
+        <div class="ops-panel rounded-lg p-3 overflow-auto" style="max-height:75vh;">
             {% if weeks %}
             <table class="matrix-table">
                 <thead>
@@ -123,7 +80,7 @@
                             <div class="text-[9px] text-gray-500 max-w-[80px] truncate">{{ w.title }}</div>
                         </th>
                         {% endfor %}
-                        <th class="text-eva-green">합계</th>
+                        <th class="ops-accent">합계</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -142,7 +99,7 @@
                             {{ 'O' if attended else 'X' }}
                         </td>
                         {% endfor %}
-                        <td class="font-bold text-eva-green">{{ cnt }}</td>
+                        <td class="font-bold ops-accent">{{ cnt }}</td>
                     </tr>
                     {% endif %}
                     {% endfor %}
@@ -160,34 +117,38 @@
 
     <!-- 학기 추가 모달 -->
     <div id="termModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-        <div class="eva-card rounded-xl p-6 w-full max-w-sm shadow-2xl">
+        <div class="ops-panel rounded-xl p-6 w-full max-w-sm shadow-2xl">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-bold text-eva-green">학기 추가</h3>
+                <h3 class="text-lg font-bold ops-accent">학기 추가</h3>
                 <button type="button" id="closeTermModal" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
             </div>
             <div class="space-y-3">
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">학기명 <span class="text-red-400">*</span></label>
-                    <input id="tName" type="text" class="eva-input w-full rounded px-3 py-2 text-sm" placeholder="예: 2026-2학기">
+                    <input id="tName" type="text" class="ops-field w-full rounded px-3 py-2 text-sm" placeholder="예: 2026-2학기">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs text-gray-400 mb-1">첫 세미나 날짜 <span class="text-red-400">*</span></label>
-                        <input id="tStart" type="date" class="eva-input w-full rounded px-3 py-2 text-sm">
+                        <input id="tStart" type="date" class="ops-field w-full rounded px-3 py-2 text-sm">
                     </div>
                     <div>
                         <label class="block text-xs text-gray-400 mb-1">마지막 세미나 날짜 <span class="text-red-400">*</span></label>
-                        <input id="tEnd" type="date" class="eva-input w-full rounded px-3 py-2 text-sm">
+                        <input id="tEnd" type="date" class="ops-field w-full rounded px-3 py-2 text-sm">
                     </div>
                 </div>
                 <p class="text-xs text-gray-500">기간 내 월/목 세미나 회차가 자동 생성되고, 세미나 투표에서도 바로 사용할 수 있습니다.</p>
                 <button type="button" id="saveTermBtn"
-                    class="w-full bg-eva-green text-black font-bold py-2 rounded hover:opacity-80">추가하기</button>
+                    class="w-full ops-primary text-black font-bold py-2 rounded hover:opacity-80">추가하기</button>
             </div>
         </div>
     </div>
 
-    <script>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
         document.querySelector('select[name=term_id]')?.addEventListener('change', function() {
             if (this.value) {
                 document.querySelector('input[name=start_date]').value = '';
@@ -237,5 +198,5 @@
         document.getElementById('hideInactive').addEventListener('change', applyDisplayOptions);
         document.getElementById('sortMode').addEventListener('change', applyDisplayOptions);
     </script>
-</body>
-</html>
+
+{% endblock %}

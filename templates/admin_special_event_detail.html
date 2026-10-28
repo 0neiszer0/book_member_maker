@@ -1,53 +1,31 @@
-<!DOCTYPE html>
-<html lang="ko">
+{% extends 'lms_admin_base.html' %}
+{% from '_lms_icons.html' import icon %}
+{% set lms_page = 'operations' %}
+{% set lms_title = '스페셜 이벤트' %}
+{% block title %}{{ event.name }} - 스페셜 이벤트{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_operations.css') }}">{% endblock %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ event.name }} - 스페셜 이벤트</title>
-    {% include '_tailwind_head.html' %}
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
-    <style>
-        :root { --eva-purple:#7A5A3A; --eva-green:#3D5C2E; --bg-dark:#FAF6EC; --card-dark:#FFFCF3; --text-light:#2A241B; --border-dark:#C9B38A; }
-        body { font-family:'Noto Sans KR', sans-serif; background:var(--bg-dark); color:var(--text-light); }
-        h1, h2 { font-family:'Pretendard', 'Noto Sans KR', sans-serif; }
-        .eva-card { background:var(--card-dark); border:1px solid var(--border-dark); }
-        .eva-input { background:var(--bg-dark); border:1px solid var(--border-dark); color:var(--text-light); }
-        .eva-input:focus { border-color:var(--eva-green); outline:none; }
-        .text-eva-green { color:var(--eva-green); }
-        .bg-eva-green { background:var(--eva-green); }
-        .member-chip { display:inline-flex; align-items:center; gap:0.4rem; background:rgba(92,122,74,0.12); border:1px solid rgba(61,92,46,0.30); padding:0.25rem 0.6rem; border-radius:999px; font-size:0.78rem; }
-        .member-chip button { color:#ef4444; font-weight:bold; cursor:pointer; }
-    </style>
-    {% include '_app_theme_head.html' %}
-</head>
-
-<body class="min-h-screen">
-    {% include '_header.html' %}
-
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-5xl">
+{% block content %}
+<div class="lms-operations">
+<div class="lms-operations-body">
         <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
-            <h1 class="text-2xl sm:text-3xl font-bold text-eva-green"><i data-lucide="sparkles" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> {{ event.name }}</h1>
-            <a href="{{ url_for('admin_special_events') }}" class="text-sm text-gray-400 hover:text-eva-green">← 스페셜 이벤트 목록</a>
+            <h1 class="text-2xl sm:text-3xl font-bold ops-accent">{{ icon('notice',18) }} {{ event.name }}</h1>
+            <a href="{{ url_for('admin_special_events') }}" class="text-sm text-gray-400 hover:ops-accent">← 스페셜 이벤트 목록</a>
         </div>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% for category, message in messages %}
-        <div class="p-3 mb-4 text-sm rounded-lg border {{ 'bg-green-900/40 text-green-200 border-green-500/40' if category=='success' else 'bg-red-900/40 text-red-200 border-red-500/40' }}">{{ message }}</div>
-        {% endfor %}
-        {% endwith %}
+
 
         <!-- 이벤트 정보 -->
-        <div class="eva-card rounded-lg p-5 mb-6">
-            <h2 class="text-lg font-bold text-eva-green mb-3">이벤트 정보</h2>
+        <div class="ops-panel rounded-lg p-5 mb-6">
+            <h2 class="text-lg font-bold ops-accent mb-3">이벤트 정보</h2>
             <form id="infoForm" class="grid grid-cols-1 md:grid-cols-6 gap-3">
                 <div class="md:col-span-3">
                     <label class="block text-xs text-gray-400 mb-1">이름</label>
-                    <input name="name" value="{{ event.name }}" class="eva-input w-full rounded px-3 py-2 text-sm">
+                    <input name="name" value="{{ event.name }}" class="ops-field w-full rounded px-3 py-2 text-sm">
                 </div>
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">분류</label>
-                    <select name="category" class="eva-input w-full rounded px-3 py-2 text-sm">
+                    <select name="category" class="ops-field w-full rounded px-3 py-2 text-sm">
                         {% for c in ['event','mt','workshop','lecture'] %}
                         <option value="{{ c }}" {% if event.category==c %}selected{% endif %}>{{ c }}</option>
                         {% endfor %}
@@ -55,19 +33,19 @@
                 </div>
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">시작일</label>
-                    <input name="event_date" type="date" value="{{ event.event_date }}" class="eva-input w-full rounded px-3 py-2 text-sm">
+                    <input name="event_date" type="date" value="{{ event.event_date }}" class="ops-field w-full rounded px-3 py-2 text-sm">
                 </div>
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">종료일</label>
-                    <input name="end_date" type="date" value="{{ event.end_date or '' }}" class="eva-input w-full rounded px-3 py-2 text-sm">
+                    <input name="end_date" type="date" value="{{ event.end_date or '' }}" class="ops-field w-full rounded px-3 py-2 text-sm">
                 </div>
                 <div class="md:col-span-3">
                     <label class="block text-xs text-gray-400 mb-1">장소</label>
-                    <input name="location" value="{{ event.location or '' }}" class="eva-input w-full rounded px-3 py-2 text-sm">
+                    <input name="location" value="{{ event.location or '' }}" class="ops-field w-full rounded px-3 py-2 text-sm">
                 </div>
                 <div class="md:col-span-3">
                     <label class="block text-xs text-gray-400 mb-1">학기 연결</label>
-                    <select name="term_id" class="eva-input w-full rounded px-3 py-2 text-sm">
+                    <select name="term_id" class="ops-field w-full rounded px-3 py-2 text-sm">
                         <option value="">없음</option>
                         {% for t in terms %}
                         <option value="{{ t.id }}" {% if t.id==event.term_id %}selected{% endif %}>{{ t.name }}</option>
@@ -76,22 +54,22 @@
                 </div>
                 <div class="md:col-span-6">
                     <label class="block text-xs text-gray-400 mb-1">설명</label>
-                    <textarea name="description" rows="3" class="eva-input w-full rounded px-3 py-2 text-sm">{{ event.description or '' }}</textarea>
+                    <textarea name="description" rows="3" class="ops-field w-full rounded px-3 py-2 text-sm">{{ event.description or '' }}</textarea>
                 </div>
                 <div class="md:col-span-6 text-right">
-                    <button type="submit" class="bg-eva-green text-black font-bold py-2 px-5 rounded text-sm hover:opacity-80">저장</button>
+                    <button type="submit" class="ops-primary text-black font-bold py-2 px-5 rounded text-sm hover:opacity-80">저장</button>
                 </div>
             </form>
         </div>
 
         <!-- 참여자 -->
-        <div class="eva-card rounded-lg p-5">
-            <h2 class="text-lg font-bold text-eva-green mb-3">참여자 ({{ attendees|length }}명)</h2>
+        <div class="ops-panel rounded-lg p-5">
+            <h2 class="text-lg font-bold ops-accent mb-3">참여자 ({{ attendees|length }}명)</h2>
 
             <div class="mb-4">
                 <label class="block text-xs text-gray-400 mb-1">회원 추가 (이름 검색 후 체크)</label>
-                <input id="memberSearch" placeholder="이름으로 검색…" class="eva-input w-full rounded px-3 py-2 text-sm mb-2">
-                <div id="memberPicker" class="max-h-48 overflow-y-auto border border-border-dark rounded p-2 mb-2 text-sm">
+                <input id="memberSearch" placeholder="이름으로 검색…" class="ops-field w-full rounded px-3 py-2 text-sm mb-2">
+                <div id="memberPicker" class="max-h-48 overflow-y-auto border ops-border rounded p-2 mb-2 text-sm">
                     {% for m in all_members %}
                     <label class="block px-2 py-1 hover:bg-gray-800 cursor-pointer">
                         <input type="checkbox" class="mr-2 member-cb" value="{{ m.id }}" data-name="{{ m.name }}">
@@ -100,13 +78,13 @@
                     {% endfor %}
                 </div>
                 <div class="flex gap-2 items-end">
-                    <select id="newRole" class="eva-input rounded px-3 py-2 text-sm">
+                    <select id="newRole" class="ops-field rounded px-3 py-2 text-sm">
                         <option value="attendee">참석자</option>
                         <option value="organizer">주최</option>
                         <option value="speaker">발표</option>
                     </select>
-                    <input id="newNote" placeholder="메모 (선택)" class="eva-input flex-1 rounded px-3 py-2 text-sm">
-                    <button id="addBtn" class="bg-eva-green text-black font-bold py-2 px-4 rounded text-sm hover:opacity-80">+ 추가</button>
+                    <input id="newNote" placeholder="메모 (선택)" class="ops-field flex-1 rounded px-3 py-2 text-sm">
+                    <button id="addBtn" class="ops-primary text-black font-bold py-2 px-4 rounded text-sm hover:opacity-80">+ 추가</button>
                 </div>
             </div>
 
@@ -127,7 +105,11 @@
         </div>
     </div>
 
-    <script>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
     const eventId = "{{ event.id }}";
 
     document.getElementById('infoForm')?.addEventListener('submit', async (e) => {
@@ -176,5 +158,5 @@
         });
     });
     </script>
-</body>
-</html>
+
+{% endblock %}

@@ -1,0 +1,98 @@
+{
+  "verified_on": "2026-10-27",
+  "fonts": [
+    {
+      "file": "Lato-Regular.woff2",
+      "bytes": 182708,
+      "sha256": "983b0caf336e8542214fc17019a4fc5e0360864b92806ca14d55c1fc1c2c5a0f",
+      "names": {
+        "0": "Copyright (c) 2011-2015 by tyPoland Lukasz Dziedzic (http://www.typoland.com/) with Reserved Font Name \"Lato\". Licensed under the SIL Open Font License, Version 1.1 (http://scripts.sil.org/OFL). ",
+        "1": "Lato",
+        "2": "Regular",
+        "5": "Version 2.015; 2015-08-06; http://www.latofonts.com/",
+        "13": "Copyright (c) 2011-2015 by tyPoland Lukasz Dziedzic (http://www.typoland.com/) with Reserved Font Name \"Lato\". Licensed under the SIL Open Font License, Version 1.1 (http://scripts.sil.org/OFL). ",
+        "14": "http://scripts.sil.org/OFL",
+        "16": null,
+        "17": null
+      },
+      "axes": [],
+      "source": "https://raw.githubusercontent.com/instructure/canvas-lms/master/public/fonts/lato/extended/Lato-Regular.woff2",
+      "license": "SIL-OFL-1.1",
+      "license_file": "Lato-OFL.txt",
+      "modifications": "None; official WOFF2 bytes retained.",
+      "observed_public_url": "https://canvas.knu.ac.kr/dist/fonts/lato/extended/Lato-Regular-bd03a2cc27.woff2",
+      "observed_byte_identical": true
+    },
+    {
+      "file": "Lato-Bold.woff2",
+      "bytes": 184912,
+      "sha256": "ae88fc0d7a961832f809527d30bd3983a6866d42f66a56ade23f543681594db6",
+      "names": {
+        "0": "Copyright (c) 2011-2015 by tyPoland Lukasz Dziedzic (http://www.typoland.com/) with Reserved Font Name \"Lato\". Licensed under the SIL Open Font License, Version 1.1 (http://scripts.sil.org/OFL). ",
+        "1": "Lato",
+        "2": "Bold",
+        "5": "Version 2.015; 2015-08-06; http://www.latofonts.com/",
+        "13": "Copyright (c) 2011-2015 by tyPoland Lukasz Dziedzic (http://www.typoland.com/) with Reserved Font Name \"Lato\". Licensed under the SIL Open Font License, Version 1.1 (http://scripts.sil.org/OFL). ",
+        "14": "http://scripts.sil.org/OFL",
+        "16": null,
+        "17": null
+      },
+      "axes": [],
+      "source": "https://raw.githubusercontent.com/instructure/canvas-lms/master/public/fonts/lato/extended/Lato-Bold.woff2",
+      "license": "SIL-OFL-1.1",
+      "license_file": "Lato-OFL.txt",
+      "modifications": "None; official WOFF2 bytes retained.",
+      "observed_public_url": "https://canvas.knu.ac.kr/dist/fonts/lato/extended/Lato-Bold-cccb897485.woff2",
+      "observed_byte_identical": true
+    },
+    {
+      "file": "Lato-Light.woff2",
+      "bytes": 181500,
+      "sha256": "f308e8c0de302ee57cd35b5365a028466300cebdc805c3a0b80c92fff3adbf44",
+      "names": {
+        "0": "Copyright (c) 2011-2015 by tyPoland Lukasz Dziedzic (http://www.typoland.com/) with Reserved Font Name \"Lato\". Licensed under the SIL Open Font License, Version 1.1 (http://scripts.sil.org/OFL). ",
+        "1": "Lato Light",
+        "2": "Regular",
+        "5": "Version 2.015; 2015-08-06; http://www.latofonts.com/",
+        "13": "Copyright (c) 2011-2015 by tyPoland Lukasz Dziedzic (http://www.typoland.com/) with Reserved Font Name \"Lato\". Licensed under the SIL Open Font License, Version 1.1 (http://scripts.sil.org/OFL). ",
+        "14": "http://scripts.sil.org/OFL",
+        "16": "Lato",
+        "17": "Light"
+      },
+      "axes": [],
+      "source": "https://raw.githubusercontent.com/instructure/canvas-lms/master/public/fonts/lato/extended/Lato-Light.woff2",
+      "license": "SIL-OFL-1.1",
+      "license_file": "Lato-OFL.txt",
+      "modifications": "None; official WOFF2 bytes retained."
+    },
+    {
+      "file": "NotoSansKR.woff2",
+      "bytes": 3908564,
+      "sha256": "f236f8a20da1fc3c1fe5e99eb7cbb3a5e2e6f6004d805392bbbe28863b2d75e4",
+      "names": {
+        "0": "(c) 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'.",
+        "1": "Noto Sans KR Thin",
+        "2": "Regular",
+        "5": "Version 2.004-H2;hotconv 1.0.118;makeotfexe 2.5.65603",
+        "13": "This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a FAQ at: https://scripts.sil.org/OFL",
+        "14": "http://scripts.sil.org/OFL",
+        "16": "Noto Sans KR",
+        "17": "Thin"
+      },
+      "axes": [
+        {
+          "tag": "wght",
+          "min": 100.0,
+          "default": 100.0,
+          "max": 900.0
+        }
+      ],
+      "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanskr/NotoSansKR%5Bwght%5D.ttf",
+      "source_sha256": "194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252",
+      "license": "SIL-OFL-1.1",
+      "license_file": "NotoSansKR-OFL.txt",
+      "modifications": "TTF to WOFF2 container conversion with fontTools 4.67.0 and Brotli 1.2.1; no glyph subsetting or name changes; character map and glyph order verified.",
+      "reference_glyph_parity": "Not established: live inventory observed Lato and icons, not Korean glyph source."
+    }
+  ]
+}

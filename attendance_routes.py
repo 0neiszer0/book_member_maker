@@ -5,7 +5,8 @@ import secrets
 from flask import abort, jsonify, render_template, request, session, send_file
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from attendance_workflow import (build_term_attendance, expected_member_ids,
-                                 match_roster_rows, parse_roster_text)
+                                 match_roster_rows, parse_roster_text,
+                                 attendance_is_confirmed, confirmed_history_session_ids)
 from term_membership import scope_members
 
 KST = timezone(timedelta(hours=9))
@@ -62,11 +63,12 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
     def admin_seminar_roster(session_id):
         target, members, audit, mode, eligible, planned, no_shows = roster_context(session_id)
         input_ids = sorted(set(eligible) - set(planned)) if mode == 'absence' else planned
-        actual = target.get('actual_member_ids')
+        histories = db().table('history').select('seminar_session_id,present,actual_member_ids,attendance_confirmed_at') \
+            .eq('seminar_session_id', session_id).execute().data or []
+        target['attendance_confirmed'] = attendance_is_confirmed(target, confirmed_history_session_ids(histories))
+        actual = target.get('actual_member_ids') if target.get('attendance_confirmed_at') else None
         if actual is None:
             actual = sorted(set(planned) - no_shows)
-            histories = db().table('history').select('present,actual_member_ids,attendance_confirmed_at') \
-                .eq('seminar_session_id', session_id).execute().data or []
             confirmed = [h for h in histories if h.get('attendance_confirmed_at')]
             if confirmed:
                 known_ids = set()
@@ -253,9 +255,9 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
                                        start, end, term.get('attendance_minimum', 3), datetime.now(KST).date(), no_shows)
         report['events'] = events
         report['roster_initialized'] = bool(term.get('roster_initialized_at'))
+        confirmed_ids = confirmed_history_session_ids(histories)
         report['pending_sessions'] = [s for s in sessions if s['meeting_date'] <= datetime.now(KST).date().isoformat()
-                                      and not s.get('attendance_confirmed_at')
-                                      and not any(h.get('attendance_confirmed_at') and h.get('seminar_session_id') == s['id'] for h in histories)]
+                                      and not attendance_is_confirmed(s, confirmed_ids)]
         return terms, term, report
 
     @app.get('/admin/term_attendance')
@@ -327,6 +329,22 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
         terms, term, report = term_report(request.args.get('term_id'))
         mine = next((m for m in (report or {}).get('members', []) if int(m['id']) == int(session['user_id'])), None)
         columns = [c for c in (report or {}).get('columns', []) if mine and report['matrix'].get(mine['id'], {}).get(c['key'])]
+        weeks = db().table('seminar_weeks').select('id,book_title,week_start').eq('term_id', term['id']).order('week_start').execute().data or [] if term else []
+        week_by_id = {str(w['id']): (index, w) for index, w in enumerate(weeks, 1)}
+        for column in columns:
+            number, week = week_by_id.get(str(column.get('week_id')), (None, {}))
+            column['week_number'] = number
+            if week.get('book_title'):
+                column['title'] = week['book_title']
+            column['week_span'] = 1
+        # Merge only adjacent rows for the same real week; keep each session's ID/date.
+        previous = None
+        for column in columns:
+            if previous and column.get('week_number') and column.get('week_id') == previous.get('week_id'):
+                previous['week_span'] += 1
+                column['week_span'] = 0
+            else:
+                previous = column
         return render_template('my_term_attendance.html', terms=terms, term=term, mine=mine, columns=columns,
                                minimum=(report or {}).get('minimum', 3))
 

@@ -1,23 +1,10 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}게시판{% endblock %} - 책 먹는 호반우</title>
-    {% include '_tailwind_head.html' %}
-    {% include '_app_theme_head.html' %}
-</head>
-<body class="min-h-screen">
-    {% include '_header.html' %}
-    {% if request.endpoint and request.endpoint.startswith('boards.admin') %}{% include '_admin_sidebar.html' %}{% endif %}
-    <main class="max-w-5xl mx-auto px-4 py-6 sm:py-8">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% for category, message in messages %}
-        <div class="mb-4 rounded-xl border px-4 py-3 text-sm {% if category == 'danger' %}border-red-300 bg-red-50 text-red-800{% else %}border-green-300 bg-green-50 text-green-800{% endif %}">{{ message }}</div>
-        {% endfor %}
-        {% endwith %}
-        {% block content %}{% endblock %}
-    </main>
-    {% block scripts %}{% endblock %}
-</body>
-</html>
+{% extends 'lms_base.html' %}
+{% set classroom_board = board_classroom_term|default(none) %}
+{% set lms_page = 'notices' if classroom_board and board is defined and (board.slug == 'notices' or board.name == '공지사항') else 'boards' %}
+{% set lms_title = board.name if board is defined else '게시판' %}
+{% set course_breadcrumb_label = classroom_board.name if classroom_board else '동아리 게시판' %}
+{% set lms_course = classroom_board or (board if board is defined else none) %}
+{% set course_breadcrumb_href = url_for('seminars', term_id=classroom_board.id) if classroom_board else (url_for('boards.board_list', slug=board.slug) if board is defined else url_for('boards.index')) %}
+{% block title %}게시판{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_boards.css') }}">{% endblock %}
+{% block course_navigation %}{% if classroom_board %}{% with term=classroom_board %}{% include '_classroom_nav.html' %}{% endwith %}{% else %}<nav class="lms-classroom-nav" aria-label="게시판 메뉴"><p class="lms-term-name">동아리 게시판</p><a href="{{ url_for('boards.index') }}">전체 게시판</a>{% for nav_board in nav_boards %}<a href="{{ url_for('boards.board_list', slug=nav_board.slug) }}" {% if board is defined and nav_board.slug == board.slug %}aria-current="page"{% endif %}>{{ nav_board.name }}</a>{% else %}{% if board is defined %}<a href="{{ url_for('boards.board_list', slug=board.slug) }}" aria-current="page">{{ board.name }}</a>{% endif %}{% endfor %}{% if session.user_role == 'admin' %}<a href="{{ url_for('boards.admin_index') }}">게시판 관리</a>{% endif %}</nav>{% endif %}{% endblock %}

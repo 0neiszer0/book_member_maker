@@ -1,51 +1,43 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>조 편성 결과 - 책 먹는 호반우</title>
-    {% include '_tailwind_head.html' %}{% include '_app_theme_head.html' %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='group_editor.css') }}">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+{% extends 'lms_admin_base.html' %}
+{% from '_lms_icons.html' import icon %}
+{% set lms_title = '조 편성 결과' %}
+{% set lms_page = 'groups' %}
+{% block title %}조 편성 결과 - 책 먹는 호반우{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='lms_groups.css') }}">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="{{ url_for('static', filename='group_drag.js') }}"></script>
     <script src="{{ url_for('static', filename='group_editor.js') }}"></script>
-    <style>
-        .solutions-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:1rem; width:100%; }
-        .result-card-combined { min-width:0; padding:clamp(.8rem,2vw,1.5rem); }
-        #image-modal { display:none;position:fixed;z-index:1100;inset:0;overflow:auto;background:rgba(0,0,0,.9);padding:1rem;align-items:center;justify-content:center;flex-direction:column;gap:.8rem; }
-        #image-modal-content { max-width:100%;max-height:76vh;object-fit:contain;background:#faf6ec; }
-        #modal-caption { color:#fff;text-align:center;font-size:1rem; }
-        #modal-download { padding:.8rem 1rem;border-radius:10px;background:#5c7a4a;color:white;font-weight:800; }
-        #modal-close { position:absolute;top:8px;right:16px;background:#242424;color:#fff;border:0;border-radius:8px;min-width:44px;min-height:44px;font-size:30px; }
-    </style>
-</head>
-<body class="min-h-screen">
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
-        <div class="group-result-heading mb-6"><h1 class="text-3xl font-bold text-eva-green">조 편성 결과</h1><a href="/making_team" class="bg-gray-600 text-white font-bold py-2 px-4 rounded-md">다시 편성하기</a></div>
+{% endblock %}
+{% block content %}
+<div class="groups-page">
+<div class="  groups-p-4 groups-sm-p-6 groups-lg-p-8">
+        <div class="group-result-heading groups-mb-6"><h1 class="  groups-accent">조 편성 결과</h1><a href="/making_team" class="groups-font-bold groups-py-2 groups-px-4 groups-rounded-md lms-button">다시 편성하기</a></div>
         <section>
-            <h2 class="text-2xl font-semibold mb-6 text-eva-green">최적화된 조 편성 추천안</h2>
+            <h2 class="  groups-mb-6 groups-accent">최적화된 조 편성 추천안</h2>
             {% if combined_solutions %}
             <div class="solutions-grid">
                 {% for result in combined_solutions %}
-                <article class="eva-card mb-6 rounded-lg result-card-combined">
-                    <div class="group-result-heading mb-3"><h3 class="text-lg font-bold text-eva-green">추천안 {{ loop.index }} <span class="text-sm text-gray-500">· 총 <span class="result-total-count">{{ present|length }}</span>명 / <span class="result-group-count">{{ result.groups|length }}</span>개 조</span></h3><span class="text-sm font-semibold px-3 py-1 rounded-full">총점: {{ result.score }}</span></div>
-                    <p class="text-sm text-gray-500 mb-3">세부 점수 (성비, 새만남, 발제자, 선호도): {{ result.details|join(', ') }}</p>
+                <article class="groups-panel groups-mb-6 groups-rounded-lg result-card-combined">
+                    <div class="group-result-heading groups-mb-3"><h3 class="  groups-accent">추천안 {{ loop.index }} <span class="groups-text-sm groups-muted">· 총 <span class="result-total-count">{{ present|length }}</span>명 / <span class="result-group-count">{{ result.groups|length }}</span>개 조</span></h3><span class="groups-text-sm groups-font-semibold groups-px-3 groups-py-1 groups-rounded-full">총점: {{ result.score }}</span></div>
+                    <p class="groups-text-sm groups-muted groups-mb-3">세부 점수 (성비, 새만남, 발제자, 선호도): {{ result.details|join(', ') }}</p>
                     <div class="group-editor-mount" data-groups='{{ result.groups|tojson }}'></div>
                     <div class="group-editor-actions button-group-view">
-                        <button type="button" class="eva-button bg-green-600 text-white rounded-lg save-groups-btn" data-groups='{{ result.groups|tojson }}'>이 추천안으로 확정</button>
-                        <button type="button" class="eva-button bg-gray-600 text-white rounded-lg capture-groups-btn" data-groups='{{ result.groups|tojson }}'>공지 이미지 만들기</button>
+                        <button type="button" class="groups-rounded-lg save-groups-btn lms-button lms-button-primary" data-groups='{{ result.groups|tojson }}'>이 추천안으로 확정</button>
+                        <button type="button" class="groups-rounded-lg capture-groups-btn lms-button" data-groups='{{ result.groups|tojson }}'>공지 이미지 만들기</button>
                     </div>
                 </article>
                 {% endfor %}
             </div>
             {% else %}
-            <div class="eva-card p-6 rounded-lg"><p>편성 결과를 찾지 못했습니다. 인원과 조건을 확인한 뒤 다시 시도해주세요.</p></div>
+            <div class="groups-panel groups-p-6 groups-rounded-lg"><p>편성 결과를 찾지 못했습니다. 인원과 조건을 확인한 뒤 다시 시도해주세요.</p></div>
             {% endif %}
         </section>
     </div>
     <div id="image-modal" role="dialog" aria-modal="true" aria-label="조 편성 결과 이미지">
         <button type="button" id="modal-close" aria-label="이미지 닫기">×</button><img id="image-modal-content" alt="조 편성 결과 미리보기"><div id="modal-caption">이미지를 길게 누르거나 아래 버튼으로 저장하세요.</div><a id="modal-download" download="책먹는호반우-조편성.png">PNG 이미지 다운로드</a>
     </div>
-    {% include '_bug_report_widget.html' %}
+
     <script id="group-result-data" type="application/json">{{ {'present': present, 'facilitators': facilitators, 'groupNames': group_names, 'meetingHistory': meeting_history, 'genders': member_genders, 'seminarSessionId': seminar_session_id, 'date': meeting_date, 'bookTitle': book_title}|tojson }}</script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -105,6 +97,5 @@
             document.addEventListener('keydown', event => { if (event.key === 'Escape') close(); });
         });
     </script>
-    {% include '_icons.html' %}
-</body>
-</html>
+</div>
+{% endblock %}

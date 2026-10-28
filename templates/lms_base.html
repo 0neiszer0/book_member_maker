@@ -1,0 +1,26 @@
+{% from '_lms_icons.html' import icon %}
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+{% if session.user_role %}<meta name="lms-csrf" content="{{ sensitive_csrf_token() }}">{% endif %}
+<meta name="app-layout" content="canvas"><meta name="color-scheme" content="light"><meta name="theme-color" content="#d20f17">
+<title>{% block title %}책 먹는 호반우{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static',filename='lms.css') }}">
+<link rel="stylesheet" href="{{ url_for('static',filename='lms_feedback.css') }}">
+<script defer src="{{ url_for('static',filename='lms_feedback.js') }}"></script>
+{% block head %}{% endblock %}
+<script defer src="{{ url_for('static',filename='lms_navigation.js') }}"></script>
+</head><body class="lms-page lms-nav-expanded {% if lms_isolated_auth|default(false) %}lms-isolated-auth{% endif %} {% if lms_course %}lms-course-page{% endif %} {% if lms_aside %}lms-has-aside{% endif %} {% if lms_page == 'dashboard' %}lms-dashboard-page{% endif %}" data-lms-page="{{ lms_page|default('content') }}">
+<a class="lms-skip" href="#lms-content">본문으로 건너뛰기</a>
+{% if not lms_isolated_auth|default(false) %}{% include '_lms_navigation.html' %}
+<div class="lms-mobile-header"><button type="button" data-lms-menu aria-label="전역 메뉴 열기">{{ icon('menu') }}</button><div class="lms-mobile-heading">{% if lms_course %}<span class="lms-mobile-course-name">{{ course_breadcrumb_label|default(lms_course.name) }}</span>{% endif %}<span>{{ lms_title|default('책 먹는 호반우') }}</span></div>{% if lms_course %}<button type="button" data-lms-course-toggle aria-label="강의실 메뉴 열기">{{ icon('chevron') }}</button>{% endif %}</div>
+{% endif %}<div class="lms-wrapper">
+{% if lms_page != 'dashboard' and not lms_isolated_auth|default(false) %}<header class="lms-breadcrumb"><button type="button" data-lms-course-toggle aria-label="강의실 메뉴 접기" aria-expanded="true">{{ icon('menu') }}</button><nav aria-label="현재 위치"><a href="{{ course_breadcrumb_href|default(url_for('seminars',term_id=lms_course.id) if lms_course else url_for('main_index')) }}">{% if lms_course %}{{ course_breadcrumb_label|default(lms_course.name) }}{% else %}책 먹는 호반우{% endif %}</a><span aria-hidden="true">›</span><span>{{ lms_title|default('') }}</span></nav></header>{% endif %}
+<div class="lms-columns">
+{% if lms_course %}<aside class="lms-course-menu" id="lms-course-menu">{% block course_navigation %}{% with term=lms_course %}{% include '_classroom_nav.html' %}{% endwith %}{% endblock %}</aside>{% endif %}
+<main class="lms-content" id="lms-content">
+{% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<p class="lms-alert" role="status">{{ message }}</p>{% endfor %}{% endwith %}
+{% block content %}{% endblock %}</main>
+{% if lms_aside %}<aside class="lms-right-panel">{% block aside %}{% endblock %}</aside>{% endif %}
+</div></div>
+{% if not lms_isolated_auth|default(false) %}{% include '_lms_feedback.html' %}{% endif %}
+{% block scripts %}{% endblock %}
+</body></html>
