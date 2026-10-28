@@ -1,7 +1,12 @@
 # 미니 PC 이전 진행 상태
 
-최신 상태(2026-10-28 16:25 KST 이후): 새 도메인 DNS 반영/Cloudflare 활성화 및 Tunnel 공개 HTTPS·원본 보호·GET 검증 통과. 첫 화면3회 중앙값 Funnel411ms→Tunnel159ms, health439ms→221ms. 결과 outputs/origin-verification.json.
-knu-read.xyz Custom Domain/Worker 원본 및 기존 링크 리다이렉트/VM 공개 URL·카카오 콜백 전환안 준비. Worker 테스트6개/최종dry-run 및 VM URL변경read-only 검증 통과. 실제 공개 전환은 최종 승인 대기이며 운영 Worker69847a91·앱8e290f7 유지. 상세 docs/MINIPC_DOMAIN_TUNNEL.md 최신 항목 우선.
+최신 완료(2026-10-28 16:46 KST): https://knu-read.xyz 실제 운영 전환 및 Chrome 카카오 로그인→관리자 화면 성공. 기존 workers.dev 링크는 새 주소302 이동. HTTP는HTTPS308. 사용자 최종 전환 승인 적용 완료.
+현재 웹 경로: knu-read.xyz→Worker www/정적CDN→origin.knu-read.xyz→Cloudflare Tunnel→Ubuntu앱. Worker a9a69259-ee5b-4cb4-bc44-2fd67c39f491(소스1909d4c), VM 앱8e290f7/UI f946824 유지·clean. 카카오 기존콜백6개+새콜백1개 저장.
+공개 검증17/17 통과, 앱/Tunnel active/enabled, 브라우저 error/warn0. 공개 첫 화면 TTFB중앙값252ms(3회). DB업무데이터/스키마·Render·GitHub main·UI코드 변경 없음. 복귀용 Funnel/기존카카오콜백/env root600 보존.
+실제 호스트 재부팅 자동복구 시험·DB 이전/백업 등의 원래 잔여 작업은 계속 미완료. 새 도메인/로그인 전환은 완료했으므로 다시 승인받거나 재적용하지 않는다. 상세 docs/MINIPC_DOMAIN_TUNNEL.md, outputs/cutover-verification.json, outputs/domain-tunnel-state.json.
+
+아래는 과거 작업 기록이며 위 최신 상태를 우선한다.
+전환 전 검증(16:25 KST): 첫 화면3회 중앙값 Funnel411ms→Tunnel159ms, health439ms→221ms. 결과 outputs/origin-verification.json. Worker 테스트6개/최종dry-run 및 VM URL변경read-only 검증 통과.
 이전 준비: 사용자가 hosting.kr에서 knu-read.xyz 구매 후 연결 요청. 일반 Cloudflare Tunnel 전환 준비 중.
 hosting.kr 로그인·정상 등록·DNS 레코드 0개 확인. Cloudflare Free zone 준비, 공개 DNS 게시 반영 대기.
 사용자 승인 후 Cloudflare 네임서버 ian.ns.cloudflare.com / riya.ns.cloudflare.com을 hosting.kr에 저장 완료.
