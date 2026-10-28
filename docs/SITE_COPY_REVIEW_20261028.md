@@ -18,6 +18,15 @@
 - 합성 데이터만 쓰는 별도 로컬 서버에서 데스크톱 및 390px 폭의 이용 안내를 확인했다. 화면 배치 정상, 콘솔 경고·오류 없음. Chrome 자동화 확장은 탭 아이콘 위에 도구 배지를 덧씌우므로 원본 favicon 파일도 별도로 확인했다.
 - 운영 위키 본문은 아직 수정하지 않았다. 추적 중인 `wiki_content` 파일은 검토용 소스 사본이며 배포만으로 실제 SQLite 문서가 바뀌지 않는다.
 
+## 배포 사전 검사
+
+- 앱 소스: `0782edf35f6d6d588a6f2875d1f5d61e7f0eb60c`.
+- 정적 digest: `9e7f06974824ac50977661f3ed890ed00a10112b4feea49807da1ec24729d20d`. 현재 파일 54개, 이전 버전 포함 297개 유지.
+- 공식 Wrangler `deploy --dry-run` 통과. 실제 공개 배포는 하지 않았다.
+- Jinja 템플릿 96개 구문 검사와 SVG/PNG MIME 확인 통과.
+- Linux와 같은 LF 바이트로 추출한 로컬 소스에 정적 파일 설치·manifest 검증 통과. Windows 기본 `git archive`의 CRLF 변환으로 첫 예행연습이 실패하여 `git -c core.autocrlf=false archive`로 다시 추출해 해결했다. 실제 배포는 Git 객체의 LF 원본을 사용한다.
+- 준비물: 작업 루트 `work/site-copy-review/{app-source.zip,server-assets.zip,install-assets.py,wiki-changes.json,validation.json}`.
+
 ## Claude 검토
 
 사용자는 Claude에 전체 사이트 검토 요청을 전달하라고 요청했다. 기존과 같은 Claude Code / Opus 5.5 High를 사용하려고 프롬프트와 선별 소스 사본을 준비했다.
