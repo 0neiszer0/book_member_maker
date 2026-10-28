@@ -1,0 +1,16 @@
+[
+  {"title":"대문","file":"01-home.namu"},
+  {"title":"책반우 소개","file":"02-about.namu"},
+  {"title":"처음 참여하기","file":"03-start.namu"},
+  {"title":"정기 세미나","file":"04-seminar.namu"},
+  {"title":"발제문 작성과 제출","file":"05-topics.namu"},
+  {"title":"출석과 불참","file":"06-attendance.namu"},
+  {"title":"동아리방 이용","file":"07-room.namu"},
+  {"title":"게시판과 후기","file":"08-boards.namu"},
+  {"title":"벽돌책과 소모임","file":"09-smallgroups.namu"},
+  {"title":"사이트 이용 안내","file":"10-site.namu"},
+  {"title":"학기별 안내","file":"11-term.namu"},
+  {"title":"자주 묻는 질문","file":"12-faq.namu"},
+  {"title":"위키 편집 안내","file":"13-editing.namu"},
+  {"title":"학기 기록 작성 양식","file":"14-record-template.namu"}
+]
