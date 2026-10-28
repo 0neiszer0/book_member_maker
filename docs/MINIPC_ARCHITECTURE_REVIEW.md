@@ -89,6 +89,35 @@ CDN을 생성하고 자산 준비 후 템플릿을 전환하여 배포 순서를
 - A 배포 보류. B 평가를 권고하지만 아직 사용자 선택/구축 승인 없음. C 도메인 구매 승인 없음.
 - 다음 설계 선택은 무료 주소·베타 평가를 우선할지, 동아리 도메인·일반 Tunnel을 우선할지다.
 
+## Cloudflare Pages 질의 (2026-10-28)
+
+- Pages는 사용 가능하며 정적 UI를 무료 제공할 수 있다. 현재 공식 가격상 Functions를 실행하지
+  않는 정적 요청은 무료·무제한이고, Pages Functions는 Workers 요청/사용량 한도를 공유한다.
+  VPC의 베타 무료 조건과는 별개다. 영구 불변 가격을 보장한다는 뜻은 아니다.
+- 현재 저장소는 Flask/Jinja가 로그인 세션·DB 결과로 HTML을 만드는 구조이며 Tailwind 빌드만 있다.
+  templates 디렉터리를 Pages에 올리는 것만으로 동작하지 않는다.
+- UI만 Pages로 옮기고 API를 계속 Funnel로 호출하면 초기 화면/정적 전송은 개선돼도 데이터와
+  로그인 요청의 Funnel 지연은 남는다. Pages 자체가 사설 미니 PC 연결을 대신해 주지는 않는다.
+- 일반 기능의 API까지 Workers/Pages Functions로 옮겨 Supabase에 직접 연결하면 해당 요청은
+  Funnel을 통과하지 않게 설계할 수 있다. 이는 UI 스타일 변경보다 큰 백엔드 개편이며, 카카오 세션·
+  서버 권한 검사·CSRF·원본 비밀 처리와 배포 동기화 재검증이 필요하다. 서비스 키를 브라우저에 두지 않는다.
+- Python Workers는 공식적으로 Flask를 지원하지만 일반 Linux/Gunicorn 환경과 같지 않다.
+  현재 OR-Tools·pandas·numpy·문서 생성 등 의존성 및 연산 한도를 검증하지 않았으므로 전체 앱을
+  수정 없이 옮길 수 있다고 판단하지 않는다. 조 편성 CP-SAT에는 1.5초 solver 제한도 있다.
+  무거운 계산만 미니 PC에 남기는 분리안은 가능성 검토 대상이며 아직 채택/구현하지 않았다.
+- Cloudflare는 신규 프로젝트에 Pages보다 Workers Static Assets를 권장한다. 현재 Worker에
+  정적 UI/자산을 함께 제공할 수 있으므로 Pages라는 제품으로 옮기는 것 자체가 필수는 아니다.
+  준비본의 run_worker_first=true는 정적 요청도 Worker를 실행하므로 순수 정적 무료 요청과 구분한다.
+- 현재 요청은 구조 논의다. Pages 생성·배포·API 이전·다른 UI 세션 변경 없음.
+
+근거:
+- https://developers.cloudflare.com/pages/functions/pricing/
+- https://developers.cloudflare.com/pages/functions/
+- https://developers.cloudflare.com/workers/best-practices/workers-best-practices/
+- https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/
+- https://developers.cloudflare.com/workers/languages/python/packages/flask/
+- https://developers.cloudflare.com/workers/languages/python/packages/
+
 공식 근거(2026-10-28 확인):
 - https://developers.cloudflare.com/workers-vpc/get-started/
 - https://developers.cloudflare.com/workers-vpc/configuration/vpc-services/
