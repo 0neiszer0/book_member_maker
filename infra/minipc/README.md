@@ -1,9 +1,11 @@
 # 미니 PC 설치·전환 실행 순서
 
 재개 기준: `docs/MINIPC_DEPLOY_STATUS.md`. 모든 운영 변경은 직전 사용자 승인 필요.
-Worker는 https://book-member-maker.alstj816.workers.dev 에 배포되어 현재 미니 PC의
+Worker는 https://www.knu-read.workers.dev 에 배포되어 현재 미니 PC의
 Funnel https://bookmembers-ubuntu.tail97bc40.ts.net 을 가리킨다. 2026-10-28 승인·전환·공개 검증 완료.
-개인 식별자가 없는 새 공개 주소로의 변경은 준비 중이다. 실제 진행 상태는 상태 문서를 따른다.
+개인 식별자가 없는 새 공개 주소로의 변경도 승인·적용·검증 완료. 실제 진행 상태는 상태 문서를 따른다.
+이전 alstj816 주소는 중단됐고 자동 리다이렉트되지 않는다. Cloudflare Worker 이름은 `www`이며,
+후속 배포는 이 이름을 사용한다. 기존 `book-member-maker` 이름으로 새 Worker를 만들지 않는다.
 
 1. 보안 SQL `supabase/migrations/*_minipc_account_security.sql`을 검토한다.
    운영 백업 및 Storage 보존을 확인하고 중복 social_id **그룹 수만** 읽기 조회한다.
