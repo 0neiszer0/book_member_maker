@@ -1,7 +1,9 @@
 # 미니 PC 설치·전환 실행 순서
 
 재개 기준: `docs/MINIPC_DEPLOY_STATUS.md`. 모든 운영 변경은 직전 사용자 승인 필요.
-Worker는 https://book-member-maker.alstj816.workers.dev 에 배포되어 현재 Render를 가리킨다. Funnel은 아직 미발급. 운영 SQL 적용 완료; 상세 승인·검증 결과는 상태 문서를 따른다.
+Worker는 https://book-member-maker.alstj816.workers.dev 에 배포되어 현재 미니 PC의
+Funnel https://bookmembers-ubuntu.tail97bc40.ts.net 을 가리킨다. 2026-10-28 승인·전환·공개 검증 완료.
+개인 식별자가 없는 새 공개 주소로의 변경은 준비 중이다. 실제 진행 상태는 상태 문서를 따른다.
 
 1. 보안 SQL `supabase/migrations/*_minipc_account_security.sql`을 검토한다.
    운영 백업 및 Storage 보존을 확인하고 중복 social_id **그룹 수만** 읽기 조회한다.
@@ -46,12 +48,22 @@ Worker는 https://book-member-maker.alstj816.workers.dev 에 배포되어 현재
    공개 승인 전 `tailscale funnel --help` 확인. 승인 후 `tailscale funnel --bg 5000` 및 상태 확인.
    MagicDNS, HTTPS, funnel node attribute 필요. 서버 노드 키 만료/인증 만료 정책도 사용자 계정에서 확인한다.
    정책 변경이 필요하면 별도 승인. 자동 로그인·무인 복구는 노드 인증이 유효한 동안만 가능하다.
+   현재 승인·적용 상태(2026-10-28): 기존 tail97bc40.ts.net에 bookmembers-ubuntu 가입,
+   전용 tag:bookmembers-server 적용, 이 태그만 funnel 허용, 노드 KeyExpiry=null.
+   `tailscale-policy.fragment.jsonc`는 기존 정책에 병합하는 조각이며 전체 정책을 덮어쓰는 파일이 아니다.
+   HTTPS 인증서 기능 활성화 후 `tailscale funnel --bg --https=443 http://127.0.0.1:5000` 적용 완료.
+   실제 원본: https://bookmembers-ubuntu.tail97bc40.ts.net . Worker 전환 완료와는 별개다.
+   관리 SSH는 고정 Tailscale IP 100.118.28.68, 기존 VM 호스트 키를 엄격 검증하도록 설정했다.
+   Tailscale 장애 때는 Hyper-V에서 현재 DHCP 주소를 읽고 `ssh -F <설정> -o HostName=<현재IP>`로
+   같은 호스트 키를 검증해 접속한다. 최초 LAN IP 172.25.178.73을 영구 주소로 가정하지 않는다.
 7. 로컬 검증: 서비스 상태 + root로 `.venv/bin/python infra/minipc/healthcheck.py`.
    HTTP 200만 확인하지 않고 status=ok와 supabase=alive 둘 다 확인한다.
    Funnel 직접 접근 403, Worker 접근 정상; 대표 SSE/쿠키/리다이렉트·공유 링크 확인.
    운영 회원/예약/글을 테스트로 작성하지 않는다. OAuth는 승인된 관리자 본인으로만 확인.
 8. 전환 승인 후 Worker UPSTREAM_ORIGIN만 실제 Funnel origin으로 변경한다.
-   Render는 보안 패치 및 동일 Worker Origin/OAuth 지원 상태로 보존한다.
+   Render는 보안 패치 버전 bda8a82를 보존한다. 사용자 결정으로 Render의 Worker OAuth 환경 설정은
+   보류됐으므로, Render로 돌아가면 전환 이전과 같이 Render 직접 로그인 주소를 사용해야 한다.
+   두 호스트의 쿠키는 공유되지 않는다. 완전한 Worker OAuth 대체 원본으로 간주하지 않는다.
    실패 시 승인 후 패치된 Render origin으로 되돌린다. 취약한 기준 main으로 롤백하지 않는다.
 9. 재부팅 승인 후 Windows 로그인 없이 VM→Gunicorn→Tailscale/Funnel→Worker 접속을 검증한다.
    전원 복구 후 자동 켜짐은 BIOS 설정 별도 확인 사항이다. 절전·최대절전 정책도 읽기 확인 후

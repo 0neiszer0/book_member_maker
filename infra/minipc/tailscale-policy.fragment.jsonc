@@ -1,0 +1,14 @@
+// Merge these sections into the existing policy only after approval.
+// Preserve every existing grant, SSH rule, and other section.
+// Apply this tag only to the bookmembers-ubuntu server.
+{
+  "tagOwners": {
+    "tag:bookmembers-server": ["autogroup:admin"]
+  },
+  "nodeAttrs": [
+    {
+      "target": ["tag:bookmembers-server"],
+      "attr": ["funnel"]
+    }
+  ]
+}
