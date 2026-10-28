@@ -6,7 +6,11 @@ Windows 부팅 시각 2026-10-27 23:05:09 KST. Hyper-V Enabled, HypervisorPresen
 vmms Running/Automatic, 기존 VM 0개, Default Switch 확인. 결과: work/hyperv-postboot.json.
 원격 main 재조회 bda8a82 유지. 사용자 VM 생성·Ubuntu 설치·SSH 키 등록 승인 후 VM 생성 완료.
 Ubuntu 24.04.5·SSH·앱 실행 환경·보호된 비밀 설정·로컬 앱 가동 완료. Tailscale 패키지 설치 완료,
-BackendState=NeedsLogin. 노드 가입/Funnel 공개/Worker 원본 전환/호스트 자동 복구 검증은 미완료.
+기존 tail97bc40.ts.net에 bookmembers-ubuntu 가입 완료, Running/Online 확인.
+Funnel 공개·서버 전용 권한·인증키 만료 해제 완료. 공개 GET 검증 12항목 통과.
+Worker 원본을 Funnel로 전환 완료, 공개 검증 8항목 통과. 호스트 자동 복구 검증 미완료.
+후속 요청: 개인 식별자가 없는 workers.dev 주소로 계정용 이름과 Worker 이름 변경 준비.
+knu_read의 밑줄은 사용할 수 없어 knu-read 후보 확인 예정. 최종 이름·Cloudflare 대시보드 로그인 대기.
 작업 사본: C:/Users/HOME/Documents/Codex/2026-10-27/markdown-0neiszer0-book-member-maker-pc/work/book_member_maker
 브랜치: codex/minipc-security. 기준 main: 91b7dd6d9d0c6771a1e07c1ea977396f72dae4ce.
 현재 GitHub main 및 Render live: bda8a82e66ac828dd3bfe1971c37e7e98cca356f. 사용자 승인 후 보안 배포 완료. 이후 백업 준비 변경은 로컬에만 있다.
@@ -23,7 +27,7 @@ BackendState=NeedsLogin. 노드 가입/Funnel 공개/Worker 원본 전환/호스
 - 운영에 20261027122104_minipc_account_security.sql 적용. RPC account_request_mutate / protected_member_mutate 및 members_social_id_unique_nonempty 인덱스만 생성. 기존 회원 행 수정 호출 없음. 트랜잭션에 lock_timeout 5s, statement_timeout 30s 적용.
 - 적용 후 카탈로그 확인: 두 함수 SECURITY INVOKER / 빈 search_path / anon·authenticated 실행 불가 / service_role 실행 가능. 인덱스 unique·valid·ready 모두 true. 운영 계정 변경 테스트 없음. execute_sql 직접 적용이므로 migration history 등록 없음. 전체 db push/reset 금지.
 - Cloudflare 제한 OAuth(account:read,user:read,workers_scripts:write) 인증 성공, Windows 키링 보호 저장. 사용자 승인 후 Worker 생성·Secret 저장·공개 GET 검증 완료.
-- Worker 주소: https://book-member-maker.alstj816.workers.dev . 원본은 https://book-member-maker.onrender.com . GET 200, keep-alive status=ok/supabase=alive, no-store, 응답에 원본 비밀 없음.
+- Worker 주소: https://book-member-maker.alstj816.workers.dev . 현재 원본은 https://bookmembers-ubuntu.tail97bc40.ts.net . GET 200, keep-alive status=ok/supabase=alive, no-store. 전환 버전 9081c2bc-b183-4bb1-a6fc-4f5de9616ba1.
 - 원본 비밀은 작업 폴더 work/origin-auth-secret.dpapi에 Windows DPAPI 암호화 저장. 절대 출력/커밋하지 말 것. 향후 VM에 같은 값을 안전하게 전달. Flask/Supabase 기존 키 재사용 안 함.
 - Render My Workspace 읽기 승인 후 확인: srv-d06thnjuibrs73eu1r4g, free/docker/singapore, main 자동 배포 활성. 현재 live SHA는 bda8a82. healthCheckPath 비어 있음. Render 환경변수 변경 없음.
 - Hyper-V 기능 활성화만 승인받아 완료: work/hyperv-enable-result.json의 Success=true/State=Enabled/RestartNeeded=true. 재부팅 아직 안 함.
@@ -34,18 +38,18 @@ BackendState=NeedsLogin. 노드 가입/Funnel 공개/Worker 원본 전환/호스
 
 1. 완료: 사용자 직접 Windows 재부팅 후 Hyper-V 실제 상태 확인. 서비스 자동 복구 검증용 재부팅은 별도 후속 단계.
 2. 완료: VM 생성·Ubuntu 설치·관리 SSH 키 등록, ISO 분리·디스크 부팅·SSH 검증.
-   아래 최신 VM 기록부터 재개한다. 다음은 앱 실행 환경 및 Tailscale 패키지 설치.
+   앱 실행 환경·비밀 이전·서비스 활성화 및 Tailscale 기기 가입도 완료.
 3. 보안 코드 bda8a82는 Render 운영 배포 완료. 다른 UI 작업은 포함하지 않음. UI 통합 시 최신 main을 기준으로 보안 코드와 CSRF를 보존한다. 추가 main push는 새 배포를 일으키므로 승인 필요.
-4. Kakao Worker 콜백 추가 완료. Render의 PUBLIC_BASE_URL/허용 Origin/프록시 콜백/원본 비밀 변경은 필요성 질문 후 보류. 현재 Worker 로그인 시작은 Render 콜백을 사용하므로 Worker OAuth 완료로 표시하지 않는다. VM에서 직접 검증하고 최종 전환 때 복구용 Render 유지 여부를 결정한다.
-5. Ubuntu 서비스 설치·비밀 환경 설정·별도 Tailscale 노드 인증. Funnel 공개 및 필요 정책 변경은 별도 승인. 원본 인증 필수, 직접 Funnel 접근은 403이어야 함.
-6. 동일 보안 버전 양쪽 원본 검증 후 Worker→Funnel 전환 승인. 외부 예약 잡·알림 중복 여부 확인 필요.
-7. 재부팅/로그인 전 자동 복구와 실제 사이트 접근 검증. BIOS 정전 후 자동 켜짐 미확인. Tailscale 노드 인증 만료 정책 확인 필요.
+4. Kakao 기존 Worker 콜백 추가 완료. 미니 PC 전환 후 Worker 콜백·보안 쿠키·로그인 시작 확인. 본인 계정 OAuth 완료는 아직 미검증. 새 공개 주소 변경 시 새 콜백과 앱 URL의 동시 변경 승인이 필요하다. Render의 과도기 OAuth 환경 변경은 계속 보류.
+5. 완료: Ubuntu 서비스·비밀 설정·Tailscale 기기 가입. 별도 승인 후 HTTPS·서버 전용 태그·Funnel 공개·키 만료 해제 완료. 공개 경로에서 인증 없음/오류 403, 정상 키 앱·DB·로그인 시작 정상 확인.
+6. 완료: 공개 Funnel 검증 후 사용자 승인으로 Worker→Funnel 전환, 공개 GET/DB/OAuth 시작 검증 통과. 새 주소 이름 변경 준비 및 실제 OAuth·SSE·공유 링크 확인이 남음.
+7. 재부팅/로그인 전 자동 복구와 실제 사이트 접근 검증. BIOS 정전 후 자동 켜짐 미확인. Tailscale 서버 노드 KeyExpiry=null 확인 완료.
 8. Render 중지/삭제 승인 없음. 복구용으로 유지. 취약한 기준 main으로 롤백하지 않음.
 
 ## 승인 경계와 검증 한계
 
 승인 완료: Hyper-V 기능만, Wrangler 권한·키링, Worker 생성·Secret·공개 GET, My Workspace 읽기, 백업 없이 해당 확장 SQL만.
-미승인/보류: 추가 호스트 재부팅, Render 추가 코드·환경 변경, 추가 Kakao 설정, Funnel 공개, Worker 원본 전환, Render 중지. VM 생성·Ubuntu 설치·관리 SSH 키 등록은 승인됨. bda8a82 보안 코드 배포와 Worker 콜백 1개 추가는 승인받아 완료.
+미승인/보류: 추가 호스트 재부팅, Render 추가 코드·환경 변경, 추가 Kakao 설정, 공개 주소 이름 변경, Render 중지. VM 생성·Ubuntu 설치·관리 SSH 키 등록, 런타임·비밀 이전, 기존 tailnet 가입 및 HTTPS·전용 Funnel·서버 키 만료 해제는 승인받아 완료. bda8a82 보안 코드 배포, Worker 콜백 1개 추가, Worker 원본 Funnel 전환도 승인받아 완료.
 SQL 합성 검증은 PGlite이며 실제 다중 연결 동시성 시험은 하지 않았다. 운영에서는 정의·권한·인덱스 읽기 검증만 했다.
 Supabase CLI migration new는 홈 설정 폴더 권한 오류로 실패하여 로컬 timestamp 파일을 작성했다.
 최초 Wrangler 권한 요청은 자동 승인 검토가 차단했으나 이후 명시적 사용자 승인으로 해소됐다.
@@ -245,3 +249,53 @@ Supabase CLI migration new는 홈 설정 폴더 권한 오류로 실패하여 �
   Chrome 인증 탭(1023347714)을 handoff로 유지. 로그인 화면에는 아직 변화가 없었음.
   사용자 인증 완료 답변 후 먼저 VM status만 조회한다. CLI timeout을 링크 만료로 단정하거나
   불필요하게 새 인증 링크를 생성하지 않는다. 현재 서버 앱/기존 Windows Tailscale은 유지됨.
+
+## Tailscale 연결·공개 Funnel 완료 (2026-10-28)
+
+- 사용자 로그인 완료 후 기존 Windows 계정과 화면의 대상 계정이 일치함을 확인하고,
+  승인된 bookmembers-ubuntu 기기 연결을 완료. Running/Online, tail97bc40.ts.net 일치.
+- 실제 DNS: bookmembers-ubuntu.tail97bc40.ts.net, IPv4 100.118.28.68.
+  초기 KeyExpiry 2027-04-26T00:35:43Z. 사용자가 후속 HTTPS·전용 권한·만료 해제·Funnel 공개 승인.
+- 기존 정책의 grants/ssh 규칙은 그대로 유지하고 tagOwners 및 nodeAttrs만 추가.
+  tag:bookmembers-server의 소유자는 autogroup:admin, funnel 허용 대상은 이 태그뿐.
+  기본 마법사의 autogroup:member 전체 공개 권한 추가는 사용하지 않음.
+- 정책 편집기 장문 입력이 중간에 멈춰 미저장 변경을 취소하고 전체 붙여넣기 사용.
+  재진입한 편집기 전체 문자열이 준비안과 정확히 일치함을 확인한 뒤 저장함.
+- Ubuntu 기기에만 태그 적용. 인증키 만료 해제 후 CLI KeyExpiry=null 확인.
+  Windows minipc 노드는 변경하지 않음. HTTPS 활성화 UI에서 Disable HTTPS 버튼 확인.
+- VM: tailscale funnel --bg --https=443 http://127.0.0.1:5000 성공.
+  status JSON의 TCP443 HTTPS, / Proxy127.0.0.1:5000, AllowFunnel true 확인.
+- Windows DNS는 공개 리졸버 지정에도 MagicDNS 내부 IP를 반환하므로, 외부 DNS-over-HTTPS로
+  공개 릴레이 IP를 읽어 해당 IP에 연결하되 원래 호스트명으로 TLS 검증/SNI를 유지하여 테스트.
+  인증서 검증 비활성화 없음. 원본 비밀은 DPAPI 복호화 메모리→stdin에서만 사용, 리다이렉트 추적 없음.
+- work/vm-funnel-verification.json: 12항목 모두 true. 공개 경로, 누락/오류 키403,
+  홈200·status=ok/supabase=alive, Kakao302·Worker콜백·state, Secure/HttpOnly/Lax,
+  응답 비밀 미노출. 운영 POST·실제 OAuth 완료·회원 변경 없음.
+- 관리 SSH를 고정 Tailscale IP로 실제 접속·기존 호스트 키 대조 후 로컬 설정에 반영.
+  StrictHostKeyChecking=yes. 장애 시 Hyper-V에서 현재 LAN DHCP를 조회해 HostName만 일회 override.
+- 원격 main 재확인 bda8a82 유지. UI 세션 파일은 변경하지 않음.
+- Worker의 로컬 UPSTREAM_ORIGIN은 Funnel 전환안으로 준비, Wrangler4.153.0 dry-run 통과.
+  아직 공개 배포하지 않았고 실제 Worker는 Render 유지. 전환·검증·실패 시 기존 원본 복귀 승인 대기.
+- 공식 문서: https://tailscale.com/docs/reference/tailscale-cli/funnel (--bg 재부팅 복구),
+  https://tailscale.com/docs/features/tags (태그와 키 만료),
+  https://tailscale.com/docs/how-to/set-up-https-certificates (공개 인증서 기록).
+
+## Worker 미니 PC 원본 전환 완료 (2026-10-28 09:47 KST 이후)
+
+- 사용자: '오케이 바로 전환하고'로 Worker 원본 변경·검증·실패 시 기존 원본 복귀 승인.
+- wrangler deploy 성공. Version ID 9081c2bc-b183-4bb1-a6fc-4f5de9616ba1.
+  공개 URL https://book-member-maker.alstj816.workers.dev 유지,
+  UPSTREAM_ORIGIN=https://bookmembers-ubuntu.tail97bc40.ts.net. 기존 Secret 유지.
+- work/worker-cutover-verification.json의 8항목 모두 true: home, app_and_database,
+  no_store, kakao_start, worker_callback, oauth_state, secure_session, no_origin_header.
+  롤백 불필요. Render/DB/Kakao 설정/운영 UI 코드는 변경하지 않음.
+- 사용자가 alstj816과 book-member-maker도 변경 가능한지 요청. Cloudflare 공식 문서에서
+  계정용 subdomain 및 Worker 이름 모두 변경 가능함을 확인. 무료 주소는
+  <worker-name>.<account-subdomain>.workers.dev 구조를 유지해야 함.
+- 사용자 knu_read 희망에 대해 하이픈 knu-read로 대안 안내. www/app/read 중 앞부분 선택 및
+  실제 Cloudflare 사용 가능 여부 확인 예정. 이름 확정·새 callback/앱 URL 준비 후 변경 직전 승인 필요.
+- Chrome Cloudflare 로그인 탭 1023347728은 로그아웃 상태. IAB에 기존 탭 없음.
+  Wrangler 키링 인증은 정상 유지되어 전환은 완료했으나 이름 변경 대시보드 로그인은 사용자 대기.
+- work/pre-recovery-baseline.json 기록. Windows vmms/Tailscale 자동 시작·Running,
+  guest bookmembers/tailscaled enabled/active, NRestarts0. 이번 작업에서 재부팅하지 않음.
+  기존 부팅은 앱/Funnel 구축 전이므로 이 기록만으로 부팅 자동 복구 검증 완료라 표시하지 않는다.
