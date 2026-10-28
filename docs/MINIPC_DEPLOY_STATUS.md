@@ -1,9 +1,11 @@
 # 미니 PC 이전 진행 상태
 
-공유 미리보기 준비(2026-10-28 KST): 추가 수정 요청에 따라 흰 배경에 **책반우 사이트**
-한 줄만 남겼다. 최종 코드7c92f9b, 새 자산 해시69f0d779…0153a99. 홈페이지/로그인/
-책 추천 공유 태그 검증21/21, 정적 자산 검사5개, Wrangler dry-run 통과. **아직 배포하지 않음**.
-기존 운영8e290f7/Worker a9a69259 유지. 실제 적용·앱 재시작·카카오 OG 캐시 갱신 승인 대기.
+공유 미리보기 완료(2026-10-28 17:35 KST): 사용자 승인 후 **책반우 사이트** 한 줄 이미지를
+CDN·미니 PC 운영에 배포하고 앱만 재시작했다. 현재 앱7c92f9b·clean,
+Worker 6eccf7cc-feb0-42f1-9f25-96889aadf622, 자산 해시69f0d779…0153a99.
+공개 검사25/25 통과(이미지·3페이지 OG·DB health·카카오 로그인 시작), 앱/Tunnel active/enabled.
+카카오 공식 도구에서 홈페이지 캐시 1건 초기화 후 새 URL/실제 문구 이미지 재수집·표시 확인.
+이 작업은 완료됐으므로 승인이나 배포를 반복하지 않는다. 복구 기준은 앱8e290f7/Worker a9a69259.
 상세 docs/MINIPC_OG_PREVIEW.md 및 작업 폴더 work/og-release/. Render/main/DB 변경 없음.
 이전 아이콘 시안8f4310a와 그 승인 질문은 더 이상 적용 대상이 아니다.
 속도 현황: 정적 CDN/캐시 및 일반 Cloudflare Tunnel 전환은 운영 반영 완료.
@@ -15,8 +17,8 @@
 전체 회원 출석 보고서 생성 및 학기/회차 중복 조회를 먼저 줄이는 개선안 기록.
 이번에는 분석/기록만 했으며 추가 코드·배포·운영 DB 변경 없음. 상세 docs/MINIPC_PERFORMANCE.md.
 
-최신 완료(2026-10-28 16:46 KST): https://knu-read.xyz 실제 운영 전환 및 Chrome 카카오 로그인→관리자 화면 성공. 기존 workers.dev 링크는 새 주소302 이동. HTTP는HTTPS308. 사용자 최종 전환 승인 적용 완료.
-현재 웹 경로: knu-read.xyz→Worker www/정적CDN→origin.knu-read.xyz→Cloudflare Tunnel→Ubuntu앱. Worker a9a69259-ee5b-4cb4-bc44-2fd67c39f491(소스1909d4c), VM 앱8e290f7/UI f946824 유지·clean. 카카오 기존콜백6개+새콜백1개 저장.
+도메인 전환 기록(2026-10-28 16:46 KST): https://knu-read.xyz 실제 운영 전환 및 Chrome 카카오 로그인→관리자 화면 성공. 기존 workers.dev 링크는 새 주소302 이동. HTTP는HTTPS308. 사용자 최종 전환 승인 적용 완료.
+웹 경로: knu-read.xyz→Worker www/정적CDN→origin.knu-read.xyz→Cloudflare Tunnel→Ubuntu앱. 당시 Worker a9a69259-ee5b-4cb4-bc44-2fd67c39f491(소스1909d4c), VM 앱8e290f7/UI f946824. 이후 현재 버전은 위 미리보기 배포 기록을 따른다. 카카오 기존콜백6개+새콜백1개 저장.
 공개 검증17/17 통과, 앱/Tunnel active/enabled, 브라우저 error/warn0. 공개 첫 화면 TTFB중앙값252ms(3회). DB업무데이터/스키마·Render·GitHub main·UI코드 변경 없음. 복귀용 Funnel/기존카카오콜백/env root600 보존.
 실제 호스트 재부팅 자동복구 시험·DB 이전/백업 등의 원래 잔여 작업은 계속 미완료. 새 도메인/로그인 전환은 완료했으므로 다시 승인받거나 재적용하지 않는다. 상세 docs/MINIPC_DOMAIN_TUNNEL.md, outputs/cutover-verification.json, outputs/domain-tunnel-state.json.
 
