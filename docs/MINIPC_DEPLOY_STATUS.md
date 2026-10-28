@@ -1,5 +1,17 @@
 # 미니 PC 이전 진행 상태
 
+공유 미리보기 준비(2026-10-28 KST): 사용자 수정 요청에 따라 작은 글자/책 아이콘의 미니멀
+이미지로 다시 생성했다. 최종 코드8f4310a, 새 자산 해시a461f5f…75f03a. 홈페이지/로그인/
+책 추천 공유 태그 검증21/21, 정적 자산 검사5개, Wrangler dry-run 통과. **아직 배포하지 않음**.
+기존 운영8e290f7/Worker a9a69259 유지. 실제 적용·앱 재시작·카카오 OG 캐시 갱신 승인 대기.
+상세 docs/MINIPC_OG_PREVIEW.md 및 작업 폴더 work/og-release/. Render/main/DB 변경 없음.
+
+추가 진단(2026-10-28 17:02 KST): 공개 비로그인 홈 158~410ms, VM 내부 3~4ms.
+운영 DB는 서울 리전이며 최소 읽기 HTTP 왕복 42/94ms(첫 새 연결418ms).
+같은 앱 코드/합성 데이터에서 회원 홈15회·관리자13회·강의실17회 DB 호출을 확인했다.
+전체 회원 출석 보고서 생성 및 학기/회차 중복 조회를 먼저 줄이는 개선안 기록.
+이번에는 분석/기록만 했으며 추가 코드·배포·운영 DB 변경 없음. 상세 docs/MINIPC_PERFORMANCE.md.
+
 최신 완료(2026-10-28 16:46 KST): https://knu-read.xyz 실제 운영 전환 및 Chrome 카카오 로그인→관리자 화면 성공. 기존 workers.dev 링크는 새 주소302 이동. HTTP는HTTPS308. 사용자 최종 전환 승인 적용 완료.
 현재 웹 경로: knu-read.xyz→Worker www/정적CDN→origin.knu-read.xyz→Cloudflare Tunnel→Ubuntu앱. Worker a9a69259-ee5b-4cb4-bc44-2fd67c39f491(소스1909d4c), VM 앱8e290f7/UI f946824 유지·clean. 카카오 기존콜백6개+새콜백1개 저장.
 공개 검증17/17 통과, 앱/Tunnel active/enabled, 브라우저 error/warn0. 공개 첫 화면 TTFB중앙값252ms(3회). DB업무데이터/스키마·Render·GitHub main·UI코드 변경 없음. 복귀용 Funnel/기존카카오콜백/env root600 보존.
