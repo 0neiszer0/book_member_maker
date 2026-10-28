@@ -1,9 +1,25 @@
 # knu-read.xyz / Cloudflare Tunnel 연결 준비
 
 2026-10-28. 사용자: hosting.kr에서 knu-read.xyz를 1년 구매했다고 알림. 페이지 이동 약 4초 지연을 호소.
-상태: **로컬 준비 완료, hosting.kr 로그인·등록 상태 확인 대기. DNS/서비스 변경 미실행.**
+상태: **hosting.kr 등록 및 Cloudflare 무료 zone 확인 완료. 네임서버 변경·Tunnel 설치 직전 승인 대기. 기존 운영 변경 없음.**
 
-## 실제 확인
+## 최신 진행 / 승인 요청안
+
+- hosting.kr 로그인 완료. knu-read.xyz 정상, DNS 레코드 0개, 만료 2027-10-28 23:59 표시. 자동연장 설정은 건드리지 않았다.
+- 공식 .xyz RDAP에서도 등록 2026-10-28T06:15:02Z 및 기존 네임서버 4개 확인. transfer prohibited/add period 상태이며 client/server hold는 없다. 1.1.1.1·8.8.8.8·.xyz 권한 DNS는 이 시점 NXDOMAIN이라 DNS 게시 반영을 추가 확인해야 한다.
+- Cloudflare Free zone을 생성하고 DNS scan 0개 확인. Bot Preference Sync는 꺼서 애플리케이션 robots.txt를 자동 변경하지 않도록 준비했다.
+- 할당 네임서버: `ian.ns.cloudflare.com`, `riya.ns.cloudflare.com`.
+- hosting.kr 변경 모달에 위 두 개만 입력했고 **저장은 누르지 않았다**. 기존 ns1~ns4.hosting.co.kr은 아직 적용 중이다.
+- 공식 cloudflared 2026.10.5 amd64 deb 다운로드 및 SHA256 검증 완료. VM에는 설치하지 않았다.
+- 다음 승인 범위: 위 네임서버 저장, 일반 Tunnel bookmembers-minipc 생성, 전용 토큰을 VM root 전용 파일에 저장, cloudflared 서비스 설치·자동 시작, origin.knu-read.xyz를 localhost5000에 연결하고 무인증403 및 읽기 전용 건강/속도 비교.
+- 기존 공개 Worker 원본/회원 안내 URL/카카오/Render/DB/재부팅은 이 준비 승인 범위에 넣지 않는다. 공개 전환 직전 별도 승인 유지.
+
+## 로그인 선호 변경
+
+사용자가 1Password 연결 후 앞으로 자동 로그인도 처리해 달라고 요청했다. 이 프로젝트의 일반 로그인은 브라우저 확장 자동완성이 가능한 범위에서 사용하도록 허용한 것으로 기록한다. 이전 첨부 지침서의 일반 로그인 수동 위임보다 최신 사용자 요청을 우선한다.
+브라우저 AX에서 1Password 메뉴 안내를 확인했다. 현재 도구에는 금고 직접 조회/인증 전용 API가 없다. 1Password 잠금 해제·휴대폰 확인·보안키 등 사용자 확인이 필요한 경우에만 요청한다. 비밀번호를 채팅/로그/기록에 출력하지 않는다. DNS·서비스·새 보안 권한 변경 직전 승인 조건은 그대로다.
+
+## 최초 확인 (아래 미완료 표시는 위 최신 기록으로 대체)
 
 - Cloudflare 계정 d282d00422ba114110e1e47218b88516 로그인 유지. 도메인 추가 화면만 열었고 생성하지 않았다.
 - hosting.kr은 Megazone Accounts 로그인 필요. 사용자에게 로그인 요청하고 해당 탭을 handoff로 유지.
