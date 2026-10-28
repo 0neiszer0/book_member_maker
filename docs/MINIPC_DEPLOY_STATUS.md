@@ -1,11 +1,16 @@
 # 미니 PC 이전 진행 상태
 
-최신 요청(2026-10-28): 새 UI 기준 정적 CDN/캐시 최적화 준비 완료, 배포 직전 승인 대기.
-로컬 커밋 8e290f7. UI f946824의 정적 파일 44개, 내용 해시 버전 URL/1년 캐시.
-Python 33개, Worker 프록시 4개, 로컬 HTTP/합성 화면 56항목, dry-run 통과.
-실제 Claude Opus5.5 High 독립 검토 완료. 상세 docs/MINIPC_CDN_RELEASE.md, CLAUDE_CDN_ADVICE.md.
-아직 공개 Worker/VM은 변경하지 않았다. VM f946824, Worker 9081c2bc 유지. Render 변경/main push 없음.
-이 항목이 아래 과거 '새 UI 예정/CDN 구조 논의 우선' 상태를 대체한다. 재부팅 자동 복구 검증 등 기존 미완료 항목은 남아 있다.
+최신 완료(2026-10-28 15:08 KST): 사용자 승인 후 새 UI 정적 CDN/캐시를 운영에 적용했다.
+VM 앱 8e290f7 (UI 내용 f946824 유지), Worker 69847a91-0a3f-49fd-850e-13d35b4410a4.
+44개 공개 정적 파일은 해시 버전 URL/1년 캐시로 CDN에서 직접 제공. 공개 검사 22/22 통과.
+앱 clean/active/enabled, DB health 정상, Chrome 로그인 화면 상태 유지 및 콘솔 오류 없음.
+같은 CSS 3회 비교 중앙값: 원본 829ms → CDN 114ms. HTML/DB/Funnel 동적 지연은 남음.
+Render·GitHub main·DB·도메인·카카오 설정 변경 없음. 재부팅 없음.
+복귀 기준: 앱 f946824, Worker 9081c2bc-b183-4bb1-a6fc-4f5de9616ba1.
+상세 docs/MINIPC_CDN_RELEASE.md 및 outputs/cdn-release-state.json. 실제 Claude Opus5.5 High 자문도 기록됨.
+아래 과거 CDN 배포 보류·VM f946824 상태는 이 완료 기록으로 대체한다.
+기존 미완료: 실제 Windows 재부팅 후 자동 복구 시험, 로컬 DB 이전/백업 등 이전 운영 전환 잔여 작업.
+
 갱신: 2026-10-28 KST. 재부팅/세션 중단 후 이 파일부터 읽는다.
 최신 UI 요청: f946824 로컬 통합 완료(e88a3f4), 관련 Python 94개 및 Node 검사 통과.
 사용자 '미니 PC에만 배포' 승인 후 2026-10-28 14:22:53 KST VM 앱 f946824 배포 완료.
