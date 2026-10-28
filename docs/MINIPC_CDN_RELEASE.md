@@ -1,6 +1,29 @@
 # 새 UI 정적 CDN 릴리스
 
-작성: 2026-10-28 KST. 상태: 로컬 검증 완료, **공개 배포·VM 활성화 승인 대기**.
+작성: 2026-10-28 KST. 상태: 사용자 승인 후 **공개 배포·VM 활성화 및 검증 완료**.
+
+## 운영 적용 결과
+
+- 사용자 `CDN 배포·미니 PC 앱 적용 승인` 수신 후 진행했다.
+- Worker 새 버전: `69847a91-0a3f-49fd-850e-13d35b4410a4`. 44개 파일 업로드 성공.
+- VM 앱: `8e290f7bf054035dfdd6f8e520c62f59317f489c`, 서비스 재시작 2026-10-28 15:07:47 KST.
+- 파일 전송 SHA256 4개 일치, 설치 및 DB health 통과. 앱 clean/active/running/enabled, NRestarts=0, 최근 오류 로그 없음.
+- CDN 먼저 공개한 단계의 검사 8/8, 앱 활성화 후 전체 공개 검사 22/22 통과.
+- 공개 HTML 3곳이 버전 URL 사용. 정적 CSS/JS/폰트/공유 이미지 바이트 일치, Cache-Control 1년 immutable, CF-Cache-Status HIT, ETag 304, HEAD 정상.
+- 기존 로그인 시작/콜백 주소·Secure/HttpOnly/SameSite 세션·비공개 경로 보호·no-store·DB health·원본 무인증 403 정상.
+- 기존 로그인된 Chrome 대시보드의 화면/폰트/버전 CSS·JS URL 정상, 콘솔 오류 없음. 사용자 데이터를 쓰거나 새 로그인 완료를 자동 수행하지 않았다.
+- Render·GitHub main·DB·도메인·카카오 설정 변경 없음. 시스템 재부팅 없음.
+
+동일 세션에서 같은 CSS를 기존 원본 경로와 CDN 경로로 번갈아 3회 요청:
+
+| 경로 | 전체 응답 시간(ms) | 중앙값 |
+|---|---|---|
+| 기존 /static/lms.css | 1973, 496, 829 | 829ms |
+| 새 버전 CDN 주소 | 122, 114, 82 | 114ms |
+
+이 표는 작은 표본의 정적 파일 전송 비교이며 전체 사이트 속도 개선율이 아니다. 최초 CDN MISS는 CSS 592ms, Noto 폰트 1090ms였고, 이후 HIT는 JS 101ms, 폰트 전체 551ms였다. HTML/login/health는 302~3163ms로 여전히 가변적이다. 브라우저 재사용이 가능한 캐시 정책은 확인했지만 Chrome 메모리/디스크 캐시의 개별 요청 사용 여부는 따로 계측하지 않았다.
+
+증거 파일: 작업 폴더의 `cdn-worker-deploy.log`, `cdn-vm-deploy.log`, `cdn-public-assets.json`, `cdn-public-full.json`, `cdn-release-state.json`. 복구 기준은 아래에 유지한다. 최종 상태 JSON과 공개 검사 JSON도 outputs에 복사했다.
 
 ## 변경 범위
 
@@ -23,9 +46,9 @@
 - Python 33개: 새 manifest/복귀 검사 5개와 기존 보안·화면·LMS 경로 검사. 모두 통과.
 - Worker 프록시 검사 4개: 스트림, 쿠키, OAuth 리다이렉트, 스푸핑 헤더 제거, no-store, 실패 처리. 모두 통과.
 - Wrangler 실제 로컬 HTTP + 합성 화면 56항목 통과: 44개 파일 바이트/헤더, HEAD, ETag 304, 동적 GET/POST, 누락 버전, 공개 자산 POST 거절, 화면 3곳의 버전 URL/존재 파일.
-- VM 파일 설치 도구를 임시 폴더에서 두 번 실행해 신규 설치 및 동일 파일 재실행 통과. 배포 Bash 문법 검사 통과. 운영 VM에는 실행하지 않음.
-- Wrangler 4.153.0 dry-run 성공. **공개 배포는 실행하지 않음**.
-- 실제 브라우저 재방문의 메모리/디스크 캐시 사용과 운영 체감 속도는 배포 후 확인 항목이다. 로컬 측정만으로 운영 개선 수치를 단정하지 않는다.
+- VM 파일 설치 도구를 임시 폴더에서 두 번 실행해 신규 설치 및 동일 파일 재실행 통과. 배포 Bash 문법 검사 통과. 이후 승인받고 운영 VM에도 정상 실행했다.
+- Wrangler 4.153.0 dry-run 성공. 이후 승인받고 위 새 버전으로 공개 배포했다.
+- 운영 측정은 위 결과를 참조한다. 브라우저 메모리/디스크 캐시별 사용 여부는 미계측이며, 전체 체감 속도는 정적 요청 측정만으로 단정하지 않는다.
 - 초기 Windows sandbox의 Temp/loopback/metrics 경로 접근 오류는 작업 디렉터리 Temp 및 승인된 로컬 실행 권한으로 해결. 코드 실패와 구별한다.
 
 ## Claude 검토
@@ -53,4 +76,3 @@
 - 앱 f946824로 checkout하면 helper가 없어 기존 URL로 돌아간다. manifest가 남아도 이전 앱은 읽지 않는다. 이전 커밋의 .gitignore에는 이 산출물이 없어 untracked로 보일 수 있다.
 - 정적 파일 세트 전체의 해시라 CSS만 바뀌어도 폰트 URL이 바뀐다. 현재 범위의 단순성/정합성을 위한 선택이며 글꼴 서브셋이나 UI 변경은 하지 않았다.
 - 정적 배포는 무료/무제한 정적 요청 범위이며 동적 Worker의 기존 요청 한도는 그대로다. 공식 문서: https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/
-
