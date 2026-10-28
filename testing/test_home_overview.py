@@ -128,8 +128,10 @@ class OverviewRouteTests(unittest.TestCase):
 
     def test_member_home_only_contains_my_progress_and_no_other_identity(self):
         html = self.client.get('/').get_data(as_text=True)
+        from bs4 import BeautifulSoup
+        visible_text = BeautifulSoup(html, 'html.parser').get_text()
         for expected in ('2026-09-23 (수)', '마음', '테스트 사회자', '발제문 작성', '1 / 3회'):
-            self.assertIn(expected, html)
+            self.assertIn(expected, visible_text)
         self.assertNotIn('다른 회원 비공개', html)
         self.assertNotIn('202600002', html)
         self.assertNotIn('운영 개요 열기', html)
@@ -229,7 +231,7 @@ class OverviewRouteTests(unittest.TestCase):
         self.assertIn('data-event-id="event"', html)
 
     def test_seminar_failure_stays_on_page_with_retry(self):
-        with patch.object(self.module, '_load_weekly_seminar_view', side_effect=RuntimeError('private-error')):
+        with patch('lms_learning.member_weeks', side_effect=RuntimeError('private-error')):
             response = self.client.get('/seminars?term_id=term')
         self.assertEqual(response.status_code, 503)
         html = response.get_data(as_text=True)

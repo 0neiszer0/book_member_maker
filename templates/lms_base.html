@@ -1,11 +1,14 @@
 {% from '_lms_icons.html' import icon %}
 <!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 {% if session.user_role %}<meta name="lms-csrf" content="{{ sensitive_csrf_token() }}">{% endif %}
+<link rel="manifest" href="/manifest.webmanifest"><meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="app-layout" content="canvas"><meta name="color-scheme" content="light"><meta name="theme-color" content="#d20f17">
 <title>{% block title %}책 먹는 호반우{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static',filename='lms.css') }}">
 <link rel="stylesheet" href="{{ url_for('static',filename='lms_feedback.css') }}">
 <script defer src="{{ url_for('static',filename='lms_feedback.js') }}"></script>
+<link rel="stylesheet" href="{{ url_for('static',filename='lms_improvements.css') }}">
+<script defer src="{{ url_for('static',filename='member_notifications.js') }}"></script>
 {% block head %}{% endblock %}
 <script defer src="{{ url_for('static',filename='lms_navigation.js') }}"></script>
 </head><body class="lms-page lms-nav-expanded {% if lms_isolated_auth|default(false) %}lms-isolated-auth{% endif %} {% if lms_course %}lms-course-page{% endif %} {% if lms_aside %}lms-has-aside{% endif %} {% if lms_page == 'dashboard' %}lms-dashboard-page{% endif %}" data-lms-page="{{ lms_page|default('content') }}">

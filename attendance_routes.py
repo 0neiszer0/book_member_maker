@@ -243,6 +243,8 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
         members = scope_members(db(), members, term=term)
         histories = db().table('history').select('id,date,present,book_title,seminar_session_id,attendance_confirmed_at,actual_member_ids').gte('date', start).lte('date', end).execute().data or []
         sessions = db().table('seminar_sessions').select('*').gte('meeting_date', start).lte('meeting_date', end).execute().data or []
+        from lms_learning import link_legacy_histories
+        histories = link_legacy_histories(histories, sessions)
         session_ids = [s['id'] for s in sessions]
         no_shows = db().table('seminar_no_shows').select('session_id,member_id,cancelled_at').in_('session_id', session_ids).is_('cancelled_at', 'null').execute().data or [] if session_ids else []
         events = db().table('special_events').select('*').gte('event_date', start).lte('event_date', end).execute().data or []
@@ -254,6 +256,7 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
         report = build_term_attendance(members, histories, sessions, events, attendees, bricks, brick_members,
                                        start, end, term.get('attendance_minimum', 3), datetime.now(KST).date(), no_shows)
         report['events'] = events
+        report['sessions'] = sessions
         report['roster_initialized'] = bool(term.get('roster_initialized_at'))
         confirmed_ids = confirmed_history_session_ids(histories)
         report['pending_sessions'] = [s for s in sessions if s['meeting_date'] <= datetime.now(KST).date().isoformat()
@@ -328,23 +331,9 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
     def my_term_attendance():
         terms, term, report = term_report(request.args.get('term_id'))
         mine = next((m for m in (report or {}).get('members', []) if int(m['id']) == int(session['user_id'])), None)
-        columns = [c for c in (report or {}).get('columns', []) if mine and report['matrix'].get(mine['id'], {}).get(c['key'])]
-        weeks = db().table('seminar_weeks').select('id,book_title,week_start').eq('term_id', term['id']).order('week_start').execute().data or [] if term else []
-        week_by_id = {str(w['id']): (index, w) for index, w in enumerate(weeks, 1)}
-        for column in columns:
-            number, week = week_by_id.get(str(column.get('week_id')), (None, {}))
-            column['week_number'] = number
-            if week.get('book_title'):
-                column['title'] = week['book_title']
-            column['week_span'] = 1
-        # Merge only adjacent rows for the same real week; keep each session's ID/date.
-        previous = None
-        for column in columns:
-            if previous and column.get('week_number') and column.get('week_id') == previous.get('week_id'):
-                previous['week_span'] += 1
-                column['week_span'] = 0
-            else:
-                previous = column
+        from lms_learning import personal_attendance_columns
+        weeks = db().table('seminar_weeks').select('id,book_title,week_start,note').eq('term_id', term['id']).order('week_start').execute().data or [] if term else []
+        columns = personal_attendance_columns(report or {}, int(session['user_id']), weeks, datetime.now(KST).date())
         return render_template('my_term_attendance.html', terms=terms, term=term, mine=mine, columns=columns,
                                minimum=(report or {}).get('minimum', 3))
 

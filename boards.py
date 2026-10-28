@@ -2,6 +2,7 @@
 
 import re
 import uuid
+from board_content import prepare_image, validate_content, render_content
 from datetime import datetime, timezone
 
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash, g, abort
@@ -14,6 +15,7 @@ IMAGE_TYPES = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'i
 
 def init_board_routes(app, supabase, login_required):
     bp = Blueprint('boards', __name__)
+    app.jinja_env.filters['board_content'] = render_content
 
     @bp.before_request
     def load_classroom_context():
@@ -66,20 +68,16 @@ def init_board_routes(app, supabase, login_required):
             return result.get('signedURL') or result.get('signedUrl') or result.get('signed_url')
         return getattr(result, 'signed_url', None) or getattr(result, 'signedURL', None)
 
-    def upload_images(post_id, files, start_order=0):
+    def prepare_uploads(files):
         images = [file for file in files if file and file.filename]
         if len(images) > 5:
             raise ValueError('이미지는 글 하나당 최대 5개까지 올릴 수 있습니다.')
+        return [(file.filename, *prepare_image(file)) for file in images]
+
+    def upload_images(post_id, images, start_order=0):
         uploaded, rows = [], []
         try:
-            for offset, file in enumerate(images):
-                mime = (file.mimetype or '').lower()
-                extension = IMAGE_TYPES.get(mime)
-                if not extension:
-                    raise ValueError('JPG, PNG, WebP, GIF 이미지만 올릴 수 있습니다.')
-                content = file.read()
-                if not content or len(content) > 10 * 1024 * 1024:
-                    raise ValueError('이미지는 파일당 10MB 이하여야 합니다.')
+            for offset, (filename, content, mime, extension) in enumerate(images):
                 path = f"posts/{post_id}/{uuid.uuid4().hex}.{extension}"
                 supabase.storage.from_('board-uploads').upload(
                     path, content, {'content-type': mime, 'upsert': 'false'}
@@ -87,7 +85,7 @@ def init_board_routes(app, supabase, login_required):
                 uploaded.append(path)
                 rows.append({
                     'post_id': post_id, 'storage_path': path,
-                    'original_name': secure_filename(file.filename) or f'image.{extension}',
+                    'original_name': secure_filename(filename) or f'image.{extension}',
                     'mime_type': mime, 'byte_size': len(content),
                     'display_order': start_order + offset,
                 })
@@ -116,7 +114,9 @@ def init_board_routes(app, supabase, login_required):
             raise ValueError('제목은 1~200자로 입력해주세요.')
         if not content or len(content) > 50000:
             raise ValueError('본문은 1~50,000자로 입력해주세요.')
-        payload = {'title': title, 'content': content, 'history_id': None, 'brick_book_id': None}
+        content_format = form.get('content_format', 'plain')
+        content = validate_content(content, content_format)
+        payload = {'title': title, 'content': content, 'content_format': content_format, 'history_id': None, 'brick_book_id': None}
         if board['board_type'] == 'seminar_review':
             target_id = (form.get('history_id') or '').strip()
             if not target_id or not (supabase.table('history').select('id').eq('id', target_id).execute().data or []):
@@ -186,9 +186,10 @@ def init_board_routes(app, supabase, login_required):
             created = None
             try:
                 payload = validate_post(board, request.form)
+                images = prepare_uploads(request.files.getlist('images'))
                 payload.update({'board_id': board['id'], 'author_id': session['user_id']})
                 created = supabase.table('posts').insert(payload).execute().data[0]
-                upload_images(created['id'], request.files.getlist('images'))
+                upload_images(created['id'], images)
                 flash('글을 등록했습니다.', 'success')
                 return redirect(board_url('boards.post_detail', slug=slug, post_id=created['id']))
             except Exception as exc:
@@ -255,13 +256,17 @@ def init_board_routes(app, supabase, login_required):
                 new_files = [file for file in request.files.getlist('images') if file and file.filename]
                 if len(existing) + len(new_files) > 5:
                     raise ValueError('기존 이미지를 포함해 최대 5개까지 올릴 수 있습니다.')
+                images = prepare_uploads(new_files)
+                upload_images(post_id, images, len(existing))
                 supabase.table('posts').update(payload).eq('id', post_id).execute()
-                upload_images(post_id, new_files, len(existing))
                 flash('글을 수정했습니다.', 'success')
                 return redirect(board_url('boards.post_detail', slug=slug, post_id=post_id))
             except Exception as exc:
                 flash(str(exc), 'danger')
-        return render_template('board_form.html', board=board, post=post, targets=targets(board['board_type']))
+        attachments = supabase.table('post_attachments').select('*').eq('post_id', post_id).order('display_order').execute().data or []
+        for attachment in attachments:
+            attachment['signed_url'] = signed_url(attachment['storage_path'])
+        return render_template('board_form.html', board=board, post=post, targets=targets(board['board_type']), attachments=attachments)
 
     @bp.route('/api/board/posts/<post_id>/delete', methods=['POST'])
     @login_required()

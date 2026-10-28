@@ -51,13 +51,14 @@ test('preserves request stream and cookies, strips spoofed headers, preserves SS
     return new Response('data: ok\n\n',{headers});
   };
   try {
-    const request=new Request('https://public.workers.dev/path?q=1',{method:'POST',body:'payload',headers:{Cookie:'session=fake','X-App-Origin-Auth':'spoof','X-Forwarded-Host':'evil','CF-Connecting-IP':'192.0.2.1'}});
+    const request=new Request('https://public.workers.dev/path?q=1',{method:'POST',body:'payload',headers:{Cookie:'session=fake','X-App-Origin-Auth':'spoof','X-App-CSRF':'session-csrf','X-Forwarded-Host':'evil','CF-Connecting-IP':'192.0.2.1'}});
     const result=await proxy.fetch(request,env);
     assert.equal(seen.url.href,'https://origin.example.ts.net/path?q=1');
     assert.equal(seen.init.body,request.body);
     assert.equal(seen.init.headers.get('Cookie'),'session=fake');
     assert.equal(seen.init.headers.get('X-Forwarded-Host'),null);
     assert.equal(seen.init.headers.get('X-App-Origin-Auth'),env.ORIGIN_AUTH_SECRET);
+    assert.equal(seen.init.headers.get('X-App-CSRF'),'session-csrf');
     assert.equal(result.headers.getSetCookie().length,2);
     assert.equal(result.headers.get('Content-Type'),'text/event-stream');
     assert.equal(result.headers.get('Cache-Control'),'no-store');

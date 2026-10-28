@@ -112,8 +112,8 @@
           <button type="button" class="btn primary mt-3" data-open-schedule="{{ week.id }}">도서·사회자 함께 편집</button>
         </div>
         <div class="rounded-2xl border ops-border p-4 order-3">
-          <div class="flex justify-between gap-2"><div><p class="text-xs font-bold muted">추가 세미나</p><h3 class="font-extrabold">참석 투표</h3></div>{% if mon %}<span class="chip">예정 {{ mon.expected_count }}명</span>{% endif %}</div>
-          {% if mon %}
+          <div class="flex justify-between gap-2"><div><p class="text-xs font-bold muted">추가 세미나</p><h3 class="font-extrabold">참석 투표</h3></div>{% if mon and mon.is_active %}<span class="chip">예정 {{ mon.expected_count }}명</span>{% endif %}</div>
+          {% if mon and mon.is_active %}
             <p class="text-sm muted mt-2">{{ mon.meeting_date|seminar_date }} · 정원·선착순 제한 없음</p>
             <div class="flex flex-wrap gap-2 mt-3"><a class="btn primary" href="{{ url_for('admin_seminar_roster', session_id=mon.id) }}">카카오톡 참석 명단 반영·출석 확정</a></div>
             <p class="text-sm muted mt-2">{{ '실제 출석 확정됨' if mon.attendance_confirmed else '실제 출석 미확정' }} · {{ '명단 반영됨' if mon.roster_updated_at else '투표 결과 반영 전' }}</p>
@@ -122,7 +122,7 @@
             <div class="flex flex-wrap gap-2 mt-4"><a class="btn primary" href="{{ url_for('bookclub_index', session_id=mon.id) }}">조 편성</a>{% if mon.history %}<a class="btn soft" href="{{ url_for('records_seminar_detail', history_id=mon.history.id) }}">진행 기록</a>{% endif %}{% if not mon.review_form %}<button class="btn soft open-review" data-session-id="{{ mon.id }}">후기 받기</button>{% endif %}</div>
             {{ review_panel(mon) }}
             {{ no_show_panel(mon) }}
-          {% else %}<p class="muted text-sm mt-3">이 주차에는 추가 세미나가 없습니다.</p>{% endif %}
+          {% else %}<p class="muted text-sm mt-3">추가 세미나를 운영하지 않는 주차입니다.</p>{% if mon %}<button type="button" class="btn soft enable-additional" data-session-id="{{ mon.id }}">필요할 때 추가 세미나 열기</button>{% endif %}{% endif %}
         </div>
         <div class="rounded-2xl border ops-border p-4 order-2">
           <div class="flex justify-between gap-2"><div><p class="text-xs font-bold muted">본 세미나</p><h3 class="font-extrabold">불참 기록</h3></div>{% if thu %}<span class="chip">예상 {{ thu.expected_count }}명</span>{% endif %}</div>
@@ -184,6 +184,7 @@ document.addEventListener('click',async e=>{
  const box=e.target.closest('[data-week]');
  try{
   if(e.target.closest('.archive-term')){const b=e.target.closest('.archive-term');if(confirm('현재 학기와 회차를 보관할까요? 기록은 삭제되지 않습니다.')){await api('/api/admin/seminar_terms/'+b.dataset.termId+'/delete',{method:'POST',body:'{}'});location.href='/admin/seminars'}return}
+  if(e.target.closest('.enable-additional')){const b=e.target.closest('.enable-additional');if(confirm('이 주차의 추가 세미나를 회원 일정에 표시할까요?')){await api('/api/admin/seminar_sessions/'+b.dataset.sessionId+'/toggle_active',{method:'POST',headers:{'X-App-CSRF':document.querySelector('meta[name="lms-csrf"]').content},body:'{}'});location.reload()}return}
   if(e.target.closest('.open-topic')){const b=e.target.closest('.open-topic');await api('/api/admin/seminar_weeks/'+b.dataset.weekId+'/open_topics',{method:'POST',body:'{}'});location.reload()}
   if(e.target.closest('.toggle-topic')){const b=e.target.closest('.toggle-topic');await api('/api/admin/topic_events/'+b.dataset.eventId+'/toggle_active',{method:'POST',body:'{}'});location.reload()}
   if(e.target.closest('.open-review')){const b=e.target.closest('.open-review'),result=await api('/api/admin/seminar_sessions/'+b.dataset.sessionId+'/review-form',{method:'POST',body:'{}'});await navigator.clipboard.writeText(result.url);alert('후기 링크를 열고 복사했습니다.');location.reload()}

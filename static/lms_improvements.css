@@ -1,0 +1,24 @@
+/* Keep the existing LMS colors, spacing and typography. */
+.lms-topic-reading{padding:20px 0;border-bottom:1px solid #e5e5e5}
+.lms-topic-reading h2{font-size:16px}.lms-topic-reading p,.lms-topic-reading blockquote{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8}
+.lms-topic-reading blockquote{margin:16px 0;padding:8px 16px;border-left:3px solid #ddd;color:#555}
+.lms-section-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.lms-past-course .lms-course-card-body{border-top:5px solid #aaa}.lms-past-course h3{margin:0;font-size:16px}
+.lms-right-panel .lms-next-seminar{border-top:3px solid #d20f17;padding-top:16px}
+.lms-right-panel section{padding-bottom:20px;margin-bottom:20px;border-bottom:1px solid #e5e5e5}
+.lms-right-panel h2{font-size:15px;color:#555;margin-bottom:10px}.lms-right-panel .lms-next-seminar>p:first-of-type{font-size:19px;font-weight:700;color:#222}
+.lms-aside-details{padding:14px 0;border-bottom:1px solid #e5e5e5}.lms-aside-details summary{cursor:pointer;font-size:14px;font-weight:600}.lms-aside-details .lms-link-list{margin-top:12px}
+.lms-push-settings{padding:20px;background:#fafafa;border:1px solid #e5e5e5;margin-bottom:28px}.lms-push-settings h2{font-size:17px;margin-top:0}
+[data-notification-badge]{display:inline-block;min-width:17px;border-radius:12px;background:white;color:#a20e14;font-size:11px;padding:1px 4px}
+[data-notification-badge][hidden]{display:none}.lms-notification{padding:14px 0;border-bottom:1px solid #eee}.lms-notification>a{font-weight:600}
+#post-editor .ql-editor{min-height:280px;font:inherit;line-height:1.8}#post-toolbar{background:#fafafa;border-color:#d8d8d8;display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+.lms-board-form .ql-container{font:inherit;border-color:#d8d8d8}.lms-board-form .ql-toolbar button:focus-visible{outline:2px solid #d20f17;outline-offset:2px}
+.lms-board-body.is-rich{white-space:normal;overflow-wrap:anywhere}.lms-board-body.is-rich p{margin:0 0 1em}.lms-board-body.is-rich blockquote{border-left:3px solid #ccc;margin-left:0;padding-left:16px}
+.lms-board-body.is-rich ul{list-style:disc;padding-left:28px}.lms-board-body.is-rich ol{list-style:decimal;padding-left:28px}
+.lms-board-drop{display:flex;flex-direction:column;gap:8px;cursor:default}.lms-board-drop input{max-width:100%}#image-error{color:#b20f17}
+#cr-free{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+#cr-free button{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:16px;background:#fff;border:1px solid #ddd;border-radius:5px;cursor:pointer;color:#333;text-align:left}
+#cr-free button span{color:#b20f17;font-size:13px}#cr-free button:hover,#cr-free button:focus-visible{border-color:#d20f17;background:#fff8f8;outline-offset:3px}
+@media(max-width:767px){.lms-push-settings{padding:16px}#post-editor .ql-editor{min-height:220px}.lms-right-panel .lms-next-seminar>p:first-of-type{font-size:17px}}
+
+.lms-attendance-number strong{font-size:28px;color:#252525}.lms-attendance-summary progress{width:100%;height:7px;accent-color:#d20f17}

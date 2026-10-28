@@ -14,3 +14,4 @@ docxtpl==0.20.2
 ortools==9.11.4210
 pycryptodome==3.23.0
 Pillow==12.3.0
+pywebpush==2.5.0

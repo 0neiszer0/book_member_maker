@@ -1,0 +1,21 @@
+[Unit]
+Description=Bookmembers notification inbox and Web Push
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=bookapp
+Group=bookapp
+WorkingDirectory=/opt/book_member_maker
+EnvironmentFile=/etc/book_member_maker/app.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+RuntimeDirectory=bookmembers-notifications
+RuntimeDirectoryMode=0700
+ExecStart=/usr/bin/flock -n /run/bookmembers-notifications/sender.lock /opt/book_member_maker/.venv/bin/python notification_delivery.py
+TimeoutStartSec=10min
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+UMask=0077

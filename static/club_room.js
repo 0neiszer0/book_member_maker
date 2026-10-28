@@ -134,7 +134,9 @@
     else {
       const ranges = freeRanges(bookings, selected, now);
       ranges.forEach(([startHour, endHour]) => {
-        const button = node('button', pad(startHour) + ':00–' + pad(endHour) + ':00'); button.type = 'button';
+        const button = node('button'); button.type = 'button';
+        button.append(node('strong',pad(startHour) + ':00–' + pad(endHour) + ':00'),node('span','이 시간에 예약하기 →'));
+        button.setAttribute('aria-label',pad(startHour)+':00부터 '+pad(endHour)+':00 사이 예약하기');
         button.addEventListener('click', () => openNew(selected, startHour)); $('cr-free').append(button);
       });
       if (!ranges.length) $('cr-free').textContent = '예약 없는 시간이 없어요. 일반 예약과는 함께 사용할 수 있어요.';

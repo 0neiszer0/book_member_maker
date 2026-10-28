@@ -388,6 +388,8 @@ def _access_denied(message, status=403):
     if request.path.startswith("/api/"):
         return jsonify({"error": message}), status
     flash(message, "warning" if status == 401 else "danger")
+    if status == 401 and request.method == 'GET':
+        return redirect(url_for('login', next=safe_internal_next_url(request.full_path.rstrip('?'))))
     target = "login" if status == 401 else "main_index"
     return redirect(url_for(target))
 
@@ -4276,6 +4278,7 @@ def _session_payload(term_id, meeting_date, day_type, weeks):
         'meeting_date': meeting_date.isoformat(),
         'day_type': day_type,
         'participation_mode': 'opt_in' if day_type == 'mon' else 'absence_only',
+        'is_active': day_type != 'mon',
         'capacity': None,  # 카카오톡 참석 투표: 정원·선착순 제한 없음
     }
 
@@ -4720,11 +4723,12 @@ def admin_seminars():
 @login_required(role="ANY")
 def seminars():
     try:
-        terms, term, weeks, _ = _load_weekly_seminar_view(request.args.get('term_id'))
+        from lms_learning import member_weeks
+        terms, term, weeks, _ = member_weeks(supabase, request.args.get('term_id'))
         topics = []
         for week in weeks:
             if week.get('topic_event'):
-                week['topic_event']['session_dates'] = [row['meeting_date'] for row in week['sessions'] if row.get('is_active', True)]
+                # Keep the existing shared-event deadline, including its linked inactive sessions.
                 topics.append(week['topic_event'])
         decorate_topic_submission_states(supabase, session['user_id'], topics)
         current_week = next((row for row in weeks if not row['is_past'] and row['sessions']), None)
@@ -4735,6 +4739,23 @@ def seminars():
     except Exception as e:
         app.logger.error(f"seminars error: {e}", exc_info=True)
         return render_template('page_load_error.html', page_title='세미나 일정', is_admin=False), 503
+
+
+@app.get('/seminars/topics/<event_id>')
+@login_required(role='ANY')
+def member_topic_reader(event_id):
+    rows = supabase.table('topic_events').select('id,seminar_week_id').eq('id', event_id).limit(1).execute().data or []
+    if not rows or not rows[0].get('seminar_week_id'):
+        abort(404)
+    event = rows[0]
+    weeks = supabase.table('seminar_weeks').select('id,term_id,book_title').eq('id', event['seminar_week_id']).limit(1).execute().data or []
+    if not weeks:
+        abort(404)
+    terms = supabase.table('seminar_terms').select('id,name').eq('id', weeks[0]['term_id']).limit(1).execute().data or []
+    if not terms:
+        abort(404)
+    rows = supabase.table('topic_submissions').select('topics').eq('event_id', event_id).order('created_at').execute().data or []
+    return render_template('member_topics.html', term=terms[0], week=weeks[0], topics=anonymous_topic_previews(rows))
 
 
 @app.route('/api/admin/seminar_sessions/<session_id>/update_book', methods=['POST'])
@@ -6547,6 +6568,9 @@ init_term_membership_routes(app, lambda: supabase, login_required, create_member
 # ==============================================================================
 # --- 7. 서버 실행 ---
 # ==============================================================================
+from member_notifications import init_member_notifications
+init_member_notifications(app, lambda: supabase, login_required)
+
 if __name__ == '__main__':
     # 로컬 개발 전용. 프로덕션(Render)에서는 Dockerfile의 gunicorn으로 구동됨.
     app.run(host='0.0.0.0', port=5000, debug=True)
