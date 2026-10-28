@@ -28,7 +28,7 @@
   async function refresh() {
     if(!supported){enable.hidden=true;status.textContent='이 브라우저는 푸시 알림을 지원하지 않습니다. Chrome·Edge·Firefox 또는 홈 화면에 추가한 Safari 앱을 이용해주세요.';return;}
     config=await api('/api/push/config');
-    if(!config.available){enable.disabled=true;status.textContent='브라우저 알림을 준비 중입니다. 사이트 안의 알림은 이용할 수 있어요.';return;}
+    if(!config.available){enable.disabled=true;status.textContent='현재 브라우저 알림을 사용할 수 없습니다. 사이트 알림함을 이용해주세요.';return;}
     const reg=await navigator.serviceWorker.getRegistration('/');const subscription=await reg?.pushManager.getSubscription();
     const hash=subscription?Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(subscription.endpoint))),v=>v.toString(16).padStart(2,'0')).join(''):'';
     const owned=subscription&&config.subscription_hashes.includes(hash);

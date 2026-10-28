@@ -1,5 +1,10 @@
 # 미니 PC 이전 진행 상태
 
+**다음 작업: 사이트 문구·위키 안내·탭 로고 로컬 검증 완료, 운영 미반영.**
+`docs/SITE_COPY_REVIEW_20261028.md`와 작업 루트 `outputs/site-copy-review-state.json` 참조.
+Claude 비공개 소스 전달은 자동 승인 검토가 차단하여 구체적인 사용자 승인 대기 중이다.
+
+
 **최신 완료: 2026-10-28 위키 운영 배포.** https://knu-read.xyz/wiki/ 에서 사용할 수 있다.
 운영 앱 `62249f6b6af997eeb4d95318df0c35cc5154c004` clean, Worker `762caede-8d06-4a67-82e1-3eac6cee04af`.
 위키는 앞서 배포한 학기 UI·공지 구분·KNU 이미지 변경을 포함한다. 아래의 더 오래된 앱 버전은 과거 기록이다.

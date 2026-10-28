@@ -4,7 +4,7 @@ import json
 import re
 from pathlib import Path
 
-PUBLIC_FILE = re.compile(r'(?:[\w-]+\.(?:css|js)|fonts/[\w-]+\.woff2|fonts/(?:Lato|NotoSansKR)-OFL\.txt|og/club-preview(?:-v2)?\.png)', re.ASCII)
+PUBLIC_FILE = re.compile(r'(?:[\w-]+\.(?:css|js)|fonts/[\w-]+\.woff2|fonts/(?:Lato|NotoSansKR)-OFL\.txt|icons/favicon(?:\.svg|-32\.png)|og/club-preview(?:-v2)?\.png)', re.ASCII)
 
 
 def validate_static_assets(app, manifest_path=None):
@@ -32,7 +32,7 @@ def validate_static_assets(app, manifest_path=None):
             raise ValueError('Static asset escapes its directory')
         content = original.read_bytes()
         # Git stores these source text files as LF; Windows development may use CRLF.
-        if original.suffix in {'.css', '.js', '.txt'}:
+        if original.suffix in {'.css', '.js', '.txt', '.svg'}:
             content = content.replace(b'\r\n', b'\n')
         immutable = versioned.read_bytes()
         if (hashlib.sha256(content).hexdigest() != entry['sha256']

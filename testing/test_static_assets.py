@@ -69,6 +69,24 @@ class StaticAssetReleaseTests(unittest.TestCase):
             self.assertEqual(client.get('/static/'+new['prefix']+'/lms.css', buffered=True).data, b'body{color:blue}')
             self.assertEqual(client.get('/static/_v/'+'0'*64+'/lms.css').status_code, 404)
 
+    def test_public_icons_use_immutable_urls_and_normalize_svg_line_endings(self):
+        manifest = self.release({'icons/favicon.svg': b'<svg/>\n', 'icons/favicon-32.png': b'png'})
+        (self.root/'static/icons/favicon.svg').write_bytes(b'<svg/>\r\n')
+        install_static_assets(self.app)
+        with self.app.test_request_context():
+            self.assertEqual(url_for('static', filename='icons/favicon.svg'),
+                             '/static/'+manifest['prefix']+'/icons/favicon.svg')
+        with self.app.test_client() as client:
+            response = client.get('/static/'+manifest['prefix']+'/icons/favicon.svg', buffered=True)
+            self.assertEqual(response.mimetype, 'image/svg+xml')
+            self.assertEqual(response.data, b'<svg/>\n')
+
+    def test_icon_allowlist_does_not_publish_arbitrary_images_or_uploads(self):
+        for name in ('icons/private.png', 'icons/member.svg', 'uploads/favicon.svg'):
+            with self.subTest(name=name):
+                self.release({name: b'private'})
+                with self.assertRaises(ValueError):
+                    validate_static_assets(self.app)
+
 if __name__ == '__main__':
     unittest.main()
-
