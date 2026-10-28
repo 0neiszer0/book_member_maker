@@ -1,5 +1,11 @@
 # 미니 PC 이전 진행 상태
 
+최신 요청(2026-10-28): 새 UI 기준 정적 CDN/캐시 최적화 준비 완료, 배포 직전 승인 대기.
+로컬 커밋 8e290f7. UI f946824의 정적 파일 44개, 내용 해시 버전 URL/1년 캐시.
+Python 33개, Worker 프록시 4개, 로컬 HTTP/합성 화면 56항목, dry-run 통과.
+실제 Claude Opus5.5 High 독립 검토 완료. 상세 docs/MINIPC_CDN_RELEASE.md, CLAUDE_CDN_ADVICE.md.
+아직 공개 Worker/VM은 변경하지 않았다. VM f946824, Worker 9081c2bc 유지. Render 변경/main push 없음.
+이 항목이 아래 과거 '새 UI 예정/CDN 구조 논의 우선' 상태를 대체한다. 재부팅 자동 복구 검증 등 기존 미완료 항목은 남아 있다.
 갱신: 2026-10-28 KST. 재부팅/세션 중단 후 이 파일부터 읽는다.
 최신 UI 요청: f946824 로컬 통합 완료(e88a3f4), 관련 Python 94개 및 Node 검사 통과.
 사용자 '미니 PC에만 배포' 승인 후 2026-10-28 14:22:53 KST VM 앱 f946824 배포 완료.
