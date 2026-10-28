@@ -47,3 +47,17 @@
 ## 최종 사전 검사 — 2026-10-29
 
 Claude 후속 보완을 포함한 앱 소스는 `001671a4199bf36a00255801aaefbdd152c55244`다. 동일한 정적 바이트(digest `9e7f06974824ac50977661f3ed890ed00a10112b4feea49807da1ec24729d20d`)로 최종 Wrangler dry-run과 설치 예행연습을 다시 통과했다. 현재 파일54개/이전 포함297개, 위키13개 수정 제안이 최종 소스와 일치한다. 작업 루트 `work/site-copy-review/SHA256SUMS`에 준비물 해시가 기록되어 있다. 이전 0782edf 승인 질문은 이 최종 소스의 승인 질문으로 대체하며 실제 운영은 아직 변경하지 않았다.
+
+## 운영 반영 완료 — 2026-10-29
+
+사용자 “오케이 그럼 반영해” 승인으로 최종 소스001671a를 적용했다. 위의 미반영/승인 대기 문구는 배포 전 기록이다.
+
+- Worker: `6678c791-2994-4ed5-ac37-416c87dd2b1b`. 현재 정적54개/이전 포함297개 유지.
+- 앱: `001671a4199bf36a00255801aaefbdd152c55244`, clean. 앱만 재시작했으며 최종 앱·DB health 정상.
+- 위키: 사전 백업 `snapshot-20261028T234930333032Z`; 13개 문서의 버전/해시 일치 확인 후 정상 편집 API로 저장. 내부 유지보수 식별자 site-copy-maintenance-20261029를 사용해 사람을 사칭하지 않고 이력 보존. 문서14/이력32, SQLite integrity ok, 저장 원문·렌더13개 확인.
+- 공개 GET/로그인 시작/CDN 해시·캐시10개 통과. Python urllib는403이었으나 Windows curl 및 실제 Chrome 정상. 실제 로그인된 위키·회원 이용안내 확인, 콘솔 경고/오류0. 탭 아이콘은 자동화 확장의 배지와 구분하여 공개 HTML과 SVG/PNG 해시로 검증.
+- 앱/위키/Tunnel/알림·백업 타이머 active/enabled 유지. 재부팅 시험은 수행하지 않았다.
+- 초기 즉시 health probe는 앱 기동 중 실패했고 다음 probe와 최종 점검은 정상. 롤백 불필요.
+- 복구 기준: 앱62249f6, Worker762caede-8d06-4a67-82e1-3eac6cee04af. 이전 manifest는 VM `/var/tmp/bookmembers-copy-001671a/previous-asset-manifest.json`. 위키 복구 시 동시 편집을 확인한 새 수정 이력을 사용하고 전체 운영 DB를 덮지 않는다.
+- 준비물/로그/검증: 작업 루트 `work/site-copy-review/`; 재개 상태 `outputs/site-copy-review-state.json`.
+- Render·GitHub main·Supabase·카카오·도메인 변경 없음. Claude의 기능/정책 후보는 별도 후속 작업이다.

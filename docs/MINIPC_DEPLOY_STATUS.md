@@ -1,11 +1,13 @@
 # 미니 PC 이전 진행 상태
 
-**다음 작업: 사이트 문구·위키 안내·탭 로고 로컬 검증 완료, 운영 미반영.**
-`docs/SITE_COPY_REVIEW_20261028.md`와 작업 루트 `outputs/site-copy-review-state.json` 참조.
-2026-10-29 사용자 승인 후 Claude Opus 5.5 High 검토 완료. 후속 문구 보완과 기능 후보는 `docs/CLAUDE_SITE_REVIEW_20261029.md` 참조. 운영 배포 승인은 아직 대기 중이다.
-
-
-**최신 완료: 2026-10-28 위키 운영 배포.** https://knu-read.xyz/wiki/ 에서 사용할 수 있다.
+**최신 완료: 2026-10-29 사이트 문구·위키 안내·탭 로고 운영 반영.**
+운영 앱 `001671a4199bf36a00255801aaefbdd152c55244` clean, Worker `6678c791-2994-4ed5-ac37-416c87dd2b1b`.
+사용자 최종 승인 후 CDN·앱 적용, 위키 13문서 정상 편집 완료(문서14/이력32, 무결성 정상).
+위키 사전 백업 `snapshot-20261028T234930333032Z`. 공개 검사10개, 로그인된 위키·이용안내 화면 및 콘솔 오류0 확인.
+앱·DB 정상, 기존 앱/위키/Tunnel/알림·백업 타이머 active/enabled 유지. Render/main/Supabase/카카오/도메인 변경 없음.
+상세: 작업 루트 `outputs/site-copy-review-state.json`, `docs/SITE_COPY_REVIEW_20261028.md`.
+Claude 문구 보완은 반영했다. 정책 판단이 필요한 기능 후보는 `docs/CLAUDE_SITE_REVIEW_20261029.md`에 별도 기록했으며 이번 배포에 포함하지 않았다.
+**이전 완료: 2026-10-28 위키 운영 배포.** https://knu-read.xyz/wiki/ 에서 사용할 수 있다.
 운영 앱 `62249f6b6af997eeb4d95318df0c35cc5154c004` clean, Worker `762caede-8d06-4a67-82e1-3eac6cee04af`.
 위키는 앞서 배포한 학기 UI·공지 구분·KNU 이미지 변경을 포함한다. 아래의 더 오래된 앱 버전은 과거 기록이다.
 사용자 승인 후 공식 openNamu 고정 버전·loopback 서비스·SQLite(문서14/이력19)·서버 키·앱·CDN 적용 완료.
