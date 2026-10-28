@@ -13,9 +13,9 @@
     {% if term and mine %}<p>학기 누적 <strong>{{ mine.total }}/{{ minimum }}회</strong> · 세미나 {{ mine.counts.seminar }}주차 · OT {{ mine.counts.ot }}회 · 벽돌책 {{ mine.counts.brick }}회</p>{% endif %}
   </div>
   {% if term and mine %}
-  <div class="attendance-report-scroll" role="region" aria-label="내 확정 참석 내역" tabindex="0">
+  <div class="attendance-report-scroll" role="region" aria-label="내 전체 참석 내역" tabindex="0">
     <table class="attendance-report-table">
-      <caption class="lms-sr">{{ term.name }} 내 확정 참석 내역</caption>
+      <caption class="lms-sr">{{ term.name }} 내 전체 참석 내역</caption>
       <colgroup><col class="attendance-col-week"><col class="attendance-col-session"><col class="attendance-col-date"><col><col class="attendance-col-kind"><col class="attendance-col-status"><col class="attendance-col-detail"></colgroup>
       <thead><tr><th scope="col">주차</th><th scope="col">회차</th><th scope="col">모임일</th><th scope="col">도서·활동명</th><th scope="col">활동유형</th><th scope="col">출석상태</th><th scope="col">상세보기</th></tr></thead>
       <tbody>{% for col in columns %}
@@ -24,10 +24,10 @@
           <td>{{ {'thu':'본','mon':'추가'}.get(col.day_type, '—') }}</td>
           <td>{{ col.date }}</td><td class="attendance-report-title">{{ col.title }}</td>
           <td>{{ {'seminar':'세미나','ot':'OT','brick':'벽돌책'}[col.kind] }}</td>
-          <td><span class="attendance-report-status">{{ '참석 기록' if col.kind == 'brick' else '확정 출석' }}</span></td>
+          <td><span class="attendance-report-status">{{ col.status }}</span></td>
           <td>{% if col.week_number %}<a href="{{ url_for('seminars', term_id=term.id) }}#week-{{ col.week_id }}" aria-label="{{ col.week_number }}주차 {{ col.title }} 보기">주차 보기</a>{% else %}—{% endif %}</td>
         </tr>
-      {% else %}<tr><td colspan="7" class="attendance-report-empty">아직 확정된 참석 기록이 없습니다.</td></tr>{% endfor %}</tbody>
+      {% else %}<tr><td colspan="7" class="attendance-report-empty">등록된 회차가 없습니다.</td></tr>{% endfor %}</tbody>
     </table>
   </div>
   <div class="attendance-report-notes">

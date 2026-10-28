@@ -1,0 +1,10 @@
+[Unit]
+Description=Refresh member notifications every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=5min
+Unit=bookmembers-notifications.service
+
+[Install]
+WantedBy=timers.target

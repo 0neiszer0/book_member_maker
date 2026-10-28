@@ -1,5 +1,6 @@
 """Read-only home summaries. Never turn a failed lookup into an empty count."""
 from datetime import date, datetime, timedelta, timezone
+from lms_learning import is_break_week
 from topic_lifecycle import topic_event_deadline, topic_event_is_open
 from attendance_workflow import attendance_is_confirmed, confirmed_history_session_ids
 
@@ -20,17 +21,18 @@ def load_seminar_context(db, term_id=None, today=None):
     term = (next((t for t in terms if str(t['id']) == str(term_id)), None)
             or next((t for t in terms if t['start_date'] <= today.isoformat() <= t['end_date']), None)
             or next((t for t in terms if t.get('is_active')), terms[0] if terms else None))
-    result = {'terms': terms, 'term': term, 'sessions': [], 'weeks': {}, 'topics': {}}
+    result = {'today': today, 'terms': terms, 'term': term, 'sessions': [], 'weeks': {}, 'topics': {}}
     if not term:
         return result
     sessions = db.table('seminar_sessions').select('*').eq('term_id', term['id']).order('meeting_date').execute().data or []
+    result['all_sessions'] = sessions
     sessions = [s for s in sessions if s.get('is_active', True)]
-    weeks = db.table('seminar_weeks').select('*').eq('term_id', term['id']).execute().data or []
+    weeks = db.table('seminar_weeks').select('*').eq('term_id', term['id']).order('week_start').execute().data or []
     week_ids = [w['id'] for w in weeks]
     topics = db.table('topic_events').select('id,seminar_week_id,seminar_session_id,meeting_date,is_active,share_token,created_at').in_('seminar_week_id', week_ids).order('created_at', desc=True).execute().data or [] if week_ids else []
     topics_by_week = {}
     for event in topics:
-        event['session_dates'] = [s['meeting_date'] for s in sessions if s.get('seminar_week_id') == event.get('seminar_week_id')]
+        event['session_dates'] = [s['meeting_date'] for s in result['all_sessions'] if s.get('seminar_week_id') == event.get('seminar_week_id')]
         event['open'] = topic_event_is_open(event, today=today)
         deadline = topic_event_deadline(event)
         event['deadline_label'] = date_label(deadline) + ' 00:00' if deadline else ''
@@ -85,7 +87,7 @@ def member_seminar_summary(db, member_id, today=None):
     tasks.sort(key=lambda event: (str(topic_event_deadline(event) or date.max), str(event['id'])))
     return {'term': context['term'], 'seminar': seminar,
             'submitted': bool(seminar and seminar['topic'] and seminar['topic']['submitted']),
-            'tasks': tasks, 'curriculum': list(context['weeks'].values())}
+            'tasks': tasks, 'curriculum': [w for w in context['weeks'].values() if not is_break_week(w)]}
 
 
 def operations_summary(db, term_id=None, session_id=None, today=None):

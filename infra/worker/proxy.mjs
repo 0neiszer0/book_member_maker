@@ -45,7 +45,7 @@ export default {
     target.search = incoming.search;
     const headers = new Headers(request.headers);
     for (const name of [...headers.keys()]) {
-      if (/^(x-app-|x-forwarded-|x-real-ip$|forwarded$|host$|cf-connecting-ip$|true-client-ip$)/i.test(name)) headers.delete(name);
+      if (name.toLowerCase() !== 'x-app-csrf' && /^(x-app-|x-forwarded-|x-real-ip$|forwarded$|host$|cf-connecting-ip$|true-client-ip$)/i.test(name)) headers.delete(name);
     }
     headers.set('X-App-Origin-Auth', env.ORIGIN_AUTH_SECRET);
     const clientIP = request.headers.get('CF-Connecting-IP');
