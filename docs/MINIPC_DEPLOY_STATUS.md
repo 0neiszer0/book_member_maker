@@ -1,6 +1,8 @@
 # 미니 PC 이전 진행 상태
 
-최신 요청: 사용자가 hosting.kr에서 knu-read.xyz 구매 후 연결 요청. 일반 Cloudflare Tunnel 전환 준비 중.
+최신 상태(2026-10-28 16:25 KST 이후): 새 도메인 DNS 반영/Cloudflare 활성화 및 Tunnel 공개 HTTPS·원본 보호·GET 검증 통과. 첫 화면3회 중앙값 Funnel411ms→Tunnel159ms, health439ms→221ms. 결과 outputs/origin-verification.json.
+knu-read.xyz Custom Domain/Worker 원본 및 기존 링크 리다이렉트/VM 공개 URL·카카오 콜백 전환안 준비. Worker 테스트6개/최종dry-run 및 VM URL변경read-only 검증 통과. 실제 공개 전환은 최종 승인 대기이며 운영 Worker69847a91·앱8e290f7 유지. 상세 docs/MINIPC_DOMAIN_TUNNEL.md 최신 항목 우선.
+이전 준비: 사용자가 hosting.kr에서 knu-read.xyz 구매 후 연결 요청. 일반 Cloudflare Tunnel 전환 준비 중.
 hosting.kr 로그인·정상 등록·DNS 레코드 0개 확인. Cloudflare Free zone 준비, 공개 DNS 게시 반영 대기.
 사용자 승인 후 Cloudflare 네임서버 ian.ns.cloudflare.com / riya.ns.cloudflare.com을 hosting.kr에 저장 완료.
 Tunnel bookmembers-minipc(0be092ee-05e5-4177-afc5-68d47bd2368b) 생성, Ubuntu cloudflared2026.10.5 설치 및 서비스 active/enabled, Cloudflare Healthy/서울4연결 확인. 토큰 root600/LoadCredential 보관.

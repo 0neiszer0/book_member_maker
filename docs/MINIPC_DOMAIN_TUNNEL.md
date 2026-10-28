@@ -1,7 +1,28 @@
 # knu-read.xyz / Cloudflare Tunnel 연결 준비
 
 2026-10-28. 사용자: hosting.kr에서 knu-read.xyz를 1년 구매했다고 알림. 페이지 이동 약 4초 지연을 호소.
-상태: **사용자 승인 후 네임서버 변경 저장, Tunnel 생성 및 Ubuntu 자동 시작 설치 완료. origin 라우트/공개 DNS 확인 중. 기존 회원용 Worker 경로는 유지.**
+상태: **DNS 반영 및 새 Tunnel 공개 검증 완료. knu-read.xyz 회원용 주소·카카오·앱 URL·Worker 전환안을 로컬 검증했으며 최종 승인 대기. 기존 Worker 운영은 유지.**
+
+## 최신 검증 / 최종 전환안 (2026-10-28 16:25 KST 이후)
+
+- 공개 NS가 ian/riya로 변경되고 origin A가 Cloudflare IP로 반환됨. Cloudflare UI에서 도메인 활성화 확인.
+- 정상 TLS 인증서 검증을 유지한 공개 GET 검사 통과: 비밀키 없음/오류 403, home200, DB health200, 카카오 로그인 시작302 및 기존 callback/state 정상.
+- 같은 Windows에서 공개 IP 경로를 고정해 3회 교차 측정. 첫 화면 중앙값 Funnel411ms → Tunnel159ms, health439ms →221ms. 첫 요청 home은2906ms→159ms. 모든 샘플은 `outputs/origin-verification.json`. 로그인 회원 화면의 최종 체감 속도는 전환 후 별도 확인해야 한다.
+- 현재 앱 안전한 공개 설정만 조회: PUBLIC_BASE_URL 및 KAKAO_REDIRECT_URI는 기존 workers.dev, KAKAO_PROXY_REDIRECT_URI 미설정, 추가 Origin 빈 문자열, 원본 인증/secure cookie 켜짐.
+- 로컬 Worker 전환 코드: UPSTREAM_ORIGIN=origin.knu-read.xyz, PUBLIC_BASE_URL=knu-read.xyz, LEGACY_PUBLIC_ORIGIN=기존 workers.dev. 기존 링크의 GET/HEAD는 경로·query를 유지한302로 새 주소로 보내 OAuth 세션 쿠키와 callback 호스트를 일치시킨다. 옛 화면의 POST 등 쓰기는 다른 호스트로 자동 재전송하지 않고409와 새 주소 로그인 안내를 반환한다. 새 도메인 HTTP 요청은 HTTPS308.
+- 기존 정적 CDN44개/해시/1년 캐시/스트리밍/no-store/비밀 헤더 보호 유지. Worker 관련6개 테스트 및 최종 Wrangler dry-run 통과. GitHub main/Render에 push하지 않는다.
+- VM 변경 스크립트 `work/domain-migration/change-public-url.py`를 운영에 **--apply 없이** 실행해 PUBLIC_BASE_URL/KAKAO_REDIRECT_URI 두 값만 바뀜을 검증. 앱 코드8e290f7·DB·비밀값·UI는 유지하며 승인 후 앱 서비스만 재시작한다. 적용 전 root600 복귀 파일 `/etc/book_member_maker/app.env.before-xyz-cutover`를 생성하도록 준비했다.
+
+### 최종 승인 후 실행할 정확한 변경
+
+1. 카카오 앱 독서동아리1288463의 기존 REST API Redirect URI를 모두 보존하고 `https://knu-read.xyz/login/kakao/callback` 한 개 추가.
+2. Cloudflare 기존 Worker `www`의 Custom Domain에 하위도메인 없이 `knu-read.xyz`(Production) 연결. UI 폼만 준비했으며 Add domain은 아직 누르지 않았다. 추가 구입/유료 플랜/등록기관 이전 없음.
+3. VM PUBLIC_BASE_URL=`https://knu-read.xyz`, KAKAO_REDIRECT_URI=`https://knu-read.xyz/login/kakao/callback` 적용, bookmembers 서비스 재시작. 다른 환경변수 보존.
+4. 검증된 Worker 코드/변수 배포로 새 Tunnel 사용 및 기존 workers.dev 방문을 새 주소로 이동. 기존 공개 파일은 그대로 재사용. 설치된 Wrangler4.153.0의 triggersDeploy는 선언된 custom-domain 목록이 비어 있으면 해당 API를 호출하지 않아 대시보드에서 연결한 Custom Domain을 유지한다.
+5. HTTPS/HTTP→HTTPS/기존 링크→새 링크/정적 CDN/DB health/카카오 시작·secure cookie를 GET으로 확인. 실제 로그인은 새 주소에서1회 필요. 전환 중 앱 재시작과 인증서/DNS 준비에 짧은 접속 중단이 생길 수 있다.
+6. 회귀 시 Worker69847a91 및 이전 앱 URL/보호된 env 백업으로 복구하고 새 Custom Domain 연결을 해제해 기존 workers.dev 운영으로 복귀. 기존 카카오 콜백/Funnel은 삭제하지 않는다.
+
+최종 전환에는 아직 승인받지 않았다. Windows 재부팅, Render, GitHub main, DB 데이터/스키마, UI 변경은 제외한다.
 
 ## 승인 실행 기록 (2026-10-28 15:58 KST)
 
@@ -15,6 +36,8 @@
 - 기존 Worker 버전69847a91/원본 Funnel, 앱8e290f7, 공개 기준 URL 및 카카오 설정은 유지. Render/main/DB/Windows 재부팅 없음.
 
 ## origin 연결 완료 / DNS 전파 대기 (2026-10-28 16:04 KST)
+
+16:11 KST 사용자 접속 문의 후 재확인: 최종 회원용 주소는 `https://knu-read.xyz`가 맞다. `origin.knu-read.xyz`는 서버 연결용이며 사용자에게 안내할 주소가 아니다. Google/Cloudflare 공개 DNS와 .xyz 권한 서버(194.169.218.42)가 아직 hosting.co.kr NS를 반환한다. 공식 RDAP 등록부에는 ian/riya가 저장돼 있어 등록부 저장과 DNS 게시 상태가 다르다. apex A는 99.83.196.71/75.2.85.42, origin은 NXDOMAIN이다. 새 Tunnel은 기존 Worker 트래픽에 아직 적용하지 않았으며 apex Worker Custom Domain 및 카카오/앱 기준 URL 전환도 남았다. 이번 단계의 설치 완료를 최종 사이트 주소 전환 완료로 해석하지 않는다.
 
 - Cloudflare Published application 저장 완료: `origin.knu-read.xyz` → `http://127.0.0.1:5000`. DNS CNAME이 `0be092ee-05e5-4177-afc5-68d47bd2368b.cfargotunnel.com`으로 생성됐음을 UI에서 확인.
 - Ubuntu cloudflared가 내려받은 ingress 설정도 동일. 마지막 규칙은 `http_status:404`, `warp-routing.enabled=false`. 전체 LAN/SSH를 공개하지 않는다.

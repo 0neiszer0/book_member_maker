@@ -12,5 +12,9 @@
     "html_handling": "none",
     "not_found_handling": "none"
   },
-  "vars": {"UPSTREAM_ORIGIN": "https://bookmembers-ubuntu.tail97bc40.ts.net"}
+  "vars": {
+    "UPSTREAM_ORIGIN": "https://origin.knu-read.xyz",
+    "PUBLIC_BASE_URL": "https://knu-read.xyz",
+    "LEGACY_PUBLIC_ORIGIN": "https://www.knu-read.workers.dev"
+  }
 }
