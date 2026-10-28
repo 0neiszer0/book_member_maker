@@ -2,7 +2,10 @@
 
 갱신: 2026-10-28 KST. 재부팅/세션 중단 후 이 파일부터 읽는다.
 최신 추가: 응답 속도 진단 완료. 공개 Funnel 지연과 정적 파일 no-store 확인.
-Worker 정적 파일 CDN 제공 최적화는 로컬 검증까지 완료, 공개 배포 승인 대기.
+Worker 정적 파일 CDN 제공 최적화는 로컬 검증까지 완료했으나 사용자가 공개 배포를 명시 보류했다.
+곧 UI가 바뀔 예정이므로 전체 구조를 먼저 검토했다. 실제 Claude Opus5.5 High 자문 완료.
+docs/MINIPC_ARCHITECTURE_REVIEW.md: 기존 Workers 주소+단일 VPC Service+비공개 Tunnel 평가 권고,
+UI 릴리스에 정적 자산 해시/manifest 통합 검토. 모두 설계안이며 새 설치·배포·전환은 하지 않았다.
 상세 수치와 재개 절차: docs/MINIPC_PERFORMANCE.md. 운영 Worker·VM 코드는 아직 그대로다.
 최신 재개: 사용자가 직접 재부팅한 뒤 계속 진행 요청. 아래 과거 '재부팅 보류' 기록은 이 항목으로 대체한다.
 Windows 부팅 시각 2026-10-27 23:05:09 KST. Hyper-V Enabled, HypervisorPresent=true,
@@ -395,5 +398,7 @@ Supabase CLI migration new는 홈 설정 폴더 권한 오류로 실패하여 �
   tailwind.css1,280ms vs3ms. 공개 Funnel 작은403도 반복879~1,156ms, 내부6ms 수준.
 - infra/worker에 ASSETS binding·운영 릴리스 고정 공개 파일18개 준비. UI 원본 파일 수정 없음.
   HTML/API/OAuth/SSE no-store 유지. 관련 테스트6·dry-run·로컬 런타임6항목 통과.
-- 아직 공개 배포하지 않음. Worker 변경 승인을 받은 뒤 배포/재측정. VM 재시작·DB/Kakao 변경 없음.
+- 아직 공개 배포하지 않음. 후속 사용자 답변은 '아직 배포하지 말고 구조부터 논의'.
+  이후 UI 변경 예정과 Claude Opus5.5 High 자문 요청을 반영해 구조 검토를 먼저 진행한다.
+  기존 최적화 배포를 자동 진행하지 않는다. VM 재시작·DB/Kakao 변경 없음.
 - 재부팅 자동 복구 검증 승인 대기와 백업 미활성 등 기존 남은 항목은 그대로다.
