@@ -13,6 +13,9 @@ Worker 원본을 Funnel로 전환 완료, 공개 검증 8항목 통과. 호스�
 Worker 이름 www. 새 카카오 콜백 저장 및 VM의 기준 URL 변경·앱 재시작 완료.
 새 주소의 공개 검증 8항목, 관리자 본인 실제 로그인·로그아웃, 조 편성 SSE 1회,
 비로그인 추천 조회 및 기존 발제 공유 링크 확인 완료. 재부팅 후 자동 복구 검증은 남아 있다.
+구축 후 검증용 Windows 재부팅 승인을 요청한 상태이며 아직 실행하지 않았다.
+기존 Windows AutoAdminLogon=true를 읽기 확인했다. 설정은 유지하고, 자동 로그인 환경에서의
+무인 복구와 엄밀한 'Windows 로그인 전' 복구 증거를 구분한다. 후자는 아직 미검증이다.
 작업 사본: C:/Users/HOME/Documents/Codex/2026-10-27/markdown-0neiszer0-book-member-maker-pc/work/book_member_maker
 브랜치: codex/minipc-security. 기준 main: 91b7dd6d9d0c6771a1e07c1ea977396f72dae4ce.
 현재 GitHub main 및 Render live: bda8a82e66ac828dd3bfe1971c37e7e98cca356f. 사용자 승인 후 보안 배포 완료. 이후 백업 준비 변경은 로컬에만 있다.
@@ -362,7 +365,21 @@ Supabase CLI migration new는 홈 설정 폴더 권한 오류로 실패하여 �
 | Tailscale·Funnel | 완료 | 전용 태그만 funnel 허용, HTTPS443→loopback5000, --bg, KeyExpiry=null |
 | Worker→미니 PC 전환 | 완료 | 공개8항목·관리자 OAuth/로그아웃·SSE1회·추천/공유 링크 조회 |
 | 사진/운영 POST | 제한 검증 | 프록시 코드·합성 테스트/경로 검토. 실제 데이터 쓰기·업로드 테스트 안 함 |
-| Windows 로그인 전 자동 복구 | 보류 | 구축 후 재부팅1회 및 로그인 전 외부 접속 확인 필요; UI 작업 저장 후 승인 |
+| Windows 재부팅 후 자동 복구 | 승인 대기 | 구축 후 재부팅 미실행. 기존 AutoAdminLogon=true 유지; 수동 서비스 시작 없이 복구 확인 예정 |
+| Windows 로그인 전 자동 복구 | 미검증 | 기존 자동 로그인 때문에 재부팅 후 정상 접속만으로 로그인 전 복구를 입증할 수 없음 |
 | 정전 후 전원 켜짐 | 미확인 | BIOS 전원 복구 정책은 OS에서 확정 못 함 |
 | DB/Storage 외부 복구 | 보류 | 백업 스크립트만 준비, 외부 저장소·복구키·활성화·격리 복원 미완료 |
 | Render·구주소 | 보존 | 기존 Render 직접 주소 유지. Worker OAuth 대체 설정은 사용자 결정으로 보류; 중지/삭제 미승인 |
+
+## 재부팅 검증 직전 재개 기록 (2026-10-28)
+
+- Windows Winlogon의 AutoAdminLogon 플래그만 조회하여 true 확인. 사용자명·비밀번호는 조회하거나 기록하지 않았다.
+- 기존 자동 로그인 설정 변경 없음. Windows 재부팅은 별도 질문으로 승인 대기 중이며,
+  승인이 없으면 실행하지 않는다. 승인 시 강제 앱 종료 없이 재부팅한다.
+- 다른 UI 세션은 읽기 상태 조회에서 idle/마지막 검토 완료였다. 그 세션의 파일·설정은 변경하지 않았다.
+- work/pre-recovery-baseline.json에 Windows 부팅 시각, Ubuntu boot_id, 서비스 enabled/active,
+  Funnel 지속 설정, 현재 Worker 버전 및 URL을 저장했다.
+- 재개 시 어떤 서비스도 먼저 수동 시작하지 말고 부팅 시각/boot_id 변경과 현재 상태를 조회한다.
+  이어 새 Worker의 공개 8항목 검증을 수행하고 자동 복구 결과를 기록한다.
+- 자동 로그인 환경의 정상 복구가 확인돼도 '로그인 전'을 별도로 입증했다고 기록하지 않는다.
+  BIOS 정전 후 전원 복구와 외부 백업·격리 복원도 여전히 미확인/미활성 상태다.

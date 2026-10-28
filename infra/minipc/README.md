@@ -67,7 +67,11 @@ Funnel https://bookmembers-ubuntu.tail97bc40.ts.net 을 가리킨다. 2026-10-28
    보류됐으므로, Render로 돌아가면 전환 이전과 같이 Render 직접 로그인 주소를 사용해야 한다.
    두 호스트의 쿠키는 공유되지 않는다. 완전한 Worker OAuth 대체 원본으로 간주하지 않는다.
    실패 시 승인 후 패치된 Render origin으로 되돌린다. 취약한 기준 main으로 롤백하지 않는다.
-9. 재부팅 승인 후 Windows 로그인 없이 VM→Gunicorn→Tailscale/Funnel→Worker 접속을 검증한다.
+9. 재부팅 승인 후 수동 서비스 시작 없이 VM→Gunicorn→Tailscale/Funnel→Worker 접속을 검증한다.
+   현재 Windows AutoAdminLogon=true이며 기존 설정은 유지한다. 이 환경에서 재부팅 후 접속 성공은
+   무인 복구 증거지만, 그 자체로 Windows 로그인 전 접속을 입증하지는 않는다.
+   재부팅 전 work/pre-recovery-baseline.json과 Windows 부팅 시각·Ubuntu boot_id를 비교한다.
+   SSH는 고정 Tailscale IP와 기존 호스트 키로 접속하며, 서비스 상태부터 확인한다.
    전원 복구 후 자동 켜짐은 BIOS 설정 별도 확인 사항이다. 절전·최대절전 정책도 읽기 확인 후
    서버 운영에 필요하면 별도 승인받아 조정한다. 현재 AC/DC 절전·최대절전 timeout은 모두 0임을 읽기 확인했고 변경하지 않았다.
 
