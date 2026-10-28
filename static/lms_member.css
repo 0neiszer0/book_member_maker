@@ -1,0 +1,67 @@
+/* Member activity, profiles and help pages use the shared LMS shell. */
+.lms-member-page{max-width:1120px;min-width:0;overflow-wrap:anywhere}
+.lms-member-page .lms-member-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:24px}
+.lms-member-page .lms-member-heading h1{margin:0 0 8px}
+.lms-member-page .lms-member-heading p{margin-bottom:0}
+.lms-member-page .lms-member-muted{color:#56616a;font-size:14px;line-height:21px}
+.lms-member-page .lms-member-section{margin-bottom:28px;padding:20px;border:1px solid #c7cdd1;scroll-margin-top:24px}
+.lms-member-page .lms-member-section>h2{margin-bottom:18px}
+.lms-member-page .lms-member-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:16px 0 0}
+.lms-member-page .lms-member-actions+p{margin-top:12px}
+.lms-member-page .lms-member-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0 0 16px}
+.lms-member-page .lms-member-stats>div{display:flex;flex-direction:column;padding:8px 16px;border-right:1px solid #c7cdd1}
+.lms-member-page .lms-member-stats>div:first-child{padding-left:0}
+.lms-member-page .lms-member-stats>div:last-child{border-right:0}
+.lms-member-page .lms-member-stats dt{font-size:14px;color:#56616a}
+.lms-member-page .lms-member-stats dd{font-size:30px;line-height:40px;margin:6px 0 0}
+.lms-member-page a.lms-member-text-link,.lms-member-guide .lms-member-section a:not(.lms-button){color:#0374b5;text-decoration:underline}
+.lms-member-page .lms-member-task-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px}
+.lms-member-page .lms-member-task{padding:18px 0;border-top:1px solid #c7cdd1;min-width:0}
+.lms-member-page .lms-member-task h3,.lms-member-page .lms-member-record h3{font-weight:700;margin-bottom:8px}
+.lms-member-page .lms-member-task p{font-size:14px;line-height:21px;color:#56616a}
+.lms-member-page .lms-member-task-wide{grid-column:1/-1}
+.lms-member-page .lms-member-record-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+.lms-member-page .lms-member-record{min-width:0}
+.lms-member-page .lms-member-link-list,.lms-member-page .lms-member-profiles{list-style:none;margin:0;padding:0}
+.lms-member-page .lms-member-link-list li{border-top:1px solid #c7cdd1}
+.lms-member-page .lms-member-link-list a,.lms-member-page .lms-member-event{display:flex;flex-direction:column;gap:4px;padding:12px 0;font-size:14px;line-height:21px}
+.lms-member-page .lms-member-link-list a:hover{background:#f5f5f5}
+.lms-member-page .lms-member-badge{display:inline-block;border:1px solid #c7cdd1;padding:0 5px;margin-left:4px;font-size:12px;line-height:18px}
+.lms-member-page .lms-member-profiles{border-top:1px solid #c7cdd1}
+.lms-member-page .lms-member-profile-link{display:flex;align-items:center;gap:20px;padding:20px 0;border-bottom:1px solid #c7cdd1}
+.lms-member-page .lms-member-profile-link:hover{background:#f5f5f5;text-decoration:none}
+.lms-member-page .lms-member-profile-link h2{font-size:18px;line-height:27px;margin:0 0 4px}
+.lms-member-page .lms-member-profile-link p{margin:0}
+.lms-member-page .lms-member-avatar{display:flex;align-items:center;justify-content:center;width:64px;height:64px;flex:0 0 64px;border-radius:50%;object-fit:cover;background:#f5f5f5;border:1px solid #c7cdd1;font-size:24px;color:#56616a}
+.lms-member-page .lms-member-profile-heading{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:24px}
+.lms-member-page .lms-member-profile-heading h2{margin:0;flex:1}
+.lms-member-page .lms-member-profile-heading .lms-member-actions{margin:0}
+.lms-member-page .lms-member-intro{background:#f5f5f5;padding:16px;margin-bottom:24px}
+.lms-member-page .lms-member-intro p{margin:0}
+.lms-member-page .lms-member-profile-content{border-top:1px solid #c7cdd1;padding-top:20px;line-height:1.7}
+.lms-member-page .lms-member-profile-content :is(h2,h3){margin-top:24px;border-bottom:1px solid #c7cdd1;padding-bottom:8px}
+.lms-member-page .lms-member-profile-content a{color:#0374b5;text-decoration:underline}
+.lms-member-page .lms-member-profile-content img{max-width:100%;height:auto}
+.lms-member-page .lms-member-input{width:100%}
+.lms-member-page textarea.lms-member-profile-editor{min-height:320px}
+.lms-member-page #profile-format-help{margin-top:8px}
+.lms-member-guide .lms-member-guide-layout{display:grid;grid-template-columns:200px minmax(0,1fr);gap:24px;align-items:start}
+.lms-member-guide .lms-member-guide-nav{position:sticky;top:24px;border-left:1px solid #c7cdd1;padding:0 0 0 12px}
+.lms-member-guide .lms-member-guide-nav a{display:block;padding:10px 8px;font-size:14px;line-height:21px}
+.lms-member-guide .lms-member-guide-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.lms-member-guide .lms-member-guide-overview-five{grid-template-columns:repeat(5,minmax(0,1fr))}
+.lms-member-guide .lms-member-summary{background:#f5f5f5;padding:16px}
+.lms-member-guide .lms-member-summary p,.lms-member-guide .lms-member-guide-overview p{margin:8px 0 0}
+.lms-member-guide .lms-member-stack>*+*{margin-top:16px}
+.lms-member-guide .lms-member-step{display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px}
+.lms-member-guide .lms-member-step-number,.lms-member-guide .lms-member-step>b:first-child{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid #c7cdd1;background:#f5f5f5;font-size:14px}
+.lms-member-guide .lms-member-step p{margin:8px 0 0}
+.lms-member-guide .lms-member-note{margin-top:20px;padding:14px 16px;background:#f5f5f5;border-left:3px solid #6b7780;font-size:14px;line-height:22px}
+.lms-member-guide .lms-member-warning{border-left-color:#a82623}
+.lms-member-guide :is(ol,ul){padding-left:24px;font-size:14px;line-height:23px;margin:12px 0 16px}
+.lms-member-guide .lms-member-checklist{list-style:square}
+.lms-member-guide .lms-member-question{padding:16px 0;border-top:1px solid #c7cdd1}
+.lms-member-guide .lms-member-question summary{cursor:pointer;font-weight:700;font-size:14px}
+.lms-member-guide .lms-member-question p{margin:12px 0 0}
+@media(max-width:991px){.lms-member-guide .lms-member-guide-overview-five{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:767px){.lms-member-page .lms-member-section{padding:16px}.lms-member-page .lms-member-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.lms-member-page .lms-member-stats>div{border:0;padding:0}.lms-member-page .lms-member-task-grid,.lms-member-page .lms-member-record-grid,.lms-member-guide .lms-member-guide-layout,.lms-member-guide .lms-member-guide-overview{grid-template-columns:minmax(0,1fr)}.lms-member-guide .lms-member-guide-nav{position:static;border:1px solid #c7cdd1;padding:8px}.lms-member-page .lms-member-profile-heading .lms-member-actions{width:100%}.lms-member-page .lms-member-profile-link{gap:12px}}

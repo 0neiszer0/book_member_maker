@@ -1,14 +1,20 @@
+{% extends 'lms_admin_base.html' %}
+{% from '_lms_icons.html' import icon %}
+{% set lms_page = 'operations' %}
+{% set lms_title = '세미나 운영' %}
+{% block title %}세미나 운영{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_operations.css') }}">{% endblock %}
 {% macro review_panel(seminar_session) -%}
   {% if seminar_session.review_form %}
   {% set form=seminar_session.review_form %}
-  <details class="session-review mt-4 rounded-xl border border-[#dce6d2] bg-[#f8fbf4] p-3">
+  <details class="session-review mt-4 rounded-xl border ops-border ops-surface p-3">
     <summary class="cursor-pointer list-none">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <strong>이 회차 후기</strong>
         <span class="flex items-center gap-2"><span class="chip">{{ '접수 중' if form.status == 'open' else '마감' }}</span><span class="chip">{{ form.submission_count }}명 제출</span><span aria-hidden="true">⌄</span></span>
       </div>
     </summary>
-    <div class="flex flex-wrap gap-2 mt-3 pb-3 border-b border-[#dce6d2]">
+    <div class="flex flex-wrap gap-2 mt-3 pb-3 border-b ops-border">
       <button class="btn soft" data-copy="{{ form.share_url }}">후기 링크 복사</button>
       <button class="btn soft review-form-status" data-form-id="{{ form.id }}" data-status="{{ 'closed' if form.status == 'open' else 'open' }}">{{ '접수 마감' if form.status == 'open' else '다시 열기' }}</button>
     </div>
@@ -25,7 +31,7 @@
 {%- endmacro %}
 
 {% macro no_show_panel(seminar_session) -%}
-  <details class="no-show-picker mt-3 rounded-xl border border-[#e7d3c3] bg-[#fffaf5] p-3">
+  <details class="no-show-picker mt-3 rounded-xl border ops-border ops-surface p-3">
     <summary class="cursor-pointer list-none">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <strong>미연락 불참</strong>
@@ -57,29 +63,10 @@
   </details>
 {%- endmacro %}
 
-<!doctype html>
-<html lang="ko">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>세미나 운영</title>{% include '_tailwind_head.html' %}
-<style>
-    body{background:var(--paper,#faf6ec);color:var(--ink,#2a241b);font-family:Pretendard,-apple-system,BlinkMacSystemFont,sans-serif}
-    .panel{background:var(--surface,#fffdf8);border:1px solid var(--line,#e5d7b8);border-radius:18px}
-    .field{width:100%;border:1px solid var(--line,#e5d7b8);border-radius:10px;background:#fff;padding:.65rem .75rem}
-    .btn{border-radius:10px;padding:.6rem .9rem;font-weight:700;font-size:.875rem;display:inline-flex;align-items:center;justify-content:center;gap:.35rem}
-    button[data-focus-session]{min-height:44px;min-width:44px;padding:8px;margin:2px;border:1px solid var(--line,#d7c9a5);border-radius:8px;text-decoration:none}
-    .primary{background:var(--moss-deep,#3d5c2e);color:#fff}.soft{background:var(--moss-tint,#e8efdd);color:var(--moss-deep,#3d5c2e)}
-    .muted{color:var(--ink-soft,#6b6255)}.chip{display:inline-flex;flex:none;align-items:center;justify-content:center;white-space:nowrap;line-height:1.25;border-radius:999px;padding:.25rem .6rem;font-size:.75rem;font-weight:700;background:var(--paper-2,#f2ebd8)}
-    .absence-option,.member-option{border:1px solid var(--line,#e5d7b8);border-radius:10px;background:#fff;padding:.55rem .65rem;cursor:pointer}
-    .absence-option:has(input:checked),.member-option:has(input:checked){border-color:var(--moss-deep,#3d5c2e);background:var(--moss-tint,#e8efdd)}
-    .review-entry{border-top:1px solid var(--line,#e5d7b8);padding:1rem 0}
-    .review-entry:first-child{border-top:0;padding-top:0}
-    .review-content{white-space:pre-wrap;line-height:1.75;color:var(--ink,#2a241b)}
-  </style>
-    {% include '_app_theme_head.html' %}
-</head>
-<body>{% include '_header.html' %}{% include '_admin_sidebar.html' %}
-<main class="max-w-[1500px] mx-auto px-4 lg:px-8 py-7">
+
+{% block content %}
+<div class="lms-operations">
+<div class="max-w-[1500px] mx-auto px-4 lg:px-8 py-7">
  <div>
   <div class="min-w-0">
   <div class="flex flex-wrap items-end justify-between gap-4 mb-6">
@@ -93,7 +80,7 @@
     </div>
   </div>
 
-  {% include 'admin_schedule_editor.html' %}
+  {% include '_lms_operations_schedule_editor.html' %}
 
   {% if not term %}<div class="panel p-8 text-center muted">등록된 학기가 없습니다. 기존 관리자 화면에서 학기를 먼저 추가해주세요.</div>{% endif %}
   <div class="space-y-5">
@@ -117,19 +104,19 @@
         </div>
       </div>
       <div class="grid lg:grid-cols-[1.15fr_1fr_1fr] gap-4">
-        <div class="rounded-2xl bg-[#f7f1e4] p-4 order-1">
+        <div class="rounded-2xl ops-surface p-4 order-1">
           <h3 class="font-extrabold mb-3">세미나 도서</h3>
           <p class="font-bold schedule-book-display">{{ week.book_title or '도서 미정' }}</p>
           <p class="muted schedule-author-display">{{ week.book_author or '' }}</p>
           <p class="muted schedule-note-display" style="white-space:pre-wrap;overflow-wrap:anywhere">{{ week.note or '' }}</p>
           <button type="button" class="btn primary mt-3" data-open-schedule="{{ week.id }}">도서·사회자 함께 편집</button>
         </div>
-        <div class="rounded-2xl border border-[#dce6d2] p-4 order-3">
+        <div class="rounded-2xl border ops-border p-4 order-3">
           <div class="flex justify-between gap-2"><div><p class="text-xs font-bold muted">추가 세미나</p><h3 class="font-extrabold">참석 투표</h3></div>{% if mon %}<span class="chip">예정 {{ mon.expected_count }}명</span>{% endif %}</div>
           {% if mon %}
             <p class="text-sm muted mt-2">{{ mon.meeting_date|seminar_date }} · 정원·선착순 제한 없음</p>
             <div class="flex flex-wrap gap-2 mt-3"><a class="btn primary" href="{{ url_for('admin_seminar_roster', session_id=mon.id) }}">카카오톡 참석 명단 반영·출석 확정</a></div>
-            <p class="text-sm muted mt-2">{{ '실제 출석 확정됨' if mon.attendance_confirmed_at else '실제 출석 미확정' }} · {{ '명단 반영됨' if mon.roster_updated_at else '투표 결과 반영 전' }}</p>
+            <p class="text-sm muted mt-2">{{ '실제 출석 확정됨' if mon.attendance_confirmed else '실제 출석 미확정' }} · {{ '명단 반영됨' if mon.roster_updated_at else '투표 결과 반영 전' }}</p>
             <p class="text-sm mt-2">사회자: <span data-moderator-display="{{ mon.id }}">{{ mon.moderator_name or '미입력' }}</span> <button type="button" class="underline" data-open-schedule="{{ week.id }}" data-focus-session="{{ mon.id }}">수정</button>{% if week.topic_event %} · <a class="underline" href="{{ url_for('download_topics_word', event_id=week.topic_event.id, session_id=mon.id) }}">이 회차 Word</a>{% endif %}</p>
             <div class="flex flex-wrap gap-1 mt-3">{% for m in mon.attendees %}<span class="chip">{{ m.name }}</span>{% else %}<span class="text-sm muted">신청자가 없습니다.</span>{% endfor %}</div>
             <div class="flex flex-wrap gap-2 mt-4"><a class="btn primary" href="{{ url_for('bookclub_index', session_id=mon.id) }}">조 편성</a>{% if mon.history %}<a class="btn soft" href="{{ url_for('records_seminar_detail', history_id=mon.history.id) }}">진행 기록</a>{% endif %}{% if not mon.review_form %}<button class="btn soft open-review" data-session-id="{{ mon.id }}">후기 받기</button>{% endif %}</div>
@@ -137,16 +124,16 @@
             {{ no_show_panel(mon) }}
           {% else %}<p class="muted text-sm mt-3">이 주차에는 추가 세미나가 없습니다.</p>{% endif %}
         </div>
-        <div class="rounded-2xl border border-[#eadac5] p-4 order-2">
+        <div class="rounded-2xl border ops-border p-4 order-2">
           <div class="flex justify-between gap-2"><div><p class="text-xs font-bold muted">본 세미나</p><h3 class="font-extrabold">불참 기록</h3></div>{% if thu %}<span class="chip">예상 {{ thu.expected_count }}명</span>{% endif %}</div>
           {% if thu %}
             <p class="text-sm muted mt-2">{{ thu.meeting_date|seminar_date }} · 불참 {{ thu.absences|length }}명</p>
             <div class="flex flex-wrap gap-2 mt-3"><a class="btn primary" href="{{ url_for('admin_seminar_roster', session_id=thu.id) }}">카카오톡 불참 명단 반영·출석 확정</a></div>
-            <p class="text-sm muted mt-2">{{ '실제 출석 확정됨' if thu.attendance_confirmed_at else '실제 출석 미확정' }} · {{ '명단 반영됨' if thu.roster_updated_at else '투표 결과 반영 전' }}</p>
+            <p class="text-sm muted mt-2">{{ '실제 출석 확정됨' if thu.attendance_confirmed else '실제 출석 미확정' }} · {{ '명단 반영됨' if thu.roster_updated_at else '투표 결과 반영 전' }}</p>
             <p class="text-sm mt-2">사회자: <span data-moderator-display="{{ thu.id }}">{{ thu.moderator_name or '미입력' }}</span> <button type="button" class="underline" data-open-schedule="{{ week.id }}" data-focus-session="{{ thu.id }}">수정</button>{% if week.topic_event %} · <a class="underline" href="{{ url_for('download_topics_word', event_id=week.topic_event.id, session_id=thu.id) }}">이 회차 Word</a>{% endif %}</p>
             {% if thu.planned_member_ids is none %}
             <div class="flex flex-wrap gap-1 mt-3">{% for a in thu.absences %}<button class="chip absence-cancel" title="불참 취소" data-session-id="{{ thu.id }}" data-member-id="{{ a.member.id }}">{{ a.member.name }}{% if a.note %} · {{ a.note }}{% endif %} ×</button>{% else %}<span class="text-sm muted">등록된 불참자가 없습니다.</span>{% endfor %}</div>
-            <details class="absence-picker mt-3 rounded-xl border border-[#eadac5] bg-[#fffdf8] p-3">
+            <details class="absence-picker mt-3 rounded-xl border ops-border ops-surface p-3">
               <summary class="font-bold cursor-pointer">여러 명 한 번에 선택</summary>
               <div class="mt-3">
                 <div class="flex flex-wrap items-center gap-2">
@@ -177,7 +164,11 @@
   </div>
   </div>
  </div>
-</main>
+</div>
+
+</div>
+{% endblock %}
+{% block scripts %}
 <script>
 async function api(url, options={}){const r=await fetch(url,{headers:{'Content-Type':'application/json'},...options});const j=await r.json();if(!r.ok||j.status==='error')throw new Error(j.message||'처리하지 못했습니다.');return j}
 function updateAbsenceSelection(picker){const count=picker.querySelectorAll('.absence-checkbox:checked').length;picker.querySelector('.absence-selected-count').textContent=count+'명 선택'}
@@ -208,4 +199,6 @@ document.addEventListener('click',async e=>{
   if(e.target.closest('.no-show-cancel')){const b=e.target.closest('.no-show-cancel');if(confirm('이 미연락 불참 기록을 취소할까요? 기록 자체는 이력에 남습니다.')){await api('/api/admin/seminar_sessions/'+b.dataset.sessionId+'/no_shows/'+b.dataset.memberId,{method:'DELETE'});location.reload()}}
  }catch(err){alert(err.message)}
 })
-</script><script src="{{ url_for('static', filename='seminar_schedule.js') }}"></script></body></html>
+</script>
+<script src="{{ url_for('static', filename='seminar_schedule.js') }}"></script>
+{% endblock %}

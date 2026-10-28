@@ -1,75 +1,71 @@
+{% extends 'lms_admin_base.html' %}
 {% from '_records_base.html' import records_nav, term_filter %}
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <title>세미나 진행 현황 - 기록 시스템</title>
-    {% include '_records_base.html' %}
-    <style>
-        dialog::backdrop { background: rgba(42, 36, 27, .5); }
-        .edit-field { width: 100%; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); padding: .65rem .75rem; }
-        .edit-label { display: block; font-size: .78rem; font-weight: 800; color: var(--ink-soft); }
-    </style>
-    {% include '_app_theme_head.html' %}
-</head>
-<body class="min-h-screen">
-    {% include '_header.html' %}
+{% from '_lms_icons.html' import icon %}
+{% set lms_title = '세미나 진행 현황' %}
+{% set lms_page = 'records' %}
+{% block title %}세미나 진행 현황 - 기록 시스템{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='lms_records.css') }}">
 
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+{% endblock %}
+{% block content %}
+<div class="records-page">
+<div class="records-content">
         {{ records_nav('seminars') }}
         {{ term_filter(terms, selected_term_id, 'records_seminars') }}
 
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-3">
-            <h1 class="text-2xl font-bold text-eva-green">세미나 진행 현황 (총 {{ total_history }}회)</h1>
-            <div class="flex gap-2 flex-wrap">
+        <div class="records-flex records-flex-col records-md-flex-row records-md-items-center records-md-justify-between records-mb-6 records-gap-3">
+            <h1 class="records-accent">세미나 진행 현황 (총 {{ total_history }}회)</h1>
+            <div class="records-flex records-gap-2 records-flex-wrap">
                 <a href="{{ url_for('manual_entry') }}"
-                    class="bg-eva-purple text-white font-bold py-2 px-3 rounded text-sm hover:opacity-80">
+                    class="records-font-bold records-py-2 records-px-3 records-rounded records-text-sm  lms-button lms-button-primary">
                     + 과거 세미나 수동 추가
                 </a>
                 <input type="search" id="seminarSearch" aria-label="현재 페이지의 세미나 기록 검색" placeholder="현재 페이지 도서명·날짜 검색"
-                    class="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm w-full md:w-64">
+                    class="records-tint records-border records-line records-rounded records-px-3 records-py-2 records-text-sm records-w-full records-md-w-64">
             </div>
         </div>
-        <p class="text-xs text-gray-500 mb-3">
-            <i data-lucide="lightbulb" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 진행했지만 그날 저장 못 한 세미나가 있다면 <strong>과거 세미나 수동 추가</strong>를 눌러 날짜·발제자·조 편성을 함께 입력하세요.
+        <p class="records-text-xs records-muted records-mb-3">
+            {{ icon('help', 18) }} 진행했지만 그날 저장 못 한 세미나가 있다면 <strong>과거 세미나 수동 추가</strong>를 눌러 날짜·발제자·조 편성을 함께 입력하세요.
             저장된 기록은 회원 프로필·통계에 즉시 반영됩니다.
         </p>
 
         {% if not buckets %}
-        <div class="eva-card rounded-lg p-6 text-center text-gray-500">기록이 없습니다.</div>
+        <div class="records-panel records-rounded-lg records-p-6 records-text-center records-muted">기록이 없습니다.</div>
         {% endif %}
 
         {% for bucket in buckets %}
-        <details class="eva-card rounded-lg overflow-hidden mb-3" {% if loop.index <= 1 %}open{% endif %}>
-            <summary class="cursor-pointer px-4 py-3 bg-gray-700/40 flex justify-between items-center">
-                <span class="font-bold text-eva-green">{{ bucket.label }}</span>
-                <span class="text-xs text-gray-400">{{ bucket.rows|length }}회</span>
+        <details class="records-panel records-rounded-lg records-overflow-hidden records-mb-3" {% if loop.index <= 1 %}open{% endif %}>
+            <summary class="records-cursor-pointer records-px-4 records-py-3 records-tint records-flex records-justify-between records-items-center">
+                <span class="records-font-bold records-accent">{{ bucket.label }}</span>
+                <span class="records-text-xs records-muted">{{ bucket.rows|length }}회</span>
             </summary>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
+            <div class="records-overflow-x-auto" tabindex="0" aria-label="세미나 기록 표 가로 스크롤">
+                <table class="records-w-full records-text-sm records-seminar-table">
                     <thead>
-                        <tr class="bg-gray-700/30 text-left text-gray-300">
-                            <th class="p-3">날짜</th>
-                            <th class="p-3">도서명</th>
-                            <th class="p-3 text-center">참여</th>
-                            <th class="p-3 text-center">조</th>
-                            <th class="p-3 text-center">발제자</th>
-                            <th class="p-3 text-center">상세</th>
+                        <tr class="records-tint records-text-left records-ink">
+                            <th class="records-p-3">날짜</th>
+                            <th class="records-p-3">도서명</th>
+                            <th class="records-p-3 records-text-center">참여</th>
+                            <th class="records-p-3 records-text-center">조</th>
+                            <th class="records-p-3 records-text-center">발제자</th>
+                            <th class="records-p-3 records-text-center">상세</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for h in bucket.rows %}
-                        <tr class="seminar-row border-t border-border-dark/50 hover:bg-gray-700/20"
+                        <tr class="seminar-row records-border-t records-line records-hover"
                             data-date="{{ h.date }}" data-title="{{ h.book_title or '' }}">
-                            <td class="p-3 font-mono text-gray-300">{{ h.date }}</td>
-                            <td class="p-3 font-bold text-[#304923]">{{ h.book_title or '(도서명 미입력)' }}</td>
-                            <td class="p-3 text-center text-eva-green font-bold">{{ h.present_count }}</td>
-                            <td class="p-3 text-center text-gray-300">{{ h.group_count }}</td>
-                            <td class="p-3 text-center text-eva-purple">{{ h.facilitator_count }}</td>
-                            <td class="p-3 text-center">
-                                <div class="flex justify-center gap-2">
-                                    <button type="button" class="edit-seminar bg-[#e8efdd] text-[#304923] font-bold text-xs py-1.5 px-3 rounded" data-history-id="{{ h.id }}">날짜·도서 편집</button>
+                            <td class="records-p-3 records-font-mono records-ink">{{ h.date }}</td>
+                            <td class="records-p-3 records-font-bold records-accent">{{ h.book_title or '(도서명 미입력)' }}</td>
+                            <td class="records-p-3 records-text-center records-accent records-font-bold">{{ h.present_count }}</td>
+                            <td class="records-p-3 records-text-center records-ink">{{ h.group_count }}</td>
+                            <td class="records-p-3 records-text-center records-accent">{{ h.facilitator_count }}</td>
+                            <td class="records-p-3 records-text-center">
+                                <div class="records-flex records-justify-center records-gap-2">
+                                    <button type="button" class="edit-seminar records-font-bold records-text-xs records-py-1-5 records-px-3 records-rounded lms-button" data-history-id="{{ h.id }}">날짜·도서 편집</button>
                                     <a href="{{ url_for('records_seminar_detail', history_id=h.id) }}"
-                                        class="bg-[#3d5c2e] text-white font-bold text-xs py-1.5 px-3 rounded">상세</a>
+                                        class="records-font-bold records-text-xs records-py-1-5 records-px-3 records-rounded lms-button lms-button-primary">상세</a>
                                 </div>
                             </td>
                         </tr>
@@ -81,33 +77,33 @@
         {% endfor %}
 
         {% if total_pages > 1 %}
-        <nav class="mt-5 flex items-center justify-center gap-3" aria-label="세미나 기록 페이지">
-            {% if page > 1 %}<a class="wood-chip" href="{{ url_for('records_seminars', term_id=selected_term_id, page=page-1) }}">← 이전 100개</a>{% endif %}
-            <span class="text-sm text-gray-500">{{ page }} / {{ total_pages }} 페이지</span>
-            {% if page < total_pages %}<a class="wood-chip" href="{{ url_for('records_seminars', term_id=selected_term_id, page=page+1) }}">다음 100개 →</a>{% endif %}
+        <nav class="records-mt-5 records-flex records-items-center records-justify-center records-gap-3" aria-label="세미나 기록 페이지">
+            {% if page > 1 %}<a class="lms-button" href="{{ url_for('records_seminars', term_id=selected_term_id, page=page-1) }}">← 이전 100개</a>{% endif %}
+            <span class="records-text-sm records-muted">{{ page }} / {{ total_pages }} 페이지</span>
+            {% if page < total_pages %}<a class="lms-button" href="{{ url_for('records_seminars', term_id=selected_term_id, page=page+1) }}">다음 100개 →</a>{% endif %}
         </nav>
         {% endif %}
 
-        <div class="mt-4 text-xs text-gray-500">날짜·도서명은 바로 편집하고, 참여자 이동·발제자·출석 확인·공지 이미지 만들기는 ‘상세’에서 진행하세요.</div>
+        <div class="records-mt-4 records-text-xs records-muted">날짜·도서명은 바로 편집하고, 참여자 이동·발제자·출석 확인·공지 이미지 만들기는 ‘상세’에서 진행하세요.</div>
     </div>
 
-    <dialog id="seminarEditDialog" class="w-[min(94vw,680px)] rounded-2xl border border-[#e5d7b8] p-0 bg-[#fffdf8] text-[#2a241b]">
-        <form method="dialog" id="seminarEditForm" class="p-5 sm:p-6">
-            <div class="flex items-start justify-between gap-4">
-                <div><p class="text-xs font-bold text-[#6b6255]">세미나 기록</p><h2 class="text-xl font-extrabold mt-1">날짜·도서 편집</h2></div>
-                <button type="button" id="seminarEditClose" class="text-2xl leading-none" aria-label="닫기">×</button>
+    <dialog id="seminarEditDialog" class="records-w--min-94vw-680px records-rounded-2xl records-border records-line records-p-0 records-white records-ink">
+        <form method="dialog" id="seminarEditForm" class="records-p-5 records-sm-p-6">
+            <div class="records-flex records-items-start records-justify-between records-gap-4">
+                <div><p class="records-text-xs records-font-bold records-muted">세미나 기록</p><h2 class="records-mt-1">날짜·도서 편집</h2></div>
+                <button type="button" id="seminarEditClose" class="records-text-2xl records-leading-none" aria-label="닫기">×</button>
             </div>
             <input type="hidden" id="editHistoryId">
-            <div class="grid sm:grid-cols-2 gap-4 mt-5">
-                <label class="edit-label">날짜<input type="date" id="editDate" class="edit-field mt-1"></label>
-                <label class="edit-label">도서명<input type="text" id="editBookTitle" class="edit-field mt-1" placeholder="도서명을 입력하세요"></label>
+            <div class="records-grid records-sm-grid-cols-2 records-gap-4 records-mt-5">
+                <label class="edit-label">날짜<input type="date" id="editDate" class="edit-field records-mt-1"></label>
+                <label class="edit-label">도서명<input type="text" id="editBookTitle" class="edit-field records-mt-1" placeholder="도서명을 입력하세요"></label>
             </div>
-            <p id="editDateHelp" class="text-xs text-[#6b6255] mt-2"></p>
-            <a id="editGroupDetail" class="block underline font-bold text-[#3d5c2e] mt-4" href="#">참여자 이동·발제자·출석은 상세 편집에서 →</a>
-            <div class="rounded-xl bg-[#f2ebd8] p-3 text-xs text-[#5f5649] mt-4">일정에서 만든 세미나는 도서명을 저장하면 목요일·월요일 일정과 발제문에도 같은 제목이 바로 반영됩니다.</div>
-            <div class="flex justify-end gap-2 mt-5">
-                <button type="button" id="seminarEditCancel" class="bg-[#eee7d8] text-[#4d463c] font-bold py-2 px-4 rounded-lg">취소</button>
-                <button type="submit" id="seminarEditSave" class="bg-[#3d5c2e] text-white font-bold py-2 px-4 rounded-lg">변경사항 저장</button>
+            <p id="editDateHelp" class="records-text-xs records-muted records-mt-2"></p>
+            <a id="editGroupDetail" class="records-block records-underline records-font-bold records-accent records-mt-4" href="#">참여자 이동·발제자·출석은 상세 편집에서 →</a>
+            <div class="records-rounded-xl records-tint records-p-3 records-text-xs records-ink records-mt-4">일정에서 만든 세미나는 도서명을 저장하면 목요일·월요일 일정과 발제문에도 같은 제목이 바로 반영됩니다.</div>
+            <div class="records-flex records-justify-end records-gap-2 records-mt-5">
+                <button type="button" id="seminarEditCancel" class="records-font-bold records-py-2 records-px-4 records-rounded-lg lms-button">취소</button>
+                <button type="submit" id="seminarEditSave" class="records-font-bold records-py-2 records-px-4 records-rounded-lg lms-button lms-button-primary">변경사항 저장</button>
             </div>
         </form>
     </dialog>
@@ -168,12 +164,12 @@
                 r.style.display = matchSearch ? '' : 'none';
             });
             // 필터 활성 시: 매칭된 row가 있는 bucket은 자동 펼침
-            document.querySelectorAll('details.eva-card').forEach(d => {
+            document.querySelectorAll('details.records-panel').forEach(d => {
                 const visibleRows = d.querySelectorAll('.seminar-row:not([style*="display: none"])');
                 if (filtering) d.open = visibleRows.length > 0;
             });
         }
         search.addEventListener('input', applyFilter);
     </script>
-</body>
-</html>
+</div>
+{% endblock %}

@@ -50,3 +50,4 @@
 @media(max-width:767px){.cr-bookings{padding:16px}.cr-booking-row{grid-template-columns:1fr}.cr-dialog #cr-close{flex-shrink:0}.cr-dialog input[type=date]{max-width:100%}.cr-form-actions{position:sticky;bottom:-22px;padding:12px 0;background:#fffdf6}.cr-hero-actions{flex-wrap:wrap}}
 @media(prefers-reduced-motion:reduce){.cr-shell *{scroll-behavior:auto!important}}
 .cr-shell [hidden],.cr-dialog [hidden]{display:none!important}
+.cr-calendar-target{outline:3px solid #236b8d;outline-offset:3px;scroll-margin-top:100px}

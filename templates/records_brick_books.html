@@ -1,57 +1,59 @@
+{% extends 'lms_admin_base.html' %}
 {% from '_records_base.html' import records_nav, genre_script, term_filter %}
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <title>벽돌책 진행 현황 - 기록 시스템</title>
-    {% include '_records_base.html' %}
-    {% include '_app_theme_head.html' %}
-</head>
-<body class="min-h-screen">
-    {% include '_header.html' %}
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+{% from '_lms_icons.html' import icon %}
+{% set lms_title = '벽돌책 기록' %}
+{% set lms_page = 'records' %}
+{% block title %}벽돌책 진행 현황 - 기록 시스템{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='lms_records.css') }}">
+
+{% endblock %}
+{% block content %}
+<div class="records-page">
+<div class="records-content">
         {{ records_nav('brick') }}
         {{ term_filter(terms, selected_term_id, 'records_brick_books') }}
 
-        <div class="flex items-center justify-between mb-6">
-            <h1 class="text-2xl font-bold text-eva-orange"><i data-lucide="blocks" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 벽돌책 ({{ books|length }}권)</h1>
+        <div class="records-flex records-items-center records-justify-between records-mb-6">
+            <h1 class="records-accent">{{ icon('folder', 18) }} 벽돌책 ({{ books|length }}권)</h1>
             <button onclick="document.getElementById('newBookModal').showModal()"
-                class="bg-eva-green text-black font-bold py-2 px-4 rounded text-sm hover:opacity-80">+ 새 벽돌책</button>
+                class="records-font-bold records-py-2 records-px-4 records-rounded records-text-sm  lms-button lms-button-primary">+ 새 벽돌책</button>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="records-grid records-grid-cols-1 records-md-grid-cols-2 records-lg-grid-cols-3 records-gap-4">
             {% for b in books %}
             <a href="{{ url_for('records_brick_book_detail', book_id=b.id) }}"
-                class="eva-card p-5 rounded-lg block transition">
-                <h3 class="text-base font-bold text-eva-orange mb-2">{{ b.title }}</h3>
-                {% if b.notes %}<p class="text-xs text-gray-400 mb-3 line-clamp-2">{{ b.notes }}</p>{% endif %}
-                <div class="text-eva-green font-bold text-sm"><i data-lucide="calendar" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> {{ b.session_count }}회 진행</div>
+                class="records-panel records-p-5 records-rounded-lg records-block">
+                <h3 class="records-accent records-mb-2">{{ b.title }}</h3>
+                {% if b.notes %}<p class="records-text-xs records-muted records-mb-3 records-line-clamp-2">{{ b.notes }}</p>{% endif %}
+                <div class="records-accent records-font-bold records-text-sm">{{ icon('calendar', 18) }} {{ b.session_count }}회 진행</div>
             </a>
             {% else %}
-            <div class="col-span-full eva-card p-8 rounded-lg text-center text-gray-500">
+            <div class="records-col-span-full records-panel records-p-8 records-rounded-lg records-text-center records-muted">
                 아직 등록된 벽돌책이 없습니다.
             </div>
             {% endfor %}
         </div>
     </div>
 
-    <dialog id="newBookModal" class="bg-gray-800 text-white p-6 rounded-lg w-full max-w-md">
-        <h2 class="text-lg font-bold text-eva-green mb-4">새 벽돌책 등록</h2>
-        <form id="newBookForm" class="space-y-3">
+    <dialog id="newBookModal" class="records-tint records-ink records-p-6 records-rounded-lg records-w-full records-max-w-md">
+        <h2 class="records-accent records-mb-4">새 벽돌책 등록</h2>
+        <form id="newBookForm" class="records-space-y-3">
             <div>
-                <label class="block text-xs text-gray-400 mb-1">책 제목 *</label>
+                <label class="records-block records-text-xs records-muted records-mb-1">책 제목 *</label>
                 <input type="text" name="title" required
-                    class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm">
+                    class="records-w-full records-tint records-border records-line records-rounded records-px-3 records-py-2 records-text-sm">
             </div>
             <div>
-                <label class="block text-xs text-gray-400 mb-1">메모</label>
+                <label class="records-block records-text-xs records-muted records-mb-1">메모</label>
                 <textarea name="notes" rows="2"
-                    class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm"></textarea>
+                    class="records-w-full records-tint records-border records-line records-rounded records-px-3 records-py-2 records-text-sm"></textarea>
             </div>
-            <div class="flex justify-end gap-2 pt-2">
+            <div class="records-flex records-justify-end records-gap-2 records-pt-2">
                 <button type="button" onclick="document.getElementById('newBookModal').close()"
-                    class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm">취소</button>
+                    class="records-px-4 records-py-2 records-rounded records-text-sm lms-button">취소</button>
                 <button type="submit"
-                    class="px-4 py-2 bg-eva-green text-black font-bold rounded text-sm">등록</button>
+                    class="records-px-4 records-py-2 records-font-bold records-rounded records-text-sm lms-button lms-button-primary">등록</button>
             </div>
         </form>
     </dialog>
@@ -70,5 +72,5 @@
             else alert('실패: ' + (data.message || '오류'));
         });
     </script>
-</body>
-</html>
+</div>
+{% endblock %}

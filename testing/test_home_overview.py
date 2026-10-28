@@ -55,6 +55,21 @@ class OverviewDataTests(unittest.TestCase):
         self.db.rows['topic_submissions'] = [{'id': 'other', 'event_id': 'event', 'member_id': 2, 'student_id': '202600002'}]
         self.assertFalse(member_seminar_summary(self.db, 1, self.today)['submitted'])
 
+    def test_tasks_include_all_open_weeks_and_hide_completed(self):
+        self.db.rows['seminar_weeks'].append({'id': 'later', 'term_id': 'term', 'week_start': '2026-10-01', 'book_title': 'Later'})
+        self.db.rows['topic_events'].append({'id': 'later-event', 'seminar_week_id': 'later', 'meeting_date': '2026-10-01', 'is_active': True, 'created_at': '2026-09-02'})
+        data = member_seminar_summary(self.db, 1, self.today)
+        self.assertEqual([row['id'] for row in data['tasks']], ['event', 'later-event'])
+        self.assertEqual(len(data['curriculum']), 2)
+        self.db.rows['topic_submissions'] = [{'id': 'own', 'event_id': 'event', 'member_id': 1}]
+        data = member_seminar_summary(self.db, 1, self.today)
+        self.assertEqual([row['id'] for row in data['tasks']], ['later-event'])
+        self.assertTrue(data['seminar']['topic']['submitted'])
+
+    def test_student_id_does_not_override_other_account_owner(self):
+        self.db.rows['topic_submissions'] = [{'id': 'other', 'event_id': 'event', 'member_id': 2, 'student_id': '202600001'}]
+        self.assertFalse(member_seminar_summary(self.db, 1, self.today)['submitted'])
+
     def test_empty_and_finished_term(self):
         self.assertIsNone(member_seminar_summary(FakeSupabase(), 1, self.today)['seminar'])
         self.assertIsNone(member_seminar_summary(self.db, 1, date(2026, 12, 31))['seminar'])
@@ -173,6 +188,45 @@ class OverviewRouteTests(unittest.TestCase):
         self.assertIn('마음', html)
         self.assertNotIn('0 / 3회', html)
         self.assertNotIn('private-database-detail', html)
+
+    def test_curriculum_keeps_all_weeks_and_personal_submission_state(self):
+        self.db.rows['seminar_weeks'].append({'id': 'empty-week', 'term_id': 'term', 'week_start': '2026-12-01', 'book_title': 'Future book'})
+        self.db.rows['topic_submissions'] = [{'id': 'own', 'event_id': 'event', 'member_id': None, 'student_id': '202600001'}]
+        response = self.client.get('/seminars?term_id=term&week_id=week')
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('id="week-week"', html)
+        self.assertIn('id="week-empty-week"', html)
+        self.assertIn('data-session-id="wed"', html)
+        self.assertIn('data-session-id="mon"', html)
+        self.assertIn('data-event-id="event"', html)
+        self.assertEqual(html.count('id="topic-week"'), 1)
+        self.assertEqual(html.count('class="classroom-week-number '), 2)
+        self.assertIn('id="classroom-collapse-all"', html)
+        self.assertIn('<h1 class="lms-sr">', html)
+        self.assertNotIn('href="/records/seminars', html)
+        self.assertNotIn('202600002', html)
+
+    def test_classroom_assignment_and_resource_views_use_isolated_shell(self):
+        for section in ('topics', 'resources'):
+            response = self.client.get('/seminars?term_id=term&section=' + section)
+            self.assertEqual(response.status_code, 200)
+            html = response.get_data(as_text=True)
+            self.assertIn('name="app-layout" content="canvas"', html)
+            self.assertIn('id="' + section + '"', html)
+            if section == 'topics':
+                self.assertIn('id="classroom-assignment-search"', html)
+                self.assertIn('aria-controls="classroom-assignment-results"', html)
+                self.assertIn('<h1 class="lms-sr">', html)
+            self.assertIn('/static/lms_classroom.css', html)
+            self.assertNotIn('/static/theme.css', html)
+            self.assertNotIn('/static/tailwind.css', html)
+
+    def test_closed_curriculum_topic_does_not_advertise_rejected_shared_link(self):
+        self.db.rows['topic_events'][0]['is_active'] = False
+        html = self.client.get('/seminars?term_id=term').get_data(as_text=True)
+        self.assertNotIn('/shared_topics?token=share-test', html)
+        self.assertIn('data-event-id="event"', html)
 
     def test_seminar_failure_stays_on_page_with_retry(self):
         with patch.object(self.module, '_load_weekly_seminar_view', side_effect=RuntimeError('private-error')):

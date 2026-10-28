@@ -1,63 +1,21 @@
-<!DOCTYPE html>
-<html lang="ko">
+{% extends 'lms_admin_base.html' %}
+{% from '_lms_icons.html' import icon %}
+{% set lms_page = 'operations' %}
+{% set lms_title = '세미나 회차 관리' %}
+{% block title %}{{ term.name }} - 세미나 회차 관리{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_operations.css') }}">{% endblock %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ term.name }} - 세미나 회차 관리</title>
-    {% include '_tailwind_head.html' %}
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap"
-        rel="stylesheet">
-    <style>
-        :root {
-            --eva-green: #3D5C2E;
-            --bg-dark: #FAF6EC;
-            --card-dark: #FFFCF3;
-            --text-light: #2A241B;
-            --border-dark: #C9B38A;
-        }
-
-        body {
-            font-family: 'Noto Sans KR', sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-light);
-        }
-
-        h1, h2 {
-            font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
-        }
-
-        .eva-card {
-            background-color: var(--card-dark);
-            border: 1px solid var(--border-dark);
-        }
-
-        .text-eva-green {
-            color: var(--eva-green);
-        }
-
-        .border-border-dark {
-            border-color: var(--border-dark);
-        }
-    </style>
-    {% include '_app_theme_head.html' %}
-</head>
-
-<body class="min-h-screen">
-    {% include '_header.html' %}
-
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+{% block content %}
+<div class="lms-operations">
+<div class="lms-operations-body">
         <div class="flex items-center justify-between">
-            <h1 class="text-2xl font-bold text-eva-green">{{ term.name }} 회차 관리</h1>
+            <h1 class="text-2xl font-bold ops-accent">{{ term.name }} 회차 관리</h1>
             <a href="{{ url_for('admin_dashboard') }}" class="text-sm text-gray-400 hover:text-white">← 대시보드</a>
         </div>
 
         <!-- 학기 정보 수정 -->
-        <div class="eva-card p-6 rounded-lg">
-            <h2 class="text-lg font-bold mb-4 text-eva-green">학기 정보</h2>
+        <div class="ops-panel p-6 rounded-lg">
+            <h2 class="text-lg font-bold mb-4 ops-accent">학기 정보</h2>
             <form id="termUpdateForm" class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
                 <div class="md:col-span-2">
                     <label class="block text-xs text-gray-400 mb-1">학기명</label>
@@ -84,7 +42,7 @@
                         <input type="checkbox" name="is_active" {% if term.is_active %}checked{% endif %}> 활성
                     </label>
                     <button type="submit"
-                        class="bg-eva-green text-black font-bold py-1.5 px-4 rounded text-sm hover:opacity-80">
+                        class="ops-primary text-black font-bold py-1.5 px-4 rounded text-sm hover:opacity-80">
                         저장
                     </button>
                     <span class="text-xs text-gray-400">마지막 세미나 날짜를 늦추면 누락된 월/목 회차가 자동 추가됩니다 (기존 회차는 보존).</span>
@@ -101,31 +59,31 @@
         </div>
 
         <!-- 회차 목록 -->
-        <div class="eva-card p-6 rounded-lg">
-            <h2 class="text-lg font-bold mb-4 text-eva-green">회차 목록 ({{ sessions|length }}개)</h2>
+        <div class="ops-panel p-6 rounded-lg">
+            <h2 class="text-lg font-bold mb-4 ops-accent">회차 목록 ({{ sessions|length }}개)</h2>
             <p class="text-xs text-gray-500 mb-3">
-                <i data-lucide="lightbulb" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 책 제목은 인라인으로 즉시 저장됩니다. 회차 카드에서 <strong>참석자 관리</strong>·<strong>진행 기록 연동</strong>이 가능합니다.
+                {{ icon('help',18) }} 책 제목은 인라인으로 즉시 저장됩니다. 회차 카드에서 <strong>참석자 관리</strong>·<strong>진행 기록 연동</strong>이 가능합니다.
             </p>
 
             {# === 예정/현재 회차 (펼친 상태) === #}
             {% if upcoming_sessions %}
-            <h3 class="text-sm font-bold text-eva-green mb-2"><i data-lucide="calendar" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 예정/오늘 ({{ upcoming_sessions|length }}개)</h3>
+            <h3 class="text-sm font-bold ops-accent mb-2">{{ icon('calendar',18) }} 예정/오늘 ({{ upcoming_sessions|length }}개)</h3>
             <div class="space-y-3 mb-6">
                 {% for s in upcoming_sessions %}
-                {% include '_session_card.html' %}
+                {% include '_lms_operations_session_card.html' %}
                 {% endfor %}
             </div>
             {% endif %}
 
             {# === 지난 회차 (접힘) === #}
             {% if past_sessions %}
-            <details class="bg-gray-900/40 rounded-lg border border-border-dark">
+            <details class="bg-gray-900/40 rounded-lg border ops-border">
                 <summary class="cursor-pointer px-4 py-3 text-sm text-gray-300 hover:text-white">
-                    <i data-lucide="folder-open" style="width:1.1em;height:1.1em;display:inline-block;vertical-align:-0.18em"></i> 지난 회차 {{ past_sessions|length }}개 보기
+                    {{ icon('folder',18) }} 지난 회차 {{ past_sessions|length }}개 보기
                 </summary>
                 <div class="space-y-3 p-4">
                     {% for s in past_sessions %}
-                    {% include '_session_card.html' %}
+                    {% include '_lms_operations_session_card.html' %}
                     {% endfor %}
                 </div>
             </details>
@@ -137,7 +95,11 @@
         </div>
     </div>
 
-    <script>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
         const TERM_ID = '{{ term.id }}';
 
         function copyShareLink() {
@@ -331,5 +293,5 @@
             }
         }
     </script>
-</body>
-</html>
+
+{% endblock %}

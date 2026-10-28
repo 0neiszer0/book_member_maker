@@ -51,7 +51,8 @@ from recruitment_results import (
     parse_applicant_rows,
 )
 from topic_lifecycle import topic_event_deadline, topic_event_is_expired
-from home_overview import date_label, member_seminar_summary, operations_summary
+from home_overview import date_label, member_seminar_summary, operations_summary, decorate_topic_submission_states
+from attendance_workflow import attendance_is_confirmed, confirmed_history_session_ids
 from security_utils import forwarded_client_address, safe_internal_next_url
 from minipc_security import install_security
 from flask import g
@@ -134,7 +135,7 @@ def add_security_headers(response):
 
 @app.after_request
 def add_default_social_preview(response):
-    """모든 HTML에 첫 화면용 밝은 배경과 기본 공유 메타데이터를 넣는다."""
+    """공유 메타데이터를 추가하고 기존 화면에만 Wood 테마를 보완한다."""
     content_type = response.headers.get("Content-Type", "")
     if response.status_code != 200 or not content_type.startswith("text/html"):
         return response
@@ -143,11 +144,12 @@ def add_default_social_preview(response):
         return response
     # Public and legacy pages do not always include the shared header. Load
     # the current theme last so their page-local old palette cannot leak out.
-    if 'data-wood-theme="1"' not in page and "/static/theme.css" not in page:
+    uses_lms_layout = '<meta name="app-layout" content="canvas">' in page
+    if not uses_lms_layout and 'data-wood-theme="1"' not in page and "/static/theme.css" not in page:
         theme_href = url_for("static", filename="theme.css")
         theme_link = f'\n  <link rel="stylesheet" href="{theme_href}" data-wood-theme="1">\n'
         page = page.replace("</head>", f"{theme_link}</head>", 1)
-    if 'data-critical-theme="wood"' not in page:
+    if not uses_lms_layout and 'data-critical-theme="wood"' not in page:
         critical_theme = """
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#FAF6EC">
@@ -557,7 +559,7 @@ def keep_alive_endpoint():
 def main_index():
     home = attendance = None
     home_error = attendance_error = False
-    if session.get('user_id') and session.get('user_role') not in (None, 'admin', 'officer'):
+    if session.get('user_id') and session.get('user_role'):
         try:
             home = member_seminar_summary(supabase, session['user_id'])
         except Exception:
@@ -3573,8 +3575,15 @@ def view_shared_topics():
         user_name = member.get('name') if member else None
         user_department = member.get('department') if member else None
         user_student_id = member.get('student_id') if member else None
+        classroom_term = None
+        if member and event_data.get('seminar_week_id'):
+            week_rows = supabase.table('seminar_weeks').select('term_id').eq('id', event_data['seminar_week_id']).limit(1).execute().data or []
+            if week_rows:
+                term_rows = supabase.table('seminar_terms').select('id,name').eq('id', week_rows[0]['term_id']).limit(1).execute().data or []
+                classroom_term = term_rows[0] if term_rows else None
+            decorate_topic_submission_states(supabase, member['id'], [event_data])
         return render_template('topic_submit.html',
-                               event=event_data,
+                               event=event_data, classroom_term=classroom_term,
                                user_name=user_name,
                                user_department=user_department,
                                user_student_id=user_student_id,
@@ -3917,7 +3926,7 @@ def seminar_session_moderator(session_id):
             return _render_topic_document_setup(seminar_session, [seminar_session],
                 seminar_session, False, error='사회자를 저장하지 못했습니다. 잠시 후 다시 시도해주세요.'), 503
         flash('이 회차의 사회자를 저장했습니다.', 'success')
-        return redirect(url_for('admin_seminars'))
+        return redirect(url_for('admin_seminars', term_id=seminar_session.get('term_id')))
     return _render_topic_document_setup(seminar_session, [seminar_session], seminar_session, False)
 
 
@@ -4547,7 +4556,7 @@ def _load_weekly_seminar_view(term_id=None):
     if week_ids:
         sessions = supabase.table('seminar_sessions').select('*').in_('seminar_week_id', week_ids) \
             .order('meeting_date').execute().data or []
-        topics = supabase.table('topic_events').select('*').in_('seminar_week_id', week_ids).execute().data or []
+        topics = supabase.table('topic_events').select('*').in_('seminar_week_id', week_ids).order('created_at', desc=True).execute().data or []
         topics = _auto_close_topic_events(topics)
 
     session_ids = [row['id'] for row in sessions]
@@ -4565,7 +4574,7 @@ def _load_weekly_seminar_view(term_id=None):
             .in_('session_id', session_ids).order('created_at').execute().data or []
         no_shows = supabase.table('seminar_no_shows').select('*') \
             .in_('session_id', session_ids).order('created_at').execute().data or []
-        histories = supabase.table('history').select('id, date, book_title, groups, seminar_session_id') \
+        histories = supabase.table('history').select('id, date, book_title, groups, seminar_session_id, attendance_confirmed_at') \
             .in_('seminar_session_id', session_ids).execute().data or []
         review_forms = supabase.table('seminar_review_forms').select('*') \
             .in_('seminar_session_id', session_ids).execute().data or []
@@ -4583,11 +4592,15 @@ def _load_weekly_seminar_view(term_id=None):
         .order('name').execute().data or []
     active_members = [row for row in scope_members(supabase, all_members, term=term) if row.get('is_active')]
     member_by_id = {row['id']: row for row in all_members}
-    topic_by_week = {row['seminar_week_id']: row for row in topics if row.get('seminar_week_id')}
+    topic_by_week = {}
+    for row in topics:
+        if row.get('seminar_week_id'):
+            topic_by_week.setdefault(row['seminar_week_id'], row)
     submission_count = defaultdict(int)
     for row in submissions:
         submission_count[row['event_id']] += 1
     history_by_session = {row['seminar_session_id']: row for row in histories if row.get('seminar_session_id')}
+    confirmed_ids = confirmed_history_session_ids(histories)
     review_count = defaultdict(int)
     reviews_by_form = defaultdict(list)
     for row in review_submissions:
@@ -4659,6 +4672,7 @@ def _load_weekly_seminar_view(term_id=None):
             item['no_show_candidates'] = [member for member in item['attendees']
                                           if member['id'] not in item['no_show_member_ids']]
         item['history'] = history_by_session.get(item['id'])
+        item['attendance_confirmed'] = attendance_is_confirmed(item, confirmed_ids)
         item['review_form'] = review_by_session.get(item['id'])
         item['is_past'] = date.fromisoformat(item['meeting_date']) < today
         sessions_by_week[item['seminar_week_id']].append(item)
@@ -4704,9 +4718,17 @@ def admin_seminars():
 def seminars():
     try:
         terms, term, weeks, _ = _load_weekly_seminar_view(request.args.get('term_id'))
-        weeks = [row for row in weeks if not row['is_past']] + list(reversed([row for row in weeks if row['is_past']]))
+        topics = []
+        for week in weeks:
+            if week.get('topic_event'):
+                week['topic_event']['session_dates'] = [row['meeting_date'] for row in week['sessions'] if row.get('is_active', True)]
+                topics.append(week['topic_event'])
+        decorate_topic_submission_states(supabase, session['user_id'], topics)
+        current_week = next((row for row in weeks if not row['is_past'] and row['sessions']), None)
+        current_week_id = request.args.get('week_id') or (current_week or {}).get('id')
         vote_url = f"{PUBLIC_BASE_URL}/seminar_vote?token={term['share_token']}" if term else ''
-        return render_template('seminars.html', terms=terms, term=term, weeks=weeks, vote_url=vote_url)
+        return render_template('seminars.html', terms=terms, term=term, weeks=weeks, vote_url=vote_url, current_week_id=current_week_id)
+
     except Exception as e:
         app.logger.error(f"seminars error: {e}", exc_info=True)
         return render_template('page_load_error.html', page_title='세미나 일정', is_admin=False), 503
@@ -5601,6 +5623,7 @@ def records_members():
         ).order('name').execute().data or []
         duplicate_student_ids = duplicate_student_id_values(members)
         for member in members:
+            member['can_view_activity'] = _can_view_member_profile(member['id'])
             member['student_id_duplicate'] = (
                 normalize_member_student_id(member.get('student_id')) in duplicate_student_ids
             )
@@ -6512,6 +6535,8 @@ from attendance_routes import init_attendance_routes
 _term_attendance_report = init_attendance_routes(app, lambda: supabase, login_required, _rebuild_matrix_for_session)
 from club_room import init_club_room_routes
 init_club_room_routes(app, lambda: supabase, login_required)
+from integrated_calendar import init_calendar_routes
+init_calendar_routes(app, lambda: supabase, login_required)
 from term_membership_routes import init_term_membership_routes
 init_term_membership_routes(app, lambda: supabase, login_required, create_member, seminar_term_create)
 

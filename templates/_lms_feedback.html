@@ -1,0 +1,28 @@
+{% if session.user_role %}
+<dialog id="lms-feedback-dialog" class="lms-feedback-dialog" aria-labelledby="lms-feedback-heading" data-source-page="{{ request.endpoint or 'unknown' }}">
+  <form id="lms-feedback-form" method="dialog">
+    <div class="lms-feedback-head">
+      <div>
+        <div class="lms-feedback-eyebrow">사용 중 불편한 점을 알려주세요</div>
+        <h2 id="lms-feedback-heading">버그·개선 제보</h2>
+      </div>
+      <button type="button" id="lms-feedback-close" class="lms-feedback-close" aria-label="닫기">&times;</button>
+    </div>
+    <p class="lms-feedback-copy">현재 화면 정보는 자동으로 함께 전달됩니다. 개인정보나 비밀번호는 적지 말아주세요.</p>
+    <label class="lms-feedback-label" for="lms-feedback-category">제보 종류</label>
+    <select id="lms-feedback-category" class="lms-feedback-field">
+      <option value="bug">기능이 제대로 작동하지 않아요</option>
+      <option value="suggestion">이렇게 개선되면 좋겠어요</option>
+    </select>
+    <label class="lms-feedback-label" for="lms-feedback-title">한 줄 요약</label>
+    <input id="lms-feedback-title" class="lms-feedback-field" type="text" minlength="2" maxlength="120" placeholder="예: 저장 버튼을 눌러도 반응이 없어요" required>
+    <label class="lms-feedback-label" for="lms-feedback-description">자세한 내용</label>
+    <textarea id="lms-feedback-description" class="lms-feedback-field lms-feedback-textarea" minlength="10" maxlength="3000" placeholder="어떤 화면에서 무엇을 했을 때 문제가 생겼는지 적어주세요." required></textarea>
+    <div id="lms-feedback-status" class="lms-feedback-status" role="status" aria-live="polite"></div>
+    <div class="lms-feedback-actions">
+      <button type="button" id="lms-feedback-cancel" class="lms-feedback-secondary">취소</button>
+      <button type="submit" id="lms-feedback-submit" class="lms-feedback-primary">제보 보내기</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
