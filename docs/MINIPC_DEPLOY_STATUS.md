@@ -2,8 +2,10 @@
 
 갱신: 2026-10-28 KST. 재부팅/세션 중단 후 이 파일부터 읽는다.
 최신 UI 요청: f946824 로컬 통합 완료(e88a3f4), 관련 Python 94개 및 Node 검사 통과.
-운영 앱은 아직 bda8a82. 미니 PC 앱만 교체하는 공개 배포 승인 대기.
+사용자 '미니 PC에만 배포' 승인 후 2026-10-28 14:22:53 KST VM 앱 f946824 배포 완료.
+공개 검증 15항목 통과. GitHub main push/Render 변경 없음. 서비스 active/enabled, clean.
 세부 범위·검증·복귀 절차: docs/MINIPC_UI_RELEASE.md. Worker CDN 배포 보류는 유지.
+아래의 과거 VM bda8a82 표기는 이 최신 앱 릴리스 상태로 대체한다. bda8a82는 앱 복귀 기준이다.
 최신 추가: 응답 속도 진단 완료. 공개 Funnel 지연과 정적 파일 no-store 확인.
 Worker 정적 파일 CDN 제공 최적화는 로컬 검증까지 완료했으나 사용자가 공개 배포를 명시 보류했다.
 곧 UI가 바뀔 예정이므로 전체 구조를 먼저 검토했다. 실제 Claude Opus5.5 High 자문 완료.

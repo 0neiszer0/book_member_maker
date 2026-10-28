@@ -37,4 +37,19 @@
 GitHub main push, Render 배포, Worker CDN 배포, 도메인 구매·Tunnel 전환,
 카카오 설정, DB·환경변수 변경은 이 UI 배포 범위에 포함하지 않음.
 
-현재 상태: 로컬 통합·검증 완료, 운영 배포 승인 대기. 운영 UI는 아직 이전 버전.
+## 운영 배포 완료 — 2026-10-28 14:22:53 KST
+
+사용자 승인: '미니 PC에만 배포하고, render쪽에는 가지 않도록 해.'
+
+- 미니 PC에만 전송·적용. GitHub push/Render 도구/Worker 배포 호출 없음.
+- 전송 SHA256: 202f61386302b7742ca8bb93962fb487d6c961fc5dd2c76680299de1618a00cf.
+- 사전/사후 앱·DB 건강 정상. VM HEAD f9468246927e1e04b7c71eaa9ab9d8049ca69053,
+  clean/detached. bookmembers active/enabled, NRestarts=0, tailscaled active.
+- 공개 검증 15항목 통과: 새 LMS 홈/로그인/캘린더, DB 건강, 카카오 시작·콜백·state·
+  보안 쿠키, no-store·원본 헤더 비노출, CSS/JS의 해당 커밋 내용 일치, 폰트 HEAD,
+  세미나 캘린더 API 로그인 요구(401), Funnel 직접 접속 거부(403).
+- 검증 시각 2026-10-28T05:24:18Z. 증거 work/ui-f946824-public-verification.json.
+- 로그인 완료를 새로 수행하거나 운영 데이터를 작성하지 않았다. 실패 회귀가 없어 복귀하지 않음.
+- 현재 운영 UI는 f946824. 즉시 앱 복귀가 필요할 때의 기준은 보안 패치 bda8a82.
+- 기존 Funnel 지연/no-store 경로는 그대로이며 이번 릴리스로 속도가 해결됐다고 판단하지 않는다.
+- 다음 필수 작업: 운영 구조 선택, 승인된 재부팅 자동 복구 점검, 오프사이트 백업·격리 복원.
