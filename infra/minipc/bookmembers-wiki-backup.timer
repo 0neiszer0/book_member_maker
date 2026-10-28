@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily local wiki snapshot
+
+[Timer]
+OnCalendar=*-*-* 04:20:00
+Persistent=true
+RandomizedDelaySec=5m
+Unit=bookmembers-wiki-backup.service
+
+[Install]
+WantedBy=timers.target
