@@ -10,6 +10,31 @@ export default {
       return new Response('Proxy configuration unavailable', {status: 503});
     }
     const incoming = new URL(request.url);
+    // Only bundled public CSS/JS and the existing club preview bypass Funnel.
+    // Authenticated HTML, APIs, uploads and unknown paths always use the origin.
+    if (env.ASSETS && ['GET', 'HEAD'].includes(request.method) &&
+        /^\/static\/(?:[\w-]+\.(?:css|js)|og\/club-preview\.png)$/.test(incoming.pathname)) {
+      const assetHeaders = new Headers();
+      for (const name of ['Accept-Encoding', 'If-None-Match', 'If-Modified-Since', 'Range', 'If-Range']) {
+        const value = request.headers.get(name);
+        if (value) assetHeaders.set(name, value);
+      }
+      const asset = await env.ASSETS.fetch(new Request(incoming, {
+        method: request.method, headers: assetHeaders,
+      }));
+      if ([200, 206, 304].includes(asset.status)) {
+        const result = new Response(asset.body, asset);
+        // Revalidate against the CDN so a UI deployment cannot leave stale CSS/JS.
+        result.headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
+        result.headers.set('X-Content-Type-Options', 'nosniff');
+        result.headers.set('X-Frame-Options', 'DENY');
+        result.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+        result.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+        result.headers.delete('Set-Cookie');
+        result.headers.delete('X-App-Origin-Auth');
+        return result;
+      }
+    }
     const target = new URL(upstream);
     target.pathname = incoming.pathname;
     target.search = incoming.search;

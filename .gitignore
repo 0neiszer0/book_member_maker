@@ -22,3 +22,7 @@ rclone.conf
 backup.env
 app.env
 /backups/
+
+# Rebuilt from the explicitly selected, committed server release.
+/infra/worker/.assets/
+/infra/worker/.wrangler/
