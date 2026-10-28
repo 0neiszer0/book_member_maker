@@ -1,0 +1,13 @@
+[Unit]
+Description=Consistent local wiki backup with identity keys
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+ExecStart=/opt/book_member_maker/.venv/bin/python /opt/book_member_maker/infra/minipc/wiki_backup.py
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/bookmembers-wiki /var/lib/bookmembers-wiki

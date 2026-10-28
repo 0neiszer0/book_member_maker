@@ -90,7 +90,7 @@ def init_wiki_routes(app, get_db):
             supplied = request.form.get('wiki_csrf', '')
             origin = request.headers.get('Origin')
             public = os.getenv('PUBLIC_BASE_URL', '').rstrip('/')
-            if (not supplied or not hmac.compare_digest(expected, supplied)
+            if (not supplied or not hmac.compare_digest(expected.encode(), supplied.encode())
                     or (origin and origin != public)
                     or request.headers.get('Sec-Fetch-Site') == 'cross-site'):
                 return message('편집 화면이 만료되었거나 요청 출처가 다릅니다. 다시 열어 주세요.', 403)
@@ -108,7 +108,8 @@ def init_wiki_routes(app, get_db):
         return message('위키에 연결하지 못했습니다. 저장 중이었다면 저장 결과를 먼저 확인해 주세요.', 503)
 
     def title_value(value):
-        if not value or len(value) > 200 or any(ord(c) < 32 for c in value) or '\\' in value:
+        if (not value or len(value) > 200 or any(ord(c) < 32 for c in value)
+                or '\\' in value or any(part in ('.', '..') for part in value.split('/'))):
             abort(400)
         return value
 
@@ -141,6 +142,8 @@ def init_wiki_routes(app, get_db):
     @bp.get('/pages')
     def pages():
         query = request.args.get('q', '').strip()[:200]
+        if query:
+            title_value(query)
         number = page_number()
         backend = engine()
         with backend.user(g.wiki_access.member_id) as client:
@@ -170,19 +173,23 @@ def init_wiki_routes(app, get_db):
         title_value(title)
         if not g.wiki_access.can_edit:
             return message(g.wiki_access.reason, 403)
-        backend = engine()
         status, notice, preview, summary = 200, '', None, ''
-        with backend.user(g.wiki_access.member_id) as client:
-            if request.method == 'GET':
-                doc = backend.document(client, title)
-            else:
-                content = request.form.get('content', '').replace('\r', '')
-                version = request.form.get('version', '')
-                summary = request.form.get('summary', '').strip()
-                if (len(content.encode()) > 512_000 or len(summary) > 300
-                        or not version.isascii() or not version.isdigit()):
-                    abort(400)
-                doc = dict(title=title, source=content, version=version, exists=version != '0')
+        doc = None
+        if request.method == 'POST':
+            content = request.form.get('content', '').replace('\r', '')
+            version = request.form.get('version', '')
+            summary = request.form.get('summary', '').strip()
+            if (len(content.encode()) > 512_000 or len(summary) > 300
+                    or not version.isascii() or not version.isdigit()):
+                abort(400)
+            # Capture the draft before configuration, login or rendering can fail.
+            doc = dict(title=title, source=content, version=version, exists=version != '0')
+        try:
+            backend = engine()
+            with backend.user(g.wiki_access.member_id) as client:
+                if request.method == 'GET':
+                    doc = backend.document(client, title)
+                    return page('edit.html', doc=doc, notice=notice, preview=preview, summary=summary)
                 if request.form.get('action') == 'preview':
                     preview = clean_wiki_html(backend.render(client, title, content))
                 elif not summary or not content.strip():
@@ -205,8 +212,10 @@ def init_wiki_routes(app, get_db):
                             notice, status = str(exc), 409
                         except EditRejected as exc:
                             notice, status = str(exc), 422
-                        except EngineUnavailable:
-                            notice, status = '저장 결과를 확인하지 못했습니다. 작성한 내용은 유지했습니다. 최신 문서와 이력을 먼저 확인해 주세요.', 503
+        except EngineUnavailable:
+            if doc is None:
+                raise
+            notice, status = '위키 연결 또는 저장 결과를 확인하지 못했습니다. 작성한 내용은 유지했습니다. 최신 문서와 이력을 먼저 확인해 주세요.', 503
         return page('edit.html', doc=doc, notice=notice, preview=preview, summary=summary), status
 
     app.register_blueprint(bp)

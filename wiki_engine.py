@@ -139,7 +139,7 @@ class OpenNamu:
 
     def save(self, client, title, content, summary, version):
         result = self.request(client, 'POST', '/edit/' + quote(title, safe=''), data={
-            'content': content, 'send': summary, 'ver': version, 'copyright_agreement': 'yes',
+            'content': content, 'send': summary, 'ver': version,
         })
         target = urlsplit(result.headers.get('Location', ''))
         if result.status_code in (302, 303) and not target.netloc and unquote(target.path) == '/w/' + title:

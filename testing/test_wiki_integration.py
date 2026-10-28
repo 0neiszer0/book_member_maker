@@ -8,6 +8,7 @@ from unittest.mock import patch
 from testing._fake_supabase import FakeSupabase
 from wiki_access import wiki_access
 from wiki_routes import clean_wiki_html
+from wiki_engine import EngineUnavailable
 
 
 def wiki_fixture(today=None):
@@ -72,19 +73,26 @@ class FakeEngine:
 class RouteTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        os.environ.update(PYTHON_DOTENV_DISABLED='1',FLASK_SECRET_KEY='wiki-test-only',
+        environment = patch.dict(os.environ, dict(PYTHON_DOTENV_DISABLED='1',FLASK_SECRET_KEY='wiki-test-only',
             SUPABASE_URL='http://127.0.0.1:9',SUPABASE_SERVICE_KEY='wiki-test-only',
-            PUBLIC_BASE_URL='http://localhost',SESSION_COOKIE_SECURE='0')
+            PUBLIC_BASE_URL='http://localhost',SESSION_COOKIE_SECURE='0'))
+        environment.start()
+        cls.addClassCleanup(environment.stop)
         with patch('supabase.create_client', return_value=FakeSupabase()), patch('dotenv.load_dotenv'):
             cls.module=importlib.import_module('app')
-        cls.module.app.config.update(TESTING=True, WIKI_ENABLED=True, SESSION_COOKIE_SECURE=False)
+        config = patch.dict(cls.module.app.config, TESTING=True, WIKI_ENABLED=True, SESSION_COOKIE_SECURE=False)
+        config.start()
+        cls.addClassCleanup(config.stop)
 
     def setUp(self):
         from datetime import datetime, timezone
         today=datetime.now(timezone(timedelta(hours=9))).date()
         self.db=FakeSupabase(wiki_fixture(today))
-        self.module.supabase=self.db
-        self.engine=FakeEngine(); self.module.app.extensions['wiki_engine']=self.engine
+        database = patch.object(self.module, 'supabase', self.db)
+        database.start(); self.addCleanup(database.stop)
+        self.engine=FakeEngine()
+        engine = patch.dict(self.module.app.extensions, wiki_engine=self.engine)
+        engine.start(); self.addCleanup(engine.stop)
         self.client=self.module.app.test_client()
 
     def login(self, member=1):
@@ -117,11 +125,28 @@ class RouteTests(unittest.TestCase):
 
     def test_csrf_failure_and_membership_failure_are_closed(self):
         self.login()
-        for token, origin in [('', 'http://localhost'),('token','https://evil.example')]:
+        for token, origin in [('', 'http://localhost'),('token','https://evil.example'),('잘못된 토큰','http://localhost')]:
             result=self.client.post('/wiki/edit/대문',data={'wiki_csrf':token,'version':'1','content':'x','summary':'x'},headers={'Origin':origin})
             self.assertEqual(result.status_code,403)
         with patch.object(self.db,'table',side_effect=RuntimeError('lookup failed')):
             self.assertEqual(self.client.get('/wiki/w/대문').status_code,503)
+
+    def test_engine_outage_preserves_posted_draft_at_every_stage(self):
+        self.login()
+        form = dict(wiki_csrf='token', version='1', content='연결 실패에도 남아야 할 본문', summary='작성 중 요약')
+        for stage, action in [('user', 'save'), ('render', 'preview'), ('save', 'save')]:
+            with self.subTest(stage=stage), patch.object(self.engine, stage, side_effect=EngineUnavailable('offline')):
+                result = self.client.post('/wiki/edit/대문', data=dict(form, action=action))
+                self.assertEqual(result.status_code, 503)
+                self.assertIn(form['content'], result.get_data(as_text=True))
+                self.assertIn(form['summary'], result.get_data(as_text=True))
+
+    def test_dot_segment_titles_cannot_change_internal_endpoint(self):
+        self.login()
+        with patch.object(self.engine, 'user') as connection:
+            for path in ['/wiki/w/..', '/wiki/edit/.', '/wiki/history/a/../b', '/wiki/pages?q=..']:
+                self.assertEqual(self.client.get(path).status_code, 400)
+            connection.assert_not_called()
 
     def test_navigation_private_responses_and_native_endpoints_hidden(self):
         self.login()
