@@ -26,3 +26,7 @@ app.env
 # Rebuilt from the explicitly selected, committed server release.
 /infra/worker/.assets/
 /infra/worker/.wrangler/
+/infra/worker/.versioned-assets/
+/infra/worker/.server-assets/
+/asset-manifest.json
+/static/_v/
