@@ -55,6 +55,7 @@ from home_overview import date_label, member_seminar_summary, operations_summary
 from attendance_workflow import attendance_is_confirmed, confirmed_history_session_ids
 from security_utils import forwarded_client_address, safe_internal_next_url
 from minipc_security import install_security
+from static_assets import install_static_assets
 from flask import g
 from topic_credentials import (
     generate_topic_edit_token,
@@ -109,6 +110,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("Supabase URL과 Key가 .env 파일에 설정되지 않았습니다.")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 install_security(app, lambda: supabase)
+install_static_assets(app)
 
 
 @app.context_processor
@@ -145,8 +147,8 @@ def add_default_social_preview(response):
     # Public and legacy pages do not always include the shared header. Load
     # the current theme last so their page-local old palette cannot leak out.
     uses_lms_layout = '<meta name="app-layout" content="canvas">' in page
-    if not uses_lms_layout and 'data-wood-theme="1"' not in page and "/static/theme.css" not in page:
-        theme_href = url_for("static", filename="theme.css")
+    theme_href = url_for("static", filename="theme.css")
+    if not uses_lms_layout and 'data-wood-theme="1"' not in page and theme_href not in page:
         theme_link = f'\n  <link rel="stylesheet" href="{theme_href}" data-wood-theme="1">\n'
         page = page.replace("</head>", f"{theme_link}</head>", 1)
     if not uses_lms_layout and 'data-critical-theme="wood"' not in page:
@@ -170,7 +172,7 @@ def add_default_social_preview(response):
         quote=True,
     )
     canonical = html.escape(f"{PUBLIC_BASE_URL}{request.full_path}".rstrip("?"), quote=True)
-    image = f"{PUBLIC_BASE_URL}/static/og/club-preview.png"
+    image = f"{PUBLIC_BASE_URL}{url_for('static', filename='og/club-preview.png')}"
     tags = f"""
   <meta name="description" content="{description}">
   <meta property="og:type" content="website">
