@@ -1,0 +1,6 @@
+{% extends 'wiki/base.html' %}
+{% block wiki_content %}<header class="wiki-heading"><h1>{{ '검색 결과' if query else '모든 문서' }}</h1></header>
+{% if query %}<p>“{{ query }}” 문서를 찾습니다.</p>{% endif %}
+<ul class="wiki-page-list">{% for title in titles %}<li><a href="{{ url_for('wiki.document',title=title) }}">{{ title }}</a></li>{% else %}<li>문서가 없습니다.</li>{% endfor %}</ul>
+<nav class="wiki-pagination" aria-label="문서 목록 페이지">{% if number>1 %}<a href="{{ url_for('wiki.pages',q=query,page=number-1) }}">이전</a>{% endif %}<span>{{ number }}페이지</span>{% if titles|length==50 %}<a href="{{ url_for('wiki.pages',q=query,page=number+1) }}">다음</a>{% endif %}</nav>
+{% endblock %}

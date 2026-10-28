@@ -1,0 +1,2 @@
+{% extends 'wiki/base.html' %}
+{% block wiki_content %}<header class="wiki-heading"><h1>위키 이용 안내</h1></header><p class="lms-alert" role="alert">{{ message }}</p><a class="lms-button" href="{{ url_for('login',next=url_for('wiki.home')) }}">사이트 로그인</a>{% endblock %}

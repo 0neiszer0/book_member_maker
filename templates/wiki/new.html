@@ -1,0 +1,2 @@
+{% extends 'wiki/base.html' %}
+{% block wiki_content %}<header class="wiki-heading"><h1>새 문서</h1></header><p>먼저 같은 내용의 문서가 있는지 검색해 주세요.</p><form action="{{ url_for('wiki.new') }}" method="get" class="wiki-new"><label for="wiki-title">문서 제목</label><input id="wiki-title" name="title" maxlength="200" required><button class="lms-button lms-button-primary" type="submit">작성 시작</button></form>{% endblock %}

@@ -1,0 +1,6 @@
+{% extends 'wiki/base.html' %}
+{% block wiki_content %}
+<header class="wiki-heading"><h1>{{ doc.title }}</h1><nav aria-label="문서 도구">{% if access.can_edit and not revision %}<a class="lms-button lms-button-primary" href="{{ url_for('wiki.edit',title=doc.title) }}">{{ '편집' if doc.exists else '문서 만들기' }}</a>{% endif %}<a class="lms-button" href="{{ url_for('wiki.history',title=doc.title) }}">수정 이력</a></nav></header>
+{% if revision %}<p class="lms-alert">r{{ revision }} 버전을 보고 있습니다. <a href="{{ url_for('wiki.document',title=doc.title) }}">최신 문서 보기</a></p>{% endif %}
+{% if doc.exists %}<article class="wiki-prose">{{ rendered }}</article>{% else %}<p class="lms-empty">아직 작성되지 않은 문서입니다.</p>{% endif %}
+{% endblock %}

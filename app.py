@@ -56,6 +56,7 @@ from attendance_workflow import attendance_is_confirmed, confirmed_history_sessi
 from security_utils import forwarded_client_address, safe_internal_next_url
 from minipc_security import install_security
 from static_assets import install_static_assets
+from wiki_routes import init_wiki_routes
 from flask import g
 from topic_credentials import (
     generate_topic_edit_token,
@@ -111,6 +112,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 install_security(app, lambda: supabase)
 install_static_assets(app)
+init_wiki_routes(app, lambda: supabase)
 
 
 @app.context_processor
@@ -120,7 +122,9 @@ def public_navigation_context():
             return None
         rows = supabase.table('seminar_terms').select('id,name').eq('id', seminar['term_id']).limit(1).execute().data or []
         return rows[0] if rows else None
-    return {"notion_public_wiki_url": NOTION_PUBLIC_WIKI_URL, 'operation_term_for': operation_term_for}
+    return {"notion_public_wiki_url": NOTION_PUBLIC_WIKI_URL,
+            "wiki_url": url_for('wiki.home') if app.config['WIKI_ENABLED'] else NOTION_PUBLIC_WIKI_URL,
+            "wiki_enabled": app.config['WIKI_ENABLED'], 'operation_term_for': operation_term_for}
 
 
 @app.after_request
@@ -2763,6 +2767,8 @@ def bookclub_api_delete_history():
 
 @app.route('/docs/<doc_title>')
 def view_document(doc_title):
+    if app.config['WIKI_ENABLED']:
+        return redirect(url_for('wiki.document', title=doc_title), code=302)
     return redirect(NOTION_PUBLIC_WIKI_URL, code=302)
     """
     데이터베이스에서 문서를 찾아 제목과 내용을 보여주는 페이지.
@@ -2789,6 +2795,8 @@ def view_document(doc_title):
 @app.route('/docs/create')
 @login_required(role="ANY")
 def create_document_page():
+    if app.config['WIKI_ENABLED']:
+        return redirect(url_for('wiki.new'), code=302)
     return redirect(NOTION_PUBLIC_WIKI_URL, code=302)
 
 
@@ -2798,7 +2806,7 @@ def create_document_page():
 def handle_create_document():
     return jsonify({
         "status": "error", "message": "앱 위키 편집은 종료되었습니다.",
-        "wiki_url": NOTION_PUBLIC_WIKI_URL,
+        "wiki_url": url_for('wiki.home') if app.config['WIKI_ENABLED'] else NOTION_PUBLIC_WIKI_URL,
     }), 410
     data = request.json
     title = data.get('title')
@@ -2830,6 +2838,8 @@ def handle_create_document():
 # 3. 전체 문서 목록을 보여주는 라우트
 @app.route('/docs')
 def view_all_documents():
+    if app.config['WIKI_ENABLED']:
+        return redirect(url_for('wiki.pages'), code=302)
     return redirect(NOTION_PUBLIC_WIKI_URL, code=302)
     """
     지금까지 생성된 모든 문서의 목록을 보여주는 페이지.
@@ -2854,6 +2864,8 @@ def view_all_documents():
 @app.route('/docs/edit/<doc_title>')
 @login_required(role="ANY")
 def edit_document_page(doc_title):
+    if app.config['WIKI_ENABLED']:
+        return redirect(url_for('wiki.edit', title=doc_title), code=302)
     return redirect(NOTION_PUBLIC_WIKI_URL, code=302)
     try:
         doc_res = supabase.table('documents').select('*').eq('title', doc_title).single().execute()
@@ -2884,7 +2896,7 @@ def edit_document_page(doc_title):
 def handle_edit_document(doc_id):
     return jsonify({
         "status": "error", "message": "앱 위키 편집은 종료되었습니다.",
-        "wiki_url": NOTION_PUBLIC_WIKI_URL,
+        "wiki_url": url_for('wiki.home') if app.config['WIKI_ENABLED'] else NOTION_PUBLIC_WIKI_URL,
     }), 410
     data = request.json
     content = data.get('content')
@@ -2949,7 +2961,7 @@ def get_document_history(doc_id):
 def handle_delete_document(doc_id):
     return jsonify({
         "status": "error", "message": "기존 위키 자료는 보존 기간이라 삭제할 수 없습니다.",
-        "wiki_url": NOTION_PUBLIC_WIKI_URL,
+        "wiki_url": url_for('wiki.home') if app.config['WIKI_ENABLED'] else NOTION_PUBLIC_WIKI_URL,
     }), 410
     try:
         # 삭제 권한 확인을 위해 먼저 문서의 작성자 정보를 가져옵니다.
