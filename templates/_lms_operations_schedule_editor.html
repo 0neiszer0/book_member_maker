@@ -9,7 +9,7 @@
       <label>마지막 세미나 날짜<input class="field" type="date" name="end_date" required></label>
       <button class="btn primary" type="submit">날짜 생성하고 일정 입력</button>
     </form>
-    <p class="muted">목요일과 다음 월요일이 한 묶음으로 생성됩니다. 목요일은 카카오톡 불참 투표, 월요일은 참석 투표를 반영하며 정원·선착순 제한은 없습니다.</p>
+    <p class="muted">본 세미나(목) 날짜가 생성됩니다. 추가 세미나는 필요한 주에서 ‘추가 세미나 열기’로 개설해주세요.</p>
     <p id="term-create-status" role="status"></p>
   </details>
   {% if weeks %}
@@ -20,7 +20,7 @@
       <form id="schedule-form">
         <div class="schedule-grid">
           <section>
-            <h3>함께 읽는 도서</h3><p class="muted">목·월 도서와 발제문은 공유합니다.</p>
+            <h3>함께 읽는 도서</h3><p class="muted">추가 세미나가 열리면 같은 주차의 도서와 발제문을 사용합니다.</p>
             <label>도서명<input class="field" name="book_title" maxlength="500" placeholder="미정이면 비워둘 수 있습니다"></label>
             <label>저자<input class="field" name="book_author" maxlength="200" placeholder="저자명"></label>
             <label>안내·운영 메모<textarea class="field" name="note" maxlength="4000" rows="3" placeholder="선택 입력"></textarea></label>

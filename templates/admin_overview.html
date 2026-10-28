@@ -17,7 +17,7 @@
       <h1>이번 주 운영 개요</h1>
       <p>선택한 세미나에서 아직 끝내지 않은 작업을 확인하세요.</p>
     </div>
-    <a class="overview-guide-link" href="{{ url_for('help_admin') }}">운영 가이드</a>
+    <a class="overview-guide-link" href="{{ url_for('help_admin') }}">운영진 안내</a>
   </header>
 
 
@@ -81,7 +81,7 @@
     </a>
     <a class="workflow-card" href="{{ url_for('admin_seminars') }}">
       <span class="workflow-num">3</span>
-      <span class="workflow-body"><strong>참석자 확인</strong><small>카카오톡 목요일 불참·월요일 참석 투표 반영</small></span>
+      <span class="workflow-body"><strong>참석자 확인</strong><small>본 세미나 불참·추가 세미나 참석 투표 반영</small></span>
       <span class="workflow-arrow" aria-hidden="true">→</span>
     </a>
     <a class="workflow-card" href="{{ url_for('bookclub_index') }}">
@@ -130,7 +130,7 @@
         <h3>기록·시스템</h3>
         <a href="{{ url_for('records_hub') }}"><strong>기록·통계</strong><span>세미나·출석·통계</span></a>
         <a href="{{ url_for('admin_bug_reports') }}"><strong>버그 제보</strong><span>불편 사항 처리</span></a>
-        <a href="{{ url_for('help_admin') }}"><strong>시스템 안내</strong><span>점검·인수인계 순서</span></a>
+        <a href="{{ url_for('help_admin') }}"><strong>운영진 안내</strong><span>점검·인수인계 순서</span></a>
       </div>
     </div>
   </section>

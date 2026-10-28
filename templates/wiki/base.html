@@ -13,6 +13,6 @@
 <section class="wiki-main">
   <form class="wiki-search" action="{{ url_for('wiki.pages') }}" method="get" role="search"><label class="lms-sr" for="wiki-query">위키 문서 검색</label><input type="search" id="wiki-query" name="q" placeholder="문서 제목 검색" value="{{ query|default('') }}" maxlength="200"><button class="lms-button" type="submit">검색</button>{% if access and access.can_edit %}<a class="lms-button" href="{{ url_for('wiki.new') }}">새 문서</a>{% endif %}</form>
   {% block wiki_content %}{% endblock %}
-  <footer class="wiki-footer">책반우 회원 위키 · openNamu<br>문서의 내용과 수정 이력은 위키에 보관됩니다.</footer>
+  <footer class="wiki-footer">책반우 회원 위키</footer>
 </section></div>
 {% endblock %}

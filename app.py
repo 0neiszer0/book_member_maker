@@ -950,7 +950,8 @@ def profiles_page():
     try:
         all_members = supabase.table('members').select('*').eq('is_active', True).order('name').execute().data
     except Exception as e:
-        flash(f"프로필 로딩 중 오류: {e}", "danger")
+        app.logger.error("Member profile unavailable", exc_info=True)
+        flash("회원 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", "danger")
         all_members = []
     return render_template('profiles.html', all_members=all_members)
 
@@ -1000,7 +1001,8 @@ def profile_detail_page(member_id):
             return redirect(url_for('profiles_page'))
 
     except Exception as e:
-        flash(f"프로필 로딩 중 오류: {e}", "danger")
+        app.logger.error("Member profile unavailable", exc_info=True)
+        flash("회원 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", "danger")
         return redirect(url_for('profiles_page'))
 
     # 새로 만들 profile_detail.html 템플릿으로 데이터를 전달합니다.
@@ -1998,7 +2000,7 @@ def bookclub_index():
 
     except Exception as e:
         app.logger.error(f"!!! /making_team 경로에서 오류 발생: {e}", exc_info=True)
-        flash(f"데이터를 불러오는 중 오류가 발생했습니다: {e}", "danger")
+        flash("조 편성에 필요한 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", "danger")
         all_active_members = []
         pre_checked_attendee_ids = set()
 

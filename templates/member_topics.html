@@ -5,5 +5,5 @@
 <a href="{{ url_for('seminars',term_id=term.id,section='topics') }}">← 학기 발제문 목록</a>
 <h1>{{ week.book_title or '세미나' }} 발제문</h1>
 <p class="lms-small">회원들이 제출한 발제문입니다. 접수 마감 후에도 읽을 수 있습니다.</p>
-{% for item in topics %}<article class="lms-topic-reading"><h2>발제 {{ loop.index }}</h2><p>{{ item.topic }}</p>{% if item.page %}<small>{{ item.page }}쪽</small>{% endif %}{% if item.reference %}<blockquote>{{ item.reference }}</blockquote>{% endif %}</article>{% else %}<p class="lms-empty">아직 제출된 발제문이 없습니다.</p>{% endfor %}
+{% for item in topics %}<article class="lms-topic-reading"><h2>발제 {{ loop.index }}</h2><p>{{ item.topic }}</p>{% if item.page %}<small>쪽: {{ item.page }}</small>{% endif %}{% if item.reference %}<blockquote>{{ item.reference }}</blockquote>{% endif %}</article>{% else %}<p class="lms-empty">아직 제출된 발제문이 없습니다.</p>{% endfor %}
 {% endblock %}

@@ -10,7 +10,7 @@
 <div class="lms-operations-body">
     <section class="moderator-panel">
       <h1 class="text-2xl font-extrabold">{% if download %}발제문 다운로드 준비{% else %}이 회차 사회자 설정{% endif %}</h1>
-      <p class="moderator-note">{{ event.book_title or '세미나' }} · {% if download %}문서에 표시할 날짜와 사회자를 확인해주세요.{% else %}목요일·월요일 사회자를 각각 저장합니다.{% endif %}</p>
+      <p class="moderator-note">{{ event.book_title or '세미나' }} · {% if download %}문서에 표시할 날짜와 사회자를 확인해주세요.{% else %}회차별 사회자를 저장합니다.{% endif %}</p>
       {% if seminar_sessions|length > 1 %}<p class="moderator-note">발제문 질문 목록은 공유하고, 날짜와 사회자만 선택한 회차에 맞춰 출력합니다.</p>{% endif %}
       {% if error %}<p class="moderator-error" role="alert">{{ error }}</p>{% endif %}
       <form method="post" class="mt-6">
