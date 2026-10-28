@@ -7,7 +7,7 @@
 {% if session.user_role %}<a class="lms-global-item" href="{{ url_for('seminars') }}" {% if ep in ['seminars','view_shared_topics','my_term_attendance'] or ep.startswith('boards.') %}aria-current="page"{% endif %}>{{ icon('book') }}<span>강의실</span></a>{% endif %}
 <a class="lms-global-item" href="{{ url_for('lms_calendar') }}" {% if ep=='lms_calendar' %}aria-current="page"{% endif %}>{{ icon('calendar') }}<span>캘린더</span></a>
 <a class="lms-global-item" href="{{ url_for('club_room') }}" {% if ep=='club_room' %}aria-current="page"{% endif %}>{{ icon('room') }}<span>동아리방</span></a>
-{% if session.user_role in ['admin','officer'] %}<button type="button" class="lms-global-item" data-lms-panel="lms-notifications" aria-controls="lms-notifications" aria-expanded="false">{{ icon('inbox') }}<span>알림</span></button><a class="lms-global-item" href="{{ url_for('admin_dashboard') }}">{{ icon('settings') }}<span>전체 운영</span></a>{% endif %}
+{% if session.user_role in ['admin','officer'] %}<button type="button" class="lms-global-item" data-lms-panel="lms-notifications" aria-controls="lms-notifications" aria-expanded="false">{{ icon('inbox') }}<span>알림</span></button><a class="lms-global-item" href="{{ url_for('admin_dashboard', term_id=lms_admin_term_id|default(none)) }}" {% if lms_admin_context|default(false) %}aria-current="page"{% endif %}>{{ icon('settings') }}<span>전체 운영</span></a>{% endif %}
 <a class="lms-global-item" href="{{ url_for('help_member') }}" {% if ep=='help_member' %}aria-current="page"{% endif %}>{{ icon('help') }}<span>이용안내</span></a>
 <button type="button" class="lms-global-collapse" aria-label="메뉴 최소화" aria-expanded="true">{{ icon('arrow') }}</button>
 </nav>

@@ -1,6 +1,7 @@
 """Read-only home summaries. Never turn a failed lookup into an empty count."""
 from datetime import date, datetime, timedelta, timezone
 from topic_lifecycle import topic_event_deadline, topic_event_is_open
+from attendance_workflow import attendance_is_confirmed, confirmed_history_session_ids
 
 KST = timezone(timedelta(hours=9))
 
@@ -96,11 +97,11 @@ def operations_summary(db, term_id=None, session_id=None, today=None):
         target = next((s for s in sessions if s['meeting_date'] >= today.isoformat()), sessions[-1] if sessions else None)
     ids = [s['id'] for s in sessions]
     histories = db.table('history').select('id,seminar_session_id,groups,attendance_confirmed_at').in_('seminar_session_id', ids).execute().data or [] if ids else []
-    confirmed_sessions = {h['seminar_session_id'] for h in histories if h.get('attendance_confirmed_at')}
+    confirmed_sessions = confirmed_history_session_ids(histories)
     grouped_sessions = {h['seminar_session_id'] for h in histories if any(h.get('groups') or [])}
     result = {**context, 'selected': session_summary(context, target), 'tasks': [], 'pending_attendance': []}
     for item in sessions:
-        if item['meeting_date'] < today.isoformat() and not (item.get('attendance_confirmed_at') or item['id'] in confirmed_sessions):
+        if item['meeting_date'] < today.isoformat() and not attendance_is_confirmed(item, confirmed_sessions):
             result['pending_attendance'].append(session_summary(context, item))
     if target:
         title = result['selected']['book_title']
@@ -113,6 +114,6 @@ def operations_summary(db, term_id=None, session_id=None, today=None):
             {'key': 'groups', 'label': '조 편성 저장', 'done': target['id'] in grouped_sessions, 'action': '조 편성'},
         ]
         if target['meeting_date'] <= today.isoformat():
-            tasks.append({'key': 'attendance', 'label': '실제 출석 확정', 'done': bool(target.get('attendance_confirmed_at') or target['id'] in confirmed_sessions), 'action': '출석 확정'})
+            tasks.append({'key': 'attendance', 'label': '실제 출석 확정', 'done': attendance_is_confirmed(target, confirmed_sessions), 'action': '출석 확정'})
         result['tasks'] = tasks
     return result

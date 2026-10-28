@@ -1,5 +1,7 @@
 {% extends 'lms_base.html' %}
+{% set lms_admin_context = true %}
+{% set lms_admin_term_id = seminar.term_id if seminar is defined and seminar else (term.id if term is defined and term else (overview.term.id if overview is defined and overview and overview.term else (seminar_sessions[0].term_id if seminar_sessions is defined and seminar_sessions else none))) %}
 {% set lms_course = {'name':'운영 관리'} %}
-{% set course_breadcrumb_href = url_for('admin_dashboard') %}
+{% set course_breadcrumb_href = url_for('admin_dashboard', term_id=lms_admin_term_id) %}
 {% set course_breadcrumb_label = '운영 관리' %}
 {% block course_navigation %}{% include '_lms_admin_nav.html' %}{% endblock %}

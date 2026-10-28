@@ -14,7 +14,7 @@
         {{ records_nav('seminars') }}
         {{ term_filter(terms, selected_term_id, 'records_seminars') }}
 
-        <div class="records-flex records-flex-col md:flex-row records-md-items-center records-md-justify-between records-mb-6 records-gap-3">
+        <div class="records-flex records-flex-col records-md-flex-row records-md-items-center records-md-justify-between records-mb-6 records-gap-3">
             <h1 class="records-accent">세미나 진행 현황 (총 {{ total_history }}회)</h1>
             <div class="records-flex records-gap-2 records-flex-wrap">
                 <a href="{{ url_for('manual_entry') }}"
