@@ -1,6 +1,10 @@
 # 미니 PC 설치·전환 실행 순서
 
 재개 기준: `docs/MINIPC_DEPLOY_STATUS.md`. 모든 운영 변경은 직전 사용자 승인 필요.
+2026-10-28 추가: 승인된 일반 Cloudflare Tunnel `bookmembers-minipc` 설치/연결 완료.
+`bookmembers-cloudflared.service`는 root 전용 토큰을 systemd credential로 읽으며 부팅 자동 시작한다.
+새 origin.knu-read.xyz의 DNS 전파/공개 검증 및 최종 Worker 전환은 `docs/MINIPC_DOMAIN_TUNNEL.md`를 따른다.
+아래 기존 Funnel은 비교·복귀 경로로 유지 중이다. Enable 상태는 실제 호스트 재부팅 검증을 대신하지 않는다.
 Worker는 https://www.knu-read.workers.dev 에 배포되어 현재 미니 PC의
 Funnel https://bookmembers-ubuntu.tail97bc40.ts.net 을 가리킨다. 2026-10-28 승인·전환·공개 검증 완료.
 개인 식별자가 없는 새 공개 주소로의 변경도 승인·적용·검증 완료. 실제 진행 상태는 상태 문서를 따른다.

@@ -1,0 +1,23 @@
+[Unit]
+Description=Cloudflare Tunnel for book members
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=notify
+TimeoutStartSec=0
+DynamicUser=yes
+LoadCredential=tunnel-token:/etc/cloudflared/bookmembers.token
+ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate --protocol auto --loglevel info --metrics 127.0.0.1:20001 run --token-file %d/tunnel-token
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=40
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
