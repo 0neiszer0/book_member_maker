@@ -1,5 +1,10 @@
 # 미니 PC 이전 진행 상태
 
+최신 요청: 사용자가 hosting.kr에서 knu-read.xyz 구매 후 연결 요청. 일반 Cloudflare Tunnel 전환 준비 중.
+Cloudflare 로그인 유지, hosting.kr 사용자 로그인 대기. 공개 DNS에는 아직 NXDOMAIN으로 보임.
+기존 운영 변경 없음. DNS zone/네임서버/Tunnel/카카오 변경 미실행, 실행 직전 승인 필요.
+로컬 자동 시작 서비스·설치 초안 준비 및 문법 검사 완료. 상세 docs/MINIPC_DOMAIN_TUNNEL.md.
+
 최신 완료(2026-10-28 15:08 KST): 사용자 승인 후 새 UI 정적 CDN/캐시를 운영에 적용했다.
 VM 앱 8e290f7 (UI 내용 f946824 유지), Worker 69847a91-0a3f-49fd-850e-13d35b4410a4.
 44개 공개 정적 파일은 해시 버전 URL/1년 캐시로 CDN에서 직접 제공. 공개 검사 22/22 통과.
