@@ -2,6 +2,44 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import proxy from '../infra/worker/proxy.mjs';
 const env={UPSTREAM_ORIGIN:'https://origin.example.ts.net',ORIGIN_AUTH_SECRET:'s'.repeat(32)};
+test('legacy links and OAuth start redirect before creating a cookie on the wrong host',async()=>{
+  const original=globalThis.fetch;
+  const migrating={...env,PUBLIC_BASE_URL:'https://knu-read.xyz',LEGACY_PUBLIC_ORIGIN:'https://www.knu-read.workers.dev'};
+  globalThis.fetch=async()=>{throw new Error('Legacy requests must never reach the origin');};
+  try {
+    for (const path of ['/login/kakao?next=%2Fdashboard','/shared_topics?token=synthetic']) {
+      const response=await proxy.fetch(new Request(migrating.LEGACY_PUBLIC_ORIGIN+path),migrating);
+      assert.equal(response.status,302);
+      assert.equal(response.headers.get('Location'),migrating.PUBLIC_BASE_URL+path);
+      assert.equal(response.headers.get('Cache-Control'),'no-store');
+      assert.equal(response.headers.get('Set-Cookie'),null);
+    }
+    const write=await proxy.fetch(new Request(migrating.LEGACY_PUBLIC_ORIGIN+'/api/member',{method:'POST',body:'synthetic'}),migrating);
+    assert.equal(write.status,409);
+    assert.equal(write.headers.get('Location'),null);
+    for (const [url,status] of [['http://knu-read.xyz/login?next=%2F',308],['http://www.knu-read.workers.dev/login?next=%2F',302]]) {
+      const response=await proxy.fetch(new Request(url),migrating);
+      assert.equal(response.status,status);
+      assert.equal(response.headers.get('Location'),'https://knu-read.xyz/login?next=%2F');
+    }
+  } finally {globalThis.fetch=original;}
+});
+test('canonical requests still proxy, and incomplete migration configuration fails closed',async()=>{
+  const original=globalThis.fetch;
+  const migrating={...env,PUBLIC_BASE_URL:'https://knu-read.xyz',LEGACY_PUBLIC_ORIGIN:'https://www.knu-read.workers.dev'};
+  let seen;
+  globalThis.fetch=async(url,init)=>{seen={url,init};return new Response('ok');};
+  try {
+    const response=await proxy.fetch(new Request('https://knu-read.xyz/login/kakao'),migrating);
+    assert.equal(response.status,200);
+    assert.equal(seen.url.href,env.UPSTREAM_ORIGIN+'/login/kakao');
+    assert.equal(seen.init.headers.get('X-App-Origin-Auth'),env.ORIGIN_AUTH_SECRET);
+    for (const bad of [{...migrating,PUBLIC_BASE_URL:'https://knu-read.xyz/path'},
+      {...migrating,LEGACY_PUBLIC_ORIGIN:''},{...migrating,LEGACY_PUBLIC_ORIGIN:migrating.PUBLIC_BASE_URL}]) {
+      assert.equal((await proxy.fetch(new Request('https://www.knu-read.workers.dev/'),bad)).status,503);
+    }
+  } finally {globalThis.fetch=original;}
+});
 test('preserves request stream and cookies, strips spoofed headers, preserves SSE and multiple cookies',async()=>{
   const original=globalThis.fetch;
   let seen;
