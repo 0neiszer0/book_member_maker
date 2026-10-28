@@ -9,8 +9,10 @@ Ubuntu 24.04.5·SSH·앱 실행 환경·보호된 비밀 설정·로컬 앱 가�
 기존 tail97bc40.ts.net에 bookmembers-ubuntu 가입 완료, Running/Online 확인.
 Funnel 공개·서버 전용 권한·인증키 만료 해제 완료. 공개 GET 검증 12항목 통과.
 Worker 원본을 Funnel로 전환 완료, 공개 검증 8항목 통과. 호스트 자동 복구 검증 미완료.
-후속 요청: 개인 식별자가 없는 workers.dev 주소로 계정용 이름과 Worker 이름 변경 준비.
-knu_read의 밑줄은 사용할 수 없어 knu-read 후보 확인 예정. 최종 이름·Cloudflare 대시보드 로그인 대기.
+공개 주소 변경 완료: https://www.knu-read.workers.dev . Cloudflare 계정용 이름 knu-read,
+Worker 이름 www. 새 카카오 콜백 저장 및 VM의 기준 URL 변경·앱 재시작 완료.
+새 주소의 공개 검증 8항목, 관리자 본인 실제 로그인·로그아웃, 조 편성 SSE 1회,
+비로그인 추천 조회 및 기존 발제 공유 링크 확인 완료. 재부팅 후 자동 복구 검증은 남아 있다.
 작업 사본: C:/Users/HOME/Documents/Codex/2026-10-27/markdown-0neiszer0-book-member-maker-pc/work/book_member_maker
 브랜치: codex/minipc-security. 기준 main: 91b7dd6d9d0c6771a1e07c1ea977396f72dae4ce.
 현재 GitHub main 및 Render live: bda8a82e66ac828dd3bfe1971c37e7e98cca356f. 사용자 승인 후 보안 배포 완료. 이후 백업 준비 변경은 로컬에만 있다.
@@ -27,7 +29,7 @@ knu_read의 밑줄은 사용할 수 없어 knu-read 후보 확인 예정. 최종
 - 운영에 20261027122104_minipc_account_security.sql 적용. RPC account_request_mutate / protected_member_mutate 및 members_social_id_unique_nonempty 인덱스만 생성. 기존 회원 행 수정 호출 없음. 트랜잭션에 lock_timeout 5s, statement_timeout 30s 적용.
 - 적용 후 카탈로그 확인: 두 함수 SECURITY INVOKER / 빈 search_path / anon·authenticated 실행 불가 / service_role 실행 가능. 인덱스 unique·valid·ready 모두 true. 운영 계정 변경 테스트 없음. execute_sql 직접 적용이므로 migration history 등록 없음. 전체 db push/reset 금지.
 - Cloudflare 제한 OAuth(account:read,user:read,workers_scripts:write) 인증 성공, Windows 키링 보호 저장. 사용자 승인 후 Worker 생성·Secret 저장·공개 GET 검증 완료.
-- Worker 주소: https://book-member-maker.alstj816.workers.dev . 현재 원본은 https://bookmembers-ubuntu.tail97bc40.ts.net . GET 200, keep-alive status=ok/supabase=alive, no-store. 전환 버전 9081c2bc-b183-4bb1-a6fc-4f5de9616ba1.
+- Worker 주소: https://www.knu-read.workers.dev . 현재 원본은 https://bookmembers-ubuntu.tail97bc40.ts.net . GET 200, keep-alive status=ok/supabase=alive, no-store. 전환 버전 9081c2bc-b183-4bb1-a6fc-4f5de9616ba1(이름 변경 후 보존).
 - 원본 비밀은 작업 폴더 work/origin-auth-secret.dpapi에 Windows DPAPI 암호화 저장. 절대 출력/커밋하지 말 것. 향후 VM에 같은 값을 안전하게 전달. Flask/Supabase 기존 키 재사용 안 함.
 - Render My Workspace 읽기 승인 후 확인: srv-d06thnjuibrs73eu1r4g, free/docker/singapore, main 자동 배포 활성. 현재 live SHA는 bda8a82. healthCheckPath 비어 있음. Render 환경변수 변경 없음.
 - Hyper-V 기능 활성화만 승인받아 완료: work/hyperv-enable-result.json의 Success=true/State=Enabled/RestartNeeded=true. 재부팅 아직 안 함.
@@ -40,16 +42,16 @@ knu_read의 밑줄은 사용할 수 없어 knu-read 후보 확인 예정. 최종
 2. 완료: VM 생성·Ubuntu 설치·관리 SSH 키 등록, ISO 분리·디스크 부팅·SSH 검증.
    앱 실행 환경·비밀 이전·서비스 활성화 및 Tailscale 기기 가입도 완료.
 3. 보안 코드 bda8a82는 Render 운영 배포 완료. 다른 UI 작업은 포함하지 않음. UI 통합 시 최신 main을 기준으로 보안 코드와 CSRF를 보존한다. 추가 main push는 새 배포를 일으키므로 승인 필요.
-4. Kakao 기존 Worker 콜백 추가 완료. 미니 PC 전환 후 Worker 콜백·보안 쿠키·로그인 시작 확인. 본인 계정 OAuth 완료는 아직 미검증. 새 공개 주소 변경 시 새 콜백과 앱 URL의 동시 변경 승인이 필요하다. Render의 과도기 OAuth 환경 변경은 계속 보류.
+4. Kakao 새 www.knu-read 콜백까지 저장 완료(기존5개 유지, 총6개). 새 기준 URL·보안 쿠키 및 본인 관리자 계정 OAuth·로그아웃 확인 완료. Render의 과도기 OAuth 환경 변경은 계속 보류.
 5. 완료: Ubuntu 서비스·비밀 설정·Tailscale 기기 가입. 별도 승인 후 HTTPS·서버 전용 태그·Funnel 공개·키 만료 해제 완료. 공개 경로에서 인증 없음/오류 403, 정상 키 앱·DB·로그인 시작 정상 확인.
-6. 완료: 공개 Funnel 검증 후 사용자 승인으로 Worker→Funnel 전환, 공개 GET/DB/OAuth 시작 검증 통과. 새 주소 이름 변경 준비 및 실제 OAuth·SSE·공유 링크 확인이 남음.
+6. 완료: 공개 Funnel 검증 후 사용자 승인으로 Worker→Funnel 전환. 별도 승인으로 www.knu-read 주소 변경·재검증 완료. 실제 OAuth·SSE·기존 공유 링크·추천 공개 조회 검증 완료. 운영 POST/실제 사진 업로드는 테스트 쓰기 금지에 따라 수행하지 않았다.
 7. 재부팅/로그인 전 자동 복구와 실제 사이트 접근 검증. BIOS 정전 후 자동 켜짐 미확인. Tailscale 서버 노드 KeyExpiry=null 확인 완료.
 8. Render 중지/삭제 승인 없음. 복구용으로 유지. 취약한 기준 main으로 롤백하지 않음.
 
 ## 승인 경계와 검증 한계
 
 승인 완료: Hyper-V 기능만, Wrangler 권한·키링, Worker 생성·Secret·공개 GET, My Workspace 읽기, 백업 없이 해당 확장 SQL만.
-미승인/보류: 추가 호스트 재부팅, Render 추가 코드·환경 변경, 추가 Kakao 설정, 공개 주소 이름 변경, Render 중지. VM 생성·Ubuntu 설치·관리 SSH 키 등록, 런타임·비밀 이전, 기존 tailnet 가입 및 HTTPS·전용 Funnel·서버 키 만료 해제는 승인받아 완료. bda8a82 보안 코드 배포, Worker 콜백 1개 추가, Worker 원본 Funnel 전환도 승인받아 완료.
+미승인/보류: 추가 호스트 재부팅, Render 추가 코드·환경 변경, 여기 기록되지 않은 추가 Kakao 설정, Render 중지. VM 생성·Ubuntu 설치·관리 SSH 키 등록, 런타임·비밀 이전, 기존 tailnet 가입 및 HTTPS·전용 Funnel·서버 키 만료 해제는 승인받아 완료. bda8a82 보안 배포, Worker 원본 Funnel 전환, www.knu-read 주소 변경·새 콜백 추가·서버 URL 갱신·앱 재시작도 승인받아 완료.
 SQL 합성 검증은 PGlite이며 실제 다중 연결 동시성 시험은 하지 않았다. 운영에서는 정의·권한·인덱스 읽기 검증만 했다.
 Supabase CLI migration new는 홈 설정 폴더 권한 오류로 실패하여 로컬 timestamp 파일을 작성했다.
 최초 Wrangler 권한 요청은 자동 승인 검토가 차단했으나 이후 명시적 사용자 승인으로 해소됐다.
@@ -299,3 +301,68 @@ Supabase CLI migration new는 홈 설정 폴더 권한 오류로 실패하여 �
 - work/pre-recovery-baseline.json 기록. Windows vmms/Tailscale 자동 시작·Running,
   guest bookmembers/tailscaled enabled/active, NRestarts0. 이번 작업에서 재부팅하지 않음.
   기존 부팅은 앱/Funnel 구축 전이므로 이 기록만으로 부팅 자동 복구 검증 완료라 표시하지 않는다.
+
+## 공개 주소 www.knu-read 변경 완료 (2026-10-28)
+
+- 사용자 최종 이름 www.knu-read.workers.dev 선택, Cloudflare·카카오 직접 로그인 완료.
+- Cloudflare 계정 목록에는 Worker 1개만 존재. subdomain knu-read 사용 가능 확인.
+  원래 주소 즉시 중단·전파 지연·새 주소 재로그인을 설명한 뒤 사용자 명시 승인받음.
+- Kakao 앱1288463 / REST키4468347의 기존5 URI를 유지하고
+  https://www.knu-read.workers.dev/login/kakao/callback 한 개 추가. 저장 후 키 목록으로
+  이동한 화면에서 URI0개가 조회된 것은 저장 실패 증거가 아니었음. 원래 키 편집 화면에
+  재진입하여 총6개와 기존5개 보존을 확인. 키·시크릿·동의항목 변경 없음.
+- 콜백 재조회 전 서버 URL 변경 실행은 자동 승인 검토가 선행조건 미확인으로 차단.
+  실제 콜백6개 저장을 확인한 뒤 같은 사용자 승인 범위로 재시도하여 허용됨.
+- work/change-public-url.py: 기본 읽기 검증에서 applied=false, URL두값 외 보존 검증.
+  승인 후 --apply로 /etc/book_member_maker/app.env의 PUBLIC_BASE_URL/KAKAO_REDIRECT_URI만
+  원자 교체. 복구 사본 app.env.before-public-url-change는 root전용. 기존 비밀 유지.
+- 앱 서비스만 재시작. 직후 첫 헬스는 준비 중 실패했지만 이어 active 및 app/database alive 확인.
+- Cloudflare 기존 Worker 이름 www로 저장, 계정 subdomain knu-read로 저장.
+  기존 Secret·원본 Funnel·배포이력 보존. wrangler deployments list --name www에서
+  현재100% 버전9081c2bc-b183-4bb1-a6fc-4f5de9616ba1 확인. 별도 Worker 생성 안 함.
+- 새 HTTPS 최초 검사에서 TLS handshake 오류가 있었으나 전파 후 정상 해소됨.
+  인증서 검증 우회 없음. work/worker-new-url-verification.json의 8항목 모두 true.
+- 브라우저 실제 URL과 DOM 링크 모두 https://www.knu-read.workers.dev 확인.
+  접근성 화면에서 www가 생략되는 것은 표시 축약이며 실제 URL 리다이렉트가 아니었음.
+  outputs/knu-read-live-site.png에 성공 화면 기록.
+- 현재 공개 GET/DB/로그인 시작은 검증 완료. Chrome 탭1023347730의 새 사이트 로그인 화면에서
+  기존 관리자 본인 카카오 로그인 완료를 사용자에게 요청 중. 아직 OAuth 완료로 기록하지 않는다.
+- 재부팅·Render중지·운영 회원/예약/글 쓰기·다른 UI 세션 편집 없음.
+
+## 새 주소 로그인·최소 실제 기능 검증 완료 (2026-10-28)
+
+- 사용자가 기존 본인 카카오 계정으로 로그인 완료. 실제 URL /admin/dashboard와
+  관리자 메뉴 표시 확인. 세션 쿠키를 추출하거나 서버 비밀로 세션을 위조하지 않음.
+- 조 편성 화면에서 4명/1개조의 저장 없는 계산1회 수행. Worker→Funnel 경로의 EventSource
+  시작 표시 후 '조 편성 결과'·'추천안1/총4명/1개조' 결과 렌더링 확인. '확정' 버튼은 누르지 않음.
+  회원명·학번·명단·요청쿼리·공유토큰은 검증 출력/상태 파일에 기록하지 않음.
+- 계산 중 MemoryCurrent=148094976bytes(약141MiB), NRestarts0, swap사용0,
+  guest available 약451MiB 관찰. 대규모 부하 시험 아님.
+- journalctl 본문을 출력하지 않고 서버 내부에서 민감한 명단 INFO 로그 패턴만 집계: 0개.
+- 인증 쿠키가 없는 별도 IAB에서 /now 공개 목록과 기존 발제 링크를 실제로 열어
+  정상 폼 표시·유효하지 않은 링크 오류 없음 확인. 링크 기준 origin이 새 www.knu-read와 일치.
+  공유 토큰은 파일/출력에 저장하지 않음. /books/suggestions 공개 조회·로그인 안내 확인.
+- 실제 관리자 페이지 재조회도 정상. 한 번 브라우저 navigation timeout 후 이미 로딩 완료된
+  정상 페이지를 확인했으며 앱 오류 페이지는 아니었음.
+- 기존 로그인 세션의 정상 '로그아웃' 링크를 눌러 공개 홈 복귀·로그인 링크 표시·관리자 메뉴 없음 확인.
+  로그인·로그아웃 최소 확인 완료. 현재 Chrome 사이트 탭은 로그아웃된 새 공개 홈.
+- app.env와 복구 사본 app.env.before-public-url-change 모두 root:root0600 확인.
+- Windows/VM 재부팅은 아직 수행하지 않음. 자동 시작 구성과 Funnel 지속 설정은 적용됐지만,
+  구축 후 Windows 로그인 전 접속 복구 증거가 없으므로 마지막 검증은 별도 승인 후 진행한다.
+
+## 현재 완료 판정표
+
+| 단계 | 상태 | 증거 / 남은 조건 |
+|---|---|---|
+| 저장소·Windows 환경 | 완료 | 원격 main bda8a82, 별도 사본·브랜치, UI 세션 파일 미수정 |
+| 보안 코드·최소 회귀 | 완료 | 보안 배포 bda8a82, 관련 테스트와 CI 통과 |
+| 운영 확장 SQL | 완료 | 사용자 백업 예외 승인, RPC2개·인덱스1개만 적용 |
+| Worker·원본 인증 | 완료 | www.knu-read.workers.dev, 독립 Secret, Funnel 직접 누락/오류403 |
+| Hyper-V·Ubuntu·앱 | 완료 | VM 자동 시작, systemd enabled/active, root전용 환경, Python3.12 |
+| Tailscale·Funnel | 완료 | 전용 태그만 funnel 허용, HTTPS443→loopback5000, --bg, KeyExpiry=null |
+| Worker→미니 PC 전환 | 완료 | 공개8항목·관리자 OAuth/로그아웃·SSE1회·추천/공유 링크 조회 |
+| 사진/운영 POST | 제한 검증 | 프록시 코드·합성 테스트/경로 검토. 실제 데이터 쓰기·업로드 테스트 안 함 |
+| Windows 로그인 전 자동 복구 | 보류 | 구축 후 재부팅1회 및 로그인 전 외부 접속 확인 필요; UI 작업 저장 후 승인 |
+| 정전 후 전원 켜짐 | 미확인 | BIOS 전원 복구 정책은 OS에서 확정 못 함 |
+| DB/Storage 외부 복구 | 보류 | 백업 스크립트만 준비, 외부 저장소·복구키·활성화·격리 복원 미완료 |
+| Render·구주소 | 보존 | 기존 Render 직접 주소 유지. Worker OAuth 대체 설정은 사용자 결정으로 보류; 중지/삭제 미승인 |
