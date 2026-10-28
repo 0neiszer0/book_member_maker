@@ -43,7 +43,7 @@ def _social_meta(title, description, canonical=None, image=None, noindex=False):
         "title": title,
         "description": description,
         "canonical": canonical or f"{_public_base()}{request.path}",
-        "image": image or f"{_public_base()}/static/og/club-preview.png",
+        "image": image or f"{_public_base()}{url_for('static', filename='og/club-preview-v2.png')}",
         "noindex": noindex,
     }
 
@@ -104,7 +104,7 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
     def engagement_navigation_context():
         return {
             "engagement_image_url": image_url,
-            "default_social_image_url": f"{_public_base()}/static/og/club-preview.png",
+            "default_social_image_url": f"{_public_base()}{url_for('static', filename='og/club-preview-v2.png')}",
         }
 
     @app.post("/participate/forget")

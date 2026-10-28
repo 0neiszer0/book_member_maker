@@ -172,7 +172,7 @@ def add_default_social_preview(response):
         quote=True,
     )
     canonical = html.escape(f"{PUBLIC_BASE_URL}{request.full_path}".rstrip("?"), quote=True)
-    image = f"{PUBLIC_BASE_URL}{url_for('static', filename='og/club-preview.png')}"
+    image = f"{PUBLIC_BASE_URL}{url_for('static', filename='og/club-preview-v2.png')}"
     tags = f"""
   <meta name="description" content="{description}">
   <meta property="og:type" content="website">
@@ -182,8 +182,9 @@ def add_default_social_preview(response):
   <meta property="og:description" content="{description}">
   <meta property="og:url" content="{canonical}">
   <meta property="og:image" content="{image}">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
+  <meta property="og:image:width" content="1730">
+  <meta property="og:image:height" content="909">
+  <meta property="og:image:alt" content="경북대학교 독서동아리 책 먹는 호반우 · knu-read.xyz">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="{title}">
   <meta name="twitter:description" content="{description}">
