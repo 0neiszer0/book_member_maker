@@ -1,4 +1,7 @@
-# 학기별 운영 구분 검토안
+# 학기별 운영·공지 구분 — 배포 완료
+
+최신 상태: 2026-10-28 사용자 승인 후 앱 1e1caed·Worker fa1b1796 배포 및 검증 완료.
+아래는 검토·준비 이력이며 마지막 운영 적용 결과가 최신이다.
 
 사용자 요청 4번의 검토 및 구현 진행 문서다. 사용자는 아래 메뉴 정리를 승인했고,
 추가로 공지를 전체 공지와 학기별 공지로 나누도록 요청했다. 로컬 구현과 기능 검증을 마쳤으며 공개 배포는 미승인이다.
@@ -82,3 +85,18 @@ PGlite에서 기존 글/전체 범위, FK·삭제 제한·인덱스, 기존 RLS/
 - `outputs/semester-ui-state.json`: 기계 판독 재개 상태. `production_sql_applied=false`, `production_deployed=false`.
 - 배포 승인 범위: 공지 열/FK/인덱스 추가, 새 CDN+앱 재시작, KNU 책반우 미리보기 및 홈페이지 카카오 캐시 갱신.
 - Render·GitHub main·도메인·카카오 로그인 설정·위키·Windows 재부팅은 변경하지 않는다.
+
+## 운영 적용 결과 — 2026-10-28
+
+- 사용자 승인: **SQL·앱·CDN·미리보기 갱신 승인**.
+- Supabase `scoped_notices` 적용 성공. `posts.term_id` nullable/FK restrict/index 추가. 기존 글 1개는 전체 공지(NULL) 유지. 기존 필드 전후 MD5 `8f1a805d0724bf29b94a3ce0ffbb2eca` 동일, RLS 유지.
+- Worker **fa1b1796-2570-45ef-8eed-d237851a9051** 배포 완료. 191개 공개 파일 중 변경 5개 업로드, 나머지 재사용. 도메인·Tunnel·Secret 유지.
+- 앱 **1e1caed3acb3eb5410e87fed0f8f8bc106fe582d** 활성화. 51개 자산/manifest 해시 검증 후 앱만 재시작. 의존성 설치·키 생성·타이머 설정 변경 없음.
+- 공개 GET: 새 CSS/JS/이미지의 ZIP 해시와 immutable 캐시 일치, 홈 OG/새 digest 정상, 로그인 200·카카오 시작 302, 비인증 개인 기록→로그인, push API 401, 원본 비밀키 없는 접근 403 통과.
+- 기존 관리자 세션으로 운영 조회: 과거 세미나 카드→본인 날짜·도서·참여 내역, 2026-2학기 회원 관리 메뉴, 공지 전체/학기 표시와 검색 맥락 유지 확인. 운영 글·회원·출석 테스트 쓰기 없음.
+- 카카오 개발자 URL 메타 도구에서 https://knu-read.xyz/ 캐시 1건 초기화 후 재조회. 빨간 KNU 책반우 배너와 ‘책반우 | 경북대학교 독서동아리’ 제목 표시 확인. 실제 기존 채팅 메시지를 수정한 것은 아님.
+- 최종 서버: checkout clean, bookmembers/Tunnel/알림 타이머 active, 앱·DB 헬스 정상, app.env root:root 0600.
+- Supabase advisor 재조회: 서버 전용 RLS/no-policy INFO와 기존 PostgreSQL 패치 WARN 유지. 이번 범위의 새 보안 경고 유형 없음. 기존 DB 패치는 별도 검토/승인 대상: https://supabase.com/docs/guides/platform/upgrading
+- Render·GitHub main·위키·도메인·카카오 로그인 설정·Windows 재부팅 변경 없음.
+- 이 배포의 남은 필수 작업 없음. 휴대폰 실제 푸시 확인, 호스트 재부팅/정전 자동 복구, 외부 백업·격리 복원은 기존 별도 미완료 항목으로 유지한다.
+- 준비 당시 `work/semester-release/release.json`과 SHA256SUMS는 감사용으로 보존. 최신 결과는 `outputs/semester-ui-state.json`을 사용한다.

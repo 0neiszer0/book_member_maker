@@ -459,3 +459,12 @@ SQL 확장/추가 회차 11개 숨김, 새 타이머 자동 시작/키 생성 �
 공개 GET·권한·CDN 해시 및 운영 화면 점검 통과. 사용자의 휴대폰 알림 허용 후 실제 수신/클릭은 확인 대기.
 상세/재개 기록은 `LMS_IMPROVEMENTS_20261028.md`, 작업폴더 `outputs/lms-improvements-state.json`.
 전체 호스트 재부팅·백업/격리 복원은 위의 별도 미완료 상태 유지. Render/GitHub main 변경 없음.
+
+
+## 2026-10-28 학기별 UI·공지·KNU 공유 이미지 — 운영 적용 완료
+
+사용자 ‘SQL·앱·CDN·미리보기 갱신 승인’ 후 앱 1e1caed, Worker fa1b1796-2570-45ef-8eed-d237851a9051 적용.
+공지 범위 열/FK/인덱스 확장, 기존 글 보존 확인, 공개·로그인 시작·개인 내역 보호·운영 화면 조회 검증 통과.
+카카오 홈페이지 미리보기 캐시 초기화 및 KNU 책반우 배너 확인 완료.
+최신 상세: `SEMESTER_NAVIGATION_REVIEW_20261028.md`, 작업 루트 `outputs/semester-ui-state.json`.
+Render/main/위키/도메인/카카오 로그인/Windows 재부팅 변경 없음. 기존 푸시 수신·자동 복구·외부 백업 검증은 별도 미완료.
