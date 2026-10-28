@@ -3,11 +3,11 @@
 재개 기준: `docs/MINIPC_DEPLOY_STATUS.md`. 모든 운영 변경은 직전 사용자 승인 필요.
 2026-10-28 추가: 승인된 일반 Cloudflare Tunnel `bookmembers-minipc` 설치/연결 완료.
 `bookmembers-cloudflared.service`는 root 전용 토큰을 systemd credential로 읽으며 부팅 자동 시작한다.
-새 origin.knu-read.xyz의 DNS 전파/공개 검증 및 최종 Worker 전환은 `docs/MINIPC_DOMAIN_TUNNEL.md`를 따른다.
-아래 기존 Funnel은 비교·복귀 경로로 유지 중이다. Enable 상태는 실제 호스트 재부팅 검증을 대신하지 않는다.
-Worker는 https://www.knu-read.workers.dev 에 배포되어 현재 미니 PC의
-Funnel https://bookmembers-ubuntu.tail97bc40.ts.net 을 가리킨다. 2026-10-28 승인·전환·공개 검증 완료.
-개인 식별자가 없는 새 공개 주소로의 변경도 승인·적용·검증 완료. 실제 진행 상태는 상태 문서를 따른다.
+2026-10-28 16:46 KST 공식 주소 https://knu-read.xyz 전환 및 실제 카카오 관리자 로그인 검증 완료.
+Worker www는 origin.knu-read.xyz(일반 Cloudflare Tunnel)를 사용하며 기존 workers.dev 링크는 새 주소로 이동한다.
+Worker 운영버전a9a69259-ee5b-4cb4-bc44-2fd67c39f491, 앱8e290f7/UI f946824. 공개GET17/17 통과.
+기존 Funnel은 복귀 경로로 유지 중이다. Enable 상태는 실제 호스트 재부팅 검증을 대신하지 않는다.
+상세 설정/비밀 보관/복귀 기준은 `docs/MINIPC_DOMAIN_TUNNEL.md`를 따른다.
 이전 alstj816 주소는 중단됐고 자동 리다이렉트되지 않는다. Cloudflare Worker 이름은 `www`이며,
 후속 배포는 이 이름을 사용한다. 기존 `book-member-maker` 이름으로 새 Worker를 만들지 않는다.
 
@@ -66,12 +66,10 @@ Funnel https://bookmembers-ubuntu.tail97bc40.ts.net 을 가리킨다. 2026-10-28
    HTTP 200만 확인하지 않고 status=ok와 supabase=alive 둘 다 확인한다.
    Funnel 직접 접근 403, Worker 접근 정상; 대표 SSE/쿠키/리다이렉트·공유 링크 확인.
    운영 회원/예약/글을 테스트로 작성하지 않는다. OAuth는 승인된 관리자 본인으로만 확인.
-8. 전환 승인 후 Worker UPSTREAM_ORIGIN만 실제 Funnel origin으로 변경한다.
-   Render는 보안 패치 버전 bda8a82를 보존한다. 사용자 결정으로 Render의 Worker OAuth 환경 설정은
-   보류됐으므로, Render로 돌아가면 전환 이전과 같이 Render 직접 로그인 주소를 사용해야 한다.
-   두 호스트의 쿠키는 공유되지 않는다. 완전한 Worker OAuth 대체 원본으로 간주하지 않는다.
-   실패 시 승인 후 패치된 Render origin으로 되돌린다. 취약한 기준 main으로 롤백하지 않는다.
-9. 재부팅 승인 후 수동 서비스 시작 없이 VM→Gunicorn→Tailscale/Funnel→Worker 접속을 검증한다.
+8. 현재 공개 원본은 origin.knu-read.xyz이며 전환 완료. 현재 복귀 대상은 기존 Funnel 및 workers.dev이다.
+   Render는 보안 패치 버전 bda8a82를 보존하고 변경하지 않는다. main push도 Render 자동 배포를 일으키므로 금지.
+   도메인별 쿠키가 다르므로 회원의 첫 새 주소 방문에는 재로그인이 필요하다. 공개 주소 전환의 상세 복귀 절차를 따른다.
+9. 재부팅 승인 후 수동 서비스 시작 없이 VM→Gunicorn→cloudflared→Worker→knu-read.xyz 접속을 검증한다.
    현재 Windows AutoAdminLogon=true이며 기존 설정은 유지한다. 이 환경에서 재부팅 후 접속 성공은
    무인 복구 증거지만, 그 자체로 Windows 로그인 전 접속을 입증하지는 않는다.
    재부팅 전 work/pre-recovery-baseline.json과 Windows 부팅 시각·Ubuntu boot_id를 비교한다.

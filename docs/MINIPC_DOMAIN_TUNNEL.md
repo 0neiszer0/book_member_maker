@@ -1,9 +1,26 @@
-# knu-read.xyz / Cloudflare Tunnel 연결 준비
+# knu-read.xyz / Cloudflare Tunnel 전환 기록
 
 2026-10-28. 사용자: hosting.kr에서 knu-read.xyz를 1년 구매했다고 알림. 페이지 이동 약 4초 지연을 호소.
-상태: **DNS 반영 및 새 Tunnel 공개 검증 완료. knu-read.xyz 회원용 주소·카카오·앱 URL·Worker 전환안을 로컬 검증했으며 최종 승인 대기. 기존 Worker 운영은 유지.**
+상태: **2026-10-28 16:46 KST 최종 전환 및 실제 카카오 관리자 로그인 확인 완료. 회원용 주소는 https://knu-read.xyz .**
 
-## 최신 검증 / 최종 전환안 (2026-10-28 16:25 KST 이후)
+## 완료 결과 (이 기록이 아래 준비·대기 기록보다 우선)
+
+- 사용자 `최종 주소·로그인·Tunnel 전환 승인`에 따라 적용. 공개 구성: `knu-read.xyz → Worker www/정적 CDN → origin.knu-read.xyz → Cloudflare Tunnel → Ubuntu127.0.0.1:5000`.
+- Cloudflare Custom Domain `knu-read.xyz` Production 연결 완료. Worker 승인 소스1909d4cb21811442b8e78f9675dca999cdfcf4ff, 운영 버전 `a9a69259-ee5b-4cb4-bc44-2fd67c39f491`. 정적 파일44개 동일하여 새 asset 업로드 없음.
+- 카카오 앱1288463/REST키4468347 기존 콜백6개 보존, 새 callback1개 저장 및 다시 열어 총7개 확인. 키·클라이언트 시크릿·동의항목 변경 없음.
+- VM PUBLIC_BASE_URL 및 KAKAO_REDIRECT_URI만 새 주소로 변경 후 bookmembers 재시작. KAKAO_PROXY_REDIRECT_URI는 계속 미설정. 원본 인증/secure cookie 유지. 앱 코드8e290f7/UI f946824/clean 유지.
+- 공개 GET 검사17/17 통과: 새 home/DB/OAuth callback·state/secure HttpOnly SameSite=Lax host-only cookie/HTML no-store/기존 링크302/HTTP308/직접 원본403/정적 파일SHA256·1년immutable·쿠키없음.
+- 실제 Chrome에서 새 주소→카카오 로그인→`https://knu-read.xyz/admin/dashboard` 진입 확인. 기존 로그인된 카카오 세션을 사용했고 새 인증정보나 MFA 입력은 필요하지 않았다. 장기 로그인 유지 체크는 끄고 검증했다. 브라우저 error/warn0. 실제 회원/예약/글 작성 시험 없음.
+- 공개 첫 화면 TTFB3회743/240/252ms, 중앙값252ms. 새 도메인 CDN의 최초 CSS 요청540ms. 이 수치를 로그인 화면 전체 완료시간이나 모든 페이지 속도로 일반화하지 않는다. 로그인한 관리자 화면의 실제 사용 속도는 사용자 체감 확인을 받는다.
+- 앱·Tunnel 모두 active/enabled. 토큰/이전env root600 확인. 호스트 재부팅은 하지 않았으며 실제 재부팅 후 자동 복구 시험은 여전히 미완료다.
+- Render·GitHub main·UI 코드·DB 스키마/업무 데이터 변경 없음. Tailscale SSH/Funnel은 복귀용으로 유지, 실제 웹 요청은 새 Tunnel 사용.
+- 결과: `outputs/cutover-verification.json`, `outputs/domain-tunnel-state.json`. 새 사이트 탭을 사용자에게 남겼다.
+
+## 복귀 기준
+
+현재 회귀가 발견되지 않아 복귀하지 않았다. 전환 승인에 포함된 복구 범위는 이전 Worker69847a91-0a3f-49fd-850e-13d35b4410a4, 이전 앱 공개URL이다. 보호된 이전환경 파일 `/etc/book_member_maker/app.env.before-xyz-cutover`(root:root600)를 사용한다. 새 Custom Domain 연결을 해제하고 기존 workers.dev에서 건강·카카오 로그인 시작을 확인한다. 기존 카카오 콜백/Funnel을 보존했으므로 Render를 건드릴 필요가 없다. 토큰과 env내용을 출력하지 않는다.
+
+## 전환 전 검증 / 승인안 (2026-10-28 16:25 KST 이후, 아래 작업은 실행 완료)
 
 - 공개 NS가 ian/riya로 변경되고 origin A가 Cloudflare IP로 반환됨. Cloudflare UI에서 도메인 활성화 확인.
 - 정상 TLS 인증서 검증을 유지한 공개 GET 검사 통과: 비밀키 없음/오류 403, home200, DB health200, 카카오 로그인 시작302 및 기존 callback/state 정상.
@@ -22,7 +39,7 @@
 5. HTTPS/HTTP→HTTPS/기존 링크→새 링크/정적 CDN/DB health/카카오 시작·secure cookie를 GET으로 확인. 실제 로그인은 새 주소에서1회 필요. 전환 중 앱 재시작과 인증서/DNS 준비에 짧은 접속 중단이 생길 수 있다.
 6. 회귀 시 Worker69847a91 및 이전 앱 URL/보호된 env 백업으로 복구하고 새 Custom Domain 연결을 해제해 기존 workers.dev 운영으로 복귀. 기존 카카오 콜백/Funnel은 삭제하지 않는다.
 
-최종 전환에는 아직 승인받지 않았다. Windows 재부팅, Render, GitHub main, DB 데이터/스키마, UI 변경은 제외한다.
+이 승인안은 사용자 승인 후 위 완료 기록대로 실행했다. Windows 재부팅, Render, GitHub main, DB 데이터/스키마, UI 변경은 범위에서 제외했다.
 
 ## 승인 실행 기록 (2026-10-28 15:58 KST)
 
