@@ -40,7 +40,7 @@
         </div>
         <div class="moderator-actions">
           <button class="moderator-primary" type="submit">{% if download %}저장하고 Word 다운로드{% else %}사회자 저장{% endif %}</button>
-          <a class="moderator-secondary" href="{{ url_for('admin_seminars') }}">세미나 운영으로</a>
+          <a class="moderator-secondary" href="{{ url_for('admin_seminars', term_id=lms_admin_term_id) }}">세미나 운영으로</a>
         </div>
       </form>
     </section>

@@ -15,9 +15,9 @@
                         submissions|length }}</strong>명 제출</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                <a href="{{ url_for('admin_dashboard') }}"
+                <a href="{{ url_for('admin_seminars', term_id=lms_admin_term_id) }}"
                     class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded shadow border border-gray-500">
-                    ◀ 대시보드
+                    ◀ 세미나 운영
                 </a>
                 <a href="/admin/topics/{{ event.id }}/download_word"
                     class="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded shadow border border-green-400">

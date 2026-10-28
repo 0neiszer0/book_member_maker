@@ -52,6 +52,7 @@ from recruitment_results import (
 )
 from topic_lifecycle import topic_event_deadline, topic_event_is_expired
 from home_overview import date_label, member_seminar_summary, operations_summary, decorate_topic_submission_states
+from attendance_workflow import attendance_is_confirmed, confirmed_history_session_ids
 from security_utils import forwarded_client_address, safe_internal_next_url
 from minipc_security import install_security
 from flask import g
@@ -3925,7 +3926,7 @@ def seminar_session_moderator(session_id):
             return _render_topic_document_setup(seminar_session, [seminar_session],
                 seminar_session, False, error='사회자를 저장하지 못했습니다. 잠시 후 다시 시도해주세요.'), 503
         flash('이 회차의 사회자를 저장했습니다.', 'success')
-        return redirect(url_for('admin_seminars'))
+        return redirect(url_for('admin_seminars', term_id=seminar_session.get('term_id')))
     return _render_topic_document_setup(seminar_session, [seminar_session], seminar_session, False)
 
 
@@ -4573,7 +4574,7 @@ def _load_weekly_seminar_view(term_id=None):
             .in_('session_id', session_ids).order('created_at').execute().data or []
         no_shows = supabase.table('seminar_no_shows').select('*') \
             .in_('session_id', session_ids).order('created_at').execute().data or []
-        histories = supabase.table('history').select('id, date, book_title, groups, seminar_session_id') \
+        histories = supabase.table('history').select('id, date, book_title, groups, seminar_session_id, attendance_confirmed_at') \
             .in_('seminar_session_id', session_ids).execute().data or []
         review_forms = supabase.table('seminar_review_forms').select('*') \
             .in_('seminar_session_id', session_ids).execute().data or []
@@ -4599,6 +4600,7 @@ def _load_weekly_seminar_view(term_id=None):
     for row in submissions:
         submission_count[row['event_id']] += 1
     history_by_session = {row['seminar_session_id']: row for row in histories if row.get('seminar_session_id')}
+    confirmed_ids = confirmed_history_session_ids(histories)
     review_count = defaultdict(int)
     reviews_by_form = defaultdict(list)
     for row in review_submissions:
@@ -4670,6 +4672,7 @@ def _load_weekly_seminar_view(term_id=None):
             item['no_show_candidates'] = [member for member in item['attendees']
                                           if member['id'] not in item['no_show_member_ids']]
         item['history'] = history_by_session.get(item['id'])
+        item['attendance_confirmed'] = attendance_is_confirmed(item, confirmed_ids)
         item['review_form'] = review_by_session.get(item['id'])
         item['is_past'] = date.fromisoformat(item['meeting_date']) < today
         sessions_by_week[item['seminar_week_id']].append(item)
@@ -5620,6 +5623,7 @@ def records_members():
         ).order('name').execute().data or []
         duplicate_student_ids = duplicate_student_id_values(members)
         for member in members:
+            member['can_view_activity'] = _can_view_member_profile(member['id'])
             member['student_id_duplicate'] = (
                 normalize_member_student_id(member.get('student_id')) in duplicate_student_ids
             )
