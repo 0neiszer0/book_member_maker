@@ -38,7 +38,27 @@ PC 주소를 코드에 넣지 않고 API 주소·비밀키·백업 경로를 서
 
 설치/서버 자원 변경 승인 → 복구 시험 → 결과 제출 → 최종 쓰기 중지·백업·증분 동기화·환경 설정 변경·앱 재시작을 별도로 승인받는다. 전환 후에는 두 DB에 동시에 쓰지 않는다. 운영 회원 트래픽은 한쪽만 사용한다.
 
-새 DB가 쓰기를 받기 전 실패하면 기존 환경 설정으로 즉시 복귀할 수 있다. 쓰기를 받은 뒤 단순히 예전 Supabase로 바꾸면 신규 기록이 사라질 수 있으므로, 다시 쓰기를 멈추고 역동기화·검증 후 복귀한다. Supabase 삭제/해지는 사용자가 별도로 승인할 때까지 보류한다.
+새 DB가 회원 쓰기를 받기 전 내부 검증에서 실패하면 기존 환경 설정으로 복귀한다. 공개 트래픽을 연 뒤에는 신규 기록 보존을 우선해 로컬을 수정한다. 역동기화 도구는 아직 없으므로 자동으로 Supabase에 되돌리지 않는다. 복귀가 꼭 필요하면 다시 쓰기를 멈추고 양쪽 데이터를 비교·이관하는 별도 복구 계획을 승인받는다. Supabase 삭제/해지는 별도 승인까지 보류한다.
+
+## Claude 검토와 다음 실험 (2026-10-29)
+
+실제 Claude Opus 5.5 high 검토: 전체 스택보다 PostgreSQL + PostgREST + 파일 계층을 권장. 현재 문서는 실제 복원 전 계획이며 전환 준비 완료가 아니다. 운영 DB 15.8에서 API를 직접 SQL로 모두 재작성하는 방식은 약 560곳의 회귀 위험 때문에 제외한다.
+
+공식 self-hosted/v0.8.3 구성 확인: PostgreSQL 17.6.1.136, PostgREST v14.18, Storage API v1.81.0, Envoy v1.39.1. 전체 구성의 공식 최소치는 RAM 4GB/디스크 40GB여서 현재 VM 최대 3GB/30GB에 그대로 설치하지 않는다. Windows 전체 여유 메모리도 조사 시 약 3.25GB였다. 이 버전들은 호환성 시험 후보이며 검증된 운영 조합이라고 주장하지 않는다.
+
+1. 운영 연결·회원 데이터·운영 비밀 없이, loopback 전용 포트와 별도 볼륨에서 PG/PostgREST/Storage 최소 조합을 시험한다. Auth/Studio/Realtime/Edge Functions/Analytics/Supavisor는 앱 사용 여부를 확인한 뒤 제외하며, 기본 compose의 gateway 의존성도 함께 수정한다. Docker·VM 자원 변경은 호스트 변경 승인 후에만 실행한다.
+2. 우선 기존 Storage API를 유지해 업로드·서명·삭제 호환성을 검증한다. 자원 초과 또는 불필요한 의존성이 확인되면 앱 내부 파일 어댑터로 변경하는 대안을 비교한다. 처음부터 검증되지 않은 두 방식을 함께 구현하지 않는다.
+3. 빈 DB에 server-only 역할과 필요한 스키마/확장을 준비하고 전체 migration을 적용한다. 합성 데이터로 앱의 실제 PostgREST CRUD/upsert/RPC, anon 차단, 파일 업로드/서명 URL 만료/삭제를 확인한다. 기존 운영 PG15 → 후보 PG17 복원은 별도로 dump/restore 검증한다. PGlite 단위 검증으로 이 단계 성공을 대체하지 않는다.
+4. 서비스별 정상/업로드/알림 작업 중 메모리와 API 지연을 측정한다. 기존 앱·위키를 포함해 충분한 여유가 없으면 중단한다. 결과로 VM 최소/고정 메모리를 결정하며, 현재 메모리로 운영 가능하다고 미리 결론내리지 않는다.
+
+### 전환 전에 해결할 코드 항목
+
+- `SUPABASE_URL` 내부 API 주소와 브라우저 이미지 주소를 분리한다. `boards.py`의 signed URL과 `engagement.py`의 커버 URL은 내부 127.0.0.1을 브라우저에 보내면 깨진다. 고정 내부 Storage upstream만 접근하는 같은 사이트의 미디어 GET 경로를 마련하고, 공개 커버와 토큰이 필요한 비공개 객체를 구분한다. 임의 URL 프록시나 REST/관리 API의 인터넷 공개는 금지한다.
+- 현재 `backup.py`는 원격 HTTPS + PG verify-full 대상으로만 검증되어 있다. 로컬 PG Unix socket/loopback, 로컬 파일, 위키 SQLite의 일관된 snapshot과 첨부, app.env/위키 키를 하나의 암호화 복구 범위로 포함하는 로컬 모드를 먼저 만든다. 파일 검증만 통과하고 실제 복원이 안 된 상태에서는 전환하지 않는다.
+- PC 밖 백업을 다시 내려받아 복호화하고, 새 빈 DB에 두 번째 복원을 수행한다. 개인키는 저장소·채팅에 두지 않는다. 같은 PC 디스크만의 백업은 외부 백업으로 간주하지 않는다.
+- 권장 운영값: 매일 백업 + 전환 직전 백업, 일간 14개/주간 8개 보존, 실패 시 전체 관리자 알림. 외부 목적지와 키 보관 위치는 사용자와 확정해야 한다. 쓰기 중단은 실제 복원 소요를 잰 뒤 구체적 시간을 제안한다.
+
+다음 승인은 운영 전환이 아니라 **선택한 최소 구성의 합성 데이터 시험 설치**다. 외부 백업 목적지·키 관리·DB 접속 비밀은 실제 백업 이전에 준비하고, 복원 시험 및 Windows 부팅 복구까지 완료한 다음 최종 전환을 별도로 승인받는다.
 
 ## 아직 완료되지 않은 항목
 
@@ -51,5 +71,7 @@ PC 주소를 코드에 넣지 않고 API 주소·비밀키·백업 경로를 서
 ## 확인한 공식 자료
 
 - [Self-hosting 운영 책임](https://supabase.com/docs/guides/self-hosting)
+- [Docker 구성과 최소 자원](https://supabase.com/docs/guides/self-hosting/docker)
+- [확인한 공식 compose v0.8.3](https://github.com/supabase/supabase/blob/self-hosted/v0.8.3/docker/docker-compose.yml)
 - [Platform에서 self-host로 복구](https://supabase.com/docs/guides/self-hosting/restore-from-platform)
 - [Storage S3 경유 복사](https://supabase.com/docs/guides/self-hosting/copy-from-platform-s3)

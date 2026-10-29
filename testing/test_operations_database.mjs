@@ -10,7 +10,7 @@ try{
  await db.exec('create role anon;create role authenticated;create role service_role;');
  const baseline=await fs.readFile(new URL('supabase/migrations/20260501000000_legacy_schema_baseline.sql',root),'utf8');
  for(const table of ['members','notifications']){const start=baseline.indexOf(`create table public.${table} (`);await db.exec(baseline.slice(start,baseline.indexOf('\n);',start)+3));}
- await db.exec(`create table seminar_terms(id uuid primary key,name text,start_date date,end_date date,roster_revision integer default 0,roster_initialized_at timestamptz);
+ await db.exec(`create table seminar_terms(id uuid primary key,name text,start_date date,end_date date,is_active boolean default false,roster_revision integer default 0,roster_initialized_at timestamptz);
  create table seminar_term_members(term_id uuid,member_id bigint,status text,entry_type text,updated_at timestamptz,primary key(term_id,member_id));
  create table seminar_term_roster_changes(term_id uuid,revision integer,previous_entries jsonb,entries jsonb,created_by bigint);
  create table seminar_weeks(id uuid primary key,term_id uuid,book_title text,note text);
@@ -30,6 +30,10 @@ try{
  assert.equal(await scalar("select operation_can(3,'members',$1)",[t]),false);
  assert.equal(await scalar("select operation_can(3,'attendance',$1)",[other]),false);
  assert.equal(await scalar("select operation_can(5,'attendance',$1)",[t]),false);
+ await db.exec(`update seminar_terms set end_date=current_date-1,is_active=true where id='${t}'`);
+ assert.equal(await scalar("select operation_can(2,'members')"),true);
+ assert.equal(await scalar("select operation_can(3,'members')"),false);
+ await db.exec(`update seminar_terms set end_date=current_date+100 where id='${t}'`);
  assert.equal((await scalar('select save_term_officers($1,3,1,$2)',[t,'[]'])).accepted,false);
  await db.exec(`insert into history(seminar_session_id) values('${s}');insert into member_inbox(member_id,event_key,operation_key) values(3,'work:a','attendance:${s}'),(4,'work:b','attendance:${s}');`);
  const payload=[{session_id:s,member_ids:[2,3],expected_confirmed_at:null,expected_roster_updated_at:null,expected_term_revision:0}];

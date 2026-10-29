@@ -53,10 +53,10 @@ def carried_entries(memberships, source_terms):
             for member_id in member_ids]
 
 
-def choose_term(terms, term_id=None):
+def choose_term(terms, term_id=None, today=None):
     if term_id:
         return next((t for t in terms if str(t['id']) == str(term_id)), None)
-    today = datetime.now(timezone(timedelta(hours=9))).date().isoformat()
+    today = (today or datetime.now(timezone(timedelta(hours=9))).date()).isoformat()
     return (next((t for t in terms if t['start_date'] <= today <= t['end_date']), None)
             or next((t for t in terms if t.get('is_active')), None)
             or (terms[0] if terms else None))
