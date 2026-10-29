@@ -103,8 +103,8 @@ Supabase에는 pg_cron 확장이 없고 Storage 객체는 0개다. 타사 예약
 설치·예약 활성화·실제 데이터 추출·클라우드 업로드는 아직 하지 않았다. 별도 ZIP도 만들지 않는다.
 현재는 공용 Gmail/Drive 연결을 요청하지 않는다. 실제 구축 시 승인된 외부 저장소를 지정한다.
 
-- Ubuntu에 PostgreSQL 클라이언트(원본 15 이상을 읽을 수 있는 버전), age, rclone이 필요하다.
-  기존 Python venv의 storage3/python-dotenv를 재사용한다. Docker나 로컬 DB 서버는 필요 없다.
+- Ubuntu에 age가 필요하다. PostgreSQL 클라이언트는 검증된 PG17 Docker image를 재사용하고, 자동 업로드 단계에서만 rclone을 추가한다.
+  기존 Python venv의 storage3/python-dotenv/httpx를 재사용한다. 고정 Docker client를 선택하지 않은 환경은 호환 PostgreSQL client를 별도로 검증해야 한다.
 - `backup.env`와 `backup.pgpass`, `rclone.conf`, `app.env`는 Git 밖 root:root 0600.
   Supabase Connect 화면의 실제 session pooler 호스트·사용자와 기존 DB 비밀번호를 사용한다.
   서비스 키는 DB 비밀번호를 대체하지 않는다. 비밀번호를 모르더라도 임의 재설정하지 않는다.
@@ -121,13 +121,13 @@ Supabase에는 pg_cron 확장이 없고 Storage 객체는 0개다. 타사 예약
 표준 PostgreSQL custom dump(public + supabase_migrations, 데이터·함수·RLS·ACL 포함),
 Storage 버킷 설정·파일 내용·원래 경로 매핑과 SHA256, 확장 버전 목록을 암호화 TAR에 담는다.
 Storage 관리 스키마의 DDL도 참고용으로 보존하지만 새 Supabase에 그대로 덮어쓰지 않는다.
-Supabase 프로젝트 설정, Auth 사용자, 글로벌 역할 비밀번호, 앱/Worker 비밀은 이 백업에 포함하지 않는다.
+format 2는 BACKUP_HOST_STATE=true일 때 위키 SQLite snapshot/첨부와 명시한 앱/위키/로컬 DB 설정 파일을 암호화하여 포함한다. Supabase 프로젝트 설정, Auth 사용자, 글로벌 역할 비밀번호, 별도로 지정하지 않은 Worker/Tunnel 비밀은 포함하지 않는다. Auth/Vault/cron/large object/외부 스키마 FK 등 지원 범위 밖 데이터가 있으면 백업을 중단한다.
 현재 앱은 자체 카카오 세션과 public 회원 테이블을 사용한다. 사용 범위가 늘면 백업 범위도 검토한다.
 
 DB dump는 일관된 스냅샷이지만 Storage와 하나의 원자적 스냅샷은 아니다. 삭제·크기 변경·조회 실패는
 백업을 실패 처리하나 동시 수정 전체를 검출한다고 보장하지 않는다. 최종 이전용 백업은 승인된
 쓰기 중지 구간에 수행한다. 임시 평문 dump는 0700 폴더에서만 생성하고 정상/예외 종료 시 정리한다.
-정전·강제 종료 후 남은 `.plain-*` 폴더는 상태 확인 후 별도 정리한다.
+정전·강제 종료 후 남은 `.plain-*` 폴더는 다음 실행이 잠금을 얻은 뒤 root 전용·경로·이름을 검증하여 정리한다. 전체 디스크 암호화를 대신하지 않는다.
 업로드 뒤 rclone download 비교가 성공해야 `COMPLETE.json`을 올린다. 완료 표시 없는 원격 폴더는
 성공한 복구 지점으로 쓰지 않는다. 업로드 검증은 실제 DB 복원 성공을 뜻하지 않는다.
 
@@ -158,3 +158,7 @@ DB dump는 일관된 스냅샷이지만 Storage와 하나의 원자적 스냅샷
 
 PGlite 검증은 WASM PostgreSQL 기반의 격리 SQL 검증이다. 운영 PostgreSQL 15에서의 실제 적용과
 다중 연결 동시성 검증을 대신하지 않는다. SQL은 일관된 순서로 테이블/행 잠금을 획득한다.
+
+### 2026-10-29 준비 상태
+
+`--export-only`는 rclone 없이 로컬 암호문과 EXPORT.json만 만들며 외부 사본/복원 성공을 주장하지 않는다. 최초 외부 사본은 승인 후 기존 Google Drive 연결 도구로 업로드·재다운로드 검증한다. 원격 DB는 공식 Supabase CA + verify-full, 로컬 DB는 고정 PG17 컨테이너의 loopback 네트워크를 공유하며 DB 포트를 공개하지 않는다. rclone 자동화는 drive.file 범위와 해당 client가 생성한 root folder를 강제한다. 상세 승인 범위와 복구 검증은 [실행안](../localdb/REAL_DATA_REHEARSAL.md)을 따른다.

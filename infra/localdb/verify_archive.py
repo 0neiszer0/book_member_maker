@@ -16,7 +16,7 @@ def verify(path):
     with tarfile.open(path, mode='r|') as archive:
         for item in archive:
             if not item.isfile() or item.name in seen or not re.fullmatch(
-                    r'database\.dump|storage-schema\.sql|manifest\.json|objects/[0-9]{8}', item.name):
+                    r'database\.dump|storage-schema\.sql|manifest\.json|objects/[0-9]{8}|recovery/[0-9]{8}', item.name):
                 raise ValueError('Unexpected or duplicate archive member')
             if item.size > 8 * 1024**3:
                 raise ValueError('Archive member exceeds validation limit')
@@ -35,7 +35,7 @@ def verify(path):
                 seen[item.name] = {'size': size, 'sha256': digest.hexdigest(), 'magic': magic}
             if item.name == 'manifest.json':
                 seen[item.name] = {}
-    if not manifest or manifest.get('format') != 1:
+    if not manifest or manifest.get('format') not in {1, 2}:
         raise ValueError('Unknown backup format')
     dump = seen.get('database.dump', {})
     if dump.get('magic') != b'PGDMP' or dump.get('sha256') != manifest.get('database_sha256'):
@@ -58,8 +58,28 @@ def verify(path):
         keys.add(key)
     if expected != {n for n in seen if n.startswith('objects/')}:
         raise ValueError('Unlisted storage objects')
+    recoveries, names = set(), set()
+    if manifest['format'] == 2:
+        schema = seen.get('storage-schema.sql')
+        if bool(schema) != bool(manifest.get('storage_schema_sha256')) or (
+                schema and schema['sha256'] != manifest['storage_schema_sha256']):
+            raise ValueError('Storage schema checksum mismatch')
+        for item in manifest.get('recovery_files', []):
+            name, filename = item['name'], item['file']
+            if (not name or name.startswith('/') or '\\' in name
+                    or any(part in {'', '.', '..'} for part in name.split('/'))
+                    or ':' in name or name in names or filename in recoveries
+                    or not re.fullmatch(r'recovery/[0-9]{8}', filename)):
+                raise ValueError('Unexpected recovery file name')
+            actual = seen.get(filename)
+            if not actual or actual['size'] != item['size'] or actual['sha256'] != item['sha256']:
+                raise ValueError('Recovery file checksum mismatch')
+            names.add(name)
+            recoveries.add(filename)
+    if recoveries != {n for n in seen if n.startswith('recovery/')}:
+        raise ValueError('Unlisted recovery files')
     return {'verified': True, 'database_bytes': dump['size'], 'buckets': len(buckets),
-            'objects': len(keys), 'restore_drill_complete': False}
+            'objects': len(keys), 'recovery_files':len(recoveries), 'restore_drill_complete': False}
 
 
 if __name__ == '__main__':
