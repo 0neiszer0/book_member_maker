@@ -1,0 +1,92 @@
+# Production candidate. Install only after the approved final restore/cutover.
+name: bookmembers-db
+services:
+  db:
+    image: supabase/postgres:17.6.1.136@sha256:f371b5f3f2ac0a05703f33d6e6134515fb2498cab708fb948a0aeb7481467c00
+    restart: unless-stopped
+    mem_limit: 640m
+    cpus: 0.7
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      PGPORT: 5432
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: postgres
+      PGDATABASE: postgres
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:?generate database.env first}
+      PGPASSWORD: ${LOCAL_DB_PASSWORD:?generate database.env first}
+      JWT_EXP: 86400
+    command: [postgres, -c, config_file=/etc/postgresql/postgresql.conf, -c, shared_buffers=64MB, -c, max_connections=30, -c, work_mem=2MB]
+    volumes:
+      - database:/var/lib/postgresql/data
+      - database-config:/etc/postgresql-custom
+      - ./roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-local-roles.sql:ro
+    healthcheck:
+      test: [CMD, pg_isready, -U, postgres, -h, localhost]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  rest:
+    image: postgrest/postgrest:v14.18@sha256:c7cd7e265a85b05248abf53f4473fcec7e327c282d0bd0cf60f1551996d09fcf
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.25
+    depends_on:
+      db: {condition: service_healthy}
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${LOCAL_DB_PASSWORD:?}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${LOCAL_JWT_SECRET:?}
+      PGRST_DB_POOL: 5
+      PGRST_DB_MAX_ROWS: 1000
+  storage:
+    image: supabase/storage-api:v1.81.0@sha256:98ffec5d0678803783c30e404c27f4ec65e97efbe014088f2a86b4b8b54b9f54
+    restart: unless-stopped
+    mem_limit: 384m
+    cpus: 0.5
+    depends_on:
+      db: {condition: service_healthy}
+      rest: {condition: service_started}
+    environment:
+      ANON_KEY: ${LOCAL_ANON_KEY:?}
+      SERVICE_KEY: ${LOCAL_SERVICE_KEY:?}
+      AUTH_JWT_SECRET: ${LOCAL_JWT_SECRET:?}
+      DATABASE_URL: postgres://supabase_storage_admin:${LOCAL_DB_PASSWORD:?}@db:5432/postgres
+      POSTGREST_URL: http://rest:3000
+      STORAGE_PUBLIC_URL: http://127.0.0.1:55480
+      REQUEST_ALLOW_X_FORWARDED_PATH: 'true'
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      GLOBAL_S3_BUCKET: bookmembers
+      TENANT_ID: bookmembers-db
+      REGION: local
+      FILE_SIZE_LIMIT: 10485760
+      ENABLE_IMAGE_TRANSFORMATION: 'false'
+      NODE_OPTIONS: --max-old-space-size=192
+    volumes:
+      - files:/var/lib/storage
+    healthcheck:
+      test: [CMD, wget, --no-verbose, --tries=1, --spider, http://127.0.0.1:5000/status]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  api:
+    image: envoyproxy/envoy:v1.39.1@sha256:57e14a549d7bd43c8d3f6d03e8cfa653e037d4b38e133acd9b54f38c524401b4
+    restart: unless-stopped
+    mem_limit: 96m
+    cpus: 0.15
+    command: [-c, /etc/envoy/envoy.yaml, --concurrency, '1']
+    ports: ['127.0.0.1:55480:8000']
+    depends_on:
+      rest: {condition: service_started}
+      storage: {condition: service_healthy}
+    volumes:
+      - ./envoy.yaml:/etc/envoy/envoy.yaml:ro
+volumes:
+  database:
+  database-config:
+  files:
+
+networks:
+  default:
+    enable_ipv6: false

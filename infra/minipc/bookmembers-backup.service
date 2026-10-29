@@ -6,11 +6,12 @@ After=network-online.target
 [Service]
 Type=oneshot
 User=root
-WorkingDirectory=/opt/book_member_maker
-ExecStart=/opt/book_member_maker/.venv/bin/python /opt/book_member_maker/infra/minipc/backup.py --run
+WorkingDirectory=/opt/bookmembers-backup
+ExecStart=/opt/book_member_maker/.venv/bin/python /opt/bookmembers-backup/infra/minipc/run_scheduled_backup.py
 TimeoutStartSec=45min
 UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ReadWritePaths=/var/lib/bookmembers-backup /etc/book_member_maker
+ReadWritePaths=/var/lib/bookmembers-backup /var/lib/bookmembers-health /etc/book_member_maker
+# Install only after approval of persistent Drive access and scheduling.

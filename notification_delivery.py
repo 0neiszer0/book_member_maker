@@ -13,6 +13,7 @@ from topic_lifecycle import topic_event_is_open
 from term_membership import scope_members
 from engagement_utils import form_is_open
 from collections import Counter
+from backup_health import backup_notice
 from member_notifications import subscription_payload
 from operations import Operations, KST, pending_work, sync_custom_tasks, filter_inbox
 
@@ -100,6 +101,9 @@ def collect_items(db, now):
             for mid in confirmed & active:
                 if (form['id'], mid) not in reviewed and (form['seminar_session_id'], mid) not in no_shows:
                     add(mid, f"review:{form['id']}", f"{meeting.get('book_title') or '세미나'} 후기", '참여한 세미나의 후기를 남겨주세요.', f"/review/seminar/{form['share_token']}")
+    backup = backup_notice(now)
+    if backup:
+        items.extend({'member_id':m['id'], **backup} for m in members if m.get('role') == 'admin')
     return items, members
 
 
