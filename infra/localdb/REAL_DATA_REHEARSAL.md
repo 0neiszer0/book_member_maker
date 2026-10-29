@@ -1,12 +1,12 @@
 # 실제 데이터 백업·격리 복원 실행안
 
-2026-10-29. **승인 대기이며 아직 실행하지 않았다.** 운영 앱은 Supabase를 계속 사용한다.
+2026-10-29. **사용자 승인 후 실행 완료.** [실제 결과](RESTORE_VALIDATION.md)를 먼저 읽는다. 아래는 승인 당시 실행안이다. 운영 앱은 Supabase를 계속 사용한다.
 
 ## 확인된 상태
 
 - Windows에 사용자 DB 비밀번호를 DPAPI로 보관했고, 공식 Supabase CA + `verify-full`로 명시적 읽기 전용 접속을 확인했다. VM에는 DB 비밀번호를 아직 저장하지 않았다.
 - 운영 PostgreSQL 15.8, public 테이블 72개, DB 약 19.8MB. Auth 사용자·Vault 비밀·Storage 객체/소유자 메타데이터·large object·외부 스키마 FK·Realtime publication 테이블은 모두 0개. cron 스키마 없음. 백업 직전 다시 조회하며, 지원 범위 밖 데이터가 생기면 중단한다.
-- Google Drive 연결 도구에서 개인 계정 `parkminseo0816@gmail.com`을 확인했다. 폴더 생성·파일 업로드·공유 설정 변경은 하지 않았다.
+- Google Drive 연결 도구에서 승인된 개인 계정을 확인했다. 폴더 생성·파일 업로드·공유 설정 변경은 하지 않았다.
 - 소스 준비: 같은 사이트의 이미지 GET 경로, backup format 2(위키 SQLite snapshot/첨부/앱·위키 설정), 고정 PG17 클라이언트, 원본 프로젝트 일치 검사, 범위 검사, 프록시 환경 무시, 복구 파일 해시 검사.
 - Python 검증 23개 통과. 실제 Linux 합성 시험에서 공개/서명 이미지 2건, PG custom dump 목록, SQLite snapshot, 복구 파일 4개 무결성 통과. 이것은 실제 회원 데이터 복원 성공을 뜻하지 않는다.
 - 합성 컨테이너는 모두 중지했고 볼륨은 보존했다. 운영 앱·위키·Tunnel 정상. 이번 코드는 미배포다.
