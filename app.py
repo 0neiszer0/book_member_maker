@@ -1586,9 +1586,12 @@ def merge_members():
         both = supabase.table('members').select('id, name, social_id, email').in_('id', [source_id, target_id]).execute().data or []
         if len(both) != 2:
             return jsonify({"status": "error", "message": "멤버를 찾을 수 없습니다."}), 404
-        protected = supabase.table('seminar_term_members').select('member_id').eq('member_id', source_id).limit(1).execute().data or []
-        if protected:
-            return jsonify(status='error', message='학기 명단이 있는 회원은 기존 합치기 기능으로 삭제할 수 없습니다. 학기 기록 보존을 위해 합치기를 중단했습니다.'), 409
+        for table, column in [('seminar_term_members', 'member_id'), ('term_officers', 'member_id'),
+                              ('operation_rules', 'created_by'), ('operation_tasks', 'completed_by'),
+                              ('operation_audit', 'actor_id')]:
+            protected = supabase.table(table).select(column).eq(column, source_id).limit(1).execute().data or []
+            if protected:
+                return jsonify(status='error', message='학기 명단이나 운영 기록이 있는 회원입니다. 기록 보존을 위해 합치기를 중단했습니다.'), 409
         source_row = next(m for m in both if m['id'] == source_id)
         target_row = next(m for m in both if m['id'] == target_id)
 

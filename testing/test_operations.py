@@ -43,6 +43,26 @@ class PolicyTests(unittest.TestCase):
         r=dict(start_date='2026-12-01',end_date='2027-03-01',frequency='monthly',month_day=31)
         self.assertEqual([d.isoformat() for d in occurrence_dates(r,date(2027,3,1))],['2026-12-31','2027-01-31','2027-02-28'])
 
+    def test_membership_during_term_gap_keeps_configured_scope(self):
+        db=WriteDB(fixture());ops=Operations(db);today=date(2027,1,10)
+        self.assertTrue(ops.can(db.rows['members'][1],'members',today=today))
+        self.assertFalse(ops.can(db.rows['members'][2],'members',today=today))
+        self.assertEqual(ops.recipients(db.rows['members'],'members',today=today),[2])
+        db.rows['seminar_terms'][0]['is_active']=False
+        self.assertTrue(Operations(db).can(db.rows['members'][1],'members',today=today))
+
+    def test_archived_term_does_not_send_attendance_push(self):
+        db=WriteDB(fixture())
+        db.rows['seminar_terms'][0].update(is_active=False,start_date='2026-03-01',end_date='2026-06-30')
+        db.rows['seminar_sessions'][0]['meeting_date']='2026-06-20'
+        self.assertEqual(pending_work(db,Operations(db),db.rows['members'],datetime(2026,10,29,tzinfo=timezone.utc)),[])
+
+    def test_unconfigured_global_officer_can_read_digest(self):
+        db=WriteDB(fixture());db.rows['seminar_terms'][0]['operations_initialized_at']=None
+        db.rows['members'][2]['role']='officer';db.rows['term_officers']=[]
+        item={'operation_key':'digest'}
+        self.assertEqual(filter_inbox(db,Operations(db),db.rows['members'][2],[item]),[item])
+
     def test_past_courses_split_summer_and_winter(self):
         histories=[dict(id=i,date=d,attendance_confirmed_at='yes',actual_member_ids=[1]) for i,d in enumerate(['2025-06-30','2025-07-01','2025-08-31','2025-09-01','2026-01-01','2026-02-28'])]
         found=historical_courses([{'id':1,'name':'가'}],histories,[],1,date(2026,10,29))
@@ -146,6 +166,17 @@ class RouteTests(unittest.TestCase):
         self.db.rows['seminar_sessions'][0]['planned_member_ids']=None
         r=self.client.post('/api/admin/term_attendance/term/preview',json={'session_ids':['meeting']},headers={'X-CSRF-Token':'csrf'})
         self.assertEqual(r.status_code,409)
+
+    def test_bulk_reuses_term_data_instead_of_per_session_queries(self):
+        self.db.rows['seminar_sessions'].append(dict(self.db.rows['seminar_sessions'][0],id='second',meeting_date='2026-10-15'))
+        counts=[]
+        for selected in [['meeting'],['meeting','second']]:
+            self.db.calls.clear()
+            result=self.client.post('/api/admin/term_attendance/term/preview',json={'session_ids':selected},headers={'X-CSRF-Token':'csrf'})
+            self.assertEqual(result.status_code,200)
+            self.assertEqual(len(result.get_json()['items']),len(selected))
+            counts.append(sum(call[0]=='select' for call in self.db.calls))
+        self.assertEqual(counts[0],counts[1])
     def test_read_and_dismiss_are_owned_and_csrf_protected(self):
         self.db.rows['member_inbox']=[dict(id='a',member_id=3),dict(id='b',member_id=4)]
         self.assertEqual(self.client.post('/api/member-notifications/a/dismiss').status_code,403)
@@ -155,5 +186,16 @@ class RouteTests(unittest.TestCase):
         self.assertIsNotNone(self.db.rows['member_inbox'][0]['dismissed_at'])
         self.client.post('/api/member-notifications/read-all',headers={'X-App-CSRF':'csrf'})
         self.assertIsNotNone(self.db.rows['member_inbox'][0]['read_at']);self.assertNotIn('read_at',self.db.rows['member_inbox'][1])
+
+    def test_merge_stops_before_writes_when_member_has_operation_history(self):
+        self.login(1)
+        for table,column in [('term_officers','member_id'),('operation_rules','created_by'),('operation_tasks','completed_by'),('operation_audit','actor_id')]:
+            with self.subTest(table=table):
+                self.db.rows[table]=[{column:6}]
+                with patch.object(self.module,'_guard_member_change',return_value=None):
+                    result=self.client.post('/api/admin/members/merge',json={'source_id':6,'target_id':2},headers={'X-App-CSRF':'csrf'})
+                self.assertEqual(result.status_code,409)
+                self.assertEqual(len(self.db.rows['members']),6)
+                self.db.rows[table]=[]
 
 if __name__=='__main__':unittest.main()

@@ -61,7 +61,9 @@ returns boolean language sql stable security invoker set search_path='' as $$
  select exists(select 1 from public.members m where m.id=p_actor and m.is_active
  and m.account_status='active' and coalesce(m.member_status,'') not in ('inactive','blocked')
  and (m.role='admin' or exists(select 1 from public.seminar_terms t
-   where (case when p_term is null then (now() at time zone 'Asia/Seoul')::date between t.start_date and t.end_date else t.id=p_term end)
+   where t.id=coalesce(p_term,(select id from public.seminar_terms
+     order by case when (now() at time zone 'Asia/Seoul')::date between start_date and end_date then 0
+       when is_active then 1 else 2 end, start_date desc limit 1))
    and ((t.operations_initialized_at is null and m.role='officer') or exists(
      select 1 from public.term_officers a join public.operation_roles r on r.id=a.role_id
      where a.term_id=t.id and a.member_id=m.id and r.is_active and p_cap=any(coalesce(a.capabilities,r.capabilities)))))))
@@ -303,4 +305,5 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION public.apply_seminar_roster_for_term(uuid,bigint[],bigint[],bigint[],timestamptz,text,bigint,integer) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.apply_seminar_roster_for_term(uuid,bigint[],bigint[],bigint[],timestamptz,text,bigint,integer) TO service_role;
+notify pgrst, 'reload schema';
 commit;

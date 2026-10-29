@@ -22,13 +22,17 @@ class Operations:
         return [a for a in self.assignments if str(a['member_id']) == str(member_id) and str(a['term_id']) == str(term_id)
                 and self.roles.get(a['role_id'], {}).get('is_active', True)]
 
+    def target_terms(self, term_id=None, today=None):
+        from term_membership import choose_term
+        term = choose_term(sorted(self.terms, key=lambda t: t['start_date'], reverse=True), term_id, today)
+        return [term] if term else []
+
     def can(self, member, capability, term_id=None, today=None):
         if not active(member):
             return False
         if member.get('role') == 'admin':
             return True
-        today = (today or datetime.now(KST).date()).isoformat()
-        terms = [t for t in self.terms if str(t['id']) == str(term_id)] if term_id else [t for t in self.terms if t['start_date'] <= today <= t['end_date']]
+        terms = self.target_terms(term_id, today)
         for term in terms:
             if not term.get('operations_initialized_at') and member.get('role') == 'officer':
                 return True  # Existing staff keep access until this term is explicitly configured.
@@ -39,8 +43,7 @@ class Operations:
         return False
 
     def recipients(self, members, capability, term_id=None, today=None):
-        today = (today or datetime.now(KST).date()).isoformat()
-        terms = [t for t in self.terms if str(t['id']) == str(term_id)] if term_id else [t for t in self.terms if t['start_date'] <= today <= t['end_date']]
+        terms = self.target_terms(term_id, today)
         assigned = []
         for m in members:
             if not active(m):
@@ -151,7 +154,10 @@ def pending_work(db, ops, members, now, rules=None):
     weeks = {str(w['id']): w for w in all_rows(db.table('seminar_weeks').select('id,note,book_title').order('id'))}
     histories = all_rows(db.table('history').select('id,date,book_title,seminar_session_id,attendance_confirmed_at').order('id'))
     confirmed = confirmed_history_session_ids(link_legacy_histories(histories, sessions))
+    reminder_terms = {str(t['id']) for t in ops.terms if t.get('is_active') or t['start_date'] <= today.isoformat() <= t['end_date']}
     for meeting in sessions:
+        if str(meeting['term_id']) not in reminder_terms:
+            continue  # Historical attendance stays available for manual batch confirmation.
         if not meeting.get('is_active', True) or is_break_week(weeks.get(str(meeting.get('seminar_week_id')), {})) or attendance_is_confirmed(meeting, confirmed):
             continue
         # A date-only meeting is ready for a reminder the following day.
@@ -188,6 +194,6 @@ def filter_inbox(db, ops, member, rows):
             rule = rules.get(str(task['rule_id'])) if task else None
             return bool(rule and member['id'] in ops.rule_recipients(rule, [member]))
         if key == 'digest':
-            return member.get('role') == 'admin' or any(ops.assigned(member.get('id'), t['id']) for t in ops.terms)
+            return any(ops.can(member, cap) for cap in CAPABILITIES) or any(ops.assigned(member.get('id'), t['id']) for t in ops.terms)
         return True
     return [r for r in rows if allowed(r)]

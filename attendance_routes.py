@@ -267,12 +267,20 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
         if set(selected) - pending.keys():
             return jsonify(message='이미 확정됐거나 대상이 아닌 회차가 있습니다. 새로고침해주세요.'), 409
         entries, previews = [], []
+        members = report['_members']
+        histories_by_session = {}
+        for history in report['_histories']:
+            histories_by_session.setdefault(str(history.get('seminar_session_id')), []).append(history)
+        noshows_by_session = {}
+        for row in report['_no_shows']:
+            noshows_by_session.setdefault(str(row['session_id']), set()).add(row['member_id'])
         for sid in selected:
-            target, members, _, _, _, planned, no_shows = roster_context(sid)
-            histories = db().table('history').select('id,present,actual_member_ids').eq('seminar_session_id', sid).execute().data or []
+            target = dict(pending[sid], term_revision=term.get('roster_revision', 0))
+            histories = histories_by_session.get(sid, [])
+            no_shows = noshows_by_session.get(sid, set())
             if target.get('planned_member_ids') is None and not histories:
                 return jsonify(message=target['meeting_date']+' 회차는 저장된 명단이 없습니다. 먼저 개별 출석 화면에서 확인해주세요.'), 409
-            ids = set(planned)
+            ids = set(target.get('planned_member_ids') or [])
             if histories and target.get('planned_member_ids') is None:
                 ids = set()
                 for h in histories:
@@ -330,6 +338,7 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
                                        start, end, term.get('attendance_minimum', 3), datetime.now(KST).date(), no_shows)
         report['events'] = events
         report['sessions'] = sessions
+        report['_members'], report['_histories'], report['_no_shows'] = members, histories, no_shows
         report['roster_initialized'] = bool(term.get('roster_initialized_at'))
         confirmed_ids = confirmed_history_session_ids(histories)
         from lms_learning import is_break_week
