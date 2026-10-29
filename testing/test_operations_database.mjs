@@ -1,0 +1,70 @@
+// Isolated PostgreSQL validation: no production connection or member data.
+import fs from 'node:fs/promises';
+import {pathToFileURL} from 'node:url';
+import assert from 'node:assert/strict';
+const {PGlite}=await import(pathToFileURL(process.argv[2]).href);
+const db=new PGlite();
+const root=new URL('../',import.meta.url),t='00000000-0000-0000-0000-000000000001',other='00000000-0000-0000-0000-000000000002',s='00000000-0000-0000-0000-000000000003',s2='00000000-0000-0000-0000-000000000004',w='00000000-0000-0000-0000-000000000005';
+const scalar=async(sql,args=[])=>Object.values((await db.query(sql,args)).rows[0])[0];
+try{
+ await db.exec('create role anon;create role authenticated;create role service_role;');
+ const baseline=await fs.readFile(new URL('supabase/migrations/20260501000000_legacy_schema_baseline.sql',root),'utf8');
+ for(const table of ['members','notifications']){const start=baseline.indexOf(`create table public.${table} (`);await db.exec(baseline.slice(start,baseline.indexOf('\n);',start)+3));}
+ await db.exec(`create table seminar_terms(id uuid primary key,name text,start_date date,end_date date,roster_revision integer default 0,roster_initialized_at timestamptz);
+ create table seminar_term_members(term_id uuid,member_id bigint,status text,entry_type text,updated_at timestamptz,primary key(term_id,member_id));
+ create table seminar_term_roster_changes(term_id uuid,revision integer,previous_entries jsonb,entries jsonb,created_by bigint);
+ create table seminar_weeks(id uuid primary key,term_id uuid,book_title text,note text);
+ create table seminar_sessions(id uuid primary key,term_id uuid,seminar_week_id uuid,meeting_date date,is_active boolean default true,actual_member_ids bigint[],attendance_confirmed_at timestamptz,roster_updated_at timestamptz);
+ create table history(id uuid primary key default gen_random_uuid(),seminar_session_id uuid,actual_member_ids bigint[],attendance_confirmed_at timestamptz);
+ create table seminar_no_shows(session_id uuid,member_id bigint,cancelled_at timestamptz);
+ create table member_inbox(id uuid primary key default gen_random_uuid(),member_id bigint,event_key text,resolved_at timestamptz);
+ insert into seminar_terms(id,name,start_date,end_date) values('${t}','학기',current_date-100,current_date+100),('${other}','다른 학기',current_date-400,current_date-200);
+ insert into seminar_weeks values('${w}','${t}','책','');
+ insert into seminar_sessions(id,term_id,seminar_week_id,meeting_date) values('${s}','${t}','${w}',current_date-7),('${s2}','${t}','${w}',current_date-14);
+ insert into members(id,name,role,account_status) values(1,'관리자','admin','active'),(2,'회장','member','active'),(3,'부장A','member','active'),(4,'부장B','member','active'),(5,'부원','member','active'),(6,'회원','member','active');`);
+ await db.exec(await fs.readFile(new URL('supabase/migrations/20261029014149_term_operations_tasks.sql',root),'utf8'));
+ const entries=[{member_id:2,role_id:'president'},{member_id:3,role_id:'planning_head'},{member_id:4,role_id:'academic_head'},{member_id:5,role_id:'planning_member'}];
+ assert.equal((await scalar('select save_term_officers($1,1,0,$2)',[t,JSON.stringify(entries)])).accepted,true);
+ assert.equal((await scalar('select save_term_officers($1,1,0,$2)',[t,'[]'])).accepted,false);
+ assert.equal(await scalar("select operation_can(3,'attendance',$1)",[t]),true);
+ assert.equal(await scalar("select operation_can(3,'members',$1)",[t]),false);
+ assert.equal(await scalar("select operation_can(3,'attendance',$1)",[other]),false);
+ assert.equal(await scalar("select operation_can(5,'attendance',$1)",[t]),false);
+ assert.equal((await scalar('select save_term_officers($1,3,1,$2)',[t,'[]'])).accepted,false);
+ await db.exec(`insert into history(seminar_session_id) values('${s}');insert into member_inbox(member_id,event_key,operation_key) values(3,'work:a','attendance:${s}'),(4,'work:b','attendance:${s}');`);
+ const payload=[{session_id:s,member_ids:[2,3],expected_confirmed_at:null,expected_roster_updated_at:null,expected_term_revision:0}];
+ assert.equal((await scalar('select confirm_seminar_attendance_batch(3,$1)',[JSON.stringify(payload)])).accepted,true);
+ assert.equal(await scalar('select count(*)::int from member_inbox where resolved_at is null'),0);
+ assert.deepEqual(await scalar('select actual_member_ids from history where seminar_session_id=$1',[s]),[2,3]);
+ assert.equal((await scalar('select confirm_seminar_attendance_batch(4,$1)',[JSON.stringify(payload)])).accepted,false);
+ const current=await scalar('select attendance_confirmed_at::text from seminar_sessions where id=$1',[s]);
+ // PostgREST uses an ISO offset, PostgreSQL text uses a space: same instant must match.
+ assert.equal((await scalar('select confirm_seminar_attendance_batch(4,$1)',[JSON.stringify([{...payload[0],expected_confirmed_at:current.replace(' ','T')}])])).accepted,true);
+ const mixed=[{...payload[0],session_id:s2},{...payload[0]}];
+ assert.equal((await scalar('select confirm_seminar_attendance_batch(4,$1)',[JSON.stringify(mixed)])).accepted,false);
+ assert.equal(await scalar('select attendance_confirmed_at from seminar_sessions where id=$1',[s2]),null);
+ await assert.rejects(db.query('select confirm_seminar_attendance_batch(5,$1)',[JSON.stringify([{...payload[0],session_id:s2}])]));
+ await db.exec(`insert into seminar_no_shows values('${s2}',2,null)`);
+ await assert.rejects(db.query('select confirm_seminar_attendance_batch(3,$1)',[JSON.stringify([{...payload[0],session_id:s2}])]));
+ const rule=await scalar(`insert into operation_rules(term_id,title,frequency,start_date,end_date,created_by,role_ids) values($1,'자료 정리','weekly',current_date,current_date+10,1,array['planning_head','academic_head']) returning id`,[t]);
+ const task=await scalar(`insert into operation_tasks(rule_id,term_id,occurrence_date,title,due_at) values($1,$2,current_date,'자료 정리',now()) returning id`,[rule,t]);
+ await db.query("insert into member_inbox(member_id,event_key,operation_key) values(3,'custom:a',$1),(4,'custom:b',$1)",['custom:'+task]);
+ assert.equal((await scalar('select complete_operation_task($1,5)',[task])).accepted,false);
+ assert.equal((await scalar('select complete_operation_task($1,3)',[task])).accepted,true);
+ assert.equal((await scalar('select complete_operation_task($1,4)',[task])).accepted,true);
+ assert.equal(await scalar("select count(*)::int from operation_audit where action='task_complete'"),1);
+ assert.equal(await scalar('select count(*)::int from member_inbox where resolved_at is null'),0);
+ await db.query("insert into member_inbox(member_id,event_key,operation_key) values(2,'roster:a',$1)",['roster:'+t]);
+ assert.equal((await scalar('select save_seminar_term_members($1,0,$2,3)',[t,'[]'])).accepted,false);
+ assert.equal((await scalar('select save_seminar_term_members($1,0,$2,2)',[t,JSON.stringify([{member_id:6,status:'active',entry_type:'new'}])])).accepted,true);
+ assert.equal(await scalar('select count(*)::int from member_inbox where resolved_at is null'),0);
+ assert.equal((await scalar('select confirm_seminar_attendance_batch(3,$1)',[JSON.stringify([{...payload[0],session_id:s2,member_ids:[]}])])).accepted,false);
+ await db.exec("insert into members(id,name,role,account_status) values(7,'신청자','member','pending');insert into notifications(id,type,status,related_member_id) values(11,'new_user_request','pending',7);insert into member_inbox(member_id,event_key) values(2,'request:11');");
+ assert.equal((await scalar("select account_request_mutate('approve',3,11)")).accepted,false);
+ assert.equal((await scalar("select account_request_mutate('approve',2,11)")).accepted,true);
+ assert.equal(await scalar('select count(*)::int from member_inbox where resolved_at is null'),0);
+ const tables=['operation_roles','term_officers','operation_rules','operation_tasks','operation_audit'];
+ for(const table of tables){assert.equal(await scalar(`select has_table_privilege('anon','public.${table}','select')`),false);assert.equal(await scalar(`select relrowsecurity from pg_class where oid='public.${table}'::regclass`),true);}
+ assert.equal(await scalar("select has_function_privilege('authenticated','public.confirm_seminar_attendance_batch(bigint,jsonb)','execute')"),false);
+ console.log('PASS: real PostgreSQL schema, scoped roles, shared completion, atomic attendance/conflict/no-show checks, audit, RLS and RPC grants');
+}catch(error){console.error(error.message, error.where||'');process.exitCode=1;}finally{await db.close();}

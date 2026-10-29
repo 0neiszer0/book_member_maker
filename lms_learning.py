@@ -4,7 +4,14 @@ from datetime import date
 
 def is_break_week(week):
     note = str(week.get('note') or '')
-    return not week.get('book_title') and any(word in note for word in ('휴회', '시험기간', '중간고사', '기말고사'))
+    return not week.get('book_title') and any(word in note for word in ('휴회', '휴강', '시험기간', '중간고사', '기말고사'))
+
+
+def academic_period(day):
+    parsed = day if isinstance(day, date) else date.fromisoformat(str(day)[:10])
+    year = parsed.year - (1 if parsed.month < 3 else 0)
+    season = '겨울' if parsed.month < 3 else '1' if parsed.month < 7 else '여름' if parsed.month < 9 else '2'
+    return f'legacy-{year}-{season}', f'{year % 100:02d}-{season}학기'
 
 
 def link_legacy_histories(histories, sessions):
@@ -108,8 +115,8 @@ def historical_courses(members, histories, terms, member_id, today, sessions=())
         if term:
             key, name, term_id = str(term['id']), term['name'], term['id']
         else:
-            half = 1 if parsed.month < 7 else 2
-            key, name, term_id = f'legacy-{parsed.year}-{half}', '', None
+            key, name = academic_period(parsed)
+            term_id = None
             legacy_dates.setdefault(key, []).append(day)
         ids = h.get('actual_member_ids')
         attended = str(member_id) in {str(i) for i in ids} if ids is not None else (
@@ -125,9 +132,6 @@ def historical_courses(members, histories, terms, member_id, today, sessions=())
         course['records'].append({'id': h['id'], 'date': day, 'book_title': h.get('book_title') or '도서명 미기록'})
     for course in found.values():
         if not course['term_id']:
-            dates = legacy_dates[course['key']]
-            first, last = min(dates), max(dates)
-            months = str(int(first[5:7])) if first[5:7] == last[5:7] else f"{int(first[5:7])}–{int(last[5:7])}"
-            course['name'] = f'{first[:4]}년 {months}월 세미나'
+            course['name'] = academic_period(course['first_date'])[1]
         course['records'].sort(key=lambda row: (row['date'], str(row['id'])))
     return sorted(found.values(), key=lambda c: c['last_date'], reverse=True)

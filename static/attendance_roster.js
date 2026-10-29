@@ -53,5 +53,5 @@
   document.getElementById('undo-roster')?.addEventListener('click',()=>action(async()=>{if(!confirm('직전 반영 이전의 참석 예정 명단으로 되돌릴까요?'))return;await post('/roster/undo',{});location.reload();}));
   function countActual(){document.getElementById('actual-count').textContent='실제 참석 '+selected('.actual-choice').length+'명 선택';}
   root.querySelectorAll('.actual-choice').forEach(input=>input.addEventListener('change',countActual));countActual();
-  document.getElementById('confirm-attendance').addEventListener('click',()=>action(async()=>{const ids=selected('.actual-choice');if(!confirm('실제 참석 '+ids.length+'명으로 확정할까요? 학기 참석 횟수에 반영됩니다.'))return;await post('/attendance/confirm',{member_ids:ids});location.reload();}));
+  document.getElementById('confirm-attendance').addEventListener('click',()=>action(async()=>{const ids=selected('.actual-choice');await post('/attendance/confirm',{member_ids:ids,confirmation_token:root.dataset.confirmationToken});location.reload();}));
 })();

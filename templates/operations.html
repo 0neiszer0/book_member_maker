@@ -1,0 +1,9 @@
+{% extends 'lms_base.html' %}{% set lms_title='맡은 업무' %}{% set lms_course=term %}
+{% block title %}맡은 업무 · 책반우{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static',filename='operations.css') }}">{% endblock %}
+{% block content %}<div class="operation-shell"><h1>맡은 업무</h1><p>함께 맡은 업무는 한 명이 처리하면 모두의 목록에서 사라집니다. 미처리 업무는 오후 1시에 다시 알려드립니다.</p>
+<form><label>학기 <select name="term_id" onchange="this.form.submit()"><option value="">전체 학기</option>{% for t in terms|reverse %}<option value="{{ t.id }}" {% if term and t.id==term.id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}</select></label></form>
+{% if operation_can('members') %}<p><a class="lms-button" href="{{ url_for('notification_center',requests=1,_anchor='requests') }}">가입·계정 신청 처리</a></p>{% endif %}
+<div class="operation-cards">{% for item in work %}<a class="operation-card" href="{{ item.url }}"><strong>{{ item.title }}</strong><span>{{ item.body }}</span><span>확인하고 처리하기 →</span></a>{% else %}<p class="lms-alert">처리할 업무가 없습니다.</p>{% endfor %}</div>
+<h2>학기 운영 설정</h2>{% for t in terms|reverse %}{% if session.user_role=='admin' or operation_can('members',t.id) or operation_can('tasks',t.id) %}<div class="operation-term"><strong>{{ t.name }}</strong>{% if operation_can('members',t.id) or operation_can('tasks',t.id) %}<a href="{{ url_for('operation_officers',term_id=t.id) }}">임원·부원 배치</a>{% endif %}{% if operation_can('tasks',t.id) %}<a href="{{ url_for('operation_rules',term_id=t.id) }}">반복 업무·알림</a>{% endif %}</div>{% endif %}{% endfor %}
+{% if session.user_role=='admin' %}<p><a href="{{ url_for('operation_settings') }}">전체 직책·기본 업무 설정</a></p>{% endif %}</div>{% endblock %}

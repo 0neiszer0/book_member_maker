@@ -14,6 +14,7 @@ from term_membership import scope_members
 from engagement_utils import form_is_open
 from collections import Counter
 from member_notifications import subscription_payload
+from operations import Operations, KST, pending_work, sync_custom_tasks, filter_inbox
 
 
 class NoRedirectSession(requests.Session):
@@ -28,8 +29,10 @@ class NoRedirectSession(requests.Session):
 def collect_items(db, now):
     members = all_rows(db.table('members').select('id,name,student_id,role,is_active,account_status,member_status').order('id'))
     identities = members
-    members = [m for m in members if m.get('account_status') == 'active' and m.get('member_status') not in ('inactive', 'blocked')]
-    staff = [m for m in members if m.get('is_active') and m.get('role') in ('admin', 'officer')]
+    members = [m for m in members if m.get('is_active') and m.get('account_status') == 'active' and m.get('member_status') not in ('inactive', 'blocked')]
+    ops = Operations(db)
+    staff_ids = set(ops.recipients(members, 'members', today=now.astimezone(KST).date()))
+    staff = [m for m in members if m['id'] in staff_ids]
     active = {int(m['id']) for m in members}
     items = []
     def add(mid, key, title, body, url):
@@ -40,6 +43,19 @@ def collect_items(db, now):
     for row in pending:
         for m in staff:
             add(m['id'], f"request:{row['id']}", labels.get(row['type'], '새 신청'), '신청 내용을 확인하고 처리해주세요.', '/notifications?requests=1')
+    rules = sync_custom_tasks(db, ops, now)
+    work = pending_work(db, ops, members, now, rules)
+    totals = Counter({m['id']: len(pending) for m in staff if pending})
+    for task in work:
+        for mid in task['recipients']:
+            items.append({'member_id': mid, 'event_key': 'work:'+task['key'], 'operation_key': task['key'],
+                'operation_term_id': task['term_id'], 'title': task['title'], 'body': task['body'], 'url': task['url']})
+            totals[mid] += 1
+    local = now.astimezone(KST)
+    if local.hour >= 13:
+        for mid, count in totals.items():
+            items.append({'member_id': mid, 'event_key': 'work-digest:'+local.date().isoformat(),
+                'operation_key': 'digest', 'title': '오늘 확인할 운영 업무', 'body': f'처리를 기다리는 업무 {count}개가 있습니다.', 'url': '/operations'})
     for row in recent:
         if row.get('status') in ('approved', 'denied') and row.get('related_member_id') in active:
             add(row['related_member_id'], f"decision:{row['id']}:{row['status']}", '신청 처리 결과',
@@ -108,11 +124,13 @@ def deliver(db, members, now, send=None):
     if send is None:
         from pywebpush import webpush
         send = webpush
-    inbox = all_rows(db.table('member_inbox').select('*').is_('resolved_at', 'null').is_('read_at', 'null').order('created_at', desc=True).order('id'))
+    inbox = all_rows(db.table('member_inbox').select('*').is_('resolved_at', 'null').is_('dismissed_at', 'null').is_('read_at', 'null').order('created_at', desc=True).order('id'))
     subscriptions = all_rows(db.table('push_subscriptions').select('*').order('endpoint_hash'))
     deliveries = all_rows(db.table('push_deliveries').select('*').order('notification_id').order('endpoint_hash'))
     previous = {(r['notification_id'], r['endpoint_hash']): r for r in deliveries}
     users = {m['id']: m for m in members}
+    ops = Operations(db)
+    visible = {mid: {r['id'] for r in filter_inbox(db, ops, m, [r for r in inbox if r['member_id']==mid])} for mid,m in users.items()}
     counts = {'sent': 0, 'failed': 0}
     for sub in subscriptions:
         member = users.get(sub['member_id'])
@@ -120,9 +138,7 @@ def deliver(db, members, now, send=None):
             db.table('push_subscriptions').delete().eq('endpoint_hash', sub['endpoint_hash']).execute()
             continue
         for item in inbox:
-            if item['member_id'] != sub['member_id']:
-                continue
-            if item['url'] == '/notifications?requests=1' and (not member.get('is_active') or member.get('role') not in ('admin', 'officer')):
+            if item['member_id'] != sub['member_id'] or item['id'] not in visible.get(sub['member_id'], set()):
                 continue
             old = previous.get((item['id'], sub['endpoint_hash']), {})
             if old.get('sent_at') or (old.get('next_attempt_at') or '') > now.isoformat():
