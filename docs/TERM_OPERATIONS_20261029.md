@@ -24,7 +24,7 @@
 
 ## 데이터와 배포 순서
 
-Migration: `supabase/migrations/20261029014149_term_operations_tasks.sql`.
+Migration: `supabase/migrations/20261029045732_term_operations_tasks.sql`.
 신규 테이블 5개(operation_roles, term_officers, operation_rules, operation_tasks, operation_audit), 학기/알림 메타데이터 열, 서버 전용 함수 및 기존 회원명단/명단반영/가입처리 RPC 보완. 기본 직책 9개 외 실제 회원 명단·출석·계정 데이터는 SQL로 변경하지 않는다. 일괄 출석은 하나의 트랜잭션이고 학기·회차 버전이 다르면 전체 저장을 거절한다. 명단/출석/가입/공동 업무 처리와 관련 알림 정리는 DB 안에서 함께 실행한다.
 
 1. 작업 루트 `outputs/operations-improvements-state.json`의 소스·준비물·승인 상태 확인. 최신 운영 커밋이 다르면 중단하고 다른 세션 변경을 먼저 비교한다.
@@ -60,3 +60,18 @@ Claude Code claude-opus-5-5 / high 실제 읽기 전용 검토 완료(74 turns).
 - PostgREST schema cache 갱신 NOTIFY 추가. SQL 검증은 격리된 축약 스키마이며 전체 과거 migration 체인/운영 복원 검증과 동일하지 않다.
 
 로컬 DB 전환은 아직 미승인·미실행. Claude 역시 실제 외부 백업과 복원 시험 없이 전환하지 말 것을 권고했다.
+
+## 운영 적용 완료 (2026-10-29)
+
+- 사용자 승인: “어 운영배포하고 … 클로드에게 검토받고 진행하자.” Claude 검토 후 여섯 사항 보완, Python 84개·Worker 6개·격리 PostgreSQL 검증 통과.
+- 운영 앱: `9459cfcdac431f40da2caae2534d417f5833f094`.
+- Worker www: `c404e53f-f12b-40b0-8531-e333e6b02c79`. 현재 정적 파일 56개, 이전 버전 포함 353개 유지.
+- Supabase migration: `20261029045732_term_operations_tasks`. 초기 요청 상태 오류 뒤 미반영을 읽기 확인하고 재시도해 성공. MCP가 실제 부여한 version으로 로컬 migration 파일명을 정렬했다. SQL 바이트는 승인된 배포 artifact와 동일하다.
+- 새 테이블 5개 전부 RLS + anon/authenticated 접근 차단, service_role 전용. 직책 9개 생성. 실제 임원 배치 0, 사용자 반복 업무 0.
+- 기존 회원149·활동기록62·학기명단84·확정회차1 유지. 자동 알림 서비스 성공, 현재 학기 출석 업무3개/받는사람별 알림15개 확인. 과거 학기 업무는 자동 발송하지 않았다.
+- 앱·DB health 및 위키·Tunnel·알림/위키백업 타이머 정상. 공개 GET/OAuth/보호 경로/OG/CDN 해시와 캐시12개 검사 통과. 실제 로그인된 업무·임원 배치 화면 정상, 브라우저 콘솔 오류/경고 없음. 테스트를 위해 운영 회원/출석/배치를 수정하지 않았다.
+- 카카오 로그인 갱신 후 홈페이지 캐시 초기화 성공(스크랩1개), 새 제목 `책반우|경북대학교 중앙독서동아리`와 설명 `책 먹는 호반우 홈페이지` 조회 확인.
+- Render, GitHub main, 도메인, 카카오 로그인 설정, 위키 엔진/데이터는 변경하지 않았다.
+- VM stage `/var/tmp/bookmembers-operations-9459cfc`에 이전 manifest와 검증된 배포 자료 보존. rollback은 위 절차를 따르고 새 데이터는 삭제하지 않는다.
+
+후속: 실제 학기 임원·부원은 관리자가 배치한다. 로컬 DB는 아직 Supabase에서 전환하지 않았다. 개인 Google Drive를 외부 암호화 백업 목적지로 선택했으며 연결/업로드 미실행. `infra/localdb/trial`에 고정 이미지4개, loopback만 공개, 메모리 합계1248MiB 상한, 자동 시작하지 않는 합성 시험 구성을 준비했다. YAML/키생성 검증만 완료했고 실제 Docker/DB 기동 시험은 미실행이다. Ubuntu Docker 설치 모의 실행은 추가6개/업그레이드0/삭제0. 설치·시험 실행은 사용자 호스트 변경 승인 대기.
