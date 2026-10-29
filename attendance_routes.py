@@ -29,6 +29,29 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
         if not expected or not secrets.compare_digest(supplied, expected):
             abort(403)
 
+    def confirmation_entry(target, ids):
+        return {'session_id': target['id'], 'member_ids': ids,
+                'expected_confirmed_at': target.get('attendance_confirmed_at'),
+                'expected_roster_updated_at': target.get('roster_updated_at'),
+                'expected_term_revision': target['term_revision']}
+
+    def confirm_batch(entries):
+        try:
+            result = db().rpc('confirm_seminar_attendance_batch', {'p_actor': session['user_id'], 'p_entries': entries}).execute().data or {}
+        except Exception:
+            app.logger.exception('Attendance batch confirmation failed')
+            return jsonify(status='error', message='확정 결과를 확인하지 못했습니다. 새로고침해 출석 상태를 확인해주세요.'), 503
+        if not result.get('accepted'):
+            return jsonify(status='error', message='명단이나 출석이 변경되었습니다. 새로고침 후 다시 확인해주세요.'), 409
+        if rebuild_matrix:
+            for entry in entries:
+                try:
+                    rebuild_matrix(entry['session_id'])
+                except Exception:
+                    # The authoritative snapshot and notifications already committed together.
+                    app.logger.exception('Legacy attendance matrix refresh failed')
+        return jsonify(status='success', count=len(entries))
+
     def roster_context(session_id):
         target = db().table('seminar_sessions').select('*').eq('id', session_id).single().execute().data
         if not target:
@@ -91,7 +114,8 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
         return render_template('admin_seminar_roster.html', seminar=target, members=members,
                                audit=audit, mode=mode, eligible_ids=eligible, input_ids=input_ids,
                                planned_ids=planned, actual_ids=actual, csrf_token=csrf_token(),
-                               today=datetime.now(KST).date().isoformat())
+                               today=datetime.now(KST).date().isoformat(),
+                               confirmation_token=signer.dumps({'actor': session['user_id'], 'entry': confirmation_entry(target, actual)}))
 
     @app.post('/api/admin/seminar_sessions/<session_id>/roster/preview')
     @login_required(role='admin')
@@ -211,6 +235,9 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
             return jsonify(status='error', message='아직 진행하지 않은 세미나는 출석을 확정할 수 없습니다.'), 400
         body = request.get_json(silent=True) or {}
         try:
+            signed = signer.loads(body.get('confirmation_token', ''), max_age=3600)
+            if signed['actor'] != session['user_id'] or str(signed['entry']['session_id']) != str(session_id):
+                raise ValueError('확정 화면을 다시 열어주세요.')
             if not isinstance(body.get('member_ids'), list):
                 raise ValueError('실제 참석 명단을 선택해주세요.')
             ids = sorted({int(mid) for mid in body['member_ids']})
@@ -218,15 +245,61 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
                 raise ValueError('존재하지 않는 회원이 포함되어 있습니다.')
             if set(ids) & no_shows:
                 raise ValueError('미연락 불참자로 기록된 회원이 있습니다. 먼저 불참 기록을 취소해주세요.')
+        except (BadSignature, SignatureExpired, KeyError):
+            return jsonify(status='error', message='확정 화면이 만료됐습니다. 새로고침해주세요.'), 409
         except (ValueError, TypeError) as exc:
             return jsonify(status='error', message=str(exc)), 400
-        stamp = datetime.now(timezone.utc).isoformat()
-        db().table('seminar_sessions').update({'actual_member_ids': ids, 'attendance_confirmed_at': stamp}).eq('id', session_id).execute()
-        # History remains an editable group plan; confirmation is separate metadata.
-        db().table('history').update({'attendance_confirmed_at': stamp}).eq('seminar_session_id', session_id).execute()
-        if rebuild_matrix:
-            rebuild_matrix(session_id)
-        return jsonify(status='success')
+        entry = dict(signed['entry'], member_ids=ids)
+        return confirm_batch([entry])
+
+    @app.post('/api/admin/term_attendance/<term_id>/preview')
+    @login_required(role='admin')
+    def attendance_bulk_preview(term_id):
+        check_csrf()
+        body = request.get_json(silent=True) or {}
+        selected = body.get('session_ids')
+        if not isinstance(selected, list) or not 1 <= len(selected) <= 50 or any(not isinstance(i, str) for i in selected) or len(set(selected)) != len(selected):
+            return jsonify(message='확정할 회차를 1~50개 선택해주세요.'), 400
+        _, term, report = term_report(term_id)
+        if not term or str(term['id']) != str(term_id):
+            abort(404)
+        pending = {str(s['id']): s for s in report['pending_sessions']}
+        if set(selected) - pending.keys():
+            return jsonify(message='이미 확정됐거나 대상이 아닌 회차가 있습니다. 새로고침해주세요.'), 409
+        entries, previews = [], []
+        for sid in selected:
+            target, members, _, _, _, planned, no_shows = roster_context(sid)
+            histories = db().table('history').select('id,present,actual_member_ids').eq('seminar_session_id', sid).execute().data or []
+            if target.get('planned_member_ids') is None and not histories:
+                return jsonify(message=target['meeting_date']+' 회차는 저장된 명단이 없습니다. 먼저 개별 출석 화면에서 확인해주세요.'), 409
+            ids = set(planned)
+            if histories and target.get('planned_member_ids') is None:
+                ids = set()
+                for h in histories:
+                    if h.get('actual_member_ids') is not None:
+                        ids.update(h['actual_member_ids'])
+                    else:
+                        for name in h.get('present') or []:
+                            matches = [m['id'] for m in members if m.get('name') == name]
+                            if len(matches) != 1:
+                                return jsonify(message=target['meeting_date']+' 기록의 이름을 회원과 정확히 연결할 수 없습니다. 개별 화면에서 확인해주세요.'), 409
+                            ids.add(matches[0])
+            ids = sorted(ids - no_shows)
+            entries.append(confirmation_entry(target, ids))
+            previews.append({'date': target['meeting_date'], 'count': len(ids), 'names': [m['name'] for m in members if m['id'] in ids]})
+        return jsonify(items=previews, token=signer.dumps({'actor': session['user_id'], 'term_id': term_id, 'entries': entries}))
+
+    @app.post('/api/admin/term_attendance/<term_id>/confirm')
+    @login_required(role='admin')
+    def attendance_bulk_confirm(term_id):
+        check_csrf()
+        try:
+            data = signer.loads((request.get_json(silent=True) or {}).get('token', ''), max_age=900)
+            if data['actor'] != session['user_id'] or data['term_id'] != term_id:
+                abort(403)
+        except (BadSignature, SignatureExpired, KeyError):
+            return jsonify(message='미리보기가 만료됐습니다. 다시 확인해주세요.'), 409
+        return confirm_batch(data['entries'])
 
     def term_report(term_id=None):
         terms = db().table('seminar_terms').select('*').order('start_date', desc=True).execute().data or []
@@ -259,7 +332,10 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
         report['sessions'] = sessions
         report['roster_initialized'] = bool(term.get('roster_initialized_at'))
         confirmed_ids = confirmed_history_session_ids(histories)
+        from lms_learning import is_break_week
+        weeks = {str(w['id']): w for w in db().table('seminar_weeks').select('id,note,book_title').eq('term_id', term['id']).execute().data or []}
         report['pending_sessions'] = [s for s in sessions if s['meeting_date'] <= datetime.now(KST).date().isoformat()
+                                      and s.get('is_active', True) and not is_break_week(weeks.get(str(s.get('seminar_week_id')), {}))
                                       and not attendance_is_confirmed(s, confirmed_ids)]
         return terms, term, report
 

@@ -1,11 +1,11 @@
 {% extends 'lms_base.html' %}{% set lms_title='알림' %}
 {% block title %}알림 · 책반우{% endblock %}
 {% block content %}
-<h1>알림</h1><p class="lms-small">신청과 해야 할 활동을 확인하세요. 완료한 활동은 다음 갱신 때 목록에서 사라집니다.</p>
+<h1>알림</h1><p class="lms-small">신청과 해야 할 활동을 확인하세요. 읽거나 삭제해도 업무가 완료되지는 않습니다.</p><p><a href="{{ url_for('operation_workbench') }}">내가 맡은 업무</a></p>
 <section class="lms-push-settings"><h2>이 기기의 브라우저 알림</h2><p>사이트를 닫아도 새 알림을 받을 수 있어요. 알림 내용은 사이트에서 확인합니다.</p>
 <button type="button" id="push-enable" class="lms-button">알림 켜기</button> <button type="button" id="push-disable" class="lms-button" hidden>알림 끄기</button>
 <p id="push-status" role="status">브라우저 지원 상태를 확인하고 있습니다.</p>
 <p class="lms-small">공용 기기에서는 알림을 끄고 로그아웃해주세요. iPhone·iPad는 Safari에서 홈 화면에 추가한 뒤 그 앱에서 켤 수 있습니다.</p></section>
-<section><h2>내 알림</h2><div id="member-inbox" role="status">알림을 불러오는 중입니다.</div></section>
-{% if session.user_role in ['admin','officer'] %}<section id="requests"><h2>처리가 필요한 신청</h2><div id="lms-approval-list" role="status">신청을 불러오는 중입니다.</div></section>{% endif %}
+<section><h2>내 알림</h2><button type="button" id="read-all-notifications" class="lms-button">모두 읽음</button><div id="member-inbox" role="status">알림을 불러오는 중입니다.</div></section>
+{% if operation_can('members') %}<section id="requests"><h2>처리가 필요한 신청</h2><div id="lms-approval-list" role="status">신청을 불러오는 중입니다.</div></section>{% endif %}
 {% endblock %}

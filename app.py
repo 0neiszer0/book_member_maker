@@ -175,10 +175,10 @@ def add_default_social_preview(response):
         return response
     title_match = re.search(r"<title[^>]*>(.*?)</title>", page, flags=re.I | re.S)
     title = re.sub(r"<[^>]+>", "", title_match.group(1)).strip() if title_match else "책 먹는 호반우"
-    title = "책반우 | 경북대학교 독서동아리" if request.endpoint in ("main_index", "login") else title
+    title = "책반우|경북대학교 중앙독서동아리" if request.endpoint in ("main_index", "login") else title
     title = html.escape(title or "책 먹는 호반우", quote=True)
     description = html.escape(
-        "경북대학교 독서동아리 책 먹는 호반우 · 세미나와 독서 활동",
+        "책 먹는 호반우 홈페이지",
         quote=True,
     )
     canonical = html.escape(f"{PUBLIC_BASE_URL}{request.full_path}".rstrip("?"), quote=True)
@@ -427,6 +427,7 @@ def login_required(role="ANY"):
                     return _access_denied("로그인이 필요합니다.", 401)
 
                 member = rows[0]
+                g.operation_member = dict(member, id=user_id)
                 user_role = member.get("role") or "member"
                 if role == 'admin' or user_role != 'admin':
                     session.pop('member_preview', None)
@@ -435,11 +436,21 @@ def login_required(role="ANY"):
                 if member.get('name'):
                     session['user_name'] = member['name']
                 session['profile_pic'] = member.get('profile_pic') or ''
-                if member.get("account_status") != "active" or member.get("member_status") == "inactive":
+                if member.get("account_status") != "active" or member.get("member_status") in ("inactive", "blocked"):
                     session.clear()
                     return _access_denied("비활성화된 계정입니다.", 403)
-                if role == 'admin' and (member.get("is_active") is False or user_role not in ("admin", "officer")):
-                    return _access_denied("이 페이지에 접근할 권한이 없습니다.", 403)
+                if role == 'admin':
+                    if member.get('is_active') is False:
+                        return _access_denied('이 페이지에 접근할 권한이 없습니다.', 403)
+                    if user_role != 'admin':
+                        from operations import scoped_endpoint_allowed
+                        try:
+                            scoped = scoped_endpoint_allowed(supabase, f.__name__, kwargs)
+                        except Exception:
+                            app.logger.exception('Scoped authorization failed')
+                            return _access_denied('권한을 확인하지 못했습니다.', 503)
+                        if scoped is False or (scoped is None and user_role != 'officer'):
+                            return _access_denied('이 학기 업무를 처리할 권한이 없습니다.', 403)
                 # Upgrade existing logins too, while respecting shared-device opt-out.
                 session.permanent = session.get('remember_login', True)
             else:
@@ -5780,9 +5791,8 @@ def records_seminars():
         for row in history:
             try:
                 d = date.fromisoformat(row['date'])
-                half = '상반기' if d.month <= 6 else '하반기'
-                key = f"{d.year}-{1 if d.month <= 6 else 2}"
-                label = f"{d.year}년 {half}"
+                from lms_learning import academic_period
+                key, label = academic_period(d)
             except Exception:
                 key, label = 'unknown', '날짜 미상'
             if key not in seen:
@@ -6590,6 +6600,8 @@ init_term_membership_routes(app, lambda: supabase, login_required, create_member
 # ==============================================================================
 from member_notifications import init_member_notifications
 init_member_notifications(app, lambda: supabase, login_required)
+from operation_routes import init_operation_routes
+init_operation_routes(app, lambda: supabase, login_required)
 
 if __name__ == '__main__':
     # 로컬 개발 전용. 프로덕션(Render)에서는 Dockerfile의 gunicorn으로 구동됨.

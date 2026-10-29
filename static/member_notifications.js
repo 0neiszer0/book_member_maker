@@ -14,12 +14,14 @@
           const link=document.createElement('a');link.textContent=(!item.read_at?'● ':'')+item.title;
           const url=new URL(item.url,location.origin);link.href=url.origin===location.origin?url.href:'/notifications';
           link.onclick=()=>{fetch('/api/member-notifications/'+encodeURIComponent(item.id)+'/read',{method:'POST',keepalive:true,headers:{'X-App-CSRF':csrf}}).catch(()=>{});};
-          const body=document.createElement('p');body.className='lms-small';body.textContent=item.body;row.append(link,body);list.append(row);});});
+          const body=document.createElement('p');body.className='lms-small';body.textContent=item.body;row.append(link,body);
+          for(const [action,label] of [['read',item.read_at?'읽음':'읽음 처리'],['dismiss','삭제']]){const button=document.createElement('button');button.type='button';button.className='lms-button';button.textContent=label;button.disabled=action==='read'&&!!item.read_at;button.setAttribute('aria-label',item.title+' '+label);button.onclick=async()=>{button.disabled=true;try{await api('/api/member-notifications/'+encodeURIComponent(item.id)+'/'+action,{});await loadInbox();}catch(error){body.textContent=error.message;button.disabled=false;}};row.append(button);}list.append(row);});});
     }catch(error){lists.forEach(list=>list.textContent=error.message);}
   }
   window.bookmembersLoadInbox=loadInbox;
   // One lightweight inbox request, no per-page attendance/task recalculation or polling.
   loadInbox();
+  document.getElementById('read-all-notifications')?.addEventListener('click',async event=>{event.target.disabled=true;try{await api('/api/member-notifications/read-all',{});await loadInbox();}catch(error){document.getElementById("member-inbox").textContent=error.message;}finally{event.target.disabled=false;}});
   const enable=document.getElementById('push-enable'),disable=document.getElementById('push-disable'),status=document.getElementById('push-status');
   if(!enable)return;
   let config;

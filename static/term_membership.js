@@ -176,7 +176,7 @@
       busy = false; location.reload();
     } catch (error) { byId('term-save-status').textContent = error.message; lock(false); }
   });
-  byId('new-term-member').addEventListener('submit', async event => {
+  byId('new-term-member')?.addEventListener('submit', async event => {
     event.preventDefault(); if (busy) return;
     const form = event.currentTarget, fields = Object.fromEntries(new FormData(form));
     lock(true);

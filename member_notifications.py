@@ -67,11 +67,26 @@ def init_member_notifications(app, get_db, login_required):
     @app.get('/api/member-notifications')
     @login_required(role='ANY')
     def member_notification_list():
-        rows = get_db().table('member_inbox').select('id,title,body,url,created_at,read_at').eq('member_id', session['user_id']).is_('resolved_at', 'null').order('created_at', desc=True).limit(100).execute().data or []
-        # Operations notifications may outlive a role change; hide them immediately.
-        if session.get('user_role') not in ('admin', 'officer'):
-            rows = [r for r in rows if r.get('url') != '/notifications?requests=1']
+        rows = get_db().table('member_inbox').select('id,title,body,url,created_at,read_at,operation_key,operation_term_id').eq('member_id', session['user_id']).is_('resolved_at', 'null').is_('dismissed_at', 'null').order('created_at', desc=True).limit(100).execute().data or []
+        from operations import request_operations, request_member, filter_inbox
+        if any(r.get('operation_key') or r.get('url') == '/notifications?requests=1' for r in rows):
+            ops, member = request_operations(get_db()), request_member(get_db())
+            rows = filter_inbox(get_db(), ops, member, rows)
         return jsonify(items=rows, unread=sum(not r.get('read_at') for r in rows))
+
+    @app.post('/api/member-notifications/read-all')
+    @login_required(role='ANY')
+    def member_notification_read_all():
+        check_csrf()
+        get_db().table('member_inbox').update({'read_at': datetime.now(timezone.utc).isoformat()}).eq('member_id', session['user_id']).is_('read_at', 'null').execute()
+        return jsonify(status='success')
+
+    @app.post('/api/member-notifications/<notification_id>/dismiss')
+    @login_required(role='ANY')
+    def member_notification_dismiss(notification_id):
+        check_csrf()
+        get_db().table('member_inbox').update({'dismissed_at': datetime.now(timezone.utc).isoformat()}).eq('id', notification_id).eq('member_id', session['user_id']).execute()
+        return jsonify(status='success')
 
     @app.post('/api/member-notifications/<notification_id>/read')
     @login_required(role='ANY')
