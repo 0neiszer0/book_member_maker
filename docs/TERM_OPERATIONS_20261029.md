@@ -37,3 +37,11 @@ Migration: `supabase/migrations/20261029014149_term_operations_tasks.sql`.
 ## 로컬 DB 후속
 
 `infra/localdb/README.md`에 현재 DB/Storage 목록, API 호환성, 최소 운영 구성 검증, 외부 암호화 백업과 복구·전환 절차를 기록했다. `verify_archive.py`는 기존 백업 형식의 dump/객체 목록·해시를 검사하며 압축을 풀거나 DB를 바꾸지 않는다. 실제 데이터 백업, 복구용 DB 설치 및 복원 시험은 아직 하지 않았다. 이 기능 릴리스 승인에 로컬 DB 전환은 포함하지 않는다.
+
+## 최종 배포 후보
+
+- 소스 d826dc74d0ccc72ec1c38d46f3a79562b2cc7b26
+- 정적 digest 0594ef0bf37b1758c59eb79bd83cd2fc5371470082f852c6915dc4e765803061
+- 현재56개/이전포함353개, Wrangler4.153.0 dry-run 통과.
+- Linux 원본 바이트 설치 예행연습과 Ubuntu bash 구문 검사 통과.
+- 작업 루트 work/operations-review에 소스 ZIP·Git bundle·정적 파일·migration.sql·설치기·배포 스크립트·SHA256SUMS 보관. 실제 운영 반영 전 승인 대기.
