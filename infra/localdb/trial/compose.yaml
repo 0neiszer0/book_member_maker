@@ -2,7 +2,7 @@
 name: bookmembers-db-trial
 services:
   db:
-    image: supabase/postgres:17.6.1.136
+    image: supabase/postgres:17.6.1.136@sha256:f371b5f3f2ac0a05703f33d6e6134515fb2498cab708fb948a0aeb7481467c00
     restart: 'no'
     mem_limit: 640m
     cpus: 0.7
@@ -26,7 +26,7 @@ services:
       timeout: 3s
       retries: 30
   rest:
-    image: postgrest/postgrest:v14.18
+    image: postgrest/postgrest:v14.18@sha256:c7cd7e265a85b05248abf53f4473fcec7e327c282d0bd0cf60f1551996d09fcf
     restart: 'no'
     mem_limit: 128m
     cpus: 0.25
@@ -40,7 +40,7 @@ services:
       PGRST_DB_POOL: 5
       PGRST_DB_MAX_ROWS: 1000
   storage:
-    image: supabase/storage-api:v1.81.0
+    image: supabase/storage-api:v1.81.0@sha256:98ffec5d0678803783c30e404c27f4ec65e97efbe014088f2a86b4b8b54b9f54
     restart: 'no'
     mem_limit: 384m
     cpus: 0.5
@@ -71,7 +71,7 @@ services:
       timeout: 3s
       retries: 30
   api:
-    image: envoyproxy/envoy:v1.39.1
+    image: envoyproxy/envoy:v1.39.1@sha256:57e14a549d7bd43c8d3f6d03e8cfa653e037d4b38e133acd9b54f38c524401b4
     restart: 'no'
     mem_limit: 96m
     cpus: 0.15

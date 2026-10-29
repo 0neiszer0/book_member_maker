@@ -139,6 +139,9 @@ create table public.topic_events (
   id uuid default gen_random_uuid() not null,
   meeting_date date not null,
   book_title varchar not null,
+  -- Legacy topic author existed in production before weekly_seminar_absences.
+  -- Confirmed by read-only information_schema inspection on 2026-10-29.
+  book_author text,
   share_token varchar not null,
   is_active boolean default true,
   created_at timestamp with time zone default timezone('utc'::text, now()),
