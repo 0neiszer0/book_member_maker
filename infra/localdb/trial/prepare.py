@@ -10,6 +10,7 @@ def prepare(output):
     source=Path(__file__).resolve().parent
     for name in ['compose.yaml','envoy.yaml','roles.sql']:
         shutil.copyfile(source/name,output/name)
+        (output/name).chmod(0o644)  # Container service users must read these non-secret bind mounts.
     key=secrets.token_hex(32);password=secrets.token_hex(24)
     def encode(value):
         return base64.urlsafe_b64encode(json.dumps(value,separators=(',',':')).encode()).rstrip(b'=')

@@ -1,6 +1,6 @@
 # 학기 임원·업무·출석 개선
 
-상태: 사용자 운영 배포 승인 및 Claude 검토 완료. 보완본 최종 검증 후 배포 진행. 운영 기준 앱은 001671a4199bf36a00255801aaefbdd152c55244, Worker는 6678c791-2994-4ed5-ac37-416c87dd2b1b. 2026-10-29 SSH 재조회 시 앱·알림 타이머·Tunnel 정상. Render와 GitHub main은 변경하지 않는다.
+상태: 운영 앱9459cfc·Worker c404e53f 배포 완료. Claude 검토 보완, 실제 운영 검증 및 카카오 미리보기 갱신 완료. 로컬 DB 최소 구성 합성 시험도 승인 후 완료했으며 실제 데이터 전환은 아직 하지 않았다. Render와 GitHub main은 변경하지 않는다.
 
 ## 사용자와 확정한 동작
 
@@ -75,3 +75,7 @@ Claude Code claude-opus-5-5 / high 실제 읽기 전용 검토 완료(74 turns).
 - VM stage `/var/tmp/bookmembers-operations-9459cfc`에 이전 manifest와 검증된 배포 자료 보존. rollback은 위 절차를 따르고 새 데이터는 삭제하지 않는다.
 
 후속: 실제 학기 임원·부원은 관리자가 배치한다. 로컬 DB는 아직 Supabase에서 전환하지 않았다. 개인 Google Drive를 외부 암호화 백업 목적지로 선택했으며 연결/업로드 미실행. `infra/localdb/trial`에 고정 이미지4개, loopback만 공개, 메모리 합계1248MiB 상한, 자동 시작하지 않는 합성 시험 구성을 준비했다. YAML/키생성 검증만 완료했고 실제 Docker/DB 기동 시험은 미실행이다. Ubuntu Docker 설치 모의 실행은 추가6개/업그레이드0/삭제0. 설치·시험 실행은 사용자 호스트 변경 승인 대기.
+
+## 로컬 DB 합성 시험 완료
+
+사용자의 “시험 환경 설치·실행 승인” 후 Docker/Compose를 설치했다. 초기 파일 권한/과거 baseline 누락을 보완하고 새 볼륨에서 migration33개, 실제 SDK/API/Storage, 컨테이너 재시작 보존을 검증했다. 시험 컨테이너는 중지하고 볼륨을 보존했다. 전체 결과는 `infra/localdb/trial/VALIDATION.md`, 수치는 작업 루트 `outputs/localdb-trial-results-20261029.json`. 실제 백업·복원·전환·Windows 재부팅은 미완료이며 다음 승인 대상이다.
