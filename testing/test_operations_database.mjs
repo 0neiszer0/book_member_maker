@@ -22,7 +22,7 @@ try{
  insert into seminar_weeks values('${w}','${t}','책','');
  insert into seminar_sessions(id,term_id,seminar_week_id,meeting_date) values('${s}','${t}','${w}',current_date-7),('${s2}','${t}','${w}',current_date-14);
  insert into members(id,name,role,account_status) values(1,'관리자','admin','active'),(2,'회장','member','active'),(3,'부장A','member','active'),(4,'부장B','member','active'),(5,'부원','member','active'),(6,'회원','member','active');`);
- await db.exec(await fs.readFile(new URL('supabase/migrations/20261029014149_term_operations_tasks.sql',root),'utf8'));
+ await db.exec(await fs.readFile(new URL('supabase/migrations/20261029045732_term_operations_tasks.sql',root),'utf8'));
  const entries=[{member_id:2,role_id:'president'},{member_id:3,role_id:'planning_head'},{member_id:4,role_id:'academic_head'},{member_id:5,role_id:'planning_member'}];
  assert.equal((await scalar('select save_term_officers($1,1,0,$2)',[t,JSON.stringify(entries)])).accepted,true);
  assert.equal((await scalar('select save_term_officers($1,1,0,$2)',[t,'[]'])).accepted,false);
