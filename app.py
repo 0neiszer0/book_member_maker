@@ -56,6 +56,7 @@ from attendance_workflow import attendance_is_confirmed, confirmed_history_sessi
 from security_utils import forwarded_client_address, safe_internal_next_url
 from minipc_security import install_security
 from static_assets import install_static_assets
+from storage_media import install_storage_media
 from wiki_routes import init_wiki_routes
 from flask import g
 from topic_credentials import (
@@ -112,6 +113,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 install_security(app, lambda: supabase)
 install_static_assets(app)
+install_storage_media(app)
 init_wiki_routes(app, lambda: supabase)
 
 

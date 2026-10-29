@@ -3,6 +3,7 @@
 import re
 import uuid
 from board_content import prepare_image, validate_content, render_content
+from storage_media import browser_storage_url
 from datetime import datetime, timezone
 
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash, g, abort
@@ -92,8 +93,13 @@ def init_board_routes(app, supabase, login_required):
     def signed_url(path):
         result = supabase.storage.from_('board-uploads').create_signed_url(path, 3600)
         if isinstance(result, dict):
-            return result.get('signedURL') or result.get('signedUrl') or result.get('signed_url')
-        return getattr(result, 'signed_url', None) or getattr(result, 'signedURL', None)
+            value = result.get('signedURL') or result.get('signedUrl') or result.get('signed_url')
+        else:
+            value = getattr(result, 'signed_url', None) or getattr(result, 'signedURL', None)
+        try:
+            return browser_storage_url(value)
+        except ValueError:
+            return None
 
     def prepare_uploads(files):
         images = [file for file in files if file and file.filename]

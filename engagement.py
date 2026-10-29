@@ -8,6 +8,7 @@ from flask import (
     abort, flash, jsonify, redirect, render_template, request, session, url_for,
 )
 from minipc_security import authenticated_member
+from storage_media import browser_storage_url
 from PIL import Image, ImageOps, UnidentifiedImageError
 from engagement_utils import clean_text as _clean_text
 from engagement_utils import form_is_open as _form_is_open
@@ -85,7 +86,10 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
     def image_url(path):
         if not path:
             return None
-        return f"{os.environ.get('SUPABASE_URL', '').rstrip('/')}/storage/v1/object/public/book-covers/{path}"
+        try:
+            return browser_storage_url(f"{os.environ.get('SUPABASE_URL', '').rstrip('/')}/storage/v1/object/public/book-covers/{path}")
+        except ValueError:
+            return None
 
     def save_revision(kind, row):
         payload = {
