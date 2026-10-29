@@ -386,12 +386,13 @@ def run_backup(cfg, app, upload=True):
         common = ['--config', cfg['RCLONE_CONFIG'], '--retries', '2']
         command(['rclone', 'copy', str(target), remote, *common])
         command(['rclone', 'check', str(target), remote, '--download', '--one-way', *common])
-        # Only a verified off-machine copy gets a success marker. Never prune remotely.
+        # Only a verified off-machine copy gets a success marker.
         marker = target / 'COMPLETE.json'
         marker.write_text(json.dumps({'format':1, 'run_id':run_id,
                                      'ciphertext_sha256':sha256(encrypted)}), encoding='utf-8')
         command(['rclone', 'copyto', str(marker), remote+'/COMPLETE.json', *common])
-        print('OK: encrypted backup uploaded and verified; restore drill still required')
+        print('OK: encrypted backup uploaded and verified; this run has not been restore-tested')
+        return target
 
 
 if __name__ == '__main__':
