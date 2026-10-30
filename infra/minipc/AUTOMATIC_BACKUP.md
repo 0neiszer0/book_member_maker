@@ -1,10 +1,19 @@
-# 자동 외부 백업 적용안 — 2026-10-29
+# 자동 외부 백업 적용안 — 2026-10-30
 
-현재 실제 회원 백업의 외부 업로드·재다운로드·복원은 완료했다. 자동 연결·스케줄러는 아직 미설치다.
+현재 실제 회원 백업의 외부 업로드·재다운로드·복원은 완료했다. 10월 30일 승인 후 rclone과 별도 백업 실행 파일·systemd 유닛을 설치했다. OAuth 연결과 첫 자동 실행은 아직 미완료이며 타이머는 꺼져 있다. 운영 DB는 계속 Supabase다.
+
+## 10월 30일 진행 결과
+
+- Render의 자동 배포를 끄고 서비스를 중지했다. 삭제하지 않았다. 이후 knu-read.xyz 로그인 200, DB alive, 원본 인증키 없는 직접 접속 403을 확인했다.
+- 전용 Google Cloud 프로젝트 `bookmembers-backup`과 Desktop 클라이언트 `bookmembers-minipc-backup`을 만들고 Drive API를 활성화했다. Google 사용자 데이터 정책 동의는 사용자에게 별도로 승인받았다.
+- 클라이언트 JSON은 Windows DPAPI로 보관하고 다운로드된 평문은 제거했다. 서버 설정은 root 0600이며 `drive.file`만 사용한다. 토큰 발급 전 대기를 취소했으므로 재개 시 새 인증 흐름을 시작한다. 중복 프로젝트·클라이언트를 만들지 않는다.
+- Google Audience의 Publish app은 브랜딩 미완료로 비활성이다. 공식 [브랜딩 도움말](https://support.google.com/cloud/answer/15549049)은 외부 Production 앱에 홈페이지·개인정보처리방침·약관 링크를 요구한다. 테스트 상태의 7일 토큰으로 무인 운영이 완성됐다고 간주하지 않는다.
+- `infra/worker/backup-info/`에 전용 소개·개인정보처리방침·이용약관 3개를 준비했다. 공개 전에 사용자 승인을 받는다. 승인 후 실제 주소를 Google 브랜딩에 등록하고 필요한 도메인 소유 확인을 진행한다. 기존 사이트의 앱 메뉴나 인증 정책은 바꾸지 않는다.
+- 백업 실행 파일은 `/opt/bookmembers-backup/infra/minipc/`, 유닛은 `/etc/systemd/system/bookmembers-backup.{service,timer}`에 있다. 알림 연동 두 파일과 `BACKUP_STATUS_FILE`은 아직 운영에 적용하지 않았다.
 
 ## Google 연결
 
-개인 Google 계정의 기존 `rclone` 프로젝트는 Testing이며 게시에 필요한 브랜딩이 미완료다. 기존 개인용 클라이언트의 권한과 인증 상태를 바꾸지 않고 `bookmembers-backup` 전용 프로젝트를 만든다. Drive API와 데스크톱 OAuth 클라이언트만 사용하고 결제 계정은 연결하지 않는다.
+개인 Google 계정의 기존 `rclone` 프로젝트는 Testing이며 게시에 필요한 브랜딩이 미완료다. 기존 개인용 클라이언트의 권한과 인증 상태를 바꾸지 않고 별도 `bookmembers-backup` 프로젝트를 사용한다. Drive API와 데스크톱 OAuth 클라이언트만 사용하고 결제 계정은 연결하지 않는다.
 
 요청할 범위는 `https://www.googleapis.com/auth/drive.file` 한 개다. 해당 앱이 만든 파일만 다룬다. Testing 토큰의 7일 만료를 피하도록 Production 상태를 사용하지만 접근 철회/계정 보안 정책 등으로 인증이 만료될 수 있어 실패 알림을 둔다. 실제 동의 화면이 이 범위보다 넓으면 중단한다.
 
@@ -22,6 +31,6 @@
 
 ## 승인 후 적용
 
-Ubuntu 공식 저장소의 rclone 1개만 추가한다. 전용 OAuth 연결 후 수동 자동백업 실행 1회가 성공해야 타이머를 켠다. 알림 코드 두 파일과 상태 파일 경로만 반영하며 DB 연결/전체 웹앱 배포는 별도 단계다. 원본/복원 검증은 이미 완료한 검사를 반복하지 않는다.
+Ubuntu 공식 저장소의 rclone 1개를 추가했다. 전용 OAuth 연결 후 수동 자동백업 실행 1회가 성공해야 타이머를 켠다. 알림 코드 두 파일과 상태 파일 경로만 반영하며 DB 연결/전체 웹앱 배포는 별도 단계다. 원본/복원 검증은 이미 완료한 검사를 반복하지 않는다.
 
 공식 근거: [Google OAuth 만료](https://developers.google.com/identity/protocols/oauth2#expiration), [Drive 최소 권한](https://developers.google.com/workspace/drive/api/guides/api-specific-auth), [rclone SSH 인증](https://rclone.org/remote_setup/), [Drive 삭제는 기본 휴지통](https://rclone.org/drive/#deleting-files).

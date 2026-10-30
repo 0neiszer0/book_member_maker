@@ -45,7 +45,22 @@ const headers = `/static/_v/*
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   ! Set-Cookie
   ! X-App-Origin-Auth
+/backup-info/*
+  Cache-Control: public, max-age=300
+  Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  X-Robots-Tag: noindex
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  ! Set-Cookie
 `;
+// Explicitly reviewed informational pages for the private backup OAuth app.
+// Keep them separate from hashed site assets and never copy arbitrary files.
+const backupPages = new Map();
+for (const name of ['index.html', 'privacy.html', 'terms.html']) {
+  backupPages.set('backup-info/' + name, await readFile(join(root, 'backup-info', name)));
+}
 async function existingFiles(directory, prefix = '') {
   let entries;
   try { entries = await readdir(directory, {withFileTypes: true}); }
@@ -76,8 +91,9 @@ async function stage(directory, entries) {
   }
 }
 // Separate outputs avoid publishing any older, unversioned staging files.
-await stage(join(root, '.versioned-assets'), new Map([...output, ['_headers', headers]]));
+await stage(join(root, '.versioned-assets'), new Map([...output, ...backupPages, ['_headers', headers]]));
 await stage(join(root, '.server-assets'), new Map([...output, ['asset-manifest.json', JSON.stringify(currentManifest, null, 2) + '\n']]));
 console.log(JSON.stringify({revision: config.revision, digest: currentManifest.digest,
   currentFiles: Object.keys(currentManifest.files).length, publishedFiles: output.size,
+  informationalPages: backupPages.size,
   bytes: [...output.values()].reduce((sum, value) => sum + value.length, 0)}));
