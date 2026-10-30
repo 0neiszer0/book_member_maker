@@ -7,8 +7,8 @@
 - 회원 사이트: https://knu-read.xyz → 기존 Worker/CDN → Cloudflare Tunnel → Ubuntu 앱.
 - 회원·학기·출석·게시글·알림 DB와 Storage는 미니 PC의 PostgreSQL/PostgREST/Storage/Envoy에서 운영한다. 위키는 기존 로컬 SQLite를 그대로 사용한다.
 - API는 VM 내부127.0.0.1:55480만 게시하며 DB 포트는 게시하지 않는다. 회원용 도메인·카카오·Flask 세션 키와 UI는 변경하지 않았다.
-- Render는 Suspend/자동 배포 Off 상태를 유지한다. Supabase 프로젝트는 삭제하지 않고 전환 전 원본으로 보존한다. 새 기록은 로컬 DB에 쌓이므로 Supabase를 현재 데이터로 간주하지 않는다.
-- 배포 코드는 기존 앱9459cfc에 검토된 로컬 파일 URL 코드(app.py/boards.py/engagement.py/storage_media.py)를 추가한 구성이다. 백업 실패 알림 overlay도 유지했다. GitHub push는 하지 않았다.
+- Render의 회원 앱은 종료했다. 이후 사용자 승인으로 `render/legacy-redirect` 브랜치의 안내 전용 코드 `070c21e`만 재개했고 자동 배포는 Off다. Supabase 프로젝트는 삭제하지 않고 전환 전 원본으로 보존한다. 새 기록은 로컬 DB에 쌓이므로 Supabase를 현재 데이터로 간주하지 않는다.
+- 배포 코드는 기존 앱9459cfc에 검토된 로컬 파일 URL 코드(app.py/boards.py/engagement.py/storage_media.py)를 추가한 구성이다. 백업 실패 알림 overlay도 유지했다. 이후 사용자 승인으로 모든 소스를 GitHub main에 반영했지만, 이것이 미니 PC 재배포를 의미하지는 않는다.
 
 ## 최종 이전 결과
 
