@@ -34,6 +34,7 @@ class OverviewDataTests(unittest.TestCase):
     def setUp(self):
         self.db = FakeSupabase(fixture())
         self.today = date(2026, 9, 23)
+        self.deadline_day = date(2026, 9, 22)  # 세미나 주 화요일(발제문 마감일)
 
     def test_actual_weekday_and_invalid_dates(self):
         self.assertEqual(date_label('2026-09-23'), '2026-09-23 (수)')
@@ -43,12 +44,12 @@ class OverviewDataTests(unittest.TestCase):
 
     def test_member_summary_shared_submission_and_deadline(self):
         self.db.rows['topic_submissions'] = [{'id': 'own', 'event_id': 'event', 'member_id': None, 'student_id': '202600001'}]
-        data = member_seminar_summary(self.db, 1, self.today)
+        data = member_seminar_summary(self.db, 1, self.deadline_day)
         self.assertEqual(data['seminar']['id'], 'wed')
         self.assertEqual(data['seminar']['book_title'], '마음')
         self.assertTrue(data['submitted'])
         self.assertTrue(data['seminar']['topic']['open'])
-        self.assertEqual(data['seminar']['topic']['deadline_label'], '2026-09-29 (화) 00:00')
+        self.assertEqual(data['seminar']['topic']['deadline_label'], '2026-09-22 (화) 23:59')
         self.assertFalse(any(c[0] in {'insert', 'update', 'delete'} for c in self.db.calls))
 
     def test_other_members_submission_is_not_mine(self):
@@ -58,11 +59,11 @@ class OverviewDataTests(unittest.TestCase):
     def test_tasks_include_all_open_weeks_and_hide_completed(self):
         self.db.rows['seminar_weeks'].append({'id': 'later', 'term_id': 'term', 'week_start': '2026-10-01', 'book_title': 'Later'})
         self.db.rows['topic_events'].append({'id': 'later-event', 'seminar_week_id': 'later', 'meeting_date': '2026-10-01', 'is_active': True, 'created_at': '2026-09-02'})
-        data = member_seminar_summary(self.db, 1, self.today)
+        data = member_seminar_summary(self.db, 1, self.deadline_day)
         self.assertEqual([row['id'] for row in data['tasks']], ['event', 'later-event'])
         self.assertEqual(len(data['curriculum']), 2)
         self.db.rows['topic_submissions'] = [{'id': 'own', 'event_id': 'event', 'member_id': 1}]
-        data = member_seminar_summary(self.db, 1, self.today)
+        data = member_seminar_summary(self.db, 1, self.deadline_day)
         self.assertEqual([row['id'] for row in data['tasks']], ['later-event'])
         self.assertTrue(data['seminar']['topic']['submitted'])
 
@@ -113,7 +114,7 @@ class OverviewRouteTests(unittest.TestCase):
         self.db_patch = patch.object(self.module, 'supabase', self.db)
         self.db_patch.start()
         self.addCleanup(self.db_patch.stop)
-        self.today_patch = patch.object(self.module, 'member_seminar_summary', side_effect=lambda db, mid: member_seminar_summary(db, mid, date(2026, 9, 23)))
+        self.today_patch = patch.object(self.module, 'member_seminar_summary', side_effect=lambda db, mid: member_seminar_summary(db, mid, date(2026, 9, 22)))
         self.today_patch.start()
         self.addCleanup(self.today_patch.stop)
         clock_patch = patch('attendance_routes.datetime')

@@ -4,7 +4,7 @@ from urllib.parse import urlencode
 
 from flask import jsonify, render_template, request, session
 from home_overview import KST, load_seminar_context
-from topic_lifecycle import topic_event_deadline
+from topic_lifecycle import DEADLINE_TIME, topic_event_deadline
 
 
 def seminar_calendar_events(context):
@@ -21,7 +21,7 @@ def seminar_calendar_events(context):
         deadline = topic_event_deadline(row)
         if not deadline:
             continue
-        events.append(dict(type='deadline', start=datetime.combine(deadline, time(), KST).isoformat(),
+        events.append(dict(type='deadline', start=datetime.combine(deadline, DEADLINE_TIME, KST).isoformat(),
                            title='발제문 마감 · ' + (context['weeks'].get(row.get('seminar_week_id'), {}).get('book_title') or '도서 미정'),
                            url=('/shared_topics?' + urlencode(dict(token=row['share_token']))) if row.get('share_token') and row.get('open') else '/seminars?' + urlencode(dict(term_id=term.get('id', ''), week_id=row.get('seminar_week_id', ''))) + '#topic-' + str(row.get('seminar_week_id') or ''),
                            id='deadline-' + str(row['id']), status=row.get('status_label', ''), allDay=False))
