@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from unittest.mock import patch
 
 from testing._fake_supabase import FakeSupabase
-from wiki_access import wiki_access
+from wiki_access import wiki_access, is_officer_title, strip_officer_includes
 from wiki_routes import clean_wiki_html
 from wiki_engine import EngineUnavailable
 
@@ -165,6 +165,98 @@ class RouteTests(unittest.TestCase):
             html=str(clean_wiki_html('<script>alert(1)</script><a href="/w/대문">home</a><img src=x onerror=alert(1)><a href="javascript:alert(1)">bad</a><p style="color:pink" onclick="x()">text</p>'))
         self.assertNotIn('script',html); self.assertNotIn('onerror',html); self.assertNotIn('onclick',html)
         self.assertNotIn('style=',html); self.assertIn('/wiki/w/',html)
+
+
+class OfficerPolicyTests(unittest.TestCase):
+    def test_officer_flag_follows_existing_staff_role(self):
+        for role, active, expected in [('admin', True, True), ('officer', True, True), ('officer', False, False),
+                                       ('member', True, False), (None, True, False)]:
+            with self.subTest(role=role, active=active):
+                db = FakeSupabase(wiki_fixture())
+                db.rows['members'][1].update(role=role, is_active=active)
+                access = wiki_access(db, {'user_id': 2, 'auth_provider': 'kakao'}, date(2026, 10, 28))
+                self.assertEqual(access.is_officer, expected)
+                self.assertFalse(access.can_edit)  # roster rule for ordinary pages is unchanged
+
+    def test_officer_namespace_detection_and_include_guard(self):
+        for title in ['운영진:회계', ' 운영진:회계', '운영진：회계', '운영진:']:
+            self.assertTrue(is_officer_title(title), title)
+        for title in ['운영진 안내', '대문', '회원:운영진:x']:
+            self.assertFalse(is_officer_title(title), title)
+        for source in ['[include(운영진:회계)]', '앞 [ INCLUDE ( 운영진：회계 )] 뒤', '[include(운영\\진:회계)]']:
+            self.assertNotIn('회계', strip_officer_includes(source).replace('운영진 전용', ''))
+        self.assertEqual(strip_officer_includes('[include(틀:안내)]\n[[운영진:회계]]'), '[include(틀:안내)]\n[[운영진:회계]]')
+
+
+class OfficerRouteTests(RouteTests):
+    OFFICER_DOC = '운영진:회계 정리'
+
+    def setUp(self):
+        super().setUp()
+        self.db.rows['members'].append(dict(id=3, name='운영진 예시', social_id='9003', role='officer',
+                                            is_active=True, account_status='active', member_status='active'))
+        self.rendered = []
+        engine = self.engine
+        engine.titles = lambda *a: ['대문', self.OFFICER_DOC, '운영진:대문']
+        engine.render = lambda client, title, source: self.rendered.append(source) or '<p>%s</p>' % source
+
+    def test_member_cannot_read_list_or_edit_officer_pages(self):
+        self.login(1)  # roster-active ordinary member
+        with patch.object(self.engine, 'document') as document, patch.object(self.engine, 'save') as save:
+            for path in ['/wiki/w/' + self.OFFICER_DOC, '/wiki/w/ 운영진:회계 정리', '/wiki/w/운영진：회계 정리',
+                         '/wiki/history/' + self.OFFICER_DOC, '/wiki/edit/' + self.OFFICER_DOC]:
+                self.assertEqual(self.client.get(path).status_code, 404, path)
+            result = self.client.post('/wiki/edit/' + self.OFFICER_DOC,
+                                      data={'wiki_csrf': 'token', 'version': '1', 'content': 'x', 'summary': 'x'})
+            self.assertEqual(result.status_code, 404)
+            self.assertEqual(self.client.get('/wiki/new?title=' + self.OFFICER_DOC).status_code, 403)
+            document.assert_not_called(); save.assert_not_called()
+        listing = self.client.get('/wiki/pages').get_data(as_text=True)
+        self.assertIn('대문', listing); self.assertNotIn('운영진:', listing)
+        self.assertNotIn('운영진:', self.client.get('/wiki/pages?q=운영진').get_data(as_text=True))
+        self.assertNotIn('운영진 문서', self.client.get('/wiki/w/대문').get_data(as_text=True))
+
+    def test_member_pages_cannot_transclude_officer_pages(self):
+        self.login(1)
+        with patch.object(self.engine, 'document', return_value=dict(title='대문', version='1', exists=True, history=[],
+                                                                      source='[include(운영진:회계 정리)]')):
+            self.client.get('/wiki/w/대문')
+        self.client.post('/wiki/edit/대문', data={'wiki_csrf': 'token', 'version': '1', 'action': 'preview',
+                                                 'content': '[include( 운영진:회계 정리 )]', 'summary': 'x'})
+        self.assertEqual(len(self.rendered), 2)
+        self.assertTrue(all('include' not in r for r in self.rendered), self.rendered)
+
+    def test_officer_reads_and_edits_officer_pages_without_roster(self):
+        self.login(3)  # officer, not on the current-term roster
+        response = self.client.get('/wiki/w/' + self.OFFICER_DOC)
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('운영진 전용 문서입니다', html); self.assertIn('/wiki/edit/', html)
+        self.assertIn(self.OFFICER_DOC, self.client.get('/wiki/pages').get_data(as_text=True))
+        self.assertEqual(self.client.get('/wiki/history/' + self.OFFICER_DOC).status_code, 200)
+        self.assertEqual(self.client.get('/wiki/edit/' + self.OFFICER_DOC).status_code, 200)
+        with patch.object(self.engine, 'save') as save:
+            result = self.client.post('/wiki/edit/' + self.OFFICER_DOC,
+                                      data={'wiki_csrf': 'token', 'version': '1', 'content': 'x', 'summary': 'x'})
+            self.assertEqual(result.status_code, 303); save.assert_called_once()
+            # Ordinary pages still follow the current-term roster rule, even for staff.
+            self.assertEqual(self.client.post('/wiki/edit/대문', data={'wiki_csrf': 'token', 'version': '1',
+                                              'content': 'x', 'summary': 'x'}).status_code, 403)
+        self.assertEqual(self.client.get('/wiki/new?title=' + self.OFFICER_DOC).status_code, 302)
+
+    def test_demoted_officer_loses_access_before_save(self):
+        self.login(3)
+        self.assertEqual(self.client.get('/wiki/edit/' + self.OFFICER_DOC).status_code, 200)
+        self.db.rows['members'][2]['role'] = 'member'
+        with patch.object(self.engine, 'save') as save:
+            result = self.client.post('/wiki/edit/' + self.OFFICER_DOC,
+                                      data={'wiki_csrf': 'token', 'version': '1', 'content': 'x', 'summary': 'x'})
+            self.assertEqual(result.status_code, 404); save.assert_not_called()
+
+
+# Inherit RouteTests' fixtures only; its own tests already run once above.
+for _name in [n for n in vars(RouteTests) if n.startswith('test_')]:
+    setattr(OfficerRouteTests, _name, None)
 
 
 if __name__=='__main__': unittest.main()
