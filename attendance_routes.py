@@ -6,7 +6,8 @@ from flask import abort, jsonify, render_template, request, session, send_file
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from attendance_workflow import (build_term_attendance, expected_member_ids,
                                  match_roster_rows, parse_roster_text,
-                                 attendance_is_confirmed, confirmed_history_session_ids)
+                                 attendance_is_confirmed, confirmed_history_session_ids,
+                                 grouped_member_ids)
 from term_membership import scope_members
 
 KST = timezone(timedelta(hours=9))
@@ -86,14 +87,29 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
     def admin_seminar_roster(session_id):
         target, members, audit, mode, eligible, planned, no_shows = roster_context(session_id)
         input_ids = sorted(set(eligible) - set(planned)) if mode == 'absence' else planned
-        histories = db().table('history').select('seminar_session_id,present,actual_member_ids,attendance_confirmed_at') \
+        histories = db().table('history').select('seminar_session_id,present,groups,actual_member_ids,attendance_confirmed_at') \
             .eq('seminar_session_id', session_id).execute().data or []
         target['attendance_confirmed'] = attendance_is_confirmed(target, confirmed_history_session_ids(histories))
+        absent = {r['member_id'] for r in db().table('seminar_absences').select('member_id').eq('session_id', session_id)
+                  .is_('cancelled_at', 'null').execute().data or []}
+        # The saved group plan is a selectable default, never an implicit confirmation.
+        grouped, group_issues = grouped_member_ids(histories, members)
+        names_by_id = {int(m['id']): m.get('name') for m in members}
+        grouped_skipped = []
+        if grouped is not None:
+            grouped_skipped = [names_by_id.get(i) for i in grouped if i in no_shows or i in absent]
+            grouped = [i for i in grouped if i not in no_shows and i not in absent]
+        default_basis = '참석 예정 명단'
         actual = target.get('actual_member_ids') if target.get('attendance_confirmed_at') else None
-        if actual is None:
+        if actual is not None:
+            default_basis = '확정된 실제 출석'
+        else:
             actual = sorted(set(planned) - no_shows)
             confirmed = [h for h in histories if h.get('attendance_confirmed_at')]
+            if not confirmed and target.get('planned_member_ids') is None and not audit and grouped:
+                actual, default_basis = grouped, '조 편성 명단'
             if confirmed:
+                default_basis = '확정된 실제 출석'
                 known_ids = set()
                 for history in confirmed:
                     if history.get('actual_member_ids') is not None:
@@ -114,6 +130,8 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
         return render_template('admin_seminar_roster.html', seminar=target, members=members,
                                audit=audit, mode=mode, eligible_ids=eligible, input_ids=input_ids,
                                planned_ids=planned, actual_ids=actual, csrf_token=csrf_token(),
+                               grouped_ids=grouped, group_issues=group_issues, grouped_skipped=grouped_skipped,
+                               default_basis=default_basis,
                                today=datetime.now(KST).date().isoformat(),
                                confirmation_token=signer.dumps({'actor': session['user_id'], 'entry': confirmation_entry(target, actual)}))
 
@@ -252,6 +270,43 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
         entry = dict(signed['entry'], member_ids=ids)
         return confirm_batch([entry])
 
+    def session_plan(target, histories, members, no_shows, absent):
+        """Which saved list a past session would be confirmed from, or why it cannot be."""
+        if target.get('planned_member_ids') is not None:
+            return {'basis': '카카오 명단', 'ids': sorted(set(target['planned_member_ids']) - no_shows)}
+        if not histories:
+            return {'reason': '저장된 참석 명단과 조 편성이 없습니다. 개별 화면에서 확인해주세요.'}
+        fixed, plans = set(), []
+        for history in histories:
+            if history.get('actual_member_ids') is not None:
+                fixed.update(history['actual_member_ids'])
+            else:
+                plans.append(history)
+        grouped, issues = grouped_member_ids(plans, members)
+        if issues:
+            return {'reason': '조 편성 이름 %d개를 회원과 정확히 연결할 수 없습니다. 개별 화면에서 확인해주세요.' % len(issues)}
+        ids = (fixed | (set(grouped or []) - absent)) - no_shows
+        return {'basis': '조 편성' if plans else '저장된 기록', 'ids': sorted(ids)}
+
+    def pending_plans(report):
+        by_session = {}
+        for history in report['_histories']:
+            by_session.setdefault(str(history.get('seminar_session_id')), []).append(history)
+        def grouped_rows(rows):
+            out = {}
+            for row in rows:
+                out.setdefault(str(row['session_id']), set()).add(row['member_id'])
+            return out
+        no_shows, absent = grouped_rows(report['_no_shows']), grouped_rows(report.get('_absences', []))
+        plans = {}
+        for item in report['pending_sessions']:
+            sid = str(item['id'])
+            plan = session_plan(item, by_session.get(sid, []), report['_members'],
+                                no_shows.get(sid, set()), absent.get(sid, set()))
+            plan['count'] = len(plan.get('ids', []))
+            plans[sid] = plan
+        return plans
+
     @app.post('/api/admin/term_attendance/<term_id>/preview')
     @login_required(role='admin')
     def attendance_bulk_preview(term_id):
@@ -268,33 +323,17 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
             return jsonify(message='이미 확정됐거나 대상이 아닌 회차가 있습니다. 새로고침해주세요.'), 409
         entries, previews = [], []
         members = report['_members']
-        histories_by_session = {}
-        for history in report['_histories']:
-            histories_by_session.setdefault(str(history.get('seminar_session_id')), []).append(history)
-        noshows_by_session = {}
-        for row in report['_no_shows']:
-            noshows_by_session.setdefault(str(row['session_id']), set()).add(row['member_id'])
+        plans = pending_plans(report)
         for sid in selected:
             target = dict(pending[sid], term_revision=term.get('roster_revision', 0))
-            histories = histories_by_session.get(sid, [])
-            no_shows = noshows_by_session.get(sid, set())
-            if target.get('planned_member_ids') is None and not histories:
-                return jsonify(message=target['meeting_date']+' 회차는 저장된 명단이 없습니다. 먼저 개별 출석 화면에서 확인해주세요.'), 409
-            ids = set(target.get('planned_member_ids') or [])
-            if histories and target.get('planned_member_ids') is None:
-                ids = set()
-                for h in histories:
-                    if h.get('actual_member_ids') is not None:
-                        ids.update(h['actual_member_ids'])
-                    else:
-                        for name in h.get('present') or []:
-                            matches = [m['id'] for m in members if m.get('name') == name]
-                            if len(matches) != 1:
-                                return jsonify(message=target['meeting_date']+' 기록의 이름을 회원과 정확히 연결할 수 없습니다. 개별 화면에서 확인해주세요.'), 409
-                            ids.add(matches[0])
-            ids = sorted(ids - no_shows)
+            plan = plans[sid]
+            if plan.get('reason'):
+                # The page disables these; a forced request still never guesses a roster.
+                return jsonify(message=target['meeting_date'] + ' 회차: ' + plan['reason']), 409
+            ids = plan['ids']
             entries.append(confirmation_entry(target, ids))
-            previews.append({'date': target['meeting_date'], 'count': len(ids), 'names': [m['name'] for m in members if m['id'] in ids]})
+            previews.append({'date': target['meeting_date'], 'basis': plan['basis'], 'count': len(ids),
+                             'names': [m['name'] for m in members if m['id'] in ids]})
         return jsonify(items=previews, token=signer.dumps({'actor': session['user_id'], 'term_id': term_id, 'entries': entries}))
 
     @app.post('/api/admin/term_attendance/<term_id>/confirm')
@@ -322,12 +361,13 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
         start, end = term['start_date'], term['end_date']
         members = db().table('members').select('id,name,student_id,department,is_active').order('name').execute().data or []
         members = scope_members(db(), members, term=term)
-        histories = db().table('history').select('id,date,present,book_title,seminar_session_id,attendance_confirmed_at,actual_member_ids').gte('date', start).lte('date', end).execute().data or []
+        histories = db().table('history').select('id,date,present,groups,book_title,seminar_session_id,attendance_confirmed_at,actual_member_ids').gte('date', start).lte('date', end).execute().data or []
         sessions = db().table('seminar_sessions').select('*').gte('meeting_date', start).lte('meeting_date', end).execute().data or []
         from lms_learning import link_legacy_histories
         histories = link_legacy_histories(histories, sessions)
         session_ids = [s['id'] for s in sessions]
         no_shows = db().table('seminar_no_shows').select('session_id,member_id,cancelled_at').in_('session_id', session_ids).is_('cancelled_at', 'null').execute().data or [] if session_ids else []
+        absences = db().table('seminar_absences').select('session_id,member_id').in_('session_id', session_ids).is_('cancelled_at', 'null').execute().data or [] if session_ids else []
         events = db().table('special_events').select('*').gte('event_date', start).lte('event_date', end).execute().data or []
         event_ids = [e['id'] for e in events]
         attendees = db().table('special_event_attendees').select('event_id,member_id').in_('event_id', event_ids).execute().data or [] if event_ids else []
@@ -339,6 +379,7 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
         report['events'] = events
         report['sessions'] = sessions
         report['_members'], report['_histories'], report['_no_shows'] = members, histories, no_shows
+        report['_absences'] = absences
         report['roster_initialized'] = bool(term.get('roster_initialized_at'))
         confirmed_ids = confirmed_history_session_ids(histories)
         from lms_learning import is_break_week
@@ -353,6 +394,7 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
     def admin_term_attendance():
         terms, term, report = term_report(request.args.get('term_id'))
         return render_template('admin_term_attendance.html', terms=terms, term=term, report=report,
+                               plans=pending_plans(report) if report else {},
                                csrf_token=csrf_token(), show=request.args.get('show', 'all'))
 
     @app.post('/api/admin/term_attendance/<term_id>/minimum')

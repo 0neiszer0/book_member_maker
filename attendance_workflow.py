@@ -52,6 +52,36 @@ def match_roster_rows(rows, members):
     return matched, issues
 
 
+def grouped_member_ids(histories, members):
+    """Saved group plan names -> member ids by exact, unique name.
+
+    Returns (ids, issues). ids is None when no group plan exists. Unknown or
+    ambiguous names are reported and never guessed.
+    """
+    by_name = defaultdict(list)
+    for member in members:
+        by_name[str(member.get('name') or '').strip()].append(int(member['id']))
+    ids, issues, found, seen = set(), [], False, set()
+    for row in histories:
+        names = row.get('present')
+        if names is None:
+            names = [name for group in (row.get('groups') or []) if isinstance(group, list)
+                     for name in group if isinstance(name, str)]
+        if names or row.get('groups') is not None:
+            found = True
+        for raw in names or []:
+            name = str(raw).strip()
+            if not name or name in seen:
+                continue
+            seen.add(name)
+            hits = by_name.get(name, [])
+            if len(hits) == 1:
+                ids.add(hits[0])
+            else:
+                issues.append({'name': name, 'reason': '동명이인' if hits else '회원 명단에 없음'})
+    return (sorted(ids) if found else None), issues
+
+
 def parse_roster_text(text):
     if len(text) > 100000:
         raise ValueError('명단은 100,000자 이하로 입력해주세요.')

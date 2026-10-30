@@ -80,6 +80,21 @@ class AttendanceWorkflowTests(unittest.TestCase):
                                       {'id': 't', 'meeting_date': '2026-08-31', 'actual_member_ids': [1], 'attendance_confirmed_at': 'yes'}])
         self.assertEqual(report['members'][0]['total'], 1)
 
+class GroupedMemberIdsTests(unittest.TestCase):
+    def test_exact_unique_names_only(self):
+        from attendance_workflow import grouped_member_ids
+        members = [{'id': 1, 'name': '가'}, {'id': 2, 'name': '나'}, {'id': 3, 'name': '나'}]
+        ids, issues = grouped_member_ids([{'present': ['가', ' 나 ', '다', '가']}], members)
+        self.assertEqual(ids, [1])
+        self.assertEqual([(i['name'], i['reason']) for i in issues], [('나', '동명이인'), ('다', '회원 명단에 없음')])
+
+    def test_groups_fallback_and_no_plan(self):
+        from attendance_workflow import grouped_member_ids
+        members = [{'id': 1, 'name': '가'}]
+        self.assertEqual(grouped_member_ids([{'present': None, 'groups': [['가'], 'bad']}], members), ([1], []))
+        self.assertEqual(grouped_member_ids([], members), (None, []))
+        self.assertEqual(grouped_member_ids([{'present': None, 'groups': None}], members), (None, []))
+
 
 if __name__ == '__main__':
     unittest.main()

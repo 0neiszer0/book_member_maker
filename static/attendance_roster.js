@@ -53,5 +53,6 @@
   document.getElementById('undo-roster')?.addEventListener('click',()=>action(async()=>{if(!confirm('직전 반영 이전의 참석 예정 명단으로 되돌릴까요?'))return;await post('/roster/undo',{});location.reload();}));
   function countActual(){document.getElementById('actual-count').textContent='실제 참석 '+selected('.actual-choice').length+'명 선택';}
   root.querySelectorAll('.actual-choice').forEach(input=>input.addEventListener('change',countActual));countActual();
+  document.getElementById('use-grouped')?.addEventListener('click',event=>{const ids=new Set(JSON.parse(event.currentTarget.dataset.ids||'[]'));root.querySelectorAll('.actual-choice').forEach(input=>{input.checked=ids.has(Number(input.value));});countActual();status.textContent='조 편성 명단 '+ids.size+'명을 선택했습니다. 확인한 뒤 실제 출석 확정을 눌러주세요.';});
   document.getElementById('confirm-attendance').addEventListener('click',()=>action(async()=>{const ids=selected('.actual-choice');await post('/attendance/confirm',{member_ids:ids,confirmation_token:root.dataset.confirmationToken});location.reload();}));
 })();
