@@ -1,0 +1,6 @@
+{# 전체 설정 탭(전체 관리자 전용): 동아리 전체에 한 번만 정하는 설정 #}
+{% set ep = request.endpoint or '' %}
+<nav class="lms-settings-tabs" aria-label="전체 설정">
+<a href="{{ url_for('operation_settings') }}" {% if ep == 'operation_settings' %}aria-current="page"{% endif %}>직책·기본 업무</a>
+<a href="{{ url_for('boards.admin_index') }}" {% if ep == 'boards.admin_index' %}aria-current="page"{% endif %}>게시판</a>
+</nav>

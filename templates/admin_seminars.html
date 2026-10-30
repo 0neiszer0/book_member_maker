@@ -71,13 +71,11 @@
  <div>
   <div class="min-w-0">
   <div class="flex flex-wrap items-end justify-between gap-4 mb-6">
-    <div><p class="text-sm font-bold muted">운영 관리</p><h1 class="text-3xl font-extrabold tracking-tight">{{ lms_title }}</h1><p class="muted mt-2">학기별 도서·발제문과 회차별 출석·조 편성을 관리합니다.</p></div>
+    <div><p class="text-sm font-bold muted">학기 운영</p><h1 class="text-3xl font-extrabold tracking-tight">{{ lms_title }}</h1><p class="muted mt-2">학기별 도서·발제문과 회차별 출석·조 편성을 관리합니다.</p></div>
     <div class="flex flex-wrap gap-2">
       <select class="field !w-auto" id="seminar-term-select" aria-label="조회할 학기">
         {% for item in terms %}<option value="{{ item.id }}" {% if term and item.id==term.id %}selected{% endif %}>{{ item.name }}{% if not item.is_active %} · 보관됨{% endif %}</option>{% endfor %}
       </select>
-      <a class="btn soft" href="{{ url_for('admin_term_attendance', term_id=term.id if term else '') }}">학기 참석 현황</a>
-      <a class="btn soft" href="{{ url_for('admin_term_members', term_id=term.id if term else '') }}">학기 회원 명단</a>
     </div>
   </div>
 

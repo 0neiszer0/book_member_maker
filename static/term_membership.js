@@ -78,7 +78,7 @@
   window.addEventListener('beforeunload', event => {
     if (draft?.dirty || busy) { event.preventDefault(); event.returnValue = ''; }
   });
-  byId('term-id').addEventListener('change', async () => {
+  byId('term-id')?.addEventListener('change', async () => {
     if (draft?.dirty && !await ask('저장하지 않은 명단 변경을 버리고 다른 학기로 이동할까요?')) { byId('term-id').value = data.term.id; return; }
     if (draft) draft.original = draft.serialize();
     byId('term-picker').submit();

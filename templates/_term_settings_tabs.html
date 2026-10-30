@@ -1,0 +1,7 @@
+{# 학기 설정 탭: 각 탭은 기존 주소를 그대로 쓰고, 권한도 각 페이지의 기존 검사를 그대로 따릅니다. #}
+{% set ep = request.endpoint or '' %}
+<nav class="lms-settings-tabs" aria-label="{{ term.name }} 학기 설정">
+{% if operation_can('members',term.id) %}<a href="{{ url_for('admin_term_members', term_id=term.id) }}" {% if ep == 'admin_term_members' %}aria-current="page"{% endif %}>회원 명단</a>{% endif %}
+{% if operation_can('members',term.id) or operation_can('tasks',term.id) %}<a href="{{ url_for('operation_officers', term_id=term.id) }}" {% if ep == 'operation_officers' %}aria-current="page"{% endif %}>임원·부원</a>{% endif %}
+{% if operation_can('tasks',term.id) %}<a href="{{ url_for('operation_rules', term_id=term.id) }}" {% if ep == 'operation_rules' %}aria-current="page"{% endif %}>반복 업무·알림</a>{% endif %}
+</nav>
