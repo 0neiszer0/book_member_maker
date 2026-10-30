@@ -51,6 +51,7 @@ from recruitment_results import (
     parse_applicant_rows,
 )
 from topic_lifecycle import topic_event_deadline, topic_event_is_expired
+from topic_autopen import open_due_topic_events
 from home_overview import date_label, member_seminar_summary, operations_summary, decorate_topic_submission_states
 from attendance_workflow import attendance_is_confirmed, confirmed_history_session_ids
 from security_utils import forwarded_client_address, safe_internal_next_url
@@ -588,6 +589,7 @@ def main_index():
     home = attendance = None
     home_error = attendance_error = False
     if session.get('user_id') and session.get('user_role'):
+        open_due_topic_events(supabase, datetime.now(timezone(timedelta(hours=9))).date())
         try:
             home = member_seminar_summary(supabase, session['user_id'])
         except Exception:
@@ -4596,6 +4598,7 @@ def _load_weekly_seminar_view(term_id=None):
     sessions = []
     topics = []
     if week_ids:
+        open_due_topic_events(supabase, datetime.now(timezone(timedelta(hours=9))).date())
         sessions = supabase.table('seminar_sessions').select('*').in_('seminar_week_id', week_ids) \
             .order('meeting_date').execute().data or []
         topics = supabase.table('topic_events').select('*').in_('seminar_week_id', week_ids).order('created_at', desc=True).execute().data or []

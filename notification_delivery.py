@@ -10,6 +10,7 @@ from db_read import all_rows
 from datetime import datetime, timedelta, timezone
 from home_overview import load_seminar_context
 from topic_lifecycle import topic_event_is_open
+from topic_autopen import open_due_topic_events
 from term_membership import scope_members
 from engagement_utils import form_is_open
 from collections import Counter
@@ -62,6 +63,7 @@ def collect_items(db, now):
             add(row['related_member_id'], f"decision:{row['id']}:{row['status']}", '신청 처리 결과',
                 '신청이 승인되었습니다.' if row['status']=='approved' else '신청이 반려되었습니다. 운영진에게 문의해주세요.', '/mypage')
     today = now.astimezone(timezone(timedelta(hours=9))).date()
+    open_due_topic_events(db, today)  # 다음 주차 발제문 링크를 수요일 00:00에 자동으로 연다
     context = load_seminar_context(db, today=today)
     events = [e for e in context['topics'].values() if topic_event_is_open(e, today=today)]
     ids = [e['id'] for e in events]
