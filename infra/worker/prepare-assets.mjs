@@ -61,6 +61,9 @@ const backupPages = new Map();
 for (const name of ['index.html', 'privacy.html', 'terms.html']) {
   backupPages.set('backup-info/' + name, await readFile(join(root, 'backup-info', name)));
 }
+// Public ownership proof issued by Search Console for the approved backup owner.
+const verificationFile = 'googlea5a4926a5da856fc.html';
+backupPages.set(verificationFile, await readFile(join(root, 'backup-info', verificationFile)));
 async function existingFiles(directory, prefix = '') {
   let entries;
   try { entries = await readdir(directory, {withFileTypes: true}); }
