@@ -168,15 +168,61 @@ class RouteTests(unittest.TestCase):
 
 
 class OfficerPolicyTests(unittest.TestCase):
-    def test_officer_flag_follows_existing_staff_role(self):
-        for role, active, expected in [('admin', True, True), ('officer', True, True), ('officer', False, False),
-                                       ('member', True, False), (None, True, False)]:
-            with self.subTest(role=role, active=active):
-                db = FakeSupabase(wiki_fixture())
-                db.rows['members'][1].update(role=role, is_active=active)
-                access = wiki_access(db, {'user_id': 2, 'auth_provider': 'kakao'}, date(2026, 10, 28))
-                self.assertEqual(access.is_officer, expected)
-                self.assertFalse(access.can_edit)  # roster rule for ordinary pages is unchanged
+    def roster(self, initialized=True):
+        db = FakeSupabase(wiki_fixture())
+        db.rows['seminar_terms'][0]['operations_initialized_at'] = '2026-09-01' if initialized else None
+        db.rows['seminar_terms'].append(dict(id='past', name='2026년 1학기', is_active=True, start_date='2026-03-01',
+                                             end_date='2026-06-30', roster_initialized_at='2026-03-01',
+                                             operations_initialized_at='2026-03-01'))
+        db.rows['operation_roles'] = [dict(id='president', is_active=True), dict(id='planning_member', is_active=True),
+                                      dict(id='retired', is_active=False)]
+        db.rows['term_officers'] = []
+        return db
+
+    def officer(self, db, member=2):
+        return wiki_access(db, {'user_id': member, 'auth_provider': 'kakao'}, date(2026, 10, 28)).is_officer
+
+    def test_current_term_officer_roster_decides_officer_pages(self):
+        db = self.roster()
+        self.assertFalse(self.officer(db))
+        db.rows['term_officers'] = [dict(term_id='current', member_id=2, role_id='planning_member')]
+        self.assertTrue(self.officer(db))
+        access = wiki_access(db, {'user_id': 2, 'auth_provider': 'kakao'}, date(2026, 10, 28))
+        self.assertFalse(access.can_edit)  # ordinary pages still follow the semester member roster
+        db.rows['members'][1]['is_active'] = False
+        self.assertFalse(self.officer(db))
+
+    def test_global_staff_role_or_past_or_inactive_assignment_is_not_enough(self):
+        db = self.roster()
+        db.rows['members'][1]['role'] = 'officer'
+        db.rows['term_officers'] = [dict(term_id='past', member_id=2, role_id='president'),
+                                    dict(term_id='current', member_id=2, role_id='retired')]
+        self.assertFalse(self.officer(db))
+
+    def test_site_admin_is_always_an_officer(self):
+        db = self.roster()
+        db.rows['members'][1]['role'] = 'admin'
+        self.assertTrue(self.officer(db))
+        db.rows['seminar_terms'] = []  # no current term at all
+        self.assertTrue(self.officer(db))
+
+    def test_unconfigured_term_keeps_existing_staff_until_roster_is_set(self):
+        db = self.roster(initialized=False)
+        self.assertFalse(self.officer(db))
+        db.rows['members'][1]['role'] = 'officer'
+        self.assertTrue(self.officer(db))
+
+    def test_roster_lookup_failure_closes_officer_pages_only(self):
+        db = self.roster()
+        db.rows['term_officers'] = [dict(term_id='current', member_id=2, role_id='president')]
+        original = db.table
+        def table(name):
+            if name == 'term_officers':
+                raise RuntimeError('offline')
+            return original(name)
+        with patch.object(db, 'table', side_effect=table):
+            access = wiki_access(db, {'user_id': 2, 'auth_provider': 'kakao'}, date(2026, 10, 28))
+        self.assertIsNotNone(access); self.assertFalse(access.is_officer)
 
     def test_officer_namespace_detection_and_include_guard(self):
         for title in ['운영진:회계', ' 운영진:회계', '운영진：회계', '운영진:']:
@@ -193,8 +239,11 @@ class OfficerRouteTests(RouteTests):
 
     def setUp(self):
         super().setUp()
-        self.db.rows['members'].append(dict(id=3, name='운영진 예시', social_id='9003', role='officer',
+        self.db.rows['members'].append(dict(id=3, name='운영진 예시', social_id='9003', role='member',
                                             is_active=True, account_status='active', member_status='active'))
+        self.db.rows['seminar_terms'][0]['operations_initialized_at'] = '2026-09-01'
+        self.db.rows['operation_roles'] = [dict(id='academic_head', is_active=True)]
+        self.db.rows['term_officers'] = [dict(term_id='current', member_id=3, role_id='academic_head')]
         self.rendered = []
         engine = self.engine
         engine.titles = lambda *a: ['대문', self.OFFICER_DOC, '운영진:대문']
@@ -247,7 +296,7 @@ class OfficerRouteTests(RouteTests):
     def test_demoted_officer_loses_access_before_save(self):
         self.login(3)
         self.assertEqual(self.client.get('/wiki/edit/' + self.OFFICER_DOC).status_code, 200)
-        self.db.rows['members'][2]['role'] = 'member'
+        self.db.rows['term_officers'] = []  # removed from this term's officer roster
         with patch.object(self.engine, 'save') as save:
             result = self.client.post('/wiki/edit/' + self.OFFICER_DOC,
                                       data={'wiki_csrf': 'token', 'version': '1', 'content': 'x', 'summary': 'x'})
