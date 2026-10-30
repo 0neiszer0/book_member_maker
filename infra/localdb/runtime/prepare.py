@@ -21,7 +21,10 @@ def prepare():
     source = Path(__file__).resolve().parent
     for name in ('compose.yaml', 'envoy.yaml', 'roles.sql'):
         shutil.copyfile(source/name, target/name)
-        (target/name).chmod(0o600)
+        # These templates contain no secrets. Mounted role/config files must be
+        # readable by the unprivileged PostgreSQL and Envoy container users.
+        # The host directory stays 0700 and database.env stays 0600.
+        (target/name).chmod(0o644)
     secret = secrets.token_hex(32)
     password = secrets.token_hex(24)
     created = int(time.time())
