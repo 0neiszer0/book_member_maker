@@ -1,13 +1,12 @@
+# Legacy address only. The production application runs on the mini PC.
+# Never point Render at main or deploy the root application's Dockerfile here.
 services:
   - type: web
-    name: bookmembers-app
-    env: docker
-    plan: starter
-    branch: main
-    autoDeploy: true
-    healthCheckPath: /keep-alive
-    envVars:
-      - key: NOTION_PUBLIC_WIKI_URL
-        value: https://quaint-sapphire-900.notion.site/bookbook
-      - key: PUBLIC_BASE_URL
-        value: https://book-member-maker.onrender.com
+    name: book_member_maker
+    runtime: docker
+    plan: free
+    branch: render/legacy-redirect
+    autoDeployTrigger: 'off'
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
