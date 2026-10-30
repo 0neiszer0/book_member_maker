@@ -9,12 +9,12 @@ from testing.test_home_overview import fixture
 
 
 class ArchiveTests(unittest.TestCase):
-    def test_unassigned_winter_records_are_named_by_actual_months(self):
+    def test_unassigned_winter_records_use_previous_academic_year(self):
         histories = [dict(id='jan', date='2026-01-05', book_title='책 A', actual_member_ids=[1], attendance_confirmed_at='yes'),
                      dict(id='feb', date='2026-02-09', book_title='책 B', actual_member_ids=[2], attendance_confirmed_at='yes')]
         result = historical_courses([dict(id=1, name='가'), dict(id=2, name='나')], histories, [], 1, date(2026,10,28))
-        self.assertEqual(result[0]['key'], 'legacy-2026-1')
-        self.assertEqual(result[0]['name'], '2026년 1–2월 세미나')
+        self.assertEqual(result[0]['key'], 'legacy-2025-겨울')
+        self.assertEqual(result[0]['name'], '25-겨울학기')
         self.assertEqual([r['id'] for r in result[0]['records']], ['jan'])
         self.assertEqual(histories[0]['actual_member_ids'], [1])
 
@@ -82,7 +82,7 @@ class NavigationRoutesTests(unittest.TestCase):
         self.assertNotIn('id="new-term"', text)
         self.assertIn('href="/admin/dashboard"', text)
         global_page = self.client.get('/admin/term_members').get_data(as_text=True)
-        self.assertIn('운영 관리 메뉴', global_page)
+        self.assertIn('전체 운영 메뉴', global_page)
         self.assertIn('id="new-term"', global_page)
         self.db.rows['members'][0]['role'] = 'member'
         self.assertEqual(self.client.get('/admin/term_members?term_id=term').status_code, 302)
@@ -91,7 +91,8 @@ class NavigationRoutesTests(unittest.TestCase):
         with self.client.session_transaction() as state:
             state.clear()
         page = self.client.get('/').get_data(as_text=True)
-        self.assertIn('content="책반우 | 경북대학교 독서동아리"', page)
+        self.assertIn('content="책반우|경북대학교 중앙독서동아리"', page)
+        self.assertIn('content="책 먹는 호반우 홈페이지"', page)
         self.assertIn('content="KNU 책반우"', page)
         self.assertIn('content="1774"', page)
 

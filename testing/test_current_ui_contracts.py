@@ -44,12 +44,12 @@ class CurrentUiContractsTest(unittest.TestCase):
 
     def test_topic_submission_has_readable_current_theme(self):
         topic = self.read("templates/topic_submit.html")
-        theme_head = self.read("templates/_app_theme_head.html")
-        self.assertIn("{% include '_app_theme_head.html' %}", topic)
-        self.assertIn('data-wood-theme="1"', theme_head)
+        stylesheet = self.read("static/lms_topics.css")
+        self.assertIn("{% extends 'lms_base.html' %}", topic)
+        self.assertIn("filename='lms_topics.css'", topic)
         self.assertIn("topic-hero", topic)
-        self.assertIn(".topic-author { color: #5C5142", topic)
-        self.assertIn("label { color: #2A241B", topic)
+        self.assertIn(".lms-topics .topic-author", stylesheet)
+        self.assertIn(".lms-topics label{display:block", stylesheet)
         self.assertNotIn("opacity:0.7", topic)
 
     def test_full_documents_load_theme_in_head_without_tailwind_cdn(self):
@@ -59,11 +59,12 @@ class CurrentUiContractsTest(unittest.TestCase):
             self.assertNotIn("cdn.tailwindcss.com", source, template.name)
             self.assertNotIn("tailwind.config =", source, template.name)
             if "<html" in source.lower() and "</head>" in source.lower():
-                self.assertIn(
-                    "{% include '_app_theme_head.html' %}",
-                    source,
-                    f"theme head missing from {template.name}",
-                )
+                head = source.split("</head>", 1)[0]
+                if 'name="app-layout" content="canvas"' in head:
+                    self.assertIn("filename='lms.css'", head, template.name)
+                    self.assertIn('name="color-scheme" content="light"', head, template.name)
+                else:
+                    self.assertIn("{% include '_app_theme_head.html' %}", head, template.name)
 
         tailwind_head = self.read("templates/_tailwind_head.html")
         self.assertIn("filename='tailwind.css'", tailwind_head)
@@ -105,8 +106,9 @@ class CurrentUiContractsTest(unittest.TestCase):
 
     def test_book_cards_have_a_clear_action(self):
         books = self.read("templates/book_suggestions.html")
-        self.assertIn("eg-card-action", books)
-        self.assertIn("도서 보기 · 같이 읽고 싶어요", books)
+        self.assertIn('class="eg-suggestion-row"', books)
+        self.assertIn("url_for('book_suggestion_detail', suggestion_id=item.id)", books)
+        self.assertIn('class="eg-row-action">같이 읽고 싶어요', books)
 
     def test_semester_members_lead_with_current_roster_and_seminar_dates(self):
         roster = self.read("templates/admin_term_members.html")

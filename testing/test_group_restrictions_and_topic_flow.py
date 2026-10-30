@@ -65,7 +65,9 @@ class GroupRestrictionIntegrationContracts(unittest.TestCase):
 
     def test_topic_submission_count_is_dark_and_badged(self):
         self.assertIn('class="submission-total"', self.topic_admin)
-        self.assertIn('color: #2F4A24', self.topic_admin)
+        self.assertIn("filename='lms_operations.css'", self.topic_admin)
+        stylesheet = (ROOT / 'static/lms_operations.css').read_text(encoding='utf-8')
+        self.assertIn('.submission-total){display:inline-flex', stylesheet)
         self.assertNotIn('class="text-white">{{\n                        submissions|length', self.topic_admin)
 
 

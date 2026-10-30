@@ -106,7 +106,7 @@ class LmsNavigationTests(unittest.TestCase):
                     self.assertRegex(response.get_data(as_text=True), r'<option[^>]*value="archive"[^>]*selected')
             self.assertNotIn('/making_team?term_id=', nav)
         overview = self.client.get('/admin/dashboard?term_id=archive').get_data(as_text=True)
-        self.assertIn('aria-label="운영 관리 메뉴"', overview)
+        self.assertIn('aria-label="전체 운영 메뉴"', overview)
         self.assertIn('href="/admin/term_members?term_id=archive"', overview)
         self.assertIn('href="/admin/dashboard"', overview)
         with self.client.session_transaction() as state:

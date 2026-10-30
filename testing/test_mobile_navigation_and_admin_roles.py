@@ -45,7 +45,7 @@ class MobileNavigationAndAdminRoleContracts(unittest.TestCase):
 
     def test_role_control_is_only_rendered_for_primary_admin(self):
         self.assertIn("{% if can_manage_roles %}", self.members)
-        self.assertIn("다시 로그인한 뒤 관리자 기능을 사용할 수 있습니다.", self.members)
+        self.assertIn("저장 후 해당 회원이 다음 화면을 열 때부터 권한이 반영됩니다.", self.members)
         self.assertIn("can_manage_roles=_current_user_is_primary_admin()", self.app_source)
 
 

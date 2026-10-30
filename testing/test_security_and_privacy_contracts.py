@@ -55,7 +55,8 @@ class SecurityContractTests(unittest.TestCase):
 
     def test_admin_authorization_is_refreshed_from_members(self):
         self.assertIn('"role, is_active, member_status, account_status"', self.app_source)
-        self.assertIn('user_role not in ("admin", "officer")', self.app_source)
+        self.assertIn("scoped_endpoint_allowed(supabase, f.__name__, kwargs)", self.app_source)
+        self.assertIn("scoped is False or (scoped is None and user_role != 'officer')", self.app_source)
 
     def test_cookie_headers_and_http_timeouts_are_explicit(self):
         for token in (

@@ -56,10 +56,14 @@ class RuntimeReview(unittest.TestCase):
         self.assertEqual(absent['total'], 0, 'A saved historical group is not evidence that an active no-show attended.')
 
     def test_actual_confirmation_rejects_existing_no_show_without_writes(self):
+        with patch('attendance_routes.render_template', return_value='ok') as render:
+            self.assertEqual(self.client.get('/admin/seminar_sessions/thu/roster').status_code, 200)
+        token = render.call_args.kwargs['confirmation_token']
         response = self.client.post('/api/admin/seminar_sessions/thu/attendance/confirm',
-            headers={'X-CSRF-Token': 'review-csrf'}, json={'member_ids': [1, 2]})
+            headers={'X-CSRF-Token': 'review-csrf'}, json={'member_ids': [1, 2], 'confirmation_token': token})
         self.assertEqual(response.status_code, 400)
-        self.assertFalse(any(call[0] == 'update' for call in self.fake.calls))
+        self.assertIn('먼저 불참 기록을 취소', response.get_json()['message'])
+        self.assertFalse(any(call[0] in {'update', 'insert', 'rpc'} for call in self.fake.calls))
 
     def test_groups_saved_after_actual_confirmation_are_counted(self):
         self.fake.rows['history'][0]['attendance_confirmed_at'] = None
@@ -123,6 +127,10 @@ class RuntimeReview(unittest.TestCase):
         self.assertEqual(member['total'], 1, 'Group-only editing must not rewrite confirmed actual attendance.')
 
     def test_standalone_manual_record_can_be_confirmed_and_then_safely_reedited(self):
+        # A standalone record has no matching session. A same-day session would
+        # intentionally link this legacy record and apply its no-show override.
+        self.fake.rows['seminar_sessions'] = []
+        self.fake.rows['seminar_no_shows'] = []
         row = self.fake.rows['history'][0]
         row.update(seminar_session_id=None, attendance_confirmed_at=None, actual_member_ids=None)
         with patch.object(self.module, 'rebuild_co_matrix', return_value={}), \
