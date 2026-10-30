@@ -22,6 +22,22 @@ class AfterThursday(datetime):
         return instant.astimezone(tz) if tz else instant.replace(tzinfo=None)
 
 
+class BeforeDeadline(datetime):
+    """세미나 주 화요일 23:59 직전."""
+    @classmethod
+    def now(cls, tz=None):
+        instant = cls(2026, 8, 11, 23, 59, tzinfo=timezone(timedelta(hours=9)))
+        return instant.astimezone(tz) if tz else instant.replace(tzinfo=None)
+
+
+class AfterDeadline(datetime):
+    """세미나 주 수요일 00:00."""
+    @classmethod
+    def now(cls, tz=None):
+        instant = cls(2026, 8, 12, 0, tzinfo=timezone(timedelta(hours=9)))
+        return instant.astimezone(tz) if tz else instant.replace(tzinfo=None)
+
+
 class AfterMonday(datetime):
     @classmethod
     def now(cls, tz=None):
@@ -69,39 +85,42 @@ class TopicSessionWorkflowTests(unittest.TestCase):
         with self.client.session_transaction() as flask_session:
             return flask_session['topic_moderator_csrf']
 
-    def test_shared_link_stays_open_on_friday_and_labels_final_deadline(self):
-        with patch.object(self.module, 'datetime', AfterThursday):
+    def test_shared_link_is_open_until_tuesday_and_labels_tuesday_2359(self):
+        with patch.object(self.module, 'datetime', BeforeDeadline):
             response = self.client.get('/shared_topics?token=shared-token')
         self.assertEqual(response.status_code, 200)
-        self.assertIn('2026-08-18 00:00', response.get_data(as_text=True))
+        self.assertIn('2026-08-11 23:59', response.get_data(as_text=True))
         self.assertTrue(self.fake.rows['topic_events'][0]['is_active'])
 
-    def test_thursday_entry_is_closed_but_does_not_close_shared_pool(self):
-        with patch.object(self.module, 'datetime', AfterThursday):
+    def test_session_entry_closes_after_tuesday(self):
+        with patch.object(self.module, 'datetime', AfterDeadline):
             response = self.client.get('/shared_topics?token=shared-token&session_id=thu')
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(self.fake.rows['topic_events'][0]['is_active'])
 
     def test_submit_api_enforces_session_deadline_for_page_left_open(self):
-        with patch.object(self.module, 'datetime', AfterThursday):
+        with patch.object(self.module, 'datetime', AfterDeadline):
             response = self.client.post('/api/topics/submit', json={
                 'event_id': 'event-1', 'session_id': 'thu', 'topics': [{'topic': '새 질문'}],
             })
         self.assertEqual(response.status_code, 400)
-        self.assertIn('마감', response.get_json()['error'])
-        self.assertTrue(self.fake.rows['topic_events'][0]['is_active'])
+        self.assertIn('화요일 23:59', response.get_json()['error'])
         self.assertEqual(len(self.fake.rows['topic_submissions']), 1)
 
-    def test_monday_entry_uses_same_pool_and_is_still_open_after_thursday(self):
-        with patch.object(self.module, 'datetime', AfterThursday):
+    def test_monday_entry_uses_same_pool_and_tuesday_deadline(self):
+        with patch.object(self.module, 'datetime', BeforeDeadline):
             response = self.client.post('/api/topics/submit', json={
                 'event_id': 'event-1', 'session_id': 'mon', 'topics': [{'topic': '월요일 질문'}],
             })
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.fake.rows['topic_submissions'][-1]['event_id'], 'event-1')
+        with patch.object(self.module, 'datetime', AfterDeadline):
+            response = self.client.post('/api/topics/submit', json={
+                'event_id': 'event-1', 'session_id': 'mon', 'topics': [{'topic': '늦은 월요일 질문'}],
+            })
+        self.assertEqual(response.status_code, 400)
 
-    def test_shared_pool_closes_at_tuesday_midnight_on_direct_submit(self):
-        with patch.object(self.module, 'datetime', AfterMonday):
+    def test_shared_pool_closes_at_wednesday_midnight_on_direct_submit(self):
+        with patch.object(self.module, 'datetime', AfterDeadline):
             response = self.client.post('/api/topics/submit', json={
                 'event_id': 'event-1', 'topics': [{'topic': '너무 늦은 질문'}],
             })

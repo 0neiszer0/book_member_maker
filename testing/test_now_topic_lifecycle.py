@@ -8,7 +8,7 @@ from flask import Flask, jsonify
 
 from engagement import init_engagement_routes
 from testing._fake_supabase import FakeQuery, FakeSupabase
-from testing.test_topic_session_workflow import AfterMonday, AfterThursday
+from testing.test_topic_session_workflow import AfterDeadline, BeforeDeadline
 
 os.environ.setdefault('PYTHON_DOTENV_DISABLED', '1')
 os.environ.setdefault('FLASK_SECRET_KEY', 'now-topic-test')
@@ -54,29 +54,29 @@ class NowTopicLifecycleTests(unittest.TestCase):
         return response.get_json()['cards']
 
     def test_now_applies_shared_cutoff_without_visiting_seminar_page(self):
-        cards = self._cards(AfterThursday)
+        cards = self._cards(BeforeDeadline)
         topics = [card for card in cards if card['kind'] == '발제문']
-        self.assertEqual(len(topics), 1)
-        self.assertEqual(topics[0]['title'], '공유 발제문')
-        self.assertEqual(topics[0]['close_at'], '2026-08-17T15:00:00+00:00')
-        self.assertIn('shared-token', topics[0]['url'])
-        self.assertFalse(self.fake.rows['topic_events'][1]['is_active'])
+        self.assertEqual(len(topics), 2)
+        shared = next(card for card in topics if card['title'] == '공유 발제문')
+        self.assertEqual(shared['close_at'], '2026-08-11T14:59:59+00:00')
+        self.assertIn('shared-token', shared['url'])
         selected = next(call[2][0] for call in self.fake.calls
                         if call[0] == 'select' and call[1] == 'topic_events')
         for column in ('is_active', 'seminar_week_id', 'seminar_session_id'):
             self.assertIn(column, selected.split(','))
 
     def test_now_removes_expired_topics_but_keeps_post_seminar_review(self):
-        cards = self._cards(AfterMonday)
+        cards = self._cards(AfterDeadline)
         self.assertFalse(any(card['kind'] == '발제문' for card in cards))
         self.assertTrue(any(card['kind'] == '세미나 후기' for card in cards))
         self.assertTrue(all(not row['is_active'] for row in self.fake.rows['topic_events']))
 
-    def test_now_uses_actual_latest_session_date_after_schedule_change(self):
+    def test_now_uses_actual_main_session_date_after_schedule_change(self):
+        self.fake.rows['seminar_sessions'][0]['meeting_date'] = '2026-08-20'
         self.fake.rows['seminar_sessions'][1]['meeting_date'] = '2026-08-24'
-        cards = self._cards(AfterMonday)
+        cards = self._cards(AfterDeadline)
         topic = next(card for card in cards if card['kind'] == '발제문')
-        self.assertEqual(topic['close_at'], '2026-08-24T15:00:00+00:00')
+        self.assertEqual(topic['close_at'], '2026-08-18T14:59:59+00:00')
         self.assertTrue(self.fake.rows['topic_events'][0]['is_active'])
 
     def test_expired_card_stays_hidden_even_when_auto_close_database_sync_fails(self):
@@ -88,7 +88,7 @@ class NowTopicLifecycleTests(unittest.TestCase):
             return original_execute(query)
 
         with patch.object(FakeQuery, 'execute', fail_update):
-            cards = self._cards(AfterMonday)
+            cards = self._cards(AfterDeadline)
         self.assertFalse(any(card['kind'] == '발제문' for card in cards))
         self.assertTrue(self.fake.rows['topic_events'][0]['is_active'])
 

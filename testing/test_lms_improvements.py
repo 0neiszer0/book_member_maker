@@ -139,7 +139,7 @@ class PushTests(unittest.TestCase):
 
     def test_worker_submission_matching_respects_owner(self):
         rows=fixture();rows['topic_submissions']=[{'event_id':'event','member_id':2,'student_id':'202600001'}]
-        items,_=collect_items(WriteDB(rows),datetime(2026,9,23,tzinfo=timezone.utc))
+        items,_=collect_items(WriteDB(rows),datetime(2026,9,22,tzinfo=timezone.utc))
         self.assertTrue(any(r['member_id']==1 and r['event_key']=='topic:event' for r in items))
         self.assertFalse(any(r['member_id']==2 and r['event_key']=='topic:event' for r in items))
 

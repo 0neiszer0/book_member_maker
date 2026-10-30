@@ -192,9 +192,10 @@ class RuntimeReview(unittest.TestCase):
 
 class PureBoundaryReview(unittest.TestCase):
     def test_kst_boundary_in_utc_and_year_rollover(self):
-        event = {'session_dates': ['2026-12-31', '2027-01-04'], 'seminar_week_id': 'week'}
-        self.assertFalse(topic_event_is_expired(event, datetime(2027, 1, 4, 14, 59, 59, tzinfo=timezone.utc)))
-        self.assertTrue(topic_event_is_expired(event, datetime(2027, 1, 4, 15, 0, tzinfo=timezone.utc)))
+        # 2027-01-01(금) 회차의 마감은 해를 넘기기 전 화요일 2026-12-29 23:59(한국시간).
+        event = {'session_dates': ['2027-01-01', '2027-01-04'], 'seminar_week_id': 'week'}
+        self.assertFalse(topic_event_is_expired(event, datetime(2026, 12, 29, 14, 59, 59, tzinfo=timezone.utc)))
+        self.assertTrue(topic_event_is_expired(event, datetime(2026, 12, 29, 15, 0, tzinfo=timezone.utc)))
 
     def test_actual_session_overrides_legacy_group_and_deduplicates_week(self):
         members = [{'id': 1, 'name': '참석'}, {'id': 2, 'name': '불참'}]

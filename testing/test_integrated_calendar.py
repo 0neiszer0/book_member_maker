@@ -28,9 +28,9 @@ class CalendarTests(unittest.TestCase):
         return dict(term={'id': 't'}, sessions=[dict(id='s', meeting_date='2026-10-29', seminar_week_id='w', day_type='thu')],
                     weeks={'w': {'book_title': '<책>'}}, topics={'w': dict(id='e', seminar_week_id='w', session_dates=['2026-10-29', '2026-11-02'], share_token='safe', open=True, status_label='제출 완료')})
 
-    def test_deadline_uses_last_session_and_original_links(self):
+    def test_deadline_is_tuesday_2359_before_main_session_with_original_links(self):
         result = seminar_calendar_events(self.context())
-        self.assertEqual(result[1]['start'], '2026-11-03T00:00:00+09:00')
+        self.assertEqual(result[1]['start'], '2026-10-27T23:59:00+09:00')
         self.assertEqual(result[1]['url'], '/shared_topics?token=safe')
         self.assertIn('week_id=w', result[0]['url'])
         self.assertIn('session_id=s', result[0]['url'])

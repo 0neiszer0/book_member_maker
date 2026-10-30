@@ -51,6 +51,7 @@ from recruitment_results import (
     parse_applicant_rows,
 )
 from topic_lifecycle import topic_event_deadline, topic_event_is_expired
+from topic_autopen import open_due_topic_events
 from home_overview import date_label, member_seminar_summary, operations_summary, decorate_topic_submission_states
 from attendance_workflow import attendance_is_confirmed, confirmed_history_session_ids
 from security_utils import forwarded_client_address, safe_internal_next_url
@@ -588,6 +589,7 @@ def main_index():
     home = attendance = None
     home_error = attendance_error = False
     if session.get('user_id') and session.get('user_role'):
+        open_due_topic_events(supabase, datetime.now(timezone(timedelta(hours=9))).date())
         try:
             home = member_seminar_summary(supabase, session['user_id'])
         except Exception:
@@ -3256,7 +3258,7 @@ def request_absence():
 
 
 def _auto_close_topic_events(events):
-    """공유 발제문은 마지막 연결 회차가 끝난 다음 날 마감한다."""
+    """공유 발제문은 세미나 주 화요일 23:59(한국시간)에 마감한다."""
     rows = list(events or [])
     week_ids = list({row['seminar_week_id'] for row in rows if row.get('seminar_week_id')})
     session_ids = list({row['seminar_session_id'] for row in rows
@@ -3453,7 +3455,7 @@ def toggle_topic_event(event_id):
         new_state = not bool(cur.get('is_active'))
         today_kst = datetime.now(timezone(timedelta(hours=9))).date()
         if new_state and topic_event_is_expired(cur, today=today_kst):
-            return jsonify({"error": "마지막 세미나 날짜가 지난 발제문은 자동 마감되어 다시 열 수 없습니다."}), 400
+            return jsonify({"error": "제출 마감(세미나 주 화요일 23:59)이 지난 발제문은 자동 마감되어 다시 열 수 없습니다."}), 400
         supabase.table('topic_events').update({'is_active': new_state}).eq('id', event_id).execute()
         return jsonify({"status": "success", "is_active": new_state})
     except Exception as e:
@@ -3661,7 +3663,7 @@ def submit_topics():
             .eq('id', event_id).limit(1).execute().data or []
         event_data = _topic_event_for_submission(event_rows, data.get('session_id'))
         if not event_data or not event_data.get('is_active'):
-            return jsonify({"error": "해당 세미나 날짜가 지나 발제문 제출이 마감되었습니다."}), 400
+            return jsonify({"error": "발제문 제출 마감(세미나 주 화요일 23:59)이 지나 제출이 마감되었습니다."}), 400
 
         # 기존 제출 내역 확인 (학번 우선 매칭 — 학과 표기만 바꿔 여러 건 제출하는 것 방지)
         existing_record = _find_topic_submission(
@@ -3820,7 +3822,7 @@ def load_topics():
             .eq('id', event_id).limit(1).execute().data or []
         event_data = _topic_event_for_submission(event_rows, data.get('session_id'))
         if not event_data or not event_data.get('is_active'):
-            return jsonify({"error": "해당 세미나 날짜가 지나 발제문 제출이 마감되었습니다."}), 400
+            return jsonify({"error": "발제문 제출 마감(세미나 주 화요일 23:59)이 지나 제출이 마감되었습니다."}), 400
 
         existing_record = _find_topic_submission(
             event_id,
@@ -4596,6 +4598,7 @@ def _load_weekly_seminar_view(term_id=None):
     sessions = []
     topics = []
     if week_ids:
+        open_due_topic_events(supabase, datetime.now(timezone(timedelta(hours=9))).date())
         sessions = supabase.table('seminar_sessions').select('*').in_('seminar_week_id', week_ids) \
             .order('meeting_date').execute().data or []
         topics = supabase.table('topic_events').select('*').in_('seminar_week_id', week_ids).order('created_at', desc=True).execute().data or []

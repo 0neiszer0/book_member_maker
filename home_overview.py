@@ -1,7 +1,7 @@
 """Read-only home summaries. Never turn a failed lookup into an empty count."""
 from datetime import date, datetime, timedelta, timezone
 from lms_learning import is_break_week
-from topic_lifecycle import topic_event_deadline, topic_event_is_open
+from topic_lifecycle import DEADLINE_LABEL, topic_event_deadline, topic_event_is_open
 from attendance_workflow import attendance_is_confirmed, confirmed_history_session_ids
 
 KST = timezone(timedelta(hours=9))
@@ -35,7 +35,7 @@ def load_seminar_context(db, term_id=None, today=None):
         event['session_dates'] = [s['meeting_date'] for s in result['all_sessions'] if s.get('seminar_week_id') == event.get('seminar_week_id')]
         event['open'] = topic_event_is_open(event, today=today)
         deadline = topic_event_deadline(event)
-        event['deadline_label'] = date_label(deadline) + ' 00:00' if deadline else ''
+        event['deadline_label'] = date_label(deadline) + ' ' + DEADLINE_LABEL if deadline else ''
         topics_by_week.setdefault(event['seminar_week_id'], event)
     result.update(sessions=sessions, weeks={w['id']: w for w in weeks}, topics=topics_by_week)
     return result
@@ -67,7 +67,7 @@ def decorate_topic_submission_states(db, member_id, events, today=None):
         event['submitted'] = event['id'] in submitted
         event['open'] = topic_event_is_open(event, today=today)
         deadline = topic_event_deadline(event)
-        event['deadline_label'] = date_label(deadline) + ' 00:00' if deadline else ''
+        event['deadline_label'] = date_label(deadline) + ' ' + DEADLINE_LABEL if deadline else ''
         event['status'] = 'submitted' if event['submitted'] else ('open' if event['open'] else 'closed')
         event['status_label'] = '제출 완료' if event['submitted'] else ('미제출 · 접수 중' if event['open'] else '미제출 · 접수 마감')
     return events

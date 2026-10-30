@@ -16,7 +16,7 @@
             {% endif %}
             <p class="topic-date">{{ icon('calendar',18) }} 모임 날짜: {{ event.meeting_date|seminar_date }}</p>
             {% if event.seminar_week_id %}<p class="topic-date">추가 세미나가 열리면 본 세미나와 같은 질문 목록을 사용합니다.</p>{% endif %}
-            {% if event.submission_deadline %}<p class="topic-date"><strong>제출·수정 마감: {{ event.submission_deadline }} 00:00 (한국시간)</strong></p>{% endif %}
+            {% if event.submission_deadline %}<p class="topic-date"><strong>제출·수정 마감: {{ event.submission_deadline }} 23:59 (한국시간)</strong></p>{% endif %}
         </div>
 
         <!-- 가이드 카드 -->

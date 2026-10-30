@@ -13,7 +13,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from engagement_utils import clean_text as _clean_text
 from engagement_utils import form_is_open as _form_is_open
 from engagement_utils import normalize_kyobo_url as _normalize_kyobo_url
-from topic_lifecycle import topic_event_deadline, topic_event_is_open
+from topic_lifecycle import topic_event_close_at, topic_event_is_open
 
 
 FORM_TABLES = {
@@ -137,9 +137,8 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
         for row in topic_rows:
             if not row.get("is_active"):
                 continue
-            deadline = topic_event_deadline(row)
-            close_at = (datetime.fromisoformat(f"{deadline.isoformat()}T00:00:00+09:00")
-                        .astimezone(timezone.utc).isoformat()) if deadline else None
+            deadline = topic_event_close_at(row)
+            close_at = deadline.astimezone(timezone.utc).isoformat() if deadline else None
             cards.append({
                 "kind": "발제문",
                 "title": row.get("book_title") or "이번 세미나 발제문",
