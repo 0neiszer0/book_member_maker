@@ -40,6 +40,12 @@
 - 전환 후에는 새 로컬 기록이 우선이다. 장애가 나도 예전 Supabase 연결로 자동 복귀하지 않는다. 최신 백업/로컬 DB를 보존하고 수정한다.
 - 이 PC의 작업 폴더 outputs/localdb-cutover-result-20261030.json, operations-improvements-state.json과 VM /var/lib/bookmembers-cutover-20261030/COMPLETE.json에 상세 증거가 있다. 이전 설정과 암호화 원본 백업도 보존했다.
 
-## 남은 검증
+## Windows 전체 재부팅 검증 완료
 
-Windows 전체 재부팅은 아직 승인/실행하지 않았다. 승인 후 Windows→Hyper-V VM→DB/API→앱/위키/알림/Tunnel→사이트의 자동 복구를 확인해야 한다. 재개 직후에는 수동으로 서비스를 시작하지 말고 먼저 부팅 시각·서비스 상태·공개 응답을 읽어 자동 복구 여부를 기록한다. 기존 Windows 자동 로그인이 있어 로그인 전 복구와는 구별한다. 정전 뒤 자동 전원 켜짐은 BIOS 설정의 별도 확인이 필요하다.
+2026-10-30 사용자 진행 승인 후10:36:38에 강제 앱 종료 옵션 없이 Windows 전체 재부팅을 요청했다. Windows 새 부팅 시각은10:37:18, VM boot_id도 이전과 달라졌다. 앱은10:38:50에 자동 시작했다(Windows 부팅 후 약92초). 재연결 뒤 어떤 서비스도 수동으로 시작하거나 재시작하지 않은 상태에서 확인했다.
+
+- DB/API·앱·위키·Tunnel과 알림/외부 백업/위키 백업 타이머 모두active. 앱 재시도0회.
+- PostgreSQL·Storage 컨테이너healthy, 실패한 systemd 유닛0개.
+- 공개 /login200, /keep-alive200 및 DBalive. 알림 작업은10:50:59에success로 종료했다.
+- 다음 외부 백업은10월31일03:19:42 KST로 예약돼 있으며, 기존 최근 백업 성공 상태를 유지한다. 재부팅 검증을 위해 불필요하게 백업/복원을 반복하지 않았다.
+- 근거: 작업 폴더 outputs/post-reboot-localdb-20261030.json. 기존 Windows 자동 로그인이 있어 로그인 이전 복구까지 별도로 입증한 것은 아니다. 정전 후 PC 자체가 자동으로 켜지는지는 BIOS 설정의 별도 확인이 필요하다.
