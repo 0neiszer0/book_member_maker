@@ -175,6 +175,23 @@ def init_wiki_routes(app, get_db):
         titles = [t for t in titles if can_read_title(g.wiki_access, t if isinstance(t, str) else str(t))]
         return page('pages.html', titles=titles, query=query, number=number, has_next=has_next)
 
+    @bp.get('/random')
+    def random_page():
+        # Pick from titles this member may read; officer pages are never offered.
+        backend = engine()
+        candidates = []
+        with backend.user(g.wiki_access.member_id) as client:
+            for number in range(1, 21):
+                batch = backend.titles(client, '', number)
+                candidates += [t if isinstance(t, str) else str(t) for t in batch]
+                if len(batch) < 50:
+                    break
+        candidates = [t for t in candidates
+                      if t.strip() and not is_officer_title(t) and t.strip() != '대문' and can_read_title(g.wiki_access, t)]
+        if not candidates:
+            return redirect(url_for('wiki.document', title='대문'))
+        return redirect(url_for('wiki.document', title=secrets.choice(candidates)))
+
     @bp.get('/history/<path:title>')
     def history(title):
         title_value(title)

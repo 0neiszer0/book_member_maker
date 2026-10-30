@@ -167,6 +167,51 @@ class RouteTests(unittest.TestCase):
         self.assertNotIn('style=',html); self.assertIn('/wiki/w/',html)
 
 
+class RandomPageTests(RouteTests):
+    def test_random_requires_login_like_other_wiki_pages(self):
+        response = self.client.get('/wiki/random')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login?next=', response.location)
+
+    def test_random_redirects_to_a_readable_page_never_officer_or_home(self):
+        self.login()
+        self.engine.titles = lambda client, query, number: (
+            ['대문', '운영진:회계 정리', ' 운영진：비밀', '운영진:대문', 'MT', '책크메이트'] if number == 1 else [])
+        seen = set()
+        with patch('wiki_routes.secrets.choice', side_effect=lambda items: (seen.update(items), items[-1])[1]):
+            response = self.client.get('/wiki/random')
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(seen, {'MT', '책크메이트'})
+        self.assertTrue(response.location.endswith('/wiki/w/%EC%B1%85%ED%81%AC%EB%A9%94%EC%9D%B4%ED%8A%B8'), response.location)
+        self.assertEqual(self.client.get(response.location).status_code, 200)
+
+    def test_random_pages_through_all_titles(self):
+        self.login()
+        calls = []
+        def titles(client, query, number):
+            calls.append(number)
+            return ['문서%d-%d' % (number, i) for i in range(50)] if number == 1 else ['마지막']
+        self.engine.titles = titles
+        with patch('wiki_routes.secrets.choice', side_effect=lambda items: items[-1]):
+            response = self.client.get('/wiki/random')
+        self.assertEqual(calls, [1, 2])
+        self.assertIn('/wiki/w/%EB%A7%88%EC%A7%80%EB%A7%89', response.location)
+
+    def test_random_with_no_candidates_goes_to_home(self):
+        self.login()
+        self.engine.titles = lambda *a: ['대문', '운영진:대문']
+        response = self.client.get('/wiki/random')
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.location.endswith('/wiki/w/%EB%8C%80%EB%AC%B8'), response.location)
+
+    def test_random_link_is_in_wiki_sidebar(self):
+        self.login()
+        html = self.client.get('/wiki/w/대문').get_data(as_text=True)
+        self.assertIn('href="/wiki/random"', html)
+        self.assertIn('랜덤 문서', html)
+        self.assertLess(html.index('모든 문서'), html.index('랜덤 문서'))
+
+
 class OfficerPolicyTests(unittest.TestCase):
     def roster(self, initialized=True):
         db = FakeSupabase(wiki_fixture())
@@ -355,6 +400,7 @@ class OfficerNavTests(OfficerRouteTests):
 # Inherit RouteTests' fixtures only; its own tests already run once above.
 for _name in [n for n in vars(RouteTests) if n.startswith('test_')]:
     setattr(OfficerRouteTests, _name, None)
+    setattr(RandomPageTests, _name, None)
 for _name in [n for n in vars(OfficerRouteTests) if n.startswith('test_')]:
     setattr(OfficerNavTests, _name, None)
 

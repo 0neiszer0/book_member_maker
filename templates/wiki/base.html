@@ -6,7 +6,7 @@
 <div class="wiki-shell">
 <aside class="wiki-menu" aria-label="위키 메뉴">
   <a class="wiki-menu-title" href="{{ url_for('wiki.home') }}">책반우 위키</a>
-  <nav><a href="{{ url_for('wiki.document',title='대문') }}">대문</a><a href="{{ url_for('wiki.pages') }}">모든 문서</a><a href="{{ url_for('wiki.document',title='처음 참여하기') }}">처음 참여하기</a><a href="{{ url_for('wiki.document',title='정기 세미나') }}">정기 세미나</a><a href="{{ url_for('wiki.document',title='위키 편집 안내') }}">편집 안내</a>{% if access and access.is_officer %}<a href="{{ url_for('wiki.document',title=officer_prefix ~ '대문') }}">운영진 문서</a>{% endif %}</nav>
+  <nav><a href="{{ url_for('wiki.document',title='대문') }}">대문</a><a href="{{ url_for('wiki.pages') }}">모든 문서</a><a href="{{ url_for('wiki.random_page') }}" rel="nofollow">랜덤 문서</a><a href="{{ url_for('wiki.document',title='처음 참여하기') }}">처음 참여하기</a><a href="{{ url_for('wiki.document',title='정기 세미나') }}">정기 세미나</a><a href="{{ url_for('wiki.document',title='위키 편집 안내') }}">편집 안내</a>{% if access and access.is_officer %}<a href="{{ url_for('wiki.document',title=officer_prefix ~ '대문') }}">운영진 문서</a>{% endif %}</nav>
   {% if access %}<div class="wiki-access"><strong>{{ access.term_name or '학기 확인 필요' }}</strong><p>{{ access.reason }}</p></div>{% endif %}
   <a class="wiki-site-return" href="{{ url_for('main_index') }}">사이트 대시보드로</a>
 </aside>
