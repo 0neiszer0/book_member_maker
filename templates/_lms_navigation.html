@@ -8,7 +8,7 @@
 <a class="lms-global-item" href="{{ url_for('lms_calendar') }}" {% if ep=='lms_calendar' %}aria-current="page"{% endif %}>{{ icon('calendar') }}<span>캘린더</span></a>
 <a class="lms-global-item" href="{{ url_for('club_room') }}" {% if ep=='club_room' %}aria-current="page"{% endif %}>{{ icon('room') }}<span>동아리방</span></a>
 {% if session.user_role %}<button type="button" class="lms-global-item" data-lms-panel="lms-notifications" aria-controls="lms-notifications" aria-expanded="false">{{ icon('inbox') }}<span>알림 <small data-notification-badge hidden></small></span></button>{% endif %}{% if session.user_role in ['admin','officer'] %}<a class="lms-global-item" href="{{ url_for('admin_dashboard') }}" {% if lms_admin_context|default(false) %}aria-current="page"{% endif %}>{{ icon('settings') }}<span>전체 운영</span></a>{% endif %}
-{% if wiki_enabled %}<a class="lms-global-item" href="{{ wiki_url }}" {% if ep.startswith('wiki.') %}aria-current="page"{% endif %}>{{ icon('document') }}<span>위키</span></a>{% endif %}
+{% if wiki_enabled %}<a class="lms-global-item" href="{{ wiki_url }}" {% if ep.startswith('wiki.') %}aria-current="page"{% endif %}>{{ icon('document') }}<span>위키</span></a>{% endif %}{% set officer_wiki = officer_wiki_url() if officer_wiki_url is defined else none %}{% if officer_wiki %}<a class="lms-global-item" href="{{ officer_wiki }}">{{ icon('document') }}<span>운영진 위키</span></a>{% endif %}
 <a class="lms-global-item" href="{{ url_for('help_member') }}" {% if ep=='help_member' %}aria-current="page"{% endif %}>{{ icon('help') }}<span>이용안내</span></a>
 <button type="button" class="lms-global-collapse" aria-label="메뉴 최소화" aria-expanded="true">{{ icon('arrow') }}</button>
 </nav>

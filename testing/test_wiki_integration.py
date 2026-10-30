@@ -303,9 +303,60 @@ class OfficerRouteTests(RouteTests):
             self.assertEqual(result.status_code, 404); save.assert_not_called()
 
 
+class OfficerNavTests(OfficerRouteTests):
+    """'운영진 위키' global nav entry: officers and admins only."""
+    LINK = '<span>운영진 위키</span>'
+
+    def nav_html(self):
+        self.module.app.extensions['officer_wiki_nav_cache'].clear()
+        with self.module.app.test_request_context():
+            paths = [self.module.url_for(e) for e in ('help_member', 'club_room', 'lms_calendar')]
+        for path in paths:
+            response = self.client.get(path)
+            html = response.get_data(as_text=True)
+            if response.status_code == 200 and 'lms-global' in html:
+                return html
+        self.fail('no page with the global navigation rendered')
+
+    def test_officer_sees_officer_wiki_link(self):
+        self.login(3)
+        html = self.nav_html()
+        self.assertIn(self.LINK, html)
+        self.assertIn('/wiki/w/%EC%9A%B4%EC%98%81%EC%A7%84:%EB%8C%80%EB%AC%B8', html)
+
+    def test_admin_sees_officer_wiki_link(self):
+        self.db.rows['members'][0]['role'] = 'admin'
+        self.login(1)
+        self.assertIn(self.LINK, self.nav_html())
+
+    def test_member_and_anonymous_do_not_see_officer_wiki_link(self):
+        self.assertNotIn(self.LINK, self.nav_html())
+        self.login(1)
+        self.assertNotIn(self.LINK, self.nav_html())
+        self.assertNotIn(self.LINK, self.client.get('/wiki/w/대문').get_data(as_text=True))
+
+    def test_officer_wiki_link_hidden_when_wiki_disabled_or_lookup_fails(self):
+        self.login(3)
+        with patch.dict(self.module.app.config, WIKI_ENABLED=False):
+            self.assertNotIn(self.LINK, self.nav_html())
+        original = self.db.table
+        def table(name):
+            if name == 'term_officers':
+                raise RuntimeError('offline')
+            return original(name)
+        with patch.object(self.db, 'table', side_effect=table):
+            self.assertNotIn(self.LINK, self.nav_html())
+
+    def test_officer_wiki_link_on_wiki_pages_uses_page_access(self):
+        self.login(3)
+        self.assertIn(self.LINK, self.client.get('/wiki/w/대문').get_data(as_text=True))
+
+
 # Inherit RouteTests' fixtures only; its own tests already run once above.
 for _name in [n for n in vars(RouteTests) if n.startswith('test_')]:
     setattr(OfficerRouteTests, _name, None)
+for _name in [n for n in vars(OfficerRouteTests) if n.startswith('test_')]:
+    setattr(OfficerNavTests, _name, None)
 
 
 if __name__=='__main__': unittest.main()

@@ -2,6 +2,7 @@
 import hmac
 import os
 import secrets
+import time
 from urllib.parse import unquote, urlsplit
 
 import bleach
@@ -252,5 +253,38 @@ def init_wiki_routes(app, get_db):
             notice, status = '위키 연결 또는 저장 결과를 확인하지 못했습니다. 작성한 내용은 유지했습니다. 최신 문서와 이력을 먼저 확인해 주세요.', 503
         return page('edit.html', doc=doc, notice=notice, preview=preview, summary=summary,
                     officer_doc=is_officer_title(title)), status
+
+    # Officer-only nav entry. Same officer rule as officer documents; cached
+    # briefly per member so ordinary pages do not re-query the roster each time.
+    nav_cache = app.extensions.setdefault('officer_wiki_nav_cache', {})
+
+    def officer_wiki_url():
+        if (not app.config['WIKI_ENABLED'] or session.get('auth_provider') != 'kakao'
+                or not session.get('user_id')):
+            return None
+        access = getattr(g, 'wiki_access', None)
+        if access is not None:
+            ok = access.is_officer
+        elif hasattr(g, 'officer_wiki_nav'):
+            ok = g.officer_wiki_nav
+        else:
+            key, now = session.get('user_id'), time.monotonic()
+            hit = nav_cache.get(key)
+            if hit and hit[0] > now:
+                ok = hit[1]
+            else:
+                try:
+                    found = wiki_access(get_db(), session)
+                    ok = bool(found and found.is_officer)
+                except Exception:
+                    current_app.logger.exception('Officer wiki nav lookup failed')
+                    ok = False
+                nav_cache[key] = (now + 120, ok)
+            g.officer_wiki_nav = ok
+        return url_for('wiki.document', title=OFFICER_PREFIX + '대문') if ok else None
+
+    @app.context_processor
+    def officer_wiki_nav_context():
+        return {'officer_wiki_url': officer_wiki_url}
 
     app.register_blueprint(bp)
