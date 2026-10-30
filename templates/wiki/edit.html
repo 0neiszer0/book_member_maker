@@ -1,7 +1,7 @@
 {% extends 'wiki/base.html' %}
 {% block wiki_content %}
 <header class="wiki-heading"><h1>{{ doc.title }} <small>편집</small></h1><a href="{{ url_for('wiki.document',title=doc.title) }}">최신 문서 보기</a></header>
-<p class="wiki-help">나무마크로 작성합니다. 저장하면 회원들이 읽을 수 있으며 수정 이력에 남습니다. <a href="{{ url_for('wiki.document',title='위키 편집 안내') }}">편집 안내</a></p>
+<p class="wiki-help">나무마크로 작성합니다. {% if officer_doc %}운영진 전용 문서라 저장해도 운영진만 읽을 수 있으며{% else %}저장하면 회원들이 읽을 수 있으며{% endif %} 수정 이력에 남습니다. <a href="{{ url_for('wiki.document',title='위키 편집 안내') }}">편집 안내</a></p>
 {% if notice %}<p class="lms-alert" role="alert">{{ notice }}</p>{% endif %}
 <form method="post" class="wiki-editor">
 <input type="hidden" name="wiki_csrf" value="{{ wiki_csrf }}"><input type="hidden" name="version" value="{{ doc.version }}">

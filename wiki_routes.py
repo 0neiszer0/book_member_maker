@@ -9,7 +9,8 @@ from bs4 import BeautifulSoup
 from flask import Blueprint, abort, current_app, g, redirect, render_template, request, session, url_for
 from markupsafe import Markup
 
-from wiki_access import wiki_access
+from wiki_access import (wiki_access, can_edit_title, can_read_title, is_officer_title,
+                         strip_officer_includes, OFFICER_PREFIX)
 from wiki_engine import OpenNamu, EngineUnavailable, EditConflict, EditRejected
 
 
@@ -61,11 +62,24 @@ def init_wiki_routes(app, get_db):
 
     def page(template, **context):
         return render_template('wiki/' + template, lms_title='위키', lms_page='wiki',
+                               officer_prefix=OFFICER_PREFIX,
                                access=getattr(g, 'wiki_access', None),
                                wiki_csrf=session.get('wiki_csrf', ''), **context)
 
     def message(text, status):
         return page('message.html', message=text), status
+
+    def hidden():
+        # Same answer as a missing page: members cannot probe officer titles.
+        return message('문서를 찾을 수 없습니다.', 404)
+
+    def edit_denied(title):
+        if is_officer_title(title):
+            return '운영진 전용 문서는 운영진만 편집할 수 있습니다.'
+        return g.wiki_access.reason
+
+    def renderable(source):
+        return source if g.wiki_access.is_officer else strip_officer_includes(source)
 
     @bp.before_request
     def authorize():
@@ -84,8 +98,11 @@ def init_wiki_routes(app, get_db):
             return message('가입 승인된 회원 계정으로 로그인해야 위키를 읽을 수 있습니다.', 403)
         session.setdefault('wiki_csrf', secrets.token_urlsafe(32))
         if request.method == 'POST':
-            if not g.wiki_access.can_edit:
-                return message(g.wiki_access.reason, 403)
+            target = (request.view_args or {}).get('title', '')
+            if not can_read_title(g.wiki_access, target):
+                return hidden()
+            if not can_edit_title(g.wiki_access, target):
+                return message(edit_denied(target), 403)
             expected = session['wiki_csrf']
             supplied = request.form.get('wiki_csrf', '')
             origin = request.headers.get('Origin')
@@ -130,14 +147,18 @@ def init_wiki_routes(app, get_db):
     @bp.get('/w/<path:title>')
     def document(title):
         title_value(title)
+        if not can_read_title(g.wiki_access, title):
+            return hidden()
         revision = request.args.get('revision')
         if revision is not None and (not revision.isascii() or not revision.isdigit()):
             abort(400)
         backend = engine()
         with backend.user(g.wiki_access.member_id) as client:
             doc = backend.document(client, title, revision)
-            rendered = clean_wiki_html(backend.render(client, title, doc['source'])) if doc['exists'] else ''
-        return page('document.html', doc=doc, rendered=rendered, revision=revision), 200 if doc['exists'] else 404
+            rendered = clean_wiki_html(backend.render(client, title, renderable(doc['source']))) if doc['exists'] else ''
+        return page('document.html', doc=doc, rendered=rendered, revision=revision,
+                    can_edit_doc=can_edit_title(g.wiki_access, title),
+                    officer_doc=is_officer_title(title)), 200 if doc['exists'] else 404
 
     @bp.get('/pages')
     def pages():
@@ -148,11 +169,16 @@ def init_wiki_routes(app, get_db):
         backend = engine()
         with backend.user(g.wiki_access.member_id) as client:
             titles = backend.titles(client, query, number)
-        return page('pages.html', titles=titles, query=query, number=number)
+        # Decide paging on the engine's page size before hiding officer titles.
+        has_next = len(titles) == 50
+        titles = [t for t in titles if can_read_title(g.wiki_access, t if isinstance(t, str) else str(t))]
+        return page('pages.html', titles=titles, query=query, number=number, has_next=has_next)
 
     @bp.get('/history/<path:title>')
     def history(title):
         title_value(title)
+        if not can_read_title(g.wiki_access, title):
+            return hidden()
         number = page_number()
         backend = engine()
         with backend.user(g.wiki_access.member_id) as client:
@@ -161,18 +187,23 @@ def init_wiki_routes(app, get_db):
 
     @bp.get('/new')
     def new():
-        if not g.wiki_access.can_edit:
+        if not (g.wiki_access.can_edit or g.wiki_access.is_officer):
             return message(g.wiki_access.reason, 403)
         title = request.args.get('title', '').strip()
         if title:
-            return redirect(url_for('wiki.edit', title=title_value(title)))
+            title_value(title)
+            if not can_edit_title(g.wiki_access, title):
+                return message(edit_denied(title), 403)
+            return redirect(url_for('wiki.edit', title=title))
         return page('new.html')
 
     @bp.route('/edit/<path:title>', methods=['GET', 'POST'])
     def edit(title):
         title_value(title)
-        if not g.wiki_access.can_edit:
-            return message(g.wiki_access.reason, 403)
+        if not can_read_title(g.wiki_access, title):
+            return hidden()
+        if not can_edit_title(g.wiki_access, title):
+            return message(edit_denied(title), 403)
         status, notice, preview, summary = 200, '', None, ''
         doc = None
         if request.method == 'POST':
@@ -189,9 +220,10 @@ def init_wiki_routes(app, get_db):
             with backend.user(g.wiki_access.member_id) as client:
                 if request.method == 'GET':
                     doc = backend.document(client, title)
-                    return page('edit.html', doc=doc, notice=notice, preview=preview, summary=summary)
+                    return page('edit.html', doc=doc, notice=notice, preview=preview, summary=summary,
+                                officer_doc=is_officer_title(title))
                 if request.form.get('action') == 'preview':
-                    preview = clean_wiki_html(backend.render(client, title, content))
+                    preview = clean_wiki_html(backend.render(client, title, renderable(content)))
                 elif not summary or not content.strip():
                     notice, status = '본문과 편집 요약을 입력해 주세요.', 400
                 else:
@@ -202,8 +234,10 @@ def init_wiki_routes(app, get_db):
                     except Exception:
                         fresh = None
                         notice, status = '회원 상태를 다시 확인하지 못해 저장하지 않았습니다.', 503
-                    if not fresh or not fresh.can_edit:
-                        notice, status = notice or '현재 학기의 활동 회원만 저장할 수 있습니다.', status if notice else 403
+                    if not can_edit_title(fresh, title):
+                        denied = ('운영진 전용 문서는 운영진만 저장할 수 있습니다.' if is_officer_title(title)
+                                  else '현재 학기의 활동 회원만 저장할 수 있습니다.')
+                        notice, status = notice or denied, status if notice else 403
                     else:
                         try:
                             backend.save(client, title, content, summary, version)
@@ -216,6 +250,7 @@ def init_wiki_routes(app, get_db):
             if doc is None:
                 raise
             notice, status = '위키 연결 또는 저장 결과를 확인하지 못했습니다. 작성한 내용은 유지했습니다. 최신 문서와 이력을 먼저 확인해 주세요.', 503
-        return page('edit.html', doc=doc, notice=notice, preview=preview, summary=summary), status
+        return page('edit.html', doc=doc, notice=notice, preview=preview, summary=summary,
+                    officer_doc=is_officer_title(title)), status
 
     app.register_blueprint(bp)
