@@ -56,6 +56,7 @@ from home_overview import date_label, member_seminar_summary, operations_summary
 from attendance_workflow import attendance_is_confirmed, confirmed_history_session_ids
 from security_utils import forwarded_client_address, safe_internal_next_url
 from minipc_security import install_security
+from session_cookie import QuietRefreshSessionInterface
 from static_assets import install_static_assets
 from storage_media import install_storage_media
 from wiki_routes import init_wiki_routes
@@ -108,6 +109,8 @@ app.config.update(
     SESSION_REFRESH_EACH_REQUEST=True,
     MAX_CONTENT_LENGTH=60 * 1024 * 1024,
 )
+# Only real changes or page navigations re-send the session cookie (see session_cookie.py).
+app.session_interface = QuietRefreshSessionInterface()
 EXTERNAL_HTTP_TIMEOUT = (5, 15)
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("Supabase URL과 Key가 .env 파일에 설정되지 않았습니다.")
@@ -899,12 +902,12 @@ def toggle_member_preview():
     if session.get('member_preview'):
         session.pop('member_preview', None)
         session['user_role'] = 'admin'
-        flash('관리자 화면으로 돌아왔습니다.', 'success')
+        flash('관리자 화면으로 돌아왔습니다.', 'toast')
         return redirect(url_for('admin_seminars'))
 
     session['member_preview'] = True
     session['user_role'] = 'member'
-    flash('회원 화면으로 전환했습니다.', 'success')
+    flash('회원 화면으로 전환했습니다.', 'toast')
     return redirect(url_for('my_page'))
 
 

@@ -11,6 +11,7 @@
 <script defer src="{{ url_for('static',filename='member_notifications.js') }}"></script>
 {% block head %}{% endblock %}
 <script defer src="{{ url_for('static',filename='lms_navigation.js') }}"></script>
+<script defer src="{{ url_for('static',filename='lms_flash.js') }}"></script>
 </head><body class="lms-page lms-nav-expanded {% if lms_isolated_auth|default(false) %}lms-isolated-auth{% endif %} {% if lms_course %}lms-course-page{% endif %} {% if lms_aside %}lms-has-aside{% endif %} {% if lms_page == 'dashboard' %}lms-dashboard-page{% endif %}" data-lms-page="{{ lms_page|default('content') }}">
 <a class="lms-skip" href="#lms-content">본문으로 건너뛰기</a>
 {% if not lms_isolated_auth|default(false) %}{% include '_lms_navigation.html' %}
@@ -20,7 +21,7 @@
 <div class="lms-columns">
 {% if lms_course %}<aside class="lms-course-menu" id="lms-course-menu">{% block course_navigation %}{% with term=lms_course %}{% include '_classroom_nav.html' %}{% endwith %}{% endblock %}</aside>{% endif %}
 <main class="lms-content" id="lms-content">
-{% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<p class="lms-alert" role="status">{{ message }}</p>{% endfor %}{% endwith %}
+{% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<p class="lms-alert lms-flash{% if category == 'toast' %} lms-flash-toast{% endif %}" role="status" data-lms-flash{% if category == 'toast' %} data-autohide="4000"{% endif %}><span>{{ message }}</span><button type="button" class="lms-flash-close" data-lms-flash-close aria-label="알림 닫기">×</button></p>{% endfor %}{% endwith %}
 {% block content %}{% endblock %}</main>
 {% if lms_aside %}<aside class="lms-right-panel">{% block aside %}{% endblock %}</aside>{% endif %}
 </div></div>

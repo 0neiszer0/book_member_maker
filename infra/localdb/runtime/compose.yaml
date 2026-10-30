@@ -84,8 +84,11 @@ services:
       - ./envoy.yaml:/etc/envoy/envoy.yaml:ro
 volumes:
   database:
+    name: bookmembers-db_production-database
   database-config:
+    name: bookmembers-db_production-config
   files:
+    name: bookmembers-db_production-files
 
 networks:
   default:
