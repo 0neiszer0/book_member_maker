@@ -11,10 +11,10 @@ class GuidesAndRecordEditingTest(unittest.TestCase):
 
     def test_member_guide_leads_with_current_required_flow_and_links(self):
         guide = self.read("templates/help_member.html")
-        self.assertIn("먼저, 필수 3가지", guide)
-        self.assertIn("목요일은 별도 신청 없음", guide)
-        self.assertIn("월요일은 카카오톡 참석 투표", guide)
-        self.assertIn("정원·선착순 제한은 없습니다", guide)
+        self.assertIn("참여 전 확인할 3가지", guide)
+        self.assertIn("해당 회차의 카카오톡 투표와 공지에 따라", guide)
+        self.assertIn("추가 세미나는 개설된 회차만", guide)
+        self.assertIn("회차에 맞는 발제문 제출", guide)
         self.assertIn("url_for('seminars')", guide)
         self.assertIn("url_for('my_page')", guide)
         self.assertNotIn("월/목 회차별로", guide)

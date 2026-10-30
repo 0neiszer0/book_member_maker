@@ -60,7 +60,7 @@ class UiUsabilityOverhaulTest(unittest.TestCase):
     def test_engagement_page_has_priority_and_empty_states(self):
         engagement = self.read("templates/engagement_now.html")
         self.assertIn("먼저 확인할 활동", engagement)
-        self.assertIn("engagement-priority-card", engagement)
+        self.assertIn('class="eg-activity-row" href="{{ first.url }}"', engagement)
         self.assertIn("지금 바로 제출하거나 신청할 활동이 없습니다", engagement)
         self.assertIn("상시 참여", engagement)
         self.assertIn("session.user_role == 'admin'", engagement)

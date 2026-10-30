@@ -14,8 +14,9 @@ class RecordsAnalyticsAttendanceTest(unittest.TestCase):
         cls.matrix_template = (ROOT / "templates" / "admin_attendance_matrix.html").read_text(encoding="utf-8")
 
     def test_compact_admin_and_records_menus_do_not_overlap(self):
-        self.assertIn(".records-subbar {", self.records_base)
-        self.assertIn("position: static;", self.records_base)
+        stylesheet = (ROOT / "static/lms_records.css").read_text(encoding="utf-8")
+        self.assertIn('class="records-subbar"', self.records_base)
+        self.assertIn(".records-subbar{position:static;", stylesheet)
         self.assertNotIn("mb-6 -mt-4 sm:-mt-6 lg:-mt-8", self.records_base)
 
     def test_records_subbar_does_not_duplicate_member_management_navigation(self):

@@ -62,8 +62,8 @@ class PersistentLoginTests(unittest.TestCase):
         response = fresh.get('/')
         html = response.get_data(as_text=True)
         self.assertEqual(response.status_code, 200)
-        self.assertIn('class="wd-link wd-link-staff">운영 관리', html)
-        self.assertIn('운영자 홈', html)
+        self.assertIn('href="/admin/dashboard"', html)
+        self.assertIn('data-lms-page="dashboard"', html)
         with fresh.session_transaction() as state:
             self.assertEqual(state['user_role'], 'admin')
 
@@ -76,8 +76,8 @@ class PersistentLoginTests(unittest.TestCase):
                 fresh.set_cookie('session', self.client.get_cookie('session').value)
                 home = fresh.get('/')
                 self.assertEqual(home.status_code, 200)
-                self.assertIn('운영자 홈', home.get_data(as_text=True))
-                self.assertIn('운영 개요 열기', home.get_data(as_text=True))
+                self.assertIn('data-lms-page="dashboard"', home.get_data(as_text=True))
+                self.assertIn('href="/admin/dashboard"', home.get_data(as_text=True))
                 self.assertEqual(fresh.get('/admin/dashboard').status_code, 200)
                 with fresh.session_transaction() as state:
                     self.assertEqual(state['user_role'], role)
@@ -89,9 +89,8 @@ class PersistentLoginTests(unittest.TestCase):
         fresh = self.module.app.test_client()
         fresh.set_cookie('session', self.client.get_cookie('session').value)
         home = fresh.get('/').get_data(as_text=True)
-        self.assertIn('회원 홈', home)
-        self.assertNotIn('운영 개요 열기', home)
-        self.assertNotIn('class="wd-link wd-link-staff"', home)
+        self.assertIn('data-lms-page="dashboard"', home)
+        self.assertNotIn('href="/admin/dashboard"', home)
         self.assertEqual(fresh.get('/admin/dashboard').status_code, 302)
 
     def test_browser_script_preserves_server_rendered_staff_navigation(self):
@@ -110,9 +109,9 @@ class PersistentLoginTests(unittest.TestCase):
         fresh.set_cookie('session', self.client.get_cookie('session').value)
 
         preview = fresh.get('/')
-        self.assertIn('회원 홈', preview.get_data(as_text=True))
+        self.assertIn('data-lms-page="dashboard"', preview.get_data(as_text=True))
         self.assertIn('관리자 화면으로 돌아가기', preview.get_data(as_text=True))
-        self.assertIn('class="wd-link wd-link-staff">운영 관리', preview.get_data(as_text=True))
+        self.assertIn('href="/admin/dashboard"', preview.get_data(as_text=True))
 
         admin = fresh.get('/admin/dashboard')
         self.assertEqual(admin.status_code, 200)
@@ -125,8 +124,8 @@ class PersistentLoginTests(unittest.TestCase):
         self.fake.rows['members'][0]['role'] = 'member'
         response = self.client.get('/')
         html = response.get_data(as_text=True)
-        self.assertNotIn('class="wd-link wd-link-staff">운영 관리', html)
-        self.assertIn('회원 홈', html)
+        self.assertNotIn('href="/admin/dashboard"', html)
+        self.assertIn('data-lms-page="dashboard"', html)
         with self.client.session_transaction() as state:
             self.assertEqual(state['user_role'], 'member')
 
@@ -134,7 +133,7 @@ class PersistentLoginTests(unittest.TestCase):
         self.oauth()
         self.fake.rows['members'][0]['account_status'] = 'pending'
         response = self.client.get('/')
-        self.assertNotIn('class="wd-link wd-link-staff">운영 관리', response.get_data(as_text=True))
+        self.assertNotIn('href="/admin/dashboard"', response.get_data(as_text=True))
         with self.client.session_transaction() as state:
             self.assertNotIn('user_id', state)
 
@@ -145,7 +144,7 @@ class PersistentLoginTests(unittest.TestCase):
             with self.subTest(path=path):
                 response = self.client.get(path)
                 self.assertEqual(response.status_code, 200)
-                self.assertNotIn('class="wd-link wd-link-staff">운영 관리', response.get_data(as_text=True))
+                self.assertNotIn('href="/admin/dashboard"', response.get_data(as_text=True))
 
     def test_demotion_clears_saved_member_preview(self):
         self.oauth()
@@ -154,7 +153,7 @@ class PersistentLoginTests(unittest.TestCase):
             state['user_role'] = 'member'
         self.fake.rows['members'][0]['role'] = 'member'
         response = self.client.get('/')
-        self.assertNotIn('class="wd-link wd-link-staff">운영 관리', response.get_data(as_text=True))
+        self.assertNotIn('href="/admin/dashboard"', response.get_data(as_text=True))
         with self.client.session_transaction() as state:
             self.assertNotIn('member_preview', state)
 

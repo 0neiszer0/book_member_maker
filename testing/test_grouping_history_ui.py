@@ -59,10 +59,12 @@ class GroupingHistoryUiContracts(unittest.TestCase):
         self.assertIn('.ge-chip.ge-female', self.editor_css)
 
     def test_gender_member_cards_stay_inside_one_aligned_table_column(self):
-        self.assertIn('.member-list { display:grid; grid-template-columns:minmax(0,1fr)', self.index_source)
-        self.assertIn('.member-row { width:100%; max-width:100%; box-sizing:border-box;', self.index_source)
-        self.assertIn('.member-row > span { min-width:0; overflow-wrap:anywhere; }', self.index_source)
-        self.assertNotIn('grid-template-columns:repeat(2,minmax(0,1fr))', self.index_source)
+        stylesheet = (ROOT / 'static/lms_groups.css').read_text(encoding='utf-8')
+        self.assertIn("filename='lms_groups.css'", self.index_source)
+        self.assertIn('.groups-page .member-list{display:grid', stylesheet)
+        self.assertIn('grid-template-columns:minmax(0,1fr) 56px 56px', stylesheet)
+        self.assertIn('.groups-page .member-row{width:100%', stylesheet)
+        self.assertIn('.groups-page .member-row>span{min-width:0;overflow-wrap:anywhere}', stylesheet)
 
     def test_saved_record_can_recreate_group_capture(self):
         self.assertIn('html2canvas/1.4.1/html2canvas.min.js', self.record_source)
