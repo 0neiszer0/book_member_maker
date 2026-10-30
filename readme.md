@@ -3,11 +3,11 @@
 
 현재 공식 사이트는 **https://knu-read.xyz** 이며, 미니 PC의 앱·로컬 PostgreSQL·파일 저장소·위키로 운영합니다. Cloudflare가 공개 연결과 정적 파일을 제공하고, 암호화 백업은 별도 Google Drive에 보관합니다. [현재 운영·복구 기록](infra/localdb/PRODUCTION_CUTOVER.md)을 먼저 참고하세요.
 
-`main`은 운영 코드 보관용입니다. Render에 전체 앱을 자동 배포하지 않습니다. 기존 Render 주소는 별도 `render/legacy-redirect` 브랜치의 [이전 안내 서비스](infra/render-redirect/README.md)로만 유지하며, 서비스 재개·배포는 별도 승인 후 수행합니다.
+`main`은 운영 코드 보관용입니다. Render에 전체 앱을 자동 배포하지 않습니다. 기존 Render 주소는 별도 `render/legacy-redirect` 브랜치의 [이전 안내 서비스](infra/render-redirect/README.md)로만 유지합니다. 사용자 승인 후 2026-10-30 안내 배포와 실제 자동 이동 검증을 완료했으며, Render 자동 배포는 꺼져 있습니다.
 
 ## 📖 프로젝트 개요
 
-'책 먹는 호반우'는 독서 동아리의 전반적인 활동과 신규 회원 모집 과정을 효율적으로 관리하기 위해 구축된 웹 애플리케이션입니다. **Flask**와 **Supabase**를 기반으로 하며, 회원 관리, 위키, 면접 일정 조율, 그리고 **OR-Tools CP-SAT을 활용한 제약 기반 조 편성** 등 동아리 운영에 필요한 핵심 기능들을 통합 제공합니다.
+'책 먹는 호반우'는 독서 동아리의 전반적인 활동과 신규 회원 모집 과정을 효율적으로 관리하기 위해 구축된 웹 애플리케이션입니다. **Flask**와 **로컬 PostgreSQL·PostgREST**를 기반으로 하며, 회원 관리, 위키, 면접 일정 조율, 그리고 **OR-Tools CP-SAT을 활용한 제약 기반 조 편성** 등 동아리 운영에 필요한 핵심 기능들을 통합 제공합니다.
 
 -----
 

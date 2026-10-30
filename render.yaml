@@ -9,4 +9,5 @@ services:
     autoDeployTrigger: 'off'
     dockerfilePath: ./Dockerfile
     dockerContext: .
+    dockerCommand: python -I -u /app/server.py
     healthCheckPath: /healthz
