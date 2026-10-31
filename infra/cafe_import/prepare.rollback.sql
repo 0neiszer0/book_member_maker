@@ -17,4 +17,6 @@ update public.boards set name = '세미나 후기', updated_at = now()
  where slug = 'seminar-reviews' and name = '세미나 기록';
 update public.history set book_title = case date when '2026-01-12' then '날개' else '사탄탱고' end
  where (date = '2026-01-12' and book_title = '사탄탱고') or (date = '2026-01-19' and book_title = '날개');
+update public.history set book_title = '나사내금'
+ where date = '2026-10-01' and book_title = '나는 소망한다 내게 금지된 것을';
 commit;

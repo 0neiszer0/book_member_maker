@@ -129,3 +129,10 @@ class CafeImportApplyTests(unittest.TestCase):
                 cafe.rollback(state)
             self.assertEqual(db.rows['posts'], [])
             self.assertEqual(bucket.files, {})
+
+
+class BrickBookAuthorTests(unittest.TestCase):
+    def test_brick_board_keeps_public_author(self):
+        self.assertEqual(cafe.public_byline('6기김윤일'), '6기 김윤일')
+        self.assertEqual(cafe.public_byline(' 6 기 김윤일'), '6기 김윤일')
+        self.assertIn('22', cafe.PUBLIC_AUTHOR_BOARDS)

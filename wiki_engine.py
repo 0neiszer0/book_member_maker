@@ -130,6 +130,11 @@ class OpenNamu:
         return {'title': title, 'source': raw.get('data', ''), 'exists': raw['response'] == 'ok',
                 'version': revision or latest, 'history': history}
 
+    def revision_source(self, client, title, revision):
+        """Raw NamuMark of one revision, or None when it does not exist or is hidden."""
+        raw = self.json(client, f'/api/v2/raw_rev/{int(revision)}/' + quote(title, safe=''))
+        return raw.get('data', '') if raw['response'] == 'ok' else None
+
     def render(self, client, title, source):
         return self.json(client, '/api/render', data={'name': title, 'data': source})['data']
 

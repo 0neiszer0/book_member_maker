@@ -1,4 +1,5 @@
 """Small same-origin wiki surface. No generic proxy or native admin endpoints."""
+import difflib
 import hmac
 import os
 import secrets
@@ -8,7 +9,7 @@ from urllib.parse import unquote, urlsplit
 import bleach
 from bs4 import BeautifulSoup
 from flask import Blueprint, abort, current_app, g, redirect, render_template, request, session, url_for
-from markupsafe import Markup
+from markupsafe import Markup, escape
 
 from wiki_access import (wiki_access, can_edit_title, can_read_title, is_officer_title,
                          strip_officer_includes, OFFICER_PREFIX)
@@ -43,6 +44,52 @@ def clean_wiki_html(source):
         '*': ['id'], 'a': ['href', 'title', 'rel'], 'td': ['colspan', 'rowspan'],
         'th': ['colspan', 'rowspan', 'scope'], 'ol': ['start'], 'details': ['open'],
     }, protocols=['http', 'https'], strip=True))
+
+
+DIFF_CONTEXT = 3
+
+
+def _inline(old, new):
+    """Mark the changed characters inside a replaced line pair (escaped HTML)."""
+    old_out, new_out = [], []
+    for tag, a1, a2, b1, b2 in difflib.SequenceMatcher(None, old, new, autojunk=False).get_opcodes():
+        before, after = escape(old[a1:a2]), escape(new[b1:b2])
+        if tag == 'equal':
+            old_out.append(before); new_out.append(after)
+        else:
+            if before:
+                old_out.append(Markup('<del>') + before + Markup('</del>'))
+            if after:
+                new_out.append(Markup('<ins>') + after + Markup('</ins>'))
+    return Markup('').join(old_out), Markup('').join(new_out)
+
+
+def diff_rows(old_text, new_text):
+    """Line rows like Namuwiki's compare view: kind in same/del/add/skip."""
+    old_lines, new_lines = old_text.split('\n'), new_text.split('\n')
+    rows = []
+    for tag, a1, a2, b1, b2 in difflib.SequenceMatcher(None, old_lines, new_lines, autojunk=False).get_opcodes():
+        if tag == 'equal':
+            span, after_change, before_change = a2 - a1, a1 > 0 or b1 > 0, a2 < len(old_lines) or b2 < len(new_lines)
+            shown = [o for o in range(span) if (after_change and o < DIFF_CONTEXT)
+                     or (before_change and o >= span - DIFF_CONTEXT)]
+            previous = -1
+            for offset in shown:
+                if offset != previous + 1:
+                    rows.append(dict(kind='skip', count=offset - previous - 1))
+                rows.append(dict(kind='same', old=a1 + offset + 1, new=b1 + offset + 1, text=old_lines[a1 + offset]))
+                previous = offset
+            if span and previous != span - 1:
+                rows.append(dict(kind='skip', count=span - previous - 1))
+            continue
+        removed, added = old_lines[a1:a2], new_lines[b1:b2]
+        pairs = min(len(removed), len(added)) if tag == 'replace' else 0
+        marked = [_inline(removed[i], added[i]) for i in range(pairs)]
+        for i, line in enumerate(removed):
+            rows.append(dict(kind='del', old=a1 + i + 1, new=None, text=marked[i][0] if i < pairs else line))
+        for i, line in enumerate(added):
+            rows.append(dict(kind='add', old=None, new=b1 + i + 1, text=marked[i][1] if i < pairs else line))
+    return rows
 
 
 def init_wiki_routes(app, get_db):
@@ -202,6 +249,28 @@ def init_wiki_routes(app, get_db):
         with backend.user(g.wiki_access.member_id) as client:
             revisions = backend.history(client, title, number)
         return page('history.html', title=title, revisions=revisions, number=number)
+
+    @bp.get('/diff/<path:title>')
+    def diff(title):
+        title_value(title)
+        if not can_read_title(g.wiki_access, title):
+            return hidden()
+        values = [request.args.get(name, '') for name in ('old', 'new')]
+        if not all(v.isascii() and v.isdigit() and 0 < int(v) < 10**9 for v in values):
+            return message('비교할 두 버전을 골라 주세요.', 400)
+        old, new = sorted(int(v) for v in values)
+        if old == new:
+            return message('서로 다른 두 버전을 골라 주세요.', 400)
+        backend = engine()
+        with backend.user(g.wiki_access.member_id) as client:
+            sources = [backend.revision_source(client, title, number) for number in (old, new)]
+        if any(source is None for source in sources):
+            return message('비교할 버전을 찾을 수 없습니다.', 404)
+        if not g.wiki_access.is_officer:
+            sources = [strip_officer_includes(source) for source in sources]
+        rows = diff_rows(*sources)
+        return page('diff.html', title=title, old=old, new=new, rows=rows,
+                    added=sum(r['kind'] == 'add' for r in rows), removed=sum(r['kind'] == 'del' for r in rows))
 
     @bp.get('/new')
     def new():

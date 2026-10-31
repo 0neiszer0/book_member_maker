@@ -46,6 +46,8 @@ BOARD_RULES = {
     '11': (REVIEW_BOARD, '[정규모임]'),
     '12': (REVIEW_BOARD, '[친목활동]'),
 }
+# 벽돌책 글은 원래 이름·학번을 공개하고 모집하므로 작성자를 그대로 둔다 (회장 결정 2026-10-31).
+PUBLIC_AUTHOR_BOARDS = {'22'}
 SKIP_BOARDS = {'14': '공지사항', '9': '신입모집', '1': '회칙', '13': '회계장부', '23': '총회 회의록'}
 # Posts that are templates or lists of people rather than club writing.
 SKIP_POSTS = {('18', '책 제목'): '후기 양식 예시', ('4', '커리큘럼 발제자 정리'): '발제자 명단'}
@@ -72,6 +74,11 @@ def cohort(author):
     if match and 1 <= int(match.group(1)) <= 19:
         return f'{int(match.group(1))}기 회원'
     return '기수 미상 회원'
+
+
+def public_byline(author):
+    # '6기김윤일' / '6 기 김윤일' -> '6기 김윤일'
+    return re.sub(r'^\s*(\d{1,2})\s*기\s*', r'\1기 ', author or '').strip() or '작성자 미상'
 
 
 def person_names(rows):
@@ -214,19 +221,22 @@ def build_plan(archive, history, public_images):
         attachments = [a for a in (meta.get('attachments') or '').split(';') if a.strip()]
         posted = datetime.strptime(meta['posted'], '%Y.%m.%d. %H:%M').replace(tzinfo=KST)
         slug, prefix = BOARD_RULES[menu]
+        public_author = menu in PUBLIC_AUTHOR_BOARDS
         if menu == '18':
             title_core, book = review_title(row['title'], names)
         else:
-            title_core = redact(row['title'], names).replace('○○○', '').strip()
+            title_core = row['title'].strip() if public_author else redact(row['title'], names).replace('○○○', '').strip()
             book = title_core
         title = f'{prefix} {title_core}'.strip()[:200]
-        body = redact(clean_body(pdf_text(folder / 'page.pdf'), attachments), names)
+        body = clean_body(pdf_text(folder / 'page.pdf'), attachments)
+        body = body if public_author else redact(body, names)
         images = sorted(p for p in folder.rglob('*') if p.suffix.lower() in IMAGE_EXT)
         files = [a for a in attachments if Path(a).suffix.lower() not in IMAGE_EXT]
         hidden_images = bool(images) and slug != REVIEW_BOARD and public_images == 'hold'
-        parts = [f"카페에서 옮긴 글 · {cohort(row['author'])} · {posted:%Y.%m.%d} 작성", '', body or '(본문 없음)']
+        byline = f'작성: {public_byline(row["author"])}' if public_author else cohort(row['author'])
+        parts = [f"카페에서 옮긴 글 · {byline} · {posted:%Y.%m.%d} 작성", '', body or '(본문 없음)']
         if files:
-            parts += ['', '카페 원본 첨부파일 (운영진 보관본):'] + [f'- {redact(f, names)}' for f in files]
+            parts += ['', '카페 원본 첨부파일 (운영진 보관본):'] + [f'- {f if public_author else redact(f, names)}' for f in files]
         if hidden_images:
             parts += ['', f'카페 원본 사진 {len(images)}장은 운영진 확인 후 올립니다.']
         history_id = None
@@ -236,7 +246,7 @@ def build_plan(archive, history, public_images):
             'source': f'{menu}/{article}', 'board': slug, 'title': title, 'content': '\n'.join(parts)[:50000],
             'created_at': posted.isoformat(), 'history_id': history_id,
             'images': [] if hidden_images else [str(p) for p in images], 'held_images': len(images) if hidden_images else 0,
-            'files': len(files), 'unknown_cohort': cohort(row['author']).startswith('기수 미상'),
+            'files': len(files), 'unknown_cohort': not public_author and cohort(row['author']).startswith('기수 미상'),
         })
     return plan, skipped
 

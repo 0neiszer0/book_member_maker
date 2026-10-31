@@ -21,4 +21,8 @@ select '카페 보관', 'system:cafe-archive', 'member', false, 'blocked', 'disa
 update public.history set book_title = case date when '2026-01-12' then '사탄탱고' else '날개' end
  where (date = '2026-01-12' and book_title = '날개') or (date = '2026-01-19' and book_title = '사탄탱고');
 
+-- 5) 2026-10-01 회차 책 제목이 약칭('나사내금')으로 들어가 있어 정식 제목으로 바꾼다 (카페 후기·일지 표기 기준).
+update public.history set book_title = '나는 소망한다 내게 금지된 것을'
+ where date = '2026-10-01' and book_title = '나사내금';
+
 commit;
