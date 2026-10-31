@@ -8,9 +8,10 @@ from security_utils import safe_internal_next_url
 
 MEMBER_POSTS = {
     'book_suggest', 'support_book_suggestion', 'comment_book_suggestion',
-    'seminar_review_form', 'brick_application_form', 'brick_review_form',
+    'seminar_review_claim', 'brick_application_form', 'brick_review_form',
 }
-SENSITIVE_POSTS = MEMBER_POSTS | {
+# Seminar review links accept guests like topic links; CSRF still applies.
+SENSITIVE_POSTS = MEMBER_POSTS | {'seminar_review_form',
     'link_account_submit', 'link_lookup', 'handle_notification', 'boards.write', 'boards.edit', 'seminar_session_toggle',
     'delete_member', 'set_member_status', 'edit_member', 'merge_members', 'create_member',
 }

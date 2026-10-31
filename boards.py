@@ -182,6 +182,29 @@ def init_board_routes(app, supabase, login_required):
         except Exception:
             return {'nav_boards': [], 'notice_board': None}
 
+    def seminar_link_reviews(history_id):
+        """Reviews submitted through a session's review link, shown in that 회차's board view."""
+        try:
+            rows = supabase.table('history').select('seminar_session_id').eq('id', history_id).limit(1).execute().data or []
+            session_id = rows[0].get('seminar_session_id') if rows else None
+            if not session_id:
+                return []
+            forms = supabase.table('seminar_review_forms').select('id').eq('seminar_session_id', session_id).execute().data or []
+            if not forms:
+                return []
+            reviews = supabase.table('seminar_reviews').select(
+                'id,member_id,author_name,identity_kind,memorable_point,discussion_point,free_text,created_at,updated_at'
+            ).in_('form_id', [f['id'] for f in forms]).is_('deleted_at', 'null').order('created_at').execute().data or []
+        except Exception:
+            app.logger.warning('seminar link reviews unavailable for board view')
+            return []
+        from engagement import review_author_label
+        names = member_map(r['member_id'] for r in reviews if r.get('member_id') is not None)
+        for row in reviews:
+            row['author_label'] = review_author_label(row, names)
+            row['content'] = '\n\n'.join(filter(None, [row.get('memorable_point'), row.get('discussion_point'), row.get('free_text')]))
+        return reviews
+
     @bp.route('/boards')
     @login_required()
     def index():
@@ -224,9 +247,10 @@ def init_board_routes(app, supabase, login_required):
         members = member_map(post['author_id'] for post in posts)
         for post in posts:
             post['author'] = members.get(post['author_id'], {'name': '알 수 없음'})
+        link_reviews = seminar_link_reviews(history_id) if history_id and page == 1 and not search else []
         return render_template('board_list.html', board=board, posts=posts, page=page,
                                has_next=has_next, q=search, history_id=history_id, can_write=allowed(board['write_role']),
-                               all_terms=all_terms, **context)
+                               all_terms=all_terms, link_reviews=link_reviews, **context)
 
     @bp.route('/board/<slug>/write', methods=['GET', 'POST'])
     @login_required()

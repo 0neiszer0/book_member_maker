@@ -86,7 +86,11 @@ def collect_items(db, now):
         session_ids = [f['seminar_session_id'] for f in forms]
         meetings = all_rows(db.table('seminar_sessions').select('id,book_title,actual_member_ids,attendance_confirmed_at').in_('id', session_ids).order('id'))
         histories = all_rows(db.table('history').select('id,seminar_session_id,present,actual_member_ids,attendance_confirmed_at').in_('seminar_session_id', session_ids).order('id'))
-        reviewed = {(r['form_id'], r['member_id']) for r in all_rows(db.table('seminar_reviews').select('id,form_id,member_id').in_('form_id', [f['id'] for f in forms]).is_('deleted_at', 'null').order('id'))}
+        review_rows = all_rows(db.table('seminar_reviews').select('id,form_id,member_id,student_id').in_('form_id', [f['id'] for f in forms]).is_('deleted_at', 'null').order('id'))
+        reviewed = {(r['form_id'], r['member_id']) for r in review_rows if r.get('member_id') is not None}
+        # A review written through the link without login counts by student ID.
+        reviewed_sids = {(r['form_id'], str(r['student_id']).strip()) for r in review_rows if r.get('student_id')}
+        sid_by_member = {m['id']: str(m.get('student_id') or '').strip() for m in members}
         no_shows = {(r['session_id'], r['member_id']) for r in all_rows(db.table('seminar_no_shows').select('id,session_id,member_id').in_('session_id', session_ids).is_('cancelled_at', 'null').order('id'))}
         names = Counter(m.get('name') for m in identities)
         for form in forms:
@@ -101,7 +105,9 @@ def collect_items(db, now):
                     else:
                         confirmed.update(m['id'] for m in members if names[m.get('name')] == 1 and m.get('name') in (h.get('present') or []))
             for mid in confirmed & active:
-                if (form['id'], mid) not in reviewed and (form['seminar_session_id'], mid) not in no_shows:
+                if (form['id'], mid) in reviewed or (sid_by_member.get(mid) and (form['id'], sid_by_member[mid]) in reviewed_sids):
+                    continue
+                if (form['seminar_session_id'], mid) not in no_shows:
                     add(mid, f"review:{form['id']}", f"{meeting.get('book_title') or '세미나'} 후기", '참여한 세미나의 후기를 남겨주세요.', f"/review/seminar/{form['share_token']}")
     backup = backup_notice(now)
     if backup:

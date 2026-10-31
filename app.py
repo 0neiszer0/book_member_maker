@@ -4629,7 +4629,7 @@ def _load_weekly_seminar_view(term_id=None):
         review_form_ids = [row['id'] for row in review_forms]
         if review_form_ids:
             review_submissions = supabase.table('seminar_reviews').select(
-                'id, form_id, member_id, memorable_point, discussion_point, free_text, created_at, updated_at'
+                'id, form_id, member_id, author_name, identity_kind, memorable_point, discussion_point, free_text, created_at, updated_at'
             ) \
                 .in_('form_id', review_form_ids).is_('deleted_at', 'null').execute().data or []
     submissions = []
@@ -4653,7 +4653,7 @@ def _load_weekly_seminar_view(term_id=None):
     reviews_by_form = defaultdict(list)
     for row in review_submissions:
         review_count[row['form_id']] += 1
-        row['member'] = member_by_id.get(row.get('member_id'), {})
+        row['member'] = {'name': review_author_label(row, member_by_id, staff=True)}
         row['review_content'] = '\n\n'.join(filter(None, [
             row.get('memorable_point'),
             row.get('discussion_point'),
@@ -6592,7 +6592,7 @@ from boards import init_board_routes
 init_board_routes(app, supabase, login_required)
 
 # 공개 링크 중심 참여 흐름(후기·책 추천·벽돌책)을 별도 모듈로 관리한다.
-from engagement import init_engagement_routes
+from engagement import init_engagement_routes, review_author_label
 init_engagement_routes(app, supabase, login_required, _voting_window_for,
                        topic_event_lifecycle=_auto_close_topic_events)
 

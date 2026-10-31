@@ -172,6 +172,10 @@ class EngagementIdentityTests(unittest.TestCase):
                 if remembered: state.update(participation_member_id=1,user_id=1)
             for path in self.paths:
                 result=self.client.post(path,data={'student_id':'1001','member_name':'test-1','member_id':1})
+                if path.startswith('/review/seminar/'):
+                    # Review links accept guests, but never without the session CSRF token.
+                    self.assertEqual(result.status_code,403)
+                    continue
                 self.assertEqual(result.status_code,303)
                 self.assertTrue(result.location.startswith('/login/kakao?next='))
         self.assertFalse(any(c[0] in {'insert','update','delete'} for c in self.db.calls))

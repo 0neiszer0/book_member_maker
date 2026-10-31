@@ -5,15 +5,44 @@ from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
 from flask import (
-    abort, flash, jsonify, redirect, render_template, request, session, url_for,
+    abort, flash, g, jsonify, make_response, redirect, render_template, request, session, url_for,
 )
 from minipc_security import authenticated_member
+from security_utils import forwarded_client_address
+from topic_credentials import (
+    generate_topic_edit_token, review_edit_token_digest, review_edit_token_matches,
+    review_request_fingerprint,
+)
 from storage_media import browser_storage_url
 from PIL import Image, ImageOps, UnidentifiedImageError
+from werkzeug.routing import BuildError
 from engagement_utils import clean_text as _clean_text
 from engagement_utils import form_is_open as _form_is_open
 from engagement_utils import normalize_kyobo_url as _normalize_kyobo_url
 from topic_lifecycle import topic_event_close_at, topic_event_is_open
+
+
+STUDENT_ID_PATTERN = re.compile(r"^[0-9]{4,12}$")
+# Link reviews without login: at most 5 new submissions and 10 failed edit/claim
+# checks per browser address and form within the window.
+GUEST_SUBMIT_LIMIT = 5
+GUEST_FAILURE_LIMIT = 10
+GUEST_WINDOW_MINUTES = 15
+REVISION_PRIVATE_KEYS = {"id", "created_at", "updated_at", "deleted_at", "edit_token_hash"}
+
+
+def review_author_label(row, member_by_id=None, staff=False):
+    """Display name of a link review: the member's name, or the name a guest typed."""
+    member = (member_by_id or {}).get(row.get("member_id")) if row.get("member_id") is not None else None
+    if member and member.get("name"):
+        return member["name"]
+    name = (row.get("author_name") or "").strip() or "회원"
+    return f"{name} (비회원)" if staff and row.get("identity_kind") == "guest" else name
+
+
+def _student_id(value):
+    value = re.sub(r"[\s-]", "", str(value or ""))
+    return value if STUDENT_ID_PATTERN.match(value) else ""
 
 
 FORM_TABLES = {
@@ -94,19 +123,160 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
     def save_revision(kind, row):
         payload = {
             key: value for key, value in row.items()
-            if key not in {"id", "created_at", "updated_at", "deleted_at"}
+            if key not in REVISION_PRIVATE_KEYS
         }
+        if row.get("member_id") is None:
+            actor_kind = "guest"
+        else:
+            actor_kind = "staff" if session.get("user_role") in ("admin", "officer") else "member"
         supabase.table("submission_revisions").insert({
             "submission_type": kind,
             "submission_id": row["id"],
-            "member_id": row["member_id"],
+            "member_id": row.get("member_id"),
             "payload": payload,
-            "actor_kind": "staff" if session.get("user_role") in ("admin", "officer") else "member",
+            "actor_kind": actor_kind,
         }).execute()
+
+    def review_request_hash(form_id):
+        address = forwarded_client_address(
+            request.headers.get("X-App-Client-IP") if g.get("trusted_app_proxy") else None,
+            request.remote_addr,
+        )
+        return review_request_fingerprint(address, form_id, app.secret_key)
+
+    def review_attempts_exceeded(form_id, action, limit, failed_only):
+        since = (datetime.now(timezone.utc) - timedelta(minutes=GUEST_WINDOW_MINUTES)).isoformat()
+        try:
+            query = supabase.table("review_edit_attempts").select("id", count="exact") \
+                .eq("form_id", form_id).eq("request_hash", review_request_hash(form_id)) \
+                .eq("action", action).gte("created_at", since)
+            if failed_only:
+                query = query.eq("succeeded", False)
+            result = query.execute()
+            return (result.count or 0) >= limit
+        except Exception:
+            app.logger.warning("review attempt lookup failed")
+            # Fail closed for anonymous writes: no audit table, no guest writes.
+            return True
+
+    def record_review_attempt(form_id, action, succeeded):
+        try:
+            supabase.table("review_edit_attempts").insert({
+                "form_id": form_id,
+                "request_hash": review_request_hash(form_id),
+                "action": action,
+                "succeeded": bool(succeeded),
+            }).execute()
+        except Exception:
+            app.logger.warning("review attempt audit failed")
+
+    def joined_review(row):
+        if row:
+            row["review_content"] = "\n\n".join(filter(None, [
+                row.get("memorable_point"), row.get("discussion_point"), row.get("free_text"),
+            ]))
+        return row
+
+    def review_by_student(form_id, student_id):
+        if not student_id:
+            return None
+        rows = supabase.table("seminar_reviews").select("*").eq("form_id", form_id) \
+            .eq("student_id", student_id).limit(1).execute().data or []
+        return rows[0] if rows else None
+
+    def review_content_payload():
+        review_content = _clean_text(request.form.get("review_content"), 5000)
+        if not review_content:
+            raise ValueError("세미나 후기를 입력해주세요.")
+        return {
+            "memorable_point": review_content,
+            "discussion_point": None,
+            "free_text": None,
+            "updated_at": _now_iso(),
+            "deleted_at": None,
+        }
+
+    def render_review(form, seminar, member, existing, status=200, **extra):
+        response = make_response(render_template(
+            "engagement_form.html",
+            form_kind="seminar_review",
+            form_row=form,
+            context_row=seminar,
+            member=member,
+            existing=joined_review(existing),
+            is_open=_form_is_open(form),
+            social_meta=_social_meta(
+                f"{seminar.get('book_title') or '세미나'} 후기",
+                f"{seminar.get('meeting_date')} 세미나 후기를 남겨주세요.",
+                f"{_public_base()}{url_for('seminar_review_form', token=form['share_token'])}",
+                noindex=True,
+            ),
+            **extra,
+        ), status)
+        # The completion screen shows a one-time edit code.
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    def submit_guest_review(form, seminar):
+        """Link submission without login. Returns a response for every outcome."""
+        values = {
+            "guest_name": _clean_text(request.form.get("author_name"), 40),
+            "guest_student_id": _student_id(request.form.get("student_id")),
+        }
+        if (request.form.get("website") or "").strip():
+            # Honeypot: answer like a validation error and store nothing.
+            flash("제출 내용을 확인할 수 없습니다. 다시 시도해주세요.", "danger")
+            return render_review(form, seminar, None, None, status=400, **values)
+        if not values["guest_name"] or not values["guest_student_id"]:
+            flash("이름과 학번(숫자)을 입력해주세요.", "danger")
+            return render_review(form, seminar, None, None, status=400, **values)
+        payload = review_content_payload()
+        existing = review_by_student(form["id"], values["guest_student_id"])
+        if existing:
+            if existing.get("identity_kind") != "guest":
+                flash("이 학번으로 계정에서 쓴 후기가 있습니다. 로그인한 뒤 수정해주세요.", "danger")
+                return render_review(form, seminar, None, None, status=409, **values)
+            if review_attempts_exceeded(form["id"], "edit", GUEST_FAILURE_LIMIT, True):
+                flash("수정 확인이 잠시 제한되었습니다. 15분 후 다시 시도해주세요.", "danger")
+                return render_review(form, seminar, None, None, status=429, **values)
+            code = (request.form.get("edit_code") or "").strip()
+            ok = review_edit_token_matches(existing.get("edit_token_hash"), code, app.secret_key)
+            record_review_attempt(form["id"], "edit", ok)
+            if not ok:
+                flash("이 학번으로 이미 낸 후기가 있습니다. 수정하려면 제출할 때 받은 수정 코드를 입력해주세요.", "danger")
+                return render_review(form, seminar, None, None, status=403, need_edit_code=True, **values)
+            save_revision("seminar_review", existing)
+            payload["author_name"] = values["guest_name"]
+            supabase.table("seminar_reviews").update(payload).eq("id", existing["id"]).execute()
+            return render_review(form, seminar, None, None, guest_done=True, guest_updated=True, **values)
+        if review_attempts_exceeded(form["id"], "submit", GUEST_SUBMIT_LIMIT, False):
+            flash("짧은 시간에 제출이 너무 많습니다. 15분 후 다시 시도해주세요.", "danger")
+            return render_review(form, seminar, None, None, status=429, **values)
+        token = generate_topic_edit_token()
+        payload.update({
+            "form_id": form["id"],
+            "seminar_session_id": form["seminar_session_id"],
+            "member_id": None,
+            "identity_kind": "guest",
+            "author_name": values["guest_name"],
+            "student_id": values["guest_student_id"],
+            "edit_token_hash": review_edit_token_digest(token, app.secret_key),
+        })
+        supabase.table("seminar_reviews").insert(payload).execute()
+        record_review_attempt(form["id"], "submit", True)
+        return render_review(form, seminar, None, None, guest_done=True, edit_token=token, **values)
 
     @app.context_processor
     def engagement_navigation_context():
+        def review_login_url(next_path):
+            # Sign-up/login entry; the Kakao route stays as fallback until the new login ships.
+            try:
+                return url_for("login", next=next_path)
+            except BuildError:
+                return url_for("kakao_login", next=next_path)
+
         return {
+            "review_login_url": review_login_url,
             "engagement_image_url": image_url,
             "default_social_image_url": f"{_public_base()}{url_for('static', filename='og/club-preview-v2.png')}",
         }
@@ -487,36 +657,36 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
         form = forms[0]
         seminar = supabase.table("seminar_sessions").select("*").eq("id", form["seminar_session_id"]).single().execute().data
         member = current_member()
-        existing = None
-        if member:
+
+        def member_review(member):
             rows = supabase.table("seminar_reviews").select("*").eq("form_id", form["id"]).eq("member_id", member["id"]).limit(1).execute().data or []
-            existing = rows[0] if rows else None
-            if existing:
-                existing["review_content"] = "\n\n".join(filter(None, [
-                    existing.get("memorable_point"),
-                    existing.get("discussion_point"),
-                    existing.get("free_text"),
-                ]))
+            return rows[0] if rows else None
+
+        existing = member_review(member) if member else None
+        unclaimed = None
+        if member and not existing:
+            row = review_by_student(form["id"], _student_id(member.get("student_id")))
+            unclaimed = row if row and row.get("identity_kind") == "guest" else None
         if request.method == "POST":
             try:
                 if not _form_is_open(form):
                     raise ValueError("후기 입력이 마감되었습니다.")
-                member = resolve_member(request.form)
-                rows = supabase.table("seminar_reviews").select("*").eq("form_id", form["id"]).eq("member_id", member["id"]).limit(1).execute().data or []
-                existing = rows[0] if rows else None
-                review_content = _clean_text(request.form.get("review_content"), 5000)
-                if not review_content:
-                    raise ValueError("세미나 후기를 입력해주세요.")
-                payload = {
+                if not member:
+                    return submit_guest_review(form, seminar)
+                if unclaimed:
+                    raise ValueError("로그인 전에 이 학번으로 쓴 후기가 있습니다. 아래에서 수정 코드로 내 계정에 연결한 뒤 수정해주세요.")
+                existing = member_review(member)
+                payload = review_content_payload()
+                payload.update({
                     "form_id": form["id"],
                     "seminar_session_id": form["seminar_session_id"],
                     "member_id": member["id"],
-                    "memorable_point": review_content,
-                    "discussion_point": None,
-                    "free_text": None,
-                    "updated_at": _now_iso(),
-                    "deleted_at": None,
-                }
+                    "identity_kind": "member",
+                    "edit_token_hash": None,
+                })
+                sid = _student_id(member.get("student_id"))
+                if sid:
+                    payload["student_id"] = sid
                 if existing:
                     save_revision("seminar_review", existing)
                     supabase.table("seminar_reviews").update(payload).eq("id", existing["id"]).execute()
@@ -526,21 +696,43 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
                 return redirect(url_for("seminar_review_form", token=token))
             except ValueError as exc:
                 flash(str(exc), "danger")
-        return render_template(
-            "engagement_form.html",
-            form_kind="seminar_review",
-            form_row=form,
-            context_row=seminar,
-            member=member,
-            existing=existing,
-            is_open=_form_is_open(form),
-            social_meta=_social_meta(
-                f"{seminar.get('book_title') or '세미나'} 후기",
-                f"{seminar.get('meeting_date')} 세미나 후기를 남겨주세요.",
-                f"{_public_base()}{request.path}",
-                noindex=True,
-            ),
-        )
+        return render_review(form, seminar, member, existing, unclaimed=unclaimed)
+
+    @app.post("/review/seminar/<uuid:token>/claim")
+    def seminar_review_claim(token):
+        """Attach a review written without login to the logged-in member."""
+        member = current_member()
+        if not member:
+            abort(401)
+        forms = supabase.table("seminar_review_forms").select("*").eq("share_token", str(token)).limit(1).execute().data or []
+        if not forms:
+            abort(404)
+        form = forms[0]
+        target = url_for("seminar_review_form", token=token)
+        sid = _student_id(member.get("student_id"))
+        row = review_by_student(form["id"], sid)
+        if not sid or not row or row.get("identity_kind") != "guest":
+            flash("내 학번으로 로그인 없이 쓴 후기가 없습니다.", "danger")
+            return redirect(target)
+        if review_attempts_exceeded(form["id"], "claim", GUEST_FAILURE_LIMIT, True):
+            flash("확인이 잠시 제한되었습니다. 15분 후 다시 시도해주세요.", "danger")
+            return redirect(target)
+        ok = review_edit_token_matches(row.get("edit_token_hash"), request.form.get("edit_code"), app.secret_key)
+        record_review_attempt(form["id"], "claim", ok)
+        if not ok:
+            flash("수정 코드가 맞지 않습니다.", "danger")
+            return redirect(target)
+        if supabase.table("seminar_reviews").select("id").eq("form_id", form["id"]).eq("member_id", member["id"]).limit(1).execute().data:
+            flash("이 세미나에 계정으로 쓴 후기가 이미 있습니다. 운영진에게 정리를 요청해주세요.", "danger")
+            return redirect(target)
+        supabase.table("seminar_reviews").update({
+            "member_id": member["id"],
+            "identity_kind": "member",
+            "edit_token_hash": None,
+            "updated_at": _now_iso(),
+        }).eq("id", row["id"]).eq("identity_kind", "guest").execute()
+        flash("로그인 전에 쓴 후기를 내 계정에 연결했습니다.", "success")
+        return redirect(target)
 
     @app.route("/brick/apply/<uuid:token>", methods=["GET", "POST"])
     def brick_application_form(token):
