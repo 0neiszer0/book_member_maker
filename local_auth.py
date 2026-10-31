@@ -24,6 +24,7 @@ from flask import abort, flash, g, jsonify, redirect, render_template, request, 
 
 from member_identity import normalize_member_student_id
 from security_utils import forwarded_client_address, safe_internal_next_url
+import signup_notify
 
 LOGIN_ID_RE = re.compile(r'^[a-z0-9_]{4,20}$')
 MEMBER_MIN_PASSWORD = 8
@@ -358,6 +359,7 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
             if created_member:
                 db().table('members').delete().eq('id', created_member['id']).eq('account_status', 'pending').execute()
             return signup_form('이미 사용 중인 아이디입니다. 다른 아이디를 정해주세요.', 409, **values)
+        signup_notify.notify_signup(values['login_id'], values['name'], app.logger)
         return render_template('signup_done.html', name=values['name'], login_id=values['login_id'],
                                next_url=safe_internal_next_url(form.get('next')) or '')
 
