@@ -13,7 +13,7 @@
   <h2>같이 읽고 싶어요 · {{ supporter_rows|length }}명</h2>
   <form class="eg-form" method="post" action="{{ url_for('support_book_suggestion', suggestion_id=suggestion.id) }}">
 <input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
-    {% if not member %}<p><a href="{{ url_for('kakao_login', next=request.path) }}">카카오 로그인 후 작성</a></p>{% endif %}
+    {% if not member %}<p><a href="{{ url_for('login', next=request.path) }}">로그인 후 작성</a></p>{% endif %}
     <label>한마디 <span class="eg-help">선택</span><input class="eg-input" name="reason" maxlength="500" placeholder="왜 같이 읽고 싶은가요?"></label>
     <button class="lms-button {% if not supported %}lms-button-primary{% endif %}" type="submit">{% if supported %}관심 표시 취소{% else %}같이 읽고 싶어요{% endif %}</button>
   </form>
@@ -24,7 +24,7 @@
   <div>{% for row in comments %}<div class="eg-comment"><strong>{{ row.member.name }}</strong><p style="white-space:pre-wrap;line-height:1.65;margin:.45rem 0 0">{{ row.content }}</p></div>{% else %}<p class="eg-muted">아직 댓글이 없습니다.</p>{% endfor %}</div>
   <form class="eg-form" method="post" action="{{ url_for('comment_book_suggestion', suggestion_id=suggestion.id) }}">
 <input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
-    {% if not member %}<p><a href="{{ url_for('kakao_login', next=request.path) }}">카카오 로그인 후 작성</a></p>{% endif %}
+    {% if not member %}<p><a href="{{ url_for('login', next=request.path) }}">로그인 후 작성</a></p>{% endif %}
     <label>댓글<textarea class="eg-textarea" name="content" maxlength="2000" required></textarea></label>
     <button class="lms-button lms-button-primary" type="submit">댓글 남기기</button>
   </form>

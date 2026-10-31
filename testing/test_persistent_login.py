@@ -42,7 +42,7 @@ class PersistentLoginTests(unittest.TestCase):
         cookie = result.headers['Set-Cookie']
         for flag in ('Expires=', 'HttpOnly', 'SameSite=Lax'):
             self.assertIn(flag, cookie)
-        self.assertEqual(self.module.app.permanent_session_lifetime.days, 90)
+        self.assertEqual(self.module.app.permanent_session_lifetime.days, 30)
         self.assertEqual(self.fake.rows['members'][0]['name'], '등록실명')
         self.assertEqual(self.fake.rows['members'][0]['profile_pic'], 'https://example.com/avatar.png')
         fresh = self.module.app.test_client()

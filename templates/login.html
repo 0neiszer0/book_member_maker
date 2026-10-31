@@ -3,24 +3,32 @@
 {% block content %}
 <section class="auth-card">
   <p class="auth-eyebrow">MEMBER</p>
-  <h1 class="auth-title">카카오로<br>시작하기</h1>
-  <p class="auth-lead">카카오 계정으로 로그인합니다. 아직 연결된 계정이 없다면 회원가입 화면으로 바로 이어집니다.</p>
-
-  <div class="auth-actions">
-    <label style="display:flex;gap:10px;align-items:center;margin-bottom:12px"><input type="checkbox" id="remember-login" checked style="width:20px;height:20px">로그인 상태 유지</label>
-    <p style="font-size:14px;margin-bottom:16px">같은 브라우저에서 마지막 접속 후 90일간 유지됩니다. 공용 기기에서는 체크를 해제하고, 사용 후 로그아웃해주세요.</p>
-    <a class="auth-btn auth-btn-kakao" data-kakao-login href="{{ url_for('kakao_login', mode='login', next=request.args.get('next', '')) }}">
-      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5c-5.25 0-9.5 3.4-9.5 7.6 0 2.7 1.77 5.08 4.43 6.43l-.9 3.31a.55.55 0 0 0 .82.61l3.9-2.58c.4.05.83.08 1.25.08 5.25 0 9.5-3.4 9.5-7.6S17.25 3.5 12 3.5Z" fill="currentColor"/></svg>
-      카카오로 로그인
-    </a>
-  </div>
+  <h1 class="auth-title">로그인</h1>
+  <form class="auth-form" method="post" action="{{ url_for('login_password') }}">
+    <input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
+    <input type="hidden" name="next" value="{{ next_url or '' }}">
+    <label class="auth-label">아이디<input class="auth-input" name="login_id" autocomplete="username" autocapitalize="none" spellcheck="false" required value="{{ login_id or '' }}" {% if not login_id %}autofocus{% endif %}></label>
+    <label class="auth-label">비밀번호<input class="auth-input" type="password" name="password" autocomplete="current-password" required {% if login_id %}autofocus{% endif %}></label>
+    <label style="display:flex;gap:10px;align-items:center"><input type="checkbox" name="remember" value="1" checked style="width:20px;height:20px">로그인 상태 유지 <span class="auth-help">마지막 접속 후 30일. 공용 기기에서는 해제하세요.</span></label>
+    {% if login_error %}<p class="auth-error" role="alert">{{ login_error }}</p>{% endif %}
+    <button class="auth-btn auth-btn-primary" type="submit">로그인</button>
+  </form>
+  <p class="auth-help" style="margin-top:12px">아이디나 비밀번호를 잊었다면 운영진에게 재설정 링크를 요청해주세요.</p>
 
   <div class="auth-callout">
     <strong>처음 오셨나요?</strong>
-    <p>카카오 인증 후 회원 정보를 확인하고 가입 신청을 진행합니다.</p>
-    <a class="auth-btn auth-btn-primary" data-kakao-login href="{{ url_for('kakao_login', mode='signup', next=request.args.get('next', '')) }}">회원가입</a>
+    <p>운영진이 알려준 이번 학기 가입 코드로 가입 신청을 하고, 운영진 승인 후 로그인합니다.</p>
+    <a class="auth-btn" href="{{ url_for('signup', next=next_url or None) }}">회원가입</a>
   </div>
+
+  <details class="auth-details">
+    <summary>카카오로 로그인하던 기존 회원 (기존 회원 전환용)</summary>
+    <p class="auth-help" style="margin:8px 0 12px">카카오로 한 번 로그인한 뒤 아이디·비밀번호를 만들면, 다음부터는 아이디로 로그인합니다. 활동 기록은 그대로 이어집니다.</p>
+    <a class="auth-btn auth-btn-kakao" href="{{ url_for('kakao_login', mode='login', next=url_for('account_convert')) }}">
+      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5c-5.25 0-9.5 3.4-9.5 7.6 0 2.7 1.77 5.08 4.43 6.43l-.9 3.31a.55.55 0 0 0 .82.61l3.9-2.58c.4.05.83.08 1.25.08 5.25 0 9.5-3.4 9.5-7.6S17.25 3.5 12 3.5Z" fill="currentColor"/></svg>
+      카카오로 로그인하고 전환하기
+    </a>
+  </details>
 </section>
 <a class="auth-back" href="{{ url_for('main_index') }}">홈으로 돌아가기</a>
-<script>document.querySelectorAll('[data-kakao-login]').forEach(link => link.addEventListener('click', () => { const url = new URL(link.href); url.searchParams.set('remember', document.getElementById('remember-login').checked ? '1' : '0'); link.href = url.href; }));</script>
 {% endblock %}

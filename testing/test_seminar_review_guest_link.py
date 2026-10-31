@@ -82,6 +82,7 @@ class GuestSeminarReviewTests(unittest.TestCase):
         self.assertNotIn(code, str(row))
         self.assertRegex(row["edit_token_hash"], r"^[0-9a-f]{64}$")
         self.assertIn("가입하고 내 후기 모아보기", html)
+        self.assertIn("/signup?next=", html)
         self.assertIn("/login?next=", html)
         self.assertEqual(self.db.rows["review_edit_attempts"][0]["action"], "submit")
 
@@ -156,6 +157,26 @@ class GuestSeminarReviewTests(unittest.TestCase):
         row = self.db.rows["seminar_reviews"][0]
         self.assertEqual((row["member_id"], row["identity_kind"], row["edit_token_hash"]), (1, "member", None))
 
+    def test_id_password_member_claims_guest_review(self):
+        html = self.post(author_name="회원1", student_id="2026000001", review_content="가입 전").get_data(as_text=True)
+        code = re.search(r'id="review-edit-code" readonly value="([^"]+)"', html).group(1)
+        self.db.rows["seminar_reviews"][0]["id"] = "r-1"
+        member = self.db.rows["members"][0]
+        member.update(social_id=None, auth_provider="local", auth_session_version=2)
+        with self.client.session_transaction() as state:
+            state.update(user_id=1, auth_provider="local", auth_session_version=2, sensitive_csrf="c")
+        self.client.post(PATH + "/claim", data={"csrf_token": "c", "edit_code": code})
+        self.assertEqual(self.db.rows["seminar_reviews"][0]["member_id"], 1)
+
+    def test_stale_password_session_cannot_claim(self):
+        html = self.post(author_name="회원1", student_id="2026000001", review_content="가입 전").get_data(as_text=True)
+        code = re.search(r'id="review-edit-code" readonly value="([^"]+)"', html).group(1)
+        self.db.rows["members"][0].update(social_id=None, auth_provider="local", auth_session_version=3)
+        with self.client.session_transaction() as state:
+            state.update(user_id=1, auth_provider="local", auth_session_version=2, sensitive_csrf="c")
+        self.client.post(PATH + "/claim", data={"csrf_token": "c", "edit_code": code})
+        self.assertIsNone(self.db.rows["seminar_reviews"][0]["member_id"])
+
     def test_other_member_cannot_claim(self):
         html = self.post(author_name="회원1", student_id="2026000001", review_content="로그인 전").get_data(as_text=True)
         code = re.search(r'id="review-edit-code" readonly value="([^"]+)"', html).group(1)
@@ -167,7 +188,7 @@ class GuestSeminarReviewTests(unittest.TestCase):
     def test_claim_requires_login(self):
         result = self.client.post(PATH + "/claim", data={"edit_code": "x"})
         self.assertEqual(result.status_code, 303)
-        self.assertIn("/login/kakao", result.location)
+        self.assertIn("/login?next=", result.location)
 
     def test_closed_form_rejects_guest(self):
         self.db.rows["seminar_review_forms"][0]["status"] = "closed"

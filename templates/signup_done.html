@@ -1,0 +1,10 @@
+{% extends 'auth_base.html' %}
+{% block title %}가입 신청 완료 · 책 먹는 호반우{% endblock %}
+{% block content %}
+<section class="auth-card">
+  <p class="auth-eyebrow">SIGN UP</p>
+  <h1 class="auth-title">가입 신청을 보냈습니다</h1>
+  <p class="auth-lead">{{ name }}님의 신청을 운영진이 확인하고 승인하면 아이디 <strong>{{ login_id }}</strong>로 로그인할 수 있어요. 승인 전에는 로그인되지 않습니다.</p>
+  <div class="auth-actions"><a class="auth-btn auth-btn-primary" href="{{ url_for('login', next=next_url or None) }}">로그인 화면으로</a></div>
+</section>
+{% endblock %}

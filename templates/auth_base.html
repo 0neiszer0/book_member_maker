@@ -1,6 +1,6 @@
 {% extends 'lms_base.html' %}
 {% set lms_page = 'auth' %}
-{% set lms_title = '로그인' if request.endpoint == 'login' else '회원 정보 확인' %}
+{% set lms_title = {'login': '로그인', 'login_password': '로그인', 'signup': '회원가입', 'account_convert': '아이디 만들기', 'account_setup': '비밀번호 정하기', 'account_password': '비밀번호 변경'}.get(request.endpoint, '회원 정보 확인') %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='lms_auth.css') }}">
 {% endblock %}

@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 import logging
 import re
 import unicodedata
+from minipc_security import LOGIN_PROVIDERS, has_login_identity, session_login_current
 
 OFFICER_PREFIX = '운영진:'
 log = logging.getLogger(__name__)
@@ -92,13 +93,14 @@ def _term_officer(db, member, term):
 
 
 def wiki_access(db, identity, today=None):
-    if identity.get('auth_provider') != 'kakao' or not identity.get('user_id'):
+    if identity.get('auth_provider') not in LOGIN_PROVIDERS or not identity.get('user_id'):
         return None
     members = db.table('members').select(
-        'id,social_id,account_status,member_status,role,is_active'
+        'id,social_id,account_status,member_status,role,is_active,auth_provider,auth_session_version'
     ).eq('id', identity['user_id']).limit(1).execute().data or []
     member = members[0] if members else None
-    if (not member or not member.get('social_id') or member.get('account_status') != 'active'
+    if (not member or not has_login_identity(member, identity) or not session_login_current(member, identity)
+            or member.get('account_status') != 'active'
             or member.get('member_status') in ('inactive', 'blocked', 'pending')):
         return None
     active_account = member.get('is_active') is not False

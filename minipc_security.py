@@ -6,6 +6,7 @@ import time
 from hashlib import sha256
 from flask import abort, g, request, session, redirect, url_for, flash
 from urllib.parse import urlsplit
+from werkzeug.routing import BuildError
 from security_utils import safe_internal_next_url
 
 MEMBER_POSTS = {
@@ -16,7 +17,11 @@ MEMBER_POSTS = {
 SENSITIVE_POSTS = MEMBER_POSTS | {'seminar_review_form',
     'link_account_submit', 'link_lookup', 'handle_notification', 'boards.write', 'boards.edit', 'seminar_session_toggle',
     'delete_member', 'set_member_status', 'edit_member', 'merge_members', 'create_member',
+    # ID/password login (local_auth.py)
+    'login_password', 'signup', 'account_convert', 'account_setup', 'account_password',
+    'admin_signup_code', 'admin_approve_signup', 'admin_reject_signup', 'admin_issue_login_link',
 }
+LOGIN_PROVIDERS = ('kakao', 'local')
 
 # Guest-capable link forms are served as 200 pages, and the CDN drops Set-Cookie on
 # those, so a fresh session CSRF value never reaches a first-time visitor. These
@@ -34,14 +39,42 @@ def active_member(row):
                 and row.get('account_status') == 'active'
                 and row.get('member_status') not in ('inactive', 'blocked'))
 
+def session_login_current(row, sess):
+    """False when a saved login no longer matches the member's login method.
+
+    ID/password sessions end when the password changes (version bump); Kakao
+    sessions end once the member converted to ID/password login. Sessions that
+    name no provider keep the previous behaviour.
+    """
+    provider = sess.get('auth_provider')
+    if provider == 'local':
+        return (row.get('auth_provider') == 'local'
+                and int(row.get('auth_session_version') or 0) == int(sess.get('auth_session_version') or 0))
+    if provider == 'kakao':
+        return row.get('auth_provider') != 'local'
+    return True
+
+
+def has_login_identity(row, sess):
+    """A real person's login: Kakao-linked, or an approved ID/password account."""
+    if str(row.get('social_id') or '').startswith('system:'):
+        return False
+    if sess.get('auth_provider') == 'local':
+        return row.get('auth_provider') == 'local'
+    return bool(row.get('social_id'))
+
+
 def authenticated_member(db):
-    if not session.get('user_id') or session.get('auth_provider') != 'kakao':
+    if not session.get('user_id') or session.get('auth_provider') not in LOGIN_PROVIDERS:
         return None
     rows = db.table('members').select(
-        'id,name,student_id,department,role,is_active,account_status,member_status,social_id'
+        'id,name,student_id,department,role,is_active,account_status,member_status,social_id,'
+        'auth_provider,auth_session_version'
     ).eq('id', session['user_id']).limit(1).execute().data or []
     row = rows[0] if rows else None
-    return row if active_member(row) and row.get('social_id') else None
+    if not active_member(row) or not has_login_identity(row, session) or not session_login_current(row, session):
+        return None
+    return row
 
 def install_security(app, get_db):
     required = os.environ.get('REQUIRE_ORIGIN_AUTH', '').lower() in ('true', '1', 'yes')
@@ -94,11 +127,15 @@ def install_security(app, get_db):
         if request.method != 'POST' or request.endpoint not in SENSITIVE_POSTS:
             return
         if request.endpoint in MEMBER_POSTS and not authenticated_member(get_db()):
-            flash('카카오 로그인 후 작성할 수 있습니다.', 'warning')
+            flash('로그인 후 작성할 수 있습니다.', 'warning')
             next_path = request.path
             if request.endpoint in {'support_book_suggestion', 'comment_book_suggestion'}:
                 next_path = request.path.rsplit('/', 1)[0]
-            return redirect(url_for('kakao_login', next=safe_internal_next_url(next_path)), code=303)
+            try:
+                target = url_for('login', next=safe_internal_next_url(next_path))
+            except BuildError:
+                target = url_for('kakao_login', next=safe_internal_next_url(next_path))
+            return redirect(target, code=303)
         expected = session.get('sensitive_csrf', '')
         token = request.headers.get('X-App-CSRF') or request.form.get('csrf_token', '')
         if request.endpoint in SIGNED_CSRF_POSTS and token.startswith('s1.'):

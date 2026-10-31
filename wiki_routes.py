@@ -10,6 +10,7 @@ import bleach
 from bs4 import BeautifulSoup
 from flask import Blueprint, abort, current_app, g, redirect, render_template, request, session, url_for
 from markupsafe import Markup, escape
+from minipc_security import LOGIN_PROVIDERS
 
 from wiki_access import (wiki_access, can_edit_title, can_read_title, is_officer_title,
                          strip_officer_includes, OFFICER_PREFIX)
@@ -133,10 +134,10 @@ def init_wiki_routes(app, get_db):
     def authorize():
         if not app.config['WIKI_ENABLED']:
             return message('위키 연결을 준비 중입니다.', 503)
-        if session.get('auth_provider') != 'kakao' or not session.get('user_id'):
+        if session.get('auth_provider') not in LOGIN_PROVIDERS or not session.get('user_id'):
             if request.method == 'GET':
                 return redirect(url_for('login', next=request.full_path.rstrip('?')))
-            return message('카카오 로그인 후 다시 시도해 주세요.', 401)
+            return message('로그인 후 다시 시도해 주세요.', 401)
         try:
             g.wiki_access = wiki_access(get_db(), session)
         except Exception:
@@ -345,7 +346,7 @@ def init_wiki_routes(app, get_db):
     nav_cache = app.extensions.setdefault('officer_wiki_nav_cache', {})
 
     def officer_wiki_url():
-        if (not app.config['WIKI_ENABLED'] or session.get('auth_provider') != 'kakao'
+        if (not app.config['WIKI_ENABLED'] or session.get('auth_provider') not in LOGIN_PROVIDERS
                 or not session.get('user_id')):
             return None
         access = getattr(g, 'wiki_access', None)

@@ -55,7 +55,8 @@ from topic_autopen import open_due_topic_events
 from home_overview import date_label, member_seminar_summary, operations_summary, decorate_topic_submission_states
 from attendance_workflow import attendance_is_confirmed, confirmed_history_session_ids
 from security_utils import forwarded_client_address, safe_internal_next_url
-from minipc_security import install_security
+from minipc_security import install_security, session_login_current
+from local_auth import install_local_auth
 from session_cookie import QuietRefreshSessionInterface
 from static_assets import install_static_assets
 from storage_media import install_storage_media
@@ -105,7 +106,7 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SECURE=_cookie_secure,
     SESSION_COOKIE_SAMESITE="Lax",
-    PERMANENT_SESSION_LIFETIME=timedelta(days=90),
+    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
     SESSION_REFRESH_EACH_REQUEST=True,
     MAX_CONTENT_LENGTH=60 * 1024 * 1024,
 )
@@ -279,7 +280,7 @@ def refresh_home_navigation_role():
         return None
     try:
         rows = supabase.table('members').select(
-            'role,is_active,member_status,account_status,name,profile_pic'
+            'role,is_active,member_status,account_status,name,profile_pic,auth_provider,auth_session_version'
         ).eq('id', session['user_id']).limit(1).execute().data or []
     except Exception as exc:
         app.logger.error('Home navigation role refresh failed: %s', exc)
@@ -287,7 +288,8 @@ def refresh_home_navigation_role():
         session.pop('member_preview', None)
         return None
 
-    if not rows or rows[0].get('account_status') != 'active' or rows[0].get('member_status') == 'inactive':
+    if (not rows or rows[0].get('account_status') != 'active' or rows[0].get('member_status') == 'inactive'
+            or not session_login_current(rows[0], session)):
         session.clear()
         return None
 
@@ -422,13 +424,13 @@ def login_required(role="ANY"):
                 user_id = session.get("user_id")
                 try:
                     rows = supabase.table("members").select(
-                        "role,is_active,member_status,account_status,name,profile_pic"
+                        "role,is_active,member_status,account_status,name,profile_pic,auth_provider,auth_session_version"
                     ).eq("id", user_id).limit(1).execute().data or []
                 except Exception as exc:
                     app.logger.error("Account authorization refresh failed: %s", exc)
                     return _access_denied("권한을 확인하지 못했습니다. 잠시 후 다시 시도해주세요.", 503)
 
-                if not rows:
+                if not rows or not session_login_current(rows[0], session):
                     session.clear()
                     return _access_denied("로그인이 필요합니다.", 401)
 
@@ -445,6 +447,9 @@ def login_required(role="ANY"):
                 if member.get("account_status") != "active" or member.get("member_status") in ("inactive", "blocked"):
                     session.clear()
                     return _access_denied("비활성화된 계정입니다.", 403)
+                if role == 'admin' and session.get('password_upgrade_required'):
+                    flash('운영 화면을 쓰려면 먼저 비밀번호를 12자 이상으로 바꿔주세요.', 'warning')
+                    return redirect(url_for('account_password'))
                 if role == 'admin':
                     if member.get('is_active') is False:
                         return _access_denied('이 페이지에 접근할 권한이 없습니다.', 403)
@@ -516,6 +521,9 @@ def primary_admin_required(f):
         return f(*args, **kwargs)
 
     return decorated_function
+
+
+install_local_auth(app, lambda: supabase, login_required, _current_user_is_primary_admin)
 
 
 def send_telegram_notification(message):
@@ -650,7 +658,7 @@ class KakaoOauth:
 def login():
     if session.get('user_id'):
         return redirect(safe_internal_next_url(request.args.get('next')) or url_for('my_page'))
-    return render_template('login.html')
+    return render_template('login.html', next_url=safe_internal_next_url(request.args.get('next')) or '')
 
 
 def _start_member_session(member):
@@ -732,6 +740,11 @@ def kakao_callback():
             if member.get('account_status') != 'active' or member.get('member_status') == 'inactive':
                 session.clear()
                 flash("승인 대기 또는 비활성화된 계정입니다. 관리자에게 문의해주세요.", "warning")
+                return redirect(url_for('login'))
+            if member.get('auth_provider') == 'local':
+                # Converted members log in with their ID/password only.
+                session.clear()
+                flash("아이디·비밀번호 로그인으로 전환한 계정입니다. 아이디로 로그인해주세요.", "info")
                 return redirect(url_for('login'))
             # A Kakao nickname is not the registered real name used in attendance.
             update_data = {}
@@ -1601,6 +1614,13 @@ def merge_members():
                 return jsonify(status='error', message='학기 명단이나 운영 기록이 있는 회원입니다. 기록 보존을 위해 합치기를 중단했습니다.'), 409
         source_row = next(m for m in both if m['id'] == source_id)
         target_row = next(m for m in both if m['id'] == target_id)
+        # ID/password logins move with the person, never overwrite the kept account's.
+        source_login = supabase.table('member_credentials').select('member_id').eq('member_id', source_id).limit(1).execute().data or []
+        if source_login:
+            if supabase.table('member_credentials').select('member_id').eq('member_id', target_id).limit(1).execute().data:
+                return jsonify(status='error', message='두 회원 모두 아이디 로그인이 있습니다. 한쪽 아이디를 정리한 뒤 합쳐주세요.'), 409
+            supabase.table('member_credentials').update({'member_id': target_id}).eq('member_id', source_id).execute()
+            supabase.table('members').update({'auth_provider': 'local'}).eq('id', target_id).execute()
 
         # 카카오 로그인 정보(social_id/email)를 target 으로 이전.
         # target 에 이미 값이 있으면 덮어쓰지 않음. source 의 값은 unique 충돌 방지를 위해 먼저 NULL 처리.
@@ -5685,8 +5705,11 @@ def records_hub():
 def records_members():
     try:
         members = supabase.table('members').select(
-            'id, name, gender, department, student_id, recruiting_class, member_status, role, email'
+            'id, name, gender, department, student_id, recruiting_class, member_status, role, email, account_status, social_id'
         ).order('name').execute().data or []
+        # New sign-ups wait in their own approval list until an officer approves them.
+        members = [m for m in members if m.get('account_status') != 'pending'
+                   and not str(m.get('social_id') or '').startswith('system:')]
         duplicate_student_ids = duplicate_student_id_values(members)
         for member in members:
             member['can_view_activity'] = _can_view_member_profile(member['id'])
@@ -5733,11 +5756,22 @@ def records_members():
         flash(f"멤버 로딩 오류: {e}", 'danger')
         members = []
         duplicate_student_ids = set()
+    try:
+        login_overview = app.extensions['local_auth_overview']()
+    except Exception:
+        app.logger.exception('Login overview failed')
+        login_overview = {'signup_code': None, 'pending_signups': [], 'credentials': {}, 'error': True}
+    for member in members:
+        credential = login_overview['credentials'].get(member['id'])
+        member['login_kind'] = ('local' if credential and credential.get('status') == 'active'
+                                else 'kakao' if member.get('social_id') else None)
+        member['login_id'] = credential.get('login_id') if credential and credential.get('status') == 'active' else ''
     return render_template(
         'records_members.html',
         members=members,
         duplicate_student_id_count=len(duplicate_student_ids),
         can_manage_roles=_current_user_is_primary_admin(),
+        login_overview=login_overview,
     )
 
 

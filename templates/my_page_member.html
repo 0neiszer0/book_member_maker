@@ -8,8 +8,9 @@
 <div class="lms-member-page">
   <header class="lms-member-heading">
     <div><h1>{{ user.name }}님</h1><p class="lms-member-muted">{{ user.department or '소속 미입력' }}{% if user.student_id %} · 학번 {{ user.student_id }}{% endif %}</p></div>
-    <a href="{{ url_for('help_member') }}" class="lms-button">이용 안내</a>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">{% if session.auth_provider == 'local' %}<a href="{{ url_for('account_password') }}" class="lms-button">비밀번호 변경</a>{% endif %}<a href="{{ url_for('help_member') }}" class="lms-button">이용 안내</a></div>
   </header>
+  {% if session.auth_provider == 'kakao' %}<p class="lms-alert" role="status">카카오 로그인은 곧 종료됩니다. <a href="{{ url_for('account_convert') }}">아이디·비밀번호 만들기</a>를 한 번만 해두면 다음부터 아이디로 로그인합니다.</p>{% endif %}
   <section aria-label="활동 요약" class="lms-member-section">
     <dl class="lms-member-stats">
       <div><dt>세미나 조 편성</dt><dd>{{ activity.seminar_count or 0 }}</dd></div>

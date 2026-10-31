@@ -275,8 +275,17 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
             except BuildError:
                 return url_for("kakao_login", next=next_path)
 
+        def review_signup_url(next_path):
+            # New members sign up with the semester code; after approval and login
+            # they return to the link and attach the review with its edit code.
+            try:
+                return url_for("signup", next=next_path)
+            except BuildError:
+                return review_login_url(next_path)
+
         return {
             "review_login_url": review_login_url,
+            "review_signup_url": review_signup_url,
             "engagement_image_url": image_url,
             "default_social_image_url": f"{_public_base()}{url_for('static', filename='og/club-preview-v2.png')}",
         }
