@@ -75,7 +75,8 @@ def send(text, logger, http=requests):
                 pass
             if ok:
                 delivered += 1
-                logger.info('Signup telegram notice sent (chat %d/%d, ok=true)', index, len(chats))
+                # WARNING level on purpose: the app logger drops INFO, and officers want a trace in the journal.
+                logger.warning('Signup telegram notice sent (chat %d/%d, ok=true)', index, len(chats))
             else:
                 logger.warning('Signup telegram notice failed (chat %d/%d, HTTP %s)', index, len(chats),
                                getattr(response, 'status_code', '?'))
@@ -89,7 +90,7 @@ def notify_signup(login_id, name, logger, *, background=True, http=requests):
     try:
         allowed, skipped = limiter.take()
         if not allowed:
-            logger.info('Signup telegram notice rate-limited')
+            logger.warning('Signup telegram notice rate-limited')
             return False
         text = build_message(login_id, name, skipped)
         if not background:
