@@ -87,7 +87,8 @@ test('asset misses, private routes and writes keep exact paths and remain uncach
       ['/static/_v/'+'0'.repeat(64)+'/lms.css','GET'],['/static/_v/'+'a'.repeat(64)+'/lms.css','POST']]) {
       const result=await proxy.fetch(new Request('https://public.workers.dev'+path,{method}),env);
       assert.equal(seen.url.href,'https://origin.example.ts.net'+path);
-      assert.deepEqual(seen.init.cf,{cacheTtl:0,cacheEverything:false});
+      assert.equal(seen.init.cf,undefined);
+      assert.equal(seen.init.cache,'no-store');
       assert.equal(result.headers.get('Cache-Control'),'no-store');
       assert.equal(result.headers.get('Set-Cookie'),'session=synthetic');
     }
@@ -107,5 +108,25 @@ test('origin errors and missing versioned files cannot become immutable cache en
     const result=await proxy.fetch(new Request('https://public.workers.dev/'),env);
     assert.equal(result.status,502);
     assert.equal(result.headers.get('Cache-Control'),'no-store');
+  } finally {globalThis.fetch=original;}
+});
+test('200 pages keep every Set-Cookie and are marked uncacheable for the CDN',async()=>{
+  const original=globalThis.fetch;
+  globalThis.fetch=async(url,init)=>{
+    assert.equal(init.cache,'no-store');
+    const headers=new Headers({'Content-Type':'text/html'});
+    headers.append('Set-Cookie','session=a; Secure; HttpOnly; SameSite=Lax');
+    headers.append('Set-Cookie','csrf=b; Secure');
+    return new Response('<form>',{status:200,headers});
+  };
+  try {
+    const result=await proxy.fetch(new Request('https://knu-read.xyz/board/free/new'),env);
+    assert.equal(result.status,200);
+    assert.deepEqual(result.headers.getSetCookie(),['session=a; Secure; HttpOnly; SameSite=Lax','csrf=b; Secure']);
+    assert.equal(result.headers.get('Cache-Control'),'no-store');
+    assert.equal(result.headers.get('CDN-Cache-Control'),'no-store');
+    assert.equal(result.headers.get('Content-Type'),'text/html');
+    const authed=await proxy.fetch(new Request('https://knu-read.xyz/',{headers:{Cookie:'session=a'}}),env);
+    assert.equal(authed.headers.get('Cloudflare-CDN-Cache-Control'),'no-store');
   } finally {globalThis.fetch=original;}
 });

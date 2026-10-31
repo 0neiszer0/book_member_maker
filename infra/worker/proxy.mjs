@@ -53,11 +53,20 @@ export default {
     const init = {
       method: request.method, headers, redirect: 'manual',
       body: ['GET', 'HEAD'].includes(request.method) ? undefined : request.body,
-      cf: {cacheTtl: 0, cacheEverything: false},
+      // Bypass Cloudflare's cache entirely: a cached (even TTL 0) subrequest has
+      // its Set-Cookie stripped, which broke first-visit sessions and CSRF.
+      cache: 'no-store',
     };
     try {
       const response = await fetch(target, init);
-      const result = new Response(response.body, response);
+      // Copy headers explicitly so every Set-Cookie line survives on any status.
+      const outHeaders = new Headers();
+      for (const [name, value] of response.headers) {
+        if (name.toLowerCase() !== 'set-cookie') outHeaders.append(name, value);
+      }
+      for (const cookie of response.headers.getSetCookie()) outHeaders.append('Set-Cookie', cookie);
+      const result = new Response(response.body, {
+        status: response.status, statusText: response.statusText, headers: outHeaders});
       const location = result.headers.get('Location');
       if (location) {
         const destination = new URL(location, target);
@@ -65,7 +74,12 @@ export default {
           result.headers.set('Location', incoming.origin + destination.pathname + destination.search + destination.hash);
         }
       }
+      // Never let a browser or shared cache keep app responses (sessions, CSRF).
       result.headers.set('Cache-Control', 'no-store');
+      if (result.headers.has('Set-Cookie') || request.headers.has('Cookie')) {
+        result.headers.set('CDN-Cache-Control', 'no-store');
+        result.headers.set('Cloudflare-CDN-Cache-Control', 'no-store');
+      }
       result.headers.delete('X-App-Origin-Auth');
       return result;
     } catch {
