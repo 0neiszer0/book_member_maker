@@ -27,7 +27,7 @@
 </section>
 {% else %}
 <form class="eg-panel eg-form" method="post" enctype="multipart/form-data">
-<input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
+<input type="hidden" name="csrf_token" value="{{ review_csrf_token() if form_kind == 'seminar_review' else sensitive_csrf_token() }}">
   {% if member %}<div class="eg-identity"><strong>{{ member.name }}님으로 {% if existing %}기존 내용을 불러왔습니다.{% else %}작성합니다.{% endif %}</strong><span class="eg-help">{{ member.department or '학과 미입력' }} · {{ member.student_id }}</span></div>
   {% elif form_kind == 'seminar_review' %}<div class="eg-identity"><strong>로그인 없이 바로 쓸 수 있어요.</strong><span class="eg-help">이미 가입했다면 <a href="{{ review_login_url(request.path) }}">로그인 후 작성</a>하면 내 활동에 바로 모입니다.</span></div>
     <label>이름<input class="eg-input" name="author_name" maxlength="40" autocomplete="name" required value="{{ guest_name or request.form.get('author_name', '') }}" {% if not is_open %}disabled{% endif %}></label>
@@ -52,7 +52,7 @@
 </form>
 {% if form_kind == 'seminar_review' and unclaimed %}
 <form class="eg-panel eg-form" method="post" action="{{ url_for('seminar_review_claim', token=form_row.share_token) }}">
-  <input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
+  <input type="hidden" name="csrf_token" value="{{ review_csrf_token() if form_kind == 'seminar_review' else sensitive_csrf_token() }}">
   <div class="eg-identity"><strong>로그인 전에 이 학번으로 쓴 후기가 있습니다.</strong><span class="eg-help">제출할 때 받은 수정 코드를 넣으면 내 계정에 연결되고, 이후에는 로그인만으로 고칠 수 있습니다.</span></div>
   <label>수정 코드<input class="eg-input" name="edit_code" autocomplete="off" required></label>
   <button class="lms-button lms-button-primary" type="submit">내 계정에 연결하기</button>

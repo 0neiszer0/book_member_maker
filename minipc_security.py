@@ -2,6 +2,8 @@
 import hmac
 import os
 import secrets
+import time
+from hashlib import sha256
 from flask import abort, g, request, session, redirect, url_for, flash
 from urllib.parse import urlsplit
 from security_utils import safe_internal_next_url
@@ -15,6 +17,17 @@ SENSITIVE_POSTS = MEMBER_POSTS | {'seminar_review_form',
     'link_account_submit', 'link_lookup', 'handle_notification', 'boards.write', 'boards.edit', 'seminar_session_toggle',
     'delete_member', 'set_member_status', 'edit_member', 'merge_members', 'create_member',
 }
+
+# Guest-capable link forms are served as 200 pages, and the CDN drops Set-Cookie on
+# those, so a fresh session CSRF value never reaches a first-time visitor. These
+# endpoints also accept a signed token bound to the visitor (member id or 'guest').
+SIGNED_CSRF_POSTS = {'seminar_review_form', 'seminar_review_claim'}
+SIGNED_CSRF_MAX_AGE = 12 * 3600
+
+
+def _signed_csrf_mac(key, subject, issued):
+    return hmac.new(key.encode(), f'csrf|review-link|{subject}|{issued}'.encode(), sha256).hexdigest()
+
 
 def active_member(row):
     return bool(row and row.get('is_active') is True
@@ -51,9 +64,25 @@ def install_security(app, get_db):
             session['sensitive_csrf'] = secrets.token_urlsafe(32)
         return session['sensitive_csrf']
 
+    def csrf_subject():
+        return str(session.get('user_id') or 'guest')
+
+    def signed_csrf_token():
+        issued = str(int(time.time()))
+        return f's1.{issued}.' + _signed_csrf_mac(app.secret_key, csrf_subject(), issued)
+
+    def signed_csrf_valid(token):
+        try:
+            version, issued, mac = token.split('.')
+            age = time.time() - int(issued)
+        except ValueError:
+            return False
+        return (version == 's1' and 0 <= age <= SIGNED_CSRF_MAX_AGE
+                and hmac.compare_digest(mac, _signed_csrf_mac(app.secret_key, csrf_subject(), issued)))
+
     @app.context_processor
     def security_context():
-        return {'sensitive_csrf_token': csrf_token}
+        return {'sensitive_csrf_token': csrf_token, 'review_csrf_token': signed_csrf_token}
 
     @app.before_request
     def check_security_boundary():
@@ -72,5 +101,9 @@ def install_security(app, get_db):
             return redirect(url_for('kakao_login', next=safe_internal_next_url(next_path)), code=303)
         expected = session.get('sensitive_csrf', '')
         token = request.headers.get('X-App-CSRF') or request.form.get('csrf_token', '')
+        if request.endpoint in SIGNED_CSRF_POSTS and token.startswith('s1.'):
+            if signed_csrf_valid(token):
+                return
+            abort(403)
         if not expected or not token or not hmac.compare_digest(expected.encode(), token.encode()):
             abort(403)

@@ -50,9 +50,8 @@ class GuestSeminarReviewTests(unittest.TestCase):
         self.patch.stop()
 
     def csrf(self):
-        self.client.get(PATH)
-        with self.client.session_transaction() as state:
-            return state["sensitive_csrf"]
+        html = self.client.get(PATH).get_data(as_text=True)
+        return re.search(r'name="csrf_token" value="([^"]+)"', html).group(1)
 
     def post(self, **data):
         data.setdefault("csrf_token", self.csrf())
@@ -85,6 +84,35 @@ class GuestSeminarReviewTests(unittest.TestCase):
         self.assertIn("가입하고 내 후기 모아보기", html)
         self.assertIn("/login?next=", html)
         self.assertEqual(self.db.rows["review_edit_attempts"][0]["action"], "submit")
+
+    def page_token(self):
+        html = self.client.get(PATH).get_data(as_text=True)
+        return re.search(r'name="csrf_token" value="([^"]+)"', html).group(1)
+
+    def test_signed_token_works_without_a_session_cookie(self):
+        token = self.page_token()
+        self.assertTrue(token.startswith('s1.'))
+        with self.client.session_transaction() as state:
+            self.assertNotIn('sensitive_csrf', state)  # nothing for the CDN to drop
+        fresh = self.module.app.test_client()
+        result = fresh.post(PATH, data={'csrf_token': token, 'author_name': '손님', 'student_id': '2026000009',
+                                        'review_content': '쿠키 없이'})
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(len(self.db.rows['seminar_reviews']), 1)
+
+    def test_signed_token_rejects_tampering_age_and_other_visitor(self):
+        token = self.page_token()
+        version, issued, mac = token.split('.')
+        bad = [f'{version}.{issued}.{"0" * len(mac)}', f'{version}.{int(issued) - 13 * 3600}.{mac}', 's1.x.y']
+        for value in bad:
+            result = self.client.post(PATH, data={'csrf_token': value, 'author_name': '손님', 'student_id': '2026000009',
+                                                  'review_content': 'x'})
+            self.assertEqual(result.status_code, 403, value)
+        with self.client.session_transaction() as state:
+            state.update(user_id=1, auth_provider='kakao')
+        result = self.client.post(PATH, data={'csrf_token': token, 'review_content': '회원으로 위조'})
+        self.assertEqual(result.status_code, 403)
+        self.assertEqual(self.db.rows['seminar_reviews'], [])
 
     def test_honeypot_stores_nothing(self):
         result = self.post(author_name="봇", student_id="2026000009", review_content="spam", website="http://x")
