@@ -4,12 +4,13 @@
 <section class="auth-card">
   <p class="auth-eyebrow">SIGN UP</p>
   <h1 class="auth-title">회원가입</h1>
-  <p class="auth-lead">이번 학기 가입 코드가 필요합니다. 신청하면 운영진이 확인한 뒤 승인합니다. 이메일·연락처는 받지 않습니다.</p>
+  <p class="auth-lead">{% if code_required %}이번 학기 가입 코드가 필요합니다. {% endif %}신청하면 운영진이 확인한 뒤 승인합니다. 이메일·연락처는 받지 않습니다.</p>
   {% if not code_ready %}<p class="auth-error" role="alert">지금은 가입을 받고 있지 않습니다. 운영진에게 문의해주세요.</p>{% endif %}
   <form class="auth-form" method="post" action="{{ url_for('signup') }}">
     <input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
     <input type="hidden" name="next" value="{{ next_url or '' }}">
-    <label class="auth-label">가입 코드<input class="auth-input" name="signup_code" autocomplete="off" autocapitalize="characters" required></label>
+    {% if code_required %}<label class="auth-label">가입 코드<input class="auth-input" name="signup_code" autocomplete="off" autocapitalize="characters" required></label>{% endif %}
+    <div aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden"><label>웹사이트<input type="text" name="website" tabindex="-1" autocomplete="off" value=""></label></div>
     <div class="auth-grid">
       <label class="auth-label">이름<input class="auth-input" name="name" maxlength="40" autocomplete="name" required value="{{ values.name or '' }}"></label>
       <label class="auth-label">학번<input class="auth-input" name="student_id" inputmode="numeric" maxlength="20" required value="{{ values.student_id or '' }}"></label>

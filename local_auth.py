@@ -14,6 +14,8 @@ import hmac
 import os
 import re
 import secrets
+import threading
+import time
 from datetime import date, datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -36,6 +38,13 @@ PAIR_LIMIT = (5, timedelta(minutes=15))
 ACCOUNT_LIMIT = (20, timedelta(hours=1))
 IP_LIMIT = (30, timedelta(minutes=15))
 SIGNUP_CODE_LIMIT = (10, timedelta(minutes=15))
+# Open signup (no code, officer approval only): per-IP caps kept in memory (single app process).
+SIGNUP_POST_LIMIT = (20, 15 * 60)     # signup form submissions per IP
+SIGNUP_CREATE_LIMIT = (10, 60 * 60)   # pending requests actually created per IP
+# A signup_codes row with this marker means "no code needed, officer approval only".
+# It is term-bound like a real code, so open signup closes by itself when the term ends.
+OPEN_SIGNUP_MARKER = 'OPEN-SIGNUP-NO-CODE'
+HONEYPOT_FIELD = 'website'
 CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 KST = timezone(timedelta(hours=9))
 
@@ -122,6 +131,40 @@ def generate_signup_code():
 
 def normalize_code(value):
     return re.sub(r'\s+', '', str(value or '')).upper()
+
+
+class _IpWindow:
+    """Small in-memory sliding-window counter per key."""
+
+    def __init__(self, limit, seconds, clock=None):
+        self.limit, self.seconds, self.clock = limit, seconds, clock or time.monotonic
+        self.hits = {}
+        self.lock = threading.Lock()
+
+    def _trim(self, key, now):
+        recent = [t for t in self.hits.get(key, []) if now - t < self.seconds]
+        if recent:
+            self.hits[key] = recent
+        else:
+            self.hits.pop(key, None)
+        return recent
+
+    def full(self, key):
+        with self.lock:
+            return len(self._trim(key, self.clock())) >= self.limit
+
+    def add(self, key):
+        with self.lock:
+            now = self.clock()
+            self._trim(key, now)
+            self.hits.setdefault(key, []).append(now)
+            if len(self.hits) > 5000:  # keep memory bounded under abuse
+                for stale in list(self.hits)[:1000]:
+                    self.hits.pop(stale, None)
+
+
+signup_posts = _IpWindow(*SIGNUP_POST_LIMIT)
+signup_creates = _IpWindow(*SIGNUP_CREATE_LIMIT)
 
 
 def is_officer_role(member):
@@ -216,6 +259,7 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
             if term and term.get('end_date') and term['end_date'] < today:
                 return None
             code['term_name'] = term.get('name') if term else ''
+        code['open'] = code.get('code') == OPEN_SIGNUP_MARKER
         return code
 
     def can_login(member):
@@ -283,8 +327,9 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
 
     # --- signup ---------------------------------------------------------------
     def signup_form(error=None, status=200, **values):
+        code = active_signup_code()
         return render_template('signup.html', error=error, values=values,
-                               code_ready=bool(active_signup_code()),
+                               code_ready=bool(code), code_required=bool(code) and not code.get('open'),
                                member_min=MEMBER_MIN_PASSWORD,
                                next_url=safe_internal_next_url(request.values.get('next')) or ''), status
 
@@ -300,14 +345,22 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
                       department=(form.get('department') or '').strip(),
                       login_id=normalize_login_id(form.get('login_id')))
         ip_key = keyed('ip', client_ip())
+        if signup_posts.full(ip_key) or signup_creates.full(ip_key):
+            return signup_form('가입 신청이 너무 많이 들어왔습니다. 잠시 뒤 다시 시도해주세요.', 429, **values)
+        signup_posts.add(ip_key)
         if failure_count('signup_code', 'ip_key', ip_key, SIGNUP_CODE_LIMIT[1]) >= SIGNUP_CODE_LIMIT[0]:
             return signup_form('가입 코드 확인이 너무 많이 실패했습니다. 15분 뒤 다시 시도해주세요.', 429, **values)
         code = active_signup_code()
         if not code:
             return signup_form('지금은 가입을 받고 있지 않습니다. 운영진에게 이번 학기 가입 코드를 문의해주세요.', 403, **values)
-        if not hmac.compare_digest(normalize_code(form.get('signup_code')).encode(), normalize_code(code['code']).encode()):
+        if not code.get('open') and not hmac.compare_digest(normalize_code(form.get('signup_code')).encode(), normalize_code(code['code']).encode()):
             record_failure('signup_code', ip_key)
             return signup_form('가입 코드가 맞지 않습니다. 운영진이 알려준 이번 학기 코드를 확인해주세요.', 400, **values)
+        if (form.get(HONEYPOT_FIELD) or '').strip():
+            # Bots fill the hidden field: answer like a success but store and notify nothing.
+            app.logger.warning('Signup honeypot triggered; request dropped')
+            signup_creates.add(ip_key)
+            return render_template('signup_done.html', name=values['name'], login_id=values['login_id'], next_url='')
         if not 1 <= len(values['name']) <= 40:
             return signup_form('이름을 입력해주세요.', 400, **values)
         if not re.fullmatch(r'[0-9]{4,20}', values['student_id']):
@@ -359,6 +412,7 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
             if created_member:
                 db().table('members').delete().eq('id', created_member['id']).eq('account_status', 'pending').execute()
             return signup_form('이미 사용 중인 아이디입니다. 다른 아이디를 정해주세요.', 409, **values)
+        signup_creates.add(ip_key)
         signup_notify.notify_signup(values['login_id'], values['name'], app.logger)
         return render_template('signup_done.html', name=values['name'], login_id=values['login_id'],
                                next_url=safe_internal_next_url(form.get('next')) or '')
@@ -519,9 +573,18 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
         if action == 'revoke':
             db().table('signup_codes').update({'revoked_at': iso(now_utc())}).is_('revoked_at', 'null').execute()
             return jsonify(status='success', code=None)
+        if action == 'open':
+            term = current_term()
+            db().table('signup_codes').update({'revoked_at': iso(now_utc())}).is_('revoked_at', 'null').execute()
+            db().table('signup_codes').insert({'code': OPEN_SIGNUP_MARKER, 'term_id': term['id'] if term else None,
+                                               'created_by': actor_id(), 'created_at': iso(now_utc())}).execute()
+            app.logger.warning('Signup switched to no-code (approval only) by member %s', actor_id())
+            return jsonify(status='success', code=None, open=True, term=(term or {}).get('name') or '')
         if action != 'set':
             return jsonify(status='error', message='알 수 없는 요청입니다.'), 400
         code = normalize_code(data.get('code')) or generate_signup_code()
+        if code == OPEN_SIGNUP_MARKER:
+            return jsonify(status='error', message='다른 코드를 정해주세요.'), 400
         if not re.fullmatch(r'[A-Z0-9가-힣_-]{6,40}', code):
             return jsonify(status='error', message='가입 코드는 띄어쓰기 없이 6~40자로 정해주세요.'), 400
         if code.lower() in common_passwords():

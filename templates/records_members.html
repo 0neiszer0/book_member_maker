@@ -18,15 +18,18 @@
   {% set lo = login_overview or {} %}
   <section class="records-panel records-p-5 records-mb-4" id="login-admin" aria-labelledby="login-admin-title">
     <h2 id="login-admin-title">가입 코드 · 가입 승인</h2>
-    <p class="records-muted records-text-sm records-mt-1">새 회원은 이번 학기 가입 코드로 가입 신청하고, 운영진이 아래에서 승인하면 아이디로 로그인합니다. 비밀번호는 운영진도 볼 수 없고, 잊은 회원에게는 회원 행의 ‘로그인 링크’로 24시간짜리 일회용 링크를 만들어 보내주세요.</p>
+    <p class="records-muted records-text-sm records-mt-1">새 회원은 가입 신청(가입 코드를 켜 두면 코드도 입력)을 하고, 운영진이 아래에서 승인하면 아이디로 로그인합니다. 비밀번호는 운영진도 볼 수 없고, 잊은 회원에게는 회원 행의 ‘로그인 링크’로 24시간짜리 일회용 링크를 만들어 보내주세요.</p>
     {% if lo.error %}<p class="records-accent records-mt-2" role="alert">가입 정보를 불러오지 못했습니다.</p>{% endif %}
     <div class="records-flex records-flex-wrap records-items-end records-gap-3 records-mt-4">
-      <div><p class="records-text-xs records-muted records-font-bold">현재 가입 코드</p>
-        {% if lo.signup_code %}<p class="records-text-2xl records-font-extrabold" id="signup-code-value">{{ lo.signup_code.code }}</p><p class="records-text-xs records-muted">{{ lo.signup_code.term_name or '' }} · 학기가 끝나면 자동으로 막힙니다</p>
+      {% set sc = lo.signup_code %}
+      <div><p class="records-text-xs records-muted records-font-bold">가입 방식</p>
+        {% if sc and sc.open %}<p class="records-text-2xl records-font-extrabold" id="signup-code-value">가입 코드 없이 · 운영진 승인만</p><p class="records-text-xs records-muted">{{ sc.term_name or '' }} · 학기가 끝나면 자동으로 막힙니다</p>
+        {% elif sc %}<p class="records-text-xs records-muted">가입 코드 필요</p><p class="records-text-2xl records-font-extrabold" id="signup-code-value">{{ sc.code }}</p><p class="records-text-xs records-muted">{{ sc.term_name or '' }} · 학기가 끝나면 자동으로 막힙니다</p>
         {% else %}<p class="records-font-extrabold" id="signup-code-value">없음 · 지금은 가입을 받지 않습니다</p>{% endif %}</div>
       <input id="signup-code-input" class="records-field" placeholder="새 코드 (비우면 자동 생성)" maxlength="40" style="max-width:240px">
-      <button class="lms-button lms-button-primary" type="button" id="signup-code-set">{{ '코드 바꾸기' if lo.signup_code else '코드 정하기' }}</button>
-      {% if lo.signup_code %}<button class="lms-button" type="button" id="signup-code-revoke">가입 막기</button>{% endif %}
+      <button class="lms-button lms-button-primary" type="button" id="signup-code-set">{{ '코드 바꾸기' if sc and not sc.open else '가입 코드 켜기' }}</button>
+      {% if not (sc and sc.open) %}<button class="lms-button" type="button" id="signup-code-open">코드 없이 받기</button>{% endif %}
+      {% if sc %}<button class="lms-button" type="button" id="signup-code-revoke">가입 막기</button>{% endif %}
     </div>
     <h3 class="records-mt-4 records-font-extrabold">승인 대기 {{ (lo.pending_signups or [])|length }}명</h3>
     {% if lo.pending_signups %}
@@ -88,7 +91,8 @@ const merge=document.getElementById('merge-panel');document.getElementById('merg
 const csrfHeader=()=>({'Content-Type':'application/json','X-App-CSRF':document.querySelector('meta[name="lms-csrf"]').content});
 async function postJson(url,body){const r=await fetch(url,{method:'POST',headers:csrfHeader(),body:JSON.stringify(body||{})});let d={};try{d=await r.json()}catch(e){}if(!r.ok||d.status!=='success'){alert(d.message||'처리하지 못했습니다.');return null}return d}
 document.getElementById('signup-code-set').onclick=async()=>{const code=document.getElementById('signup-code-input').value.trim();if(!confirm(code?`가입 코드를 ${code}(으)로 바꿀까요? 이전 코드는 바로 막힙니다.`:'새 가입 코드를 자동으로 만들까요? 이전 코드는 바로 막힙니다.'))return;const d=await postJson('/api/admin/signup-code',{action:'set',code});if(d)location.reload()};
-document.getElementById('signup-code-revoke')?.addEventListener('click',async()=>{if(!confirm('가입 코드를 없애 새 가입을 막을까요?'))return;if(await postJson('/api/admin/signup-code',{action:'revoke'}))location.reload()});
+document.getElementById('signup-code-open')?.addEventListener('click',async()=>{if(!confirm('가입 코드 없이 신청을 받을까요? 새 신청은 운영진이 승인해야 로그인할 수 있고, 학기가 끝나면 자동으로 막힙니다.'))return;if(await postJson('/api/admin/signup-code',{action:'open'}))location.reload()});
+document.getElementById('signup-code-revoke')?.addEventListener('click',async()=>{if(!confirm('새 가입을 막을까요?'))return;if(await postJson('/api/admin/signup-code',{action:'revoke'}))location.reload()});
 document.querySelectorAll('.signup-decision').forEach(b=>b.onclick=async()=>{const approve=b.dataset.action==='approve-login';if(!confirm(`${b.dataset.name}님의 가입 신청을 ${approve?'승인':'거절'}할까요?`))return;if(await postJson(`/api/admin/members/${b.dataset.id}/${b.dataset.action}`))location.reload()});
 document.querySelectorAll('.login-link').forEach(b=>b.onclick=async()=>{if(!confirm(`${b.dataset.name}님에게 보낼 일회용 로그인 링크(24시간)를 만들까요? 이전 링크는 막힙니다.`))return;const d=await postJson(`/api/admin/members/${b.dataset.id}/login-link`);if(d)prompt(`${d.name}님의 ${d.kind==='reset'?'비밀번호 재설정':'아이디 만들기'} 링크입니다. ${d.expires}까지 한 번만 쓸 수 있으니 본인에게만 보내주세요.`,d.url)});
 </script>

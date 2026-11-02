@@ -77,6 +77,9 @@ class LocalLoginTests(unittest.TestCase):
         self.module.app.config.update(TESTING=True)
         self.client = self.module.app.test_client()
         self.set_code("BOOK2026")
+        import local_auth  # fresh per-IP signup windows for every test
+        local_auth.signup_posts.hits.clear()
+        local_auth.signup_creates.hits.clear()
 
     def tearDown(self):
         self.patch.stop()

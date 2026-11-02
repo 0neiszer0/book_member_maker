@@ -120,3 +120,85 @@ class SignupNotifyRouteTests(base.LocalLoginTests):
 for _name in [n for n in dir(base.LocalLoginTests) if n.startswith("test_")]:
     setattr(SignupNotifyRouteTests, _name, None)
 del _name
+
+
+class OpenSignupTests(base.LocalLoginTests):
+    """No-code mode: officer approval is the only gate; code field hidden; spam guards stay."""
+
+    def setUp(self):
+        super().setUp()
+        self.notify = patch.object(signup_notify, "notify_signup", return_value=True)
+        self.mock = self.notify.start()
+        self.db.rows["signup_codes"] = []
+        self.admin_session()
+        res = self.admin_post("/api/admin/signup-code", {"action": "open"})
+        self.assertEqual(res.status_code, 200, res.get_data(as_text=True)[:300])
+        self.client.get("/logout")
+        with self.client.session_transaction() as s:
+            s.clear()
+
+    def tearDown(self):
+        self.notify.stop()
+        super().tearDown()
+
+    def admin_session(self):
+        self.as_member(1)
+
+    def test_open_mode_hides_code_field_and_accepts_signup_without_code(self):
+        html = self.client.get("/signup").get_data(as_text=True)
+        self.assertNotIn('name="signup_code"', html)
+        self.assertIn('name="website"', html)
+        result = self.signup(signup_code="")
+        self.assertEqual(result.status_code, 200, result.get_data(as_text=True)[:300])
+        self.assertEqual(self.cred("newbie_01")["status"], "pending")
+        self.mock.assert_called_once()
+        self.assertEqual(self.login("newbie_01", base.GOOD_PW).status_code, 403)  # still needs approval
+
+    def test_honeypot_fakes_success_but_stores_and_notifies_nothing(self):
+        result = self.signup(signup_code="", website="http://spam.example")
+        self.assertEqual(result.status_code, 200)
+        self.assertIsNone(self.cred("newbie_01"))
+        self.mock.assert_not_called()
+
+    def test_per_ip_cap_on_created_requests(self):
+        import local_auth
+        for i in range(local_auth.SIGNUP_CREATE_LIMIT[0]):
+            self.assertEqual(self.signup(signup_code="", login_id=f"spam_{i:02d}", student_id=f"20269999{i:02d}").status_code, 200)
+        self.assertEqual(self.signup(signup_code="", login_id="spam_xx", student_id="2026999999").status_code, 429)
+        self.assertIsNone(self.cred("spam_xx"))
+        self.assertEqual(self.mock.call_count, local_auth.SIGNUP_CREATE_LIMIT[0])
+
+    def test_per_ip_cap_on_submissions(self):
+        import local_auth
+        for _ in range(local_auth.SIGNUP_POST_LIMIT[0]):
+            self.signup(signup_code="", login_id="x")  # invalid id -> 400, still counted
+        self.assertEqual(self.signup(signup_code="").status_code, 429)
+
+    def test_officer_switches_back_to_code_without_deploy(self):
+        self.admin_session()
+        self.assertEqual(self.admin_post("/api/admin/signup-code", {"action": "set", "code": "BACK2026"}).status_code, 200)
+        self.client.get("/logout")
+        with self.client.session_transaction() as s:
+            s.clear()
+        self.assertIn('name="signup_code"', self.client.get("/signup").get_data(as_text=True))
+        self.assertEqual(self.signup(signup_code="").status_code, 400)
+        self.assertEqual(self.signup(signup_code="back2026").status_code, 200)
+
+    def test_marker_cannot_be_used_as_code_and_open_mode_ends_with_term(self):
+        import local_auth
+        self.admin_session()
+        r = self.admin_post("/api/admin/signup-code", {"action": "set", "code": local_auth.OPEN_SIGNUP_MARKER})
+        self.assertEqual(r.status_code, 400)
+        page = self.client.get("/admin/members").get_data(as_text=True)
+        self.assertIn("가입 코드 없이", page)
+        self.assertNotIn(local_auth.OPEN_SIGNUP_MARKER, page)
+        self.db.rows["seminar_terms"][0]["end_date"] = "2020-01-01"
+        self.client.get("/logout")
+        with self.client.session_transaction() as s:
+            s.clear()
+        self.assertEqual(self.signup(signup_code="").status_code, 403)
+
+
+for _name in [n for n in dir(base.LocalLoginTests) if n.startswith("test_")]:
+    setattr(OpenSignupTests, _name, None)
+del _name

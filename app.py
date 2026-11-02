@@ -526,35 +526,6 @@ def primary_admin_required(f):
 install_local_auth(app, lambda: supabase, login_required, _current_user_is_primary_admin)
 
 
-def send_telegram_notification(message):
-    """[수정] 여러 관리자에게 텔레그램 메시지를 발송합니다."""
-    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
-    # [수정] 쉼표로 구분된 여러 채팅 ID를 불러옵니다.
-    chat_ids_str = os.environ.get("TELEGRAM_CHAT_IDS")
-
-    if not bot_token or not chat_ids_str:
-        app.logger.error("텔레그램 봇 토큰 또는 관리자 채팅 ID가 설정되지 않았습니다.")
-        return
-
-    # 쉼표로 구분된 문자열을 개별 ID 리스트로 변환합니다.
-    chat_ids = [chat_id.strip() for chat_id in chat_ids_str.split(',')]
-
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-
-    # 각 채팅 ID에 대해 메시지를 발송합니다.
-    for chat_id in chat_ids:
-        params = {
-            'chat_id': chat_id,
-            'text': message,
-            'parse_mode': 'Markdown'
-        }
-        try:
-            response = requests.get(url, params=params, timeout=EXTERNAL_HTTP_TIMEOUT)
-            response.raise_for_status()  # 오류 발생 시 예외 발생
-            app.logger.info(f"{chat_id}로 텔레그램 알림이 성공적으로 발송되었습니다.")
-        except Exception as e:
-            app.logger.error(f"{chat_id}로 텔레그램 알림 발송 실패: {e}")
-
 def get_next_monday():
     """오늘을 기준으로 다음 돌아오는 월요일의 날짜를 계산합니다."""
     today = datetime.now(timezone(timedelta(hours=9))).date()
