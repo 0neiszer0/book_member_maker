@@ -2,6 +2,7 @@
 import difflib
 import hmac
 import os
+import re
 import secrets
 import time
 from urllib.parse import unquote, urlsplit
@@ -15,6 +16,43 @@ from minipc_security import LOGIN_PROVIDERS
 from wiki_access import (wiki_access, can_edit_title, can_read_title, is_officer_title,
                          strip_officer_includes, OFFICER_PREFIX)
 from wiki_engine import OpenNamu, EngineUnavailable, EditConflict, EditRejected
+
+
+_CSS_LEN = r'(?:0|\d{1,4}(?:\.\d{1,2})?(?:px|%|em|rem))'
+_CSS_COLOR = r'(?:#[0-9a-fA-F]{3,8}|[a-zA-Z]{3,20}|rgba?\(\s*\d{1,3}%?\s*,\s*\d{1,3}%?\s*,\s*\d{1,3}%?\s*(?:,\s*(?:0|1|0?\.\d{1,3})\s*)?\))'
+_CSS_RULES = {
+    'width': _CSS_LEN, 'min-width': _CSS_LEN, 'max-width': _CSS_LEN, 'height': _CSS_LEN,
+    'text-align': r'(?:left|center|right|justify)', 'vertical-align': r'(?:top|middle|bottom)',
+    'color': _CSS_COLOR, 'background': _CSS_COLOR, 'background-color': _CSS_COLOR, 'border-color': _CSS_COLOR,
+    'border': r'(?:[0-5]px\s+(?:solid|dashed|dotted)\s+' + _CSS_COLOR + r')',
+    'margin': r'(?:auto|0)', 'margin-left': r'(?:\d{1,3}px)',
+    'padding': _CSS_LEN + r'(?:\s+' + _CSS_LEN + r'){0,3}',
+    'font-size': r'(?:[5-9]\d|[12]\d\d|300)%',
+}
+_STYLE_TAGS = {'table', 'tr', 'td', 'th', 'div', 'span', 'li'}
+
+
+class WikiStyle:
+    """Small allow-list for the inline styles openNamu emits (table width/align/colors,
+    text color/size, list indent). Anything else (url(), position, expressions) is dropped.
+    openNamu adds an implicit 'text-align: X;' (with a space) to every cell; we drop that so
+    existing tables keep the site look, and keep explicit <:> / <(> / <)> ('!important')."""
+
+    def sanitize_css(self, style):
+        kept = []
+        for part in str(style or '').split(';'):
+            if ':' not in part:
+                continue
+            name, value = part.split(':', 1)
+            name, raw = name.strip().lower(), value.strip()
+            important = raw.lower().endswith('!important')
+            value = raw[:-len('!important')].strip() if important else raw
+            if name == 'text-align' and not important:
+                continue
+            rule = _CSS_RULES.get(name)
+            if rule and re.fullmatch(rule, value):
+                kept.append(f'{name}:{value}')
+        return ';'.join(kept)
 
 
 def clean_wiki_html(source):
@@ -41,10 +79,15 @@ def clean_wiki_html(source):
             'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code',
             'table', 'thead', 'tbody', 'tr', 'th', 'td', 'caption', 'sup', 'sub', 'dl', 'dt', 'dd',
             'details', 'summary'}
-    return Markup(bleach.clean(str(soup), tags=tags, attributes={
+    attributes = {
         '*': ['id'], 'a': ['href', 'title', 'rel'], 'td': ['colspan', 'rowspan'],
         'th': ['colspan', 'rowspan', 'scope'], 'ol': ['start'], 'details': ['open'],
-    }, protocols=['http', 'https'], strip=True))
+    }
+    for tag in _STYLE_TAGS:
+        attributes[tag] = attributes.get(tag, ['id']) + ['style']
+    cleaned = bleach.clean(str(soup), tags=tags, attributes=attributes, css_sanitizer=WikiStyle(),
+                           protocols=['http', 'https'], strip=True)
+    return Markup(re.sub(r'\sstyle=""', '', cleaned))
 
 
 DIFF_CONTEXT = 3

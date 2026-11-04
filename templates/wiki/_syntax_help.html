@@ -1,0 +1,23 @@
+{# 편집 화면 위쪽의 접이식 문법 도움말. 전체 설명은 '문서 편집 가이드' 문서. #}
+<details class="wiki-syntax-help" style="margin:12px 0 16px;border:1px solid var(--lms-line);padding:8px 14px;background:#fafafa">
+<summary style="cursor:pointer;font-weight:700">편집 문법 도움말 <span class="lms-small" style="font-weight:400">(눌러서 펼치기)</span></summary>
+<table style="width:100%;border-collapse:collapse;font-size:14px;line-height:22px;margin:10px 0">
+<thead><tr><th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--lms-line);width:38%">하고 싶은 것</th><th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--lms-line)">이렇게 씁니다</th></tr></thead>
+<tbody>
+<tr><td style="padding:4px 8px">문단 제목</td><td style="padding:4px 8px"><code>== 제목 ==</code> · <code>=== 작은 제목 ===</code></td></tr>
+<tr><td style="padding:4px 8px">굵게 · 기울임 · 취소선</td><td style="padding:4px 8px"><code>'''굵게'''</code> · <code>''기울임''</code> · <code>~~취소선~~</code> · <code>__밑줄__</code></td></tr>
+<tr><td style="padding:4px 8px">글자 색 · 크기</td><td style="padding:4px 8px"><code>{{ '{{{' }}#red 빨강}}}</code> · <code>{{ '{{{' }}+1 크게}}}</code></td></tr>
+<tr><td style="padding:4px 8px">문서 링크</td><td style="padding:4px 8px"><code>[[문서 이름]]</code> · <code>[[문서 이름|보일 글자]]</code> · <code>[[문서 이름#s-2|2번 문단]]</code></td></tr>
+<tr><td style="padding:4px 8px">바깥 링크</td><td style="padding:4px 8px"><code>[[https://knu-read.xyz|사이트]]</code></td></tr>
+<tr><td style="padding:4px 8px">목록</td><td style="padding:4px 8px">줄 앞에 <code> * 항목</code> (앞에 한 칸 띄움, 두 칸이면 들여쓰기)</td></tr>
+<tr><td style="padding:4px 8px">줄바꿈 · 가로줄</td><td style="padding:4px 8px"><code>[br]</code> · 한 줄에 <code>----</code></td></tr>
+<tr><td style="padding:4px 8px">각주 · 목차</td><td style="padding:4px 8px"><code>[* 각주 내용]</code> · <code>[목차]</code></td></tr>
+<tr><td style="padding:4px 8px">인용</td><td style="padding:4px 8px">줄 앞에 <code>&gt; </code></td></tr>
+<tr><td style="padding:4px 8px">표</td><td style="padding:4px 8px"><code>|| 칸1 || 칸2 ||</code> (한 줄 = 한 행)</td></tr>
+<tr><td style="padding:4px 8px">표 너비 · 칸 너비</td><td style="padding:4px 8px"><code>||&lt;tablewidth=60%&gt; 칸 ||</code> · <code>||&lt;width=30%&gt; 칸 ||</code></td></tr>
+<tr><td style="padding:4px 8px">칸 합치기 · 정렬 · 색</td><td style="padding:4px 8px"><code>&lt;-2&gt;</code> 가로 · <code>&lt;|2&gt;</code> 세로 · <code>&lt;:&gt;</code> 가운데 · <code>&lt;bgcolor=#eeeeee&gt;</code></td></tr>
+<tr><td style="padding:4px 8px">접기</td><td style="padding:4px 8px"><code>{{ '{{{' }}#!folding 제목</code> 다음 줄에 내용, 끝에 <code>}}}</code></td></tr>
+<tr><td style="padding:4px 8px">문법 그대로 보이기</td><td style="padding:4px 8px"><code>{{ '{{{' }}'''굵게 안 됨'''}}}</code></td></tr>
+</tbody></table>
+<p class="lms-small" style="margin:0">예시와 결과는 <a href="{{ url_for('wiki.document', title='문서 편집 가이드') }}" target="_blank" rel="noopener">문서 편집 가이드</a>에 있습니다(새 탭). 저장 전에 <strong>미리보기</strong>로 확인하세요.</p>
+</details>
