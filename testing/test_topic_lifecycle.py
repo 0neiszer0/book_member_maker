@@ -55,7 +55,7 @@ class TopicLifecycleTest(unittest.TestCase):
         self.assertIn("def _auto_close_topic_events", source)
         self.assertIn("event_data = _topic_event_for_submission([event_data], request.args.get('session_id'))", source)
         self.assertGreaterEqual(source.count("발제문 제출 마감(세미나 주 화요일 23:59)이 지나 제출이 마감되었습니다."), 2)
-        self.assertIn("자동 마감되어 다시 열 수 없습니다.", source)
+        self.assertIn("‘추가 제출’ 버튼으로 며칠 더 열 수 있습니다.", source)
 
 
 if __name__ == "__main__":

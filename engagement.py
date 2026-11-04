@@ -303,7 +303,7 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
 
         topic_rows = (
             supabase.table("topic_events")
-            .select("id,meeting_date,book_title,book_author,share_token,created_at,is_active,seminar_week_id,seminar_session_id")
+            .select("id,meeting_date,book_title,book_author,share_token,created_at,is_active,seminar_week_id,seminar_session_id,late_until")
             .eq("is_active", True)
             .order("meeting_date")
             .execute().data or []

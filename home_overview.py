@@ -29,7 +29,7 @@ def load_seminar_context(db, term_id=None, today=None):
     sessions = [s for s in sessions if s.get('is_active', True)]
     weeks = db.table('seminar_weeks').select('*').eq('term_id', term['id']).order('week_start').execute().data or []
     week_ids = [w['id'] for w in weeks]
-    topics = db.table('topic_events').select('id,seminar_week_id,seminar_session_id,meeting_date,is_active,share_token,created_at').in_('seminar_week_id', week_ids).order('created_at', desc=True).execute().data or [] if week_ids else []
+    topics = db.table('topic_events').select('id,seminar_week_id,seminar_session_id,meeting_date,is_active,share_token,created_at,late_until').in_('seminar_week_id', week_ids).order('created_at', desc=True).execute().data or [] if week_ids else []
     topics_by_week = {}
     for event in topics:
         event['session_dates'] = [s['meeting_date'] for s in result['all_sessions'] if s.get('seminar_week_id') == event.get('seminar_week_id')]

@@ -46,19 +46,64 @@ def topic_event_deadline(event):
     return tuesday_before(meeting_date)
 
 
-def topic_event_close_at(event):
-    """마감 시각(한국시간 화요일 23:59:59)을 timezone 포함 datetime으로 반환한다."""
-    deadline = topic_event_deadline(event)
-    return datetime.combine(deadline, time(23, 59, 59), KST) if deadline else None
+def topic_event_late_until(event):
+    """운영진이 연 추가 제출 마감(timezone 포함 datetime) 또는 None."""
+    value = (event or {}).get("late_until")
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=KST)
 
 
-def topic_event_is_expired(event, today=None):
-    """한국시간 기준 마감 화요일이 지난 수요일 00시부터 마감으로 본다."""
-    deadline = topic_event_deadline(event)
+def late_until_end_of_day(day):
+    """추가 제출은 고른 날의 23:59:59(한국시간)까지 받는다."""
+    return datetime.combine(day, time(23, 59, 59), KST)
+
+
+def _current_date(today):
     current = today if today is not None else datetime.now(KST)
     if isinstance(current, datetime):
         current = current.astimezone(KST).date() if current.tzinfo else current.date()
-    return bool(deadline and current > deadline)
+    return current
+
+
+def topic_event_close_at(event):
+    """실제 마감 시각(추가 제출 기간이 더 늦으면 그 시각, 한국시간)."""
+    deadline = topic_event_deadline(event)
+    original = datetime.combine(deadline, time(23, 59, 59), KST) if deadline else None
+    late = topic_event_late_until(event)
+    if late and (original is None or late > original):
+        return late
+    return original
+
+
+def topic_event_original_expired(event, today=None):
+    """원래 마감(화요일 23:59)이 지났는지. 추가 제출 기간과 무관."""
+    deadline = topic_event_deadline(event)
+    return bool(deadline and _current_date(today) > deadline)
+
+
+def topic_event_late_open(event, today=None):
+    """원래 마감은 지났지만 추가 제출 기간 안인지."""
+    late = topic_event_late_until(event)
+    return bool(late and topic_event_original_expired(event, today)
+                and _current_date(today) <= late.astimezone(KST).date())
+
+
+def topic_event_is_expired(event, today=None):
+    """한국시간 기준 마감 화요일이 지난 수요일 00시부터 마감으로 본다.
+
+    운영진이 추가 제출 기간(late_until)을 열었다면 그 날짜가 끝날 때까지는 열려 있다.
+    """
+    if not topic_event_original_expired(event, today):
+        return False
+    return not topic_event_late_open(event, today)
 
 
 def topic_event_is_open(event, today=None):

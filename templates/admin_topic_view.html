@@ -27,7 +27,7 @@
         </div>
 
         <section class="ops-panel p-4 rounded-lg mb-6" aria-label="회차별 사회자와 다운로드">
-            {% if event.submission_deadline %}<p class="mb-3">공유 발제문 제출·수정 마감: <strong>{{ event.submission_deadline }} 23:59 (한국시간)</strong> · {{ '접수 중' if event.is_active else '마감' }}</p>{% endif %}
+            {% if event.submission_deadline %}<p class="mb-3">공유 발제문 제출·수정 마감: <strong>{{ event.submission_deadline }} 23:59 (한국시간)</strong> · {{ ('추가 제출 중 (' ~ event.late_until_date ~ ' 23:59까지)') if event.late_open and event.is_active else ('접수 중' if event.is_active else '마감') }}{% if event.late_until_date and not event.late_open and event.is_active %} · 추가 제출 {{ event.late_until_date }} 23:59까지 예정{% endif %}</p>{% endif %}
             <div class="flex flex-wrap gap-3">
             {% for item in seminar_sessions %}
                 <div class="border ops-border rounded-lg p-3 flex-1 min-w-0">
@@ -48,7 +48,7 @@
             <div class="ops-panel p-6 rounded-lg shadow-lg" data-sub-id="{{ sub.id }}">
                 <div class="border-b ops-border pb-3 mb-4 flex justify-between items-center flex-wrap gap-2">
                     <h2 class="text-xl font-bold ops-accent">
-                        {{ icon('account',18) }} {% if sub.admission_year %}<span class="ops-accent font-mono mr-1">{{ sub.admission_year }}</span>{% endif %}<span class="sub-author">{{ sub.author_name }}</span>
+                        {{ icon('account',18) }} {% if sub.admission_year %}<span class="ops-accent font-mono mr-1">{{ sub.admission_year }}</span>{% endif %}<span class="sub-author">{{ sub.author_name }}</span>{% if sub.late_submission %} <span class="chip text-xs">추가 제출</span>{% endif %}
                         <span class="text-sm text-gray-400 font-normal">(<span class="sub-dept">{{ sub.department }}</span>)</span>
                     </h2>
                     <div class="flex items-center gap-2">

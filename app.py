@@ -50,7 +50,9 @@ from recruitment_results import (
     parse_applicant_file,
     parse_applicant_rows,
 )
-from topic_lifecycle import topic_event_deadline, topic_event_is_expired
+from topic_lifecycle import (late_until_end_of_day, topic_event_close_at, topic_event_deadline,
+                             topic_event_is_expired, topic_event_late_open, topic_event_late_until,
+                             topic_event_original_expired)
 from topic_autopen import open_due_topic_events
 from home_overview import date_label, member_seminar_summary, operations_summary, decorate_topic_submission_states
 from attendance_workflow import attendance_is_confirmed, confirmed_history_session_ids
@@ -3273,6 +3275,8 @@ def _auto_close_topic_events(events):
         deadline = topic_event_deadline(row)
         row['submission_deadline'] = deadline.isoformat() if deadline else None
     today_kst = datetime.now(timezone(timedelta(hours=9))).date()
+    for row in rows:
+        _annotate_topic_late_window(row, today_kst)
     expired = [row for row in rows if row.get('is_active') and topic_event_is_expired(row, today=today_kst)]
     expired_ids = [row.get('id') for row in expired if row.get('id')]
     if expired_ids:
@@ -3284,6 +3288,16 @@ def _auto_close_topic_events(events):
             row['is_active'] = False
             row['auto_closed'] = True
     return rows
+
+
+def _annotate_topic_late_window(row, today_kst):
+    """화면용: 추가 제출 기간 정보(원래 마감은 submission_deadline 그대로)."""
+    late = topic_event_late_until(row)
+    row['late_until_date'] = late.astimezone(timezone(timedelta(hours=9))).date().isoformat() if late else None
+    row['late_open'] = topic_event_late_open(row, today=today_kst)
+    row['original_expired'] = topic_event_original_expired(row, today=today_kst)
+    close_at = topic_event_close_at(row)
+    row['close_at_iso'] = close_at.isoformat() if close_at else None
 
 
 def _topic_event_for_submission(event_rows, session_id=None):
@@ -3301,7 +3315,9 @@ def _topic_event_for_submission(event_rows, session_id=None):
         event['submission_meeting_date'] = seminar_session['meeting_date']
         deadline = topic_event_deadline(event)
         event['submission_deadline'] = deadline.isoformat() if deadline else None
-        if topic_event_is_expired(event, today=datetime.now(timezone(timedelta(hours=9))).date()):
+        today_kst = datetime.now(timezone(timedelta(hours=9))).date()
+        _annotate_topic_late_window(event, today_kst)
+        if topic_event_is_expired(event, today=today_kst):
             event['is_active'] = False
     return event
 
@@ -3449,12 +3465,67 @@ def toggle_topic_event(event_id):
         new_state = not bool(cur.get('is_active'))
         today_kst = datetime.now(timezone(timedelta(hours=9))).date()
         if new_state and topic_event_is_expired(cur, today=today_kst):
-            return jsonify({"error": "제출 마감(세미나 주 화요일 23:59)이 지난 발제문은 자동 마감되어 다시 열 수 없습니다."}), 400
+            return jsonify({"error": "제출 마감(세미나 주 화요일 23:59)이 지났습니다. ‘추가 제출’ 버튼으로 며칠 더 열 수 있습니다."}), 400
         supabase.table('topic_events').update({'is_active': new_state}).eq('id', event_id).execute()
         return jsonify({"status": "success", "is_active": new_state})
     except Exception as e:
         app.logger.error(f"Error toggling topic event: {e}")
         return jsonify({"error": "상태 변경 중 오류가 발생했습니다."}), 500
+
+
+TOPIC_LATE_MAX_DAYS = 30
+
+
+@app.route('/api/admin/topic_events/<event_id>/late_window', methods=['POST'])
+@login_required(role="admin")
+def topic_event_late_window(event_id):
+    """추가 제출 기간 열기/연장/끝내기. 원래 마감(화요일 23:59)은 바꾸지 않는다.
+
+    body: {"days": 1~30} 원래 마감(또는 이미 지났으면 오늘)부터 N일 더,
+          {"until": "YYYY-MM-DD"} 그 날 23:59(한국시간)까지,
+          {"action": "close"} 추가 제출 기간을 없앤다(원래 마감이 지났으면 바로 마감).
+    """
+    try:
+        rows = supabase.table('topic_events').select('*').eq('id', event_id).limit(1).execute().data or []
+        if not rows:
+            return jsonify({"error": "이벤트를 찾을 수 없습니다."}), 404
+        cur = _auto_close_topic_events(rows)[0]
+        data = request.get_json(silent=True) or {}
+        today_kst = datetime.now(timezone(timedelta(hours=9))).date()
+        deadline = topic_event_deadline(cur)
+        if data.get('action') == 'close':
+            update = {'late_until': None}
+            if topic_event_original_expired(cur, today=today_kst):
+                update['is_active'] = False
+            supabase.table('topic_events').update(update).eq('id', event_id).execute()
+            return jsonify({"status": "success", "late_until": None, "is_active": update.get('is_active', cur.get('is_active'))})
+        if 'until' in data:
+            try:
+                until = date.fromisoformat(str(data.get('until') or '')[:10])
+            except ValueError:
+                return jsonify({"error": "날짜를 YYYY-MM-DD로 골라주세요."}), 400
+        else:
+            try:
+                days = int(data.get('days'))
+            except (TypeError, ValueError):
+                return jsonify({"error": "며칠 더 열지 골라주세요."}), 400
+            if not 1 <= days <= TOPIC_LATE_MAX_DAYS:
+                return jsonify({"error": f"1~{TOPIC_LATE_MAX_DAYS}일 사이로 골라주세요."}), 400
+            base = max(deadline or today_kst, today_kst)
+            until = base + timedelta(days=days)
+        if until < today_kst or (deadline and until <= deadline):
+            return jsonify({"error": "추가 제출 마감은 원래 마감보다 늦고 오늘 이후여야 합니다."}), 400
+        if until > today_kst + timedelta(days=TOPIC_LATE_MAX_DAYS):
+            return jsonify({"error": f"추가 제출은 오늘부터 최대 {TOPIC_LATE_MAX_DAYS}일까지 열 수 있습니다."}), 400
+        late_until = late_until_end_of_day(until)
+        supabase.table('topic_events').update({'late_until': late_until.isoformat(), 'is_active': True}) \
+            .eq('id', event_id).execute()
+        app.logger.warning('Topic event %s late window until %s by member %s', event_id, until.isoformat(),
+                           session.get('user_id'))
+        return jsonify({"status": "success", "late_until": until.isoformat(), "is_active": True})
+    except Exception as e:
+        app.logger.error(f"Error setting topic late window: {type(e).__name__}")
+        return jsonify({"error": "추가 제출 기간을 바꾸는 중 오류가 발생했습니다."}), 500
 
 
 def _authenticated_topic_member(event_id=None):
@@ -3908,7 +3979,15 @@ def view_admin_topics(event_id):
         submissions = supabase.table('topic_submissions').select('*').eq('event_id', event_id).order(
             'created_at').execute().data
         submissions = number_topic_submissions(submissions)
-        
+        original_close = (datetime.combine(date.fromisoformat(event['submission_deadline']), time(23, 59, 59), KST)
+                          if event.get('submission_deadline') else None)
+        for sub in submissions or []:
+            try:
+                created = datetime.fromisoformat(str(sub.get('created_at') or '').replace('Z', '+00:00'))
+                sub['late_submission'] = bool(original_close and created.tzinfo and created > original_close)
+            except ValueError:
+                sub['late_submission'] = False
+
         return render_template('admin_topic_view.html', event=event, submissions=submissions,
                                seminar_sessions=_topic_event_sessions(event))
     except Exception as e:
