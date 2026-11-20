@@ -131,8 +131,40 @@ class KnuEmailPinTests(unittest.TestCase):
             self.assertEqual(session["auth_provider"], "local")
             self.assertTrue(session.permanent)
 
+    def test_login_response_headers(self):
+        response = self.client.get("/login")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+        self.assertEqual(response.headers["Referrer-Policy"], "same-origin")
+
+    def test_account_setup_response_headers(self):
+        token = "test-account-setup-token"
+        self.db.rows["account_setup_tokens"].append({
+            "member_id": 3,
+            "token_hash": local_auth.token_digest(token),
+            "expires_at": local_auth.iso(self.now + timedelta(minutes=10)),
+        })
+        response = self.client.get(f"/account/setup/{token}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+        self.assertEqual(response.headers["Referrer-Policy"], "same-origin")
+
+    def test_email_request_requires_an_allowed_origin_when_present(self):
+        base_url = self.module.PUBLIC_BASE_URL
+        self.assertEqual(self.client.get("/login", base_url=base_url).status_code, 200)
+        with self.client.session_transaction(base_url=base_url) as session:
+            csrf = session["sensitive_csrf"]
+        data = {"email": "probe@example.invalid", "csrf_token": csrf}
+        response = self.client.post("/auth/email/request", base_url=base_url, data=data,
+                                    headers={"Origin": base_url, "Sec-Fetch-Site": "same-origin"})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn(local_auth.EMAIL_ERROR, response.get_data(as_text=True))
+        response = self.client.post("/auth/email/request", base_url=base_url, data=data,
+                                    headers={"Origin": "null", "Sec-Fetch-Site": "same-origin"})
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self.sent, [])
+
     def test_non_knu_email_and_csrf_rejection(self):
-        self.assertEqual(self.client.get("/login").headers["Cache-Control"], "no-store")
         for path in ("/auth/email/request", "/auth/email/verify", "/auth/email/enroll", "/login/pin",
                      "/account/pin/setup", "/account/pin/reset"):
             self.assertEqual(self.client.post(path).status_code, 403, path)
