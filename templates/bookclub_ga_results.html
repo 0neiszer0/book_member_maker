@@ -30,7 +30,7 @@
                 {% endfor %}
             </div>
             {% else %}
-            <div class="groups-panel groups-p-6 groups-rounded-lg"><p>편성 결과를 찾지 못했습니다. 인원과 조건을 확인한 뒤 다시 시도해주세요.</p></div>
+            <div class="groups-panel groups-p-6 groups-rounded-lg"><p>{{ empty_reason or '편성 결과를 찾지 못했습니다. 인원과 조건을 확인한 뒤 다시 시도해주세요.' }}</p></div>
             {% endif %}
         </section>
     </div>

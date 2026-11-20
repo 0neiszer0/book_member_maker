@@ -1864,9 +1864,9 @@ def delete_group_pair_restriction(restriction_id):
 def bookclub_index():
     app.logger.info("---/making_team 경로 함수 실행 시작---")
     seminar_session_id = (request.args.get('session_id') or '').strip() or None
-    day_choice = (request.args.get('day') or 'mon').lower()
-    if day_choice not in ('mon', 'thu', 'all'):
-        day_choice = 'mon'
+    raw_day = (request.args.get('day') or '').strip().lower()
+    day_explicit = raw_day in ('mon', 'thu', 'all')
+    day_choice = raw_day if day_explicit else 'mon'
 
     mon_attendee_ids: set = set()
     thu_attendee_ids: set = set()
@@ -1949,6 +1949,13 @@ def bookclub_index():
                 'id,term_id,meeting_date,day_type,participation_mode,seminar_week_id,book_title,planned_member_ids'
             ) \
                 .in_('meeting_date', date_strs).eq('is_active', True).execute().data or []
+            # 요일이 명시되지 않았으면, 가장 가까운 활성 회차의 요일을 기본값으로 삼는다.
+            if not day_explicit:
+                valid_sessions = [s for s in sess_rows if s.get('day_type') in ('mon', 'thu')]
+                if valid_sessions:
+                    day_choice = min(valid_sessions, key=lambda s: s.get('meeting_date') or '9999-99-99')['day_type']
+                elif seminar_dates:
+                    day_choice = 'thu' if seminar_dates[0].weekday() == 3 else 'mon'
             for s in sess_rows:
                 scoped_ids = {m['id'] for m in scope_members(supabase, member_rows, term_id=s.get('term_id')) if m.get('is_active')}
                 target_ids = mon_attendee_ids if s.get('day_type') == 'mon' else thu_attendee_ids
@@ -2153,6 +2160,16 @@ def start_group_generation():
             combined_solutions = solver_result['solutions'] or []
             app.logger.info(f"[8] '종합 최적화' 완료, {len(combined_solutions)}개")
 
+            # 결과가 없을 때 사용자에게 원인을 안내하되, 비공개 편성 제한의 구성원은 절대 노출하지 않는다.
+            empty_reason = None
+            if not combined_solutions:
+                if len(present_names) < 3:
+                    empty_reason = '참석자가 3명 미만이라 조를 편성할 수 없습니다. 최소 3명 이상 선택해주세요.'
+                elif any(a in present_set and b in present_set for a, b in restricted_pairs):
+                    empty_reason = '현재 인원·조 수와 편성 조건을 동시에 만족하는 조합을 찾지 못했습니다. 조 수를 조정하거나 수동 편성을 이용해주세요.'
+                else:
+                    empty_reason = '현재 인원과 발제자·조 수 조건을 동시에 만족하는 조합을 찾지 못했습니다. 조 수나 조건을 조정해 다시 시도해주세요.'
+
             yield f"event: progress\ndata: {json.dumps({'progress': 90})}\n\n"
 
             # 결과 페이지에서 'M'/'W'로 비교하므로 정규화된 값으로 전달
@@ -2178,6 +2195,7 @@ def start_group_generation():
                     seminar_session_id=seminar_session_id,
                     meeting_date=meeting_date,
                     book_title=session_book_title,
+                    empty_reason=empty_reason,
                 )
                 complete_data = json.dumps({'html': final_html})
                 yield f"event: complete\ndata: {complete_data}\n\n"
@@ -2238,7 +2256,7 @@ def run_cp_grouping(members_df, co_matrix, attendee_names, presenter_names,
     # 모든 그룹이 최소 MIN_GROUP_SIZE명 이상 가질 수 있도록 그룹 수 상한선 적용
     num_groups = max(1, min(num_groups, n // MIN_GROUP_SIZE))
 
-    min_size = MIN_GROUP_SIZE
+    min_size = min(MIN_GROUP_SIZE, n)
     max_size = math.ceil(n / num_groups)  # +1 제거: 일부 조에 여유 생갈 경우 3인조 발생 방지
 
     app.logger.info(f"[CP-SAT] 그룹={num_groups}, 크기={min_size}~{max_size}")
@@ -2379,6 +2397,9 @@ def run_cp_grouping(members_df, co_matrix, attendee_names, presenter_names,
 
         if cancel_event is not None and cancel_event.is_set():
             app.logger.info("[CP-SAT] stopping after active solve due to cancellation")
+            break
+        if status == cp_model.INFEASIBLE:
+            app.logger.warning("[CP-SAT] 조건이 모순되어(INFEASIBLE) 탐색을 즉시 중단합니다.")
             break
         if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
             app.logger.warning(f"[CP-SAT] attempt {attempt}: 실패 status={status}")
@@ -6339,241 +6360,6 @@ def admin_rebuild_bookclub_matrix():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
-# --- 벽돌책 ---
-@app.route('/records/brick_books')
-@login_required(role="admin")
-def records_brick_books():
-    term_id = request.args.get('term_id') or ''
-    try:
-        books = supabase.table('brick_books').select('*').order('created_at', desc=True).execute().data or []
-        start, end, _ = _get_term_range(term_id)
-        if books:
-            ids = [b['id'] for b in books]
-            sq = supabase.table('brick_book_sessions').select('brick_book_id, meeting_date').in_('brick_book_id', ids)
-            if start and end:
-                sq = sq.gte('meeting_date', start).lte('meeting_date', end)
-            sess_res = sq.execute().data or []
-            cnt = {}
-            for s in sess_res:
-                cnt[s['brick_book_id']] = cnt.get(s['brick_book_id'], 0) + 1
-            for b in books:
-                b['session_count'] = cnt.get(b['id'], 0)
-            # 학기 필터링 시: 해당 학기 내 세션이 있는 책만 표시
-            if start and end:
-                books = [b for b in books if b['session_count'] > 0]
-        terms = _get_terms_for_filter()
-    except Exception as e:
-        app.logger.error(f"records_brick_books error: {e}", exc_info=True)
-        flash(f"오류: {e}", 'danger')
-        books, terms = [], []
-    return render_template('records_brick_books.html', books=books,
-                           terms=terms, selected_term_id=term_id)
-
-
-@app.route('/records/brick_books/<book_id>')
-@login_required(role="admin")
-def records_brick_book_detail(book_id):
-    try:
-        book = supabase.table('brick_books').select('*').eq('id', book_id).single().execute().data
-        sessions_res = supabase.table('brick_book_sessions').select('*') \
-            .eq('brick_book_id', book_id).order('meeting_date', desc=True).execute()
-        sessions = sessions_res.data or []
-        sess_ids = [s['id'] for s in sessions]
-        member_map_by_sess = {}
-        if sess_ids:
-            parts = supabase.table('brick_session_members').select('session_id, member_id, members(id, name)') \
-                .in_('session_id', sess_ids).execute().data or []
-            for p in parts:
-                sid = p['session_id']
-                member_map_by_sess.setdefault(sid, []).append(p.get('members') or {})
-        for s in sessions:
-            s['members'] = member_map_by_sess.get(s['id'], [])
-        all_members = supabase.table('members').select('id, name').eq('is_active', True).order('name').execute().data or []
-        return render_template('records_brick_book_detail.html',
-                               book=book, sessions=sessions, all_members=all_members)
-    except Exception as e:
-        app.logger.error(f"records_brick_book_detail error: {e}", exc_info=True)
-        flash(f"오류: {e}", 'danger')
-        return redirect(url_for('records_brick_books'))
-
-
-@app.route('/api/admin/brick_books/create', methods=['POST'])
-@login_required(role="admin")
-def brick_book_create():
-    try:
-        data = request.json or {}
-        title = (data.get('title') or '').strip()
-        if not title:
-            return jsonify({'status': 'error', 'message': '제목은 필수입니다.'}), 400
-        res = supabase.table('brick_books').insert({
-            'title': title,
-            'notes': (data.get('notes') or '').strip() or None,
-        }).execute()
-        return jsonify({'status': 'success', 'book': res.data[0]})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
-
-@app.route('/api/admin/brick_books/<book_id>/delete', methods=['POST'])
-@login_required(role="admin")
-def brick_book_delete(book_id):
-    try:
-        supabase.table('brick_books').delete().eq('id', book_id).execute()
-        return jsonify({'status': 'success'})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
-
-@app.route('/api/admin/brick_books/<book_id>/sessions/add', methods=['POST'])
-@login_required(role="admin")
-def brick_session_add(book_id):
-    try:
-        data = request.json or {}
-        meeting_date = data.get('meeting_date')
-        if not meeting_date:
-            return jsonify({'status': 'error', 'message': '날짜가 필요합니다.'}), 400
-        sess = supabase.table('brick_book_sessions').insert({
-            'brick_book_id': book_id,
-            'meeting_date': meeting_date,
-            'notes': (data.get('notes') or '').strip() or None,
-        }).execute().data[0]
-        member_ids = [int(m) for m in (data.get('member_ids') or []) if m]
-        if member_ids:
-            supabase.table('brick_session_members').insert([
-                {'session_id': sess['id'], 'member_id': mid} for mid in member_ids
-            ]).execute()
-        return jsonify({'status': 'success', 'session': sess})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
-
-@app.route('/api/admin/brick_sessions/<session_id>/delete', methods=['POST'])
-@login_required(role="admin")
-def brick_session_delete(session_id):
-    try:
-        supabase.table('brick_book_sessions').delete().eq('id', session_id).execute()
-        return jsonify({'status': 'success'})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
-
-# --- 소모임 ---
-@app.route('/records/study_groups')
-@login_required(role="admin")
-def records_study_groups():
-    term_id = request.args.get('term_id') or ''
-    try:
-        groups = supabase.table('study_groups').select('*').order('created_at', desc=True).execute().data or []
-        start, end, _ = _get_term_range(term_id)
-        if groups:
-            ids = [g['id'] for g in groups]
-            sq = supabase.table('study_group_sessions').select('study_group_id, meeting_date').in_('study_group_id', ids)
-            if start and end:
-                sq = sq.gte('meeting_date', start).lte('meeting_date', end)
-            sess_res = sq.execute().data or []
-            cnt = {}
-            for s in sess_res:
-                cnt[s['study_group_id']] = cnt.get(s['study_group_id'], 0) + 1
-            for g in groups:
-                g['session_count'] = cnt.get(g['id'], 0)
-            if start and end:
-                groups = [g for g in groups if g['session_count'] > 0]
-        terms = _get_terms_for_filter()
-    except Exception as e:
-        app.logger.error(f"records_study_groups error: {e}", exc_info=True)
-        flash(f"오류: {e}", 'danger')
-        groups, terms = [], []
-    return render_template('records_study_groups.html', groups=groups,
-                           terms=terms, selected_term_id=term_id)
-
-
-@app.route('/records/study_groups/<group_id>')
-@login_required(role="admin")
-def records_study_group_detail(group_id):
-    try:
-        group = supabase.table('study_groups').select('*').eq('id', group_id).single().execute().data
-        sessions_res = supabase.table('study_group_sessions').select('*') \
-            .eq('study_group_id', group_id).order('meeting_date', desc=True).execute()
-        sessions = sessions_res.data or []
-        sess_ids = [s['id'] for s in sessions]
-        member_map_by_sess = {}
-        if sess_ids:
-            parts = supabase.table('study_session_members').select('session_id, member_id, members(id, name)') \
-                .in_('session_id', sess_ids).execute().data or []
-            for p in parts:
-                sid = p['session_id']
-                member_map_by_sess.setdefault(sid, []).append(p.get('members') or {})
-        for s in sessions:
-            s['members'] = member_map_by_sess.get(s['id'], [])
-        all_members = supabase.table('members').select('id, name').eq('is_active', True).order('name').execute().data or []
-        return render_template('records_study_group_detail.html',
-                               group=group, sessions=sessions, all_members=all_members)
-    except Exception as e:
-        app.logger.error(f"records_study_group_detail error: {e}", exc_info=True)
-        flash(f"오류: {e}", 'danger')
-        return redirect(url_for('records_study_groups'))
-
-
-@app.route('/api/admin/study_groups/create', methods=['POST'])
-@login_required(role="admin")
-def study_group_create():
-    try:
-        data = request.json or {}
-        name = (data.get('name') or '').strip()
-        if not name:
-            return jsonify({'status': 'error', 'message': '이름은 필수입니다.'}), 400
-        res = supabase.table('study_groups').insert({
-            'name': name,
-            'notes': (data.get('notes') or '').strip() or None,
-        }).execute()
-        return jsonify({'status': 'success', 'group': res.data[0]})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
-
-@app.route('/api/admin/study_groups/<group_id>/delete', methods=['POST'])
-@login_required(role="admin")
-def study_group_delete(group_id):
-    try:
-        supabase.table('study_groups').delete().eq('id', group_id).execute()
-        return jsonify({'status': 'success'})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
-
-@app.route('/api/admin/study_groups/<group_id>/sessions/add', methods=['POST'])
-@login_required(role="admin")
-def study_session_add(group_id):
-    try:
-        data = request.json or {}
-        meeting_date = data.get('meeting_date')
-        if not meeting_date:
-            return jsonify({'status': 'error', 'message': '날짜가 필요합니다.'}), 400
-        sess = supabase.table('study_group_sessions').insert({
-            'study_group_id': group_id,
-            'meeting_date': meeting_date,
-            'notes': (data.get('notes') or '').strip() or None,
-        }).execute().data[0]
-        member_ids = [int(m) for m in (data.get('member_ids') or []) if m]
-        if member_ids:
-            supabase.table('study_session_members').insert([
-                {'session_id': sess['id'], 'member_id': mid} for mid in member_ids
-            ]).execute()
-        return jsonify({'status': 'success', 'session': sess})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
-
-@app.route('/api/admin/study_sessions/<session_id>/delete', methods=['POST'])
-@login_required(role="admin")
-def study_session_delete(session_id):
-    try:
-        supabase.table('study_group_sessions').delete().eq('id', session_id).execute()
-        return jsonify({'status': 'success'})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
-
 # --- 통계 ---
 @app.route('/records/analytics')
 @login_required(role="admin")
@@ -6688,6 +6474,8 @@ from integrated_calendar import init_calendar_routes
 init_calendar_routes(app, lambda: supabase, login_required)
 from term_membership_routes import init_term_membership_routes
 init_term_membership_routes(app, lambda: supabase, login_required, create_member, seminar_term_create)
+from records_activity_routes import init_records_activity_routes
+init_records_activity_routes(app, lambda: supabase, login_required, _get_term_range, _get_terms_for_filter)
 
 
 # ==============================================================================
