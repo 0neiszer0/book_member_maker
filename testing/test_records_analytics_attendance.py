@@ -9,6 +9,7 @@ class RecordsAnalyticsAttendanceTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+        cls.analytics_source = (ROOT / "records_analytics_routes.py").read_text(encoding="utf-8")
         cls.analytics = (ROOT / "templates" / "records_analytics.html").read_text(encoding="utf-8")
         cls.records_base = (ROOT / "templates" / "_records_base.html").read_text(encoding="utf-8")
         cls.matrix_template = (ROOT / "templates" / "admin_attendance_matrix.html").read_text(encoding="utf-8")
@@ -39,10 +40,7 @@ class RecordsAnalyticsAttendanceTest(unittest.TestCase):
         self.assertIn("같은 주의 월·목 회차도 각각", self.matrix_template)
 
     def test_analytics_uses_actual_matrix_and_moves_minimum_to_term_page(self):
-        route = self.app_source[
-            self.app_source.index("def records_analytics"):
-            self.app_source.index("from boards import init_board_routes")
-        ]
+        route = self.analytics_source[self.analytics_source.index("def records_analytics"):]
         self.assertIn("select('id, date, genre, present, book_title')", route)
         self.assertIn("attendance_counts.get(member['id'], 0)", route)
         self.assertNotIn("below_minimum", route)

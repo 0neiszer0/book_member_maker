@@ -9,6 +9,7 @@ class QueryEfficiencyContractsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+        cls.records_source = (ROOT / "records_analytics_routes.py").read_text(encoding="utf-8")
         cls.engagement_source = (ROOT / "engagement.py").read_text(encoding="utf-8")
 
     @staticmethod
@@ -53,7 +54,7 @@ class QueryEfficiencyContractsTest(unittest.TestCase):
 
     def test_seminar_records_use_exact_count_and_server_range(self):
         route = self.section(
-            self.app_source,
+            self.records_source,
             "def records_seminars():",
             "def records_seminar_detail(",
         )
