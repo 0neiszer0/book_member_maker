@@ -5,7 +5,7 @@ import hmac
 import os
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
-from flask import abort, jsonify, render_template, request, session, make_response, send_from_directory
+from flask import abort, jsonify, render_template, request, session, make_response, send_from_directory, url_for
 from cryptography.hazmat.primitives.asymmetric import ec
 from lms_learning import historical_courses
 from db_read import all_rows
@@ -132,7 +132,29 @@ def init_member_notifications(app, get_db, login_required):
 
     @app.get('/manifest.webmanifest')
     def push_manifest():
-        return jsonify(name='책 먹는 호반우', short_name='책반우', start_url='/notifications', scope='/', display='standalone', theme_color='#d20f17', background_color='#ffffff')
+        return jsonify(
+            name='책 먹는 호반우',
+            short_name='책반우',
+            start_url='/',
+            scope='/',
+            display='standalone',
+            theme_color='#d20f17',
+            background_color='#ffffff',
+            icons=[
+                {
+                    'src': url_for('static', filename='icons/icon-192.png'),
+                    'sizes': '192x192',
+                    'type': 'image/png',
+                    'purpose': 'any maskable',
+                },
+                {
+                    'src': url_for('static', filename='icons/icon-512.png'),
+                    'sizes': '512x512',
+                    'type': 'image/png',
+                    'purpose': 'any maskable',
+                },
+            ],
+        )
 
     @app.get('/push-worker.js')
     def push_service_worker():

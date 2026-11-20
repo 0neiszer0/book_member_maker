@@ -95,6 +95,32 @@ class GroupedMemberIdsTests(unittest.TestCase):
         self.assertEqual(grouped_member_ids([], members), (None, []))
         self.assertEqual(grouped_member_ids([{'present': None, 'groups': None}], members), (None, []))
 
+    def test_active_member_preferred_and_unicode_nfc_normalized(self):
+        import unicodedata
+        from attendance_workflow import grouped_member_ids
+        nfd_name = unicodedata.normalize('NFD', '홍길동')
+        members = [
+            {'id': 1, 'name': '홍길동', 'is_active': True},
+            {'id': 2, 'name': '홍길동', 'is_active': False},
+            {'id': 3, 'name': '이순신', 'is_active': False},
+            {'id': 4, 'name': '김철수', 'is_active': True},
+            {'id': 5, 'name': '김철수', 'is_active': True},
+        ]
+        ids, issues = grouped_member_ids(
+            [{'present': [f' {nfd_name} ', '이순신', '김철수']}],
+            members,
+        )
+        self.assertEqual(ids, [1, 3])
+        self.assertEqual([(i['name'], i['reason']) for i in issues], [('김철수', '동명이인')])
+
+    def test_match_roster_rows_normalizes_unicode_nfc(self):
+        import unicodedata
+        nfd = unicodedata.normalize('NFD', '독서')
+        members = [{'id': 1, 'name': '독서', 'student_id': '202600001', 'is_active': True}]
+        matched, issues = match_roster_rows([[f' {nfd} ']], members)
+        self.assertEqual([m['id'] for m in matched], [1])
+        self.assertEqual(issues, [])
+
 
 if __name__ == '__main__':
     unittest.main()

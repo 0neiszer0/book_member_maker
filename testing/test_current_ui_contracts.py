@@ -121,6 +121,22 @@ class CurrentUiContractsTest(unittest.TestCase):
             self.assertIn("첫 세미나 날짜", source)
             self.assertIn("마지막 세미나 날짜", source)
 
+    def test_retired_seminar_vote_share_link_ui_is_removed(self):
+        dashboard = self.read("templates/admin_dashboard.html")
+        term = self.read("templates/admin_seminar_term.html")
+        app_source = self.read("app.py")
+        self.assertNotIn("copySeminarLink", dashboard)
+        self.assertNotIn("term.share_url", dashboard)
+        self.assertNotIn("data.share_url", dashboard)
+        self.assertNotIn("copyShareLink", term)
+        self.assertNotIn("{{ share_url }}", term)
+        self.assertIn("seminar_vote_retired.html", app_source)
+
+    def test_favicon_partial_includes_pwa_apple_touch_icon(self):
+        favicon = self.read("templates/_favicon.html")
+        self.assertIn('rel="apple-touch-icon"', favicon)
+        self.assertIn("icons/icon-192.png", favicon)
+
 
 if __name__ == "__main__":
     unittest.main()

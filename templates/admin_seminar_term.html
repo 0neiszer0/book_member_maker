@@ -48,14 +48,6 @@
                     <span class="text-xs text-gray-400">마지막 세미나 날짜를 늦추면 누락된 월/목 회차가 자동 추가됩니다 (기존 회차는 보존).</span>
                 </div>
             </form>
-            <div class="mt-4 flex items-center gap-3">
-                <span class="text-sm text-gray-400">공유 링크:</span>
-                <input type="text" readonly value="{{ share_url }}"
-                    class="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm font-mono">
-                <button onclick="copyShareLink()" class="bg-gray-700 hover:bg-gray-600 text-white py-1.5 px-3 rounded text-sm">
-                    복사
-                </button>
-            </div>
         </div>
 
         <!-- 회차 목록 -->
@@ -101,12 +93,6 @@
 {% block scripts %}
 <script>
         const TERM_ID = '{{ term.id }}';
-
-        function copyShareLink() {
-            const url = '{{ share_url }}';
-            navigator.clipboard.writeText(url).then(() => alert('복사되었습니다!'))
-                .catch(() => prompt('복사:', url));
-        }
 
         document.getElementById('termUpdateForm').addEventListener('submit', async (e) => {
             e.preventDefault();

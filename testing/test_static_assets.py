@@ -88,5 +88,23 @@ class StaticAssetReleaseTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     validate_static_assets(self.app)
 
+    def test_pwa_icons_exist_with_expected_dimensions_and_pass_allowlist(self):
+        from PIL import Image
+        repo_static = Path(__file__).resolve().parents[1] / 'static'
+        for name, expected_size in (('icons/icon-192.png', (192, 192)), ('icons/icon-512.png', (512, 512))):
+            with self.subTest(name=name):
+                path = repo_static / name
+                self.assertTrue(path.exists(), f'Missing {path}')
+                with Image.open(path) as img:
+                    self.assertEqual(img.format, 'PNG')
+                    self.assertEqual(img.size, expected_size)
+        manifest = self.release({'icons/icon-192.png': b'png192', 'icons/icon-512.png': b'png512'})
+        install_static_assets(self.app)
+        with self.app.test_request_context():
+            self.assertEqual(url_for('static', filename='icons/icon-192.png'),
+                             '/static/'+manifest['prefix']+'/icons/icon-192.png')
+            self.assertEqual(url_for('static', filename='icons/icon-512.png'),
+                             '/static/'+manifest['prefix']+'/icons/icon-512.png')
+
 if __name__ == '__main__':
     unittest.main()

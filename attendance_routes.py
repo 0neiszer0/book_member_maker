@@ -7,7 +7,7 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from attendance_workflow import (build_term_attendance, expected_member_ids,
                                  match_roster_rows, parse_roster_text,
                                  attendance_is_confirmed, confirmed_history_session_ids,
-                                 grouped_member_ids)
+                                 grouped_member_ids, normalize_member_name)
 from term_membership import scope_members
 
 KST = timezone(timedelta(hours=9))
@@ -80,7 +80,7 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
             votes = db().table('seminar_votes').select('member_id').eq('session_id', session_id).eq('attending', True).execute().data or []
             planned = {r['member_id'] for r in votes}
         no_shows = db().table('seminar_no_shows').select('member_id').eq('session_id', session_id).is_('cancelled_at', 'null').execute().data or []
-        return target, members, audit, mode, sorted(eligible), sorted(planned), {r['member_id'] for r in no_shows}
+        return target, scoped, audit, mode, sorted(eligible), sorted(planned), {r['member_id'] for r in no_shows}
 
     @app.get('/admin/seminar_sessions/<session_id>/roster')
     @login_required(role='admin')
@@ -115,8 +115,12 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
                     if history.get('actual_member_ids') is not None:
                         known_ids.update(history['actual_member_ids'])
                     else:
-                        for name in history.get('present') or []:
-                            matches = [m['id'] for m in members if m.get('name') == name]
+                        for raw_name in history.get('present') or []:
+                            norm = normalize_member_name(raw_name)
+                            if not norm:
+                                continue
+                            active_matches = [m['id'] for m in members if m.get('is_active') and normalize_member_name(m.get('name')) == norm]
+                            matches = active_matches or [m['id'] for m in members if normalize_member_name(m.get('name')) == norm]
                             if len(matches) == 1:
                                 known_ids.add(matches[0])
                 actual = sorted(known_ids - no_shows)
