@@ -221,9 +221,9 @@ begin
     if not v_ot then
       if v_code.id is null or v_code.code = 'OT-AUTO-APPROVAL'
          or v_code.expires_at <= v_now
-         or (v_code.expires_at is null and exists (
+         or exists (
            select 1 from public.seminar_terms where id = v_code.term_id and end_date < v_today
-         )) then
+         ) then
         return jsonb_build_object('result', 'closed');
       end if;
       if v_code.code <> 'OPEN-SIGNUP-NO-CODE' and v_code.code is distinct from p_signup_code then

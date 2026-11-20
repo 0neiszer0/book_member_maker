@@ -289,7 +289,7 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
             terms = db().table('seminar_terms').select('id,name,end_date').eq('id', code['term_id']).limit(1).execute().data or []
             term = terms[0] if terms else None
             today = now_utc().astimezone(KST).date().isoformat()
-            if not expires and term and term.get('end_date') and term['end_date'] < today:
+            if term and term.get('end_date') and term['end_date'] < today:
                 return None
             code['term_name'] = term.get('name') if term else ''
         code['open'] = code.get('code') == OPEN_SIGNUP_MARKER

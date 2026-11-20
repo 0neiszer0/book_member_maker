@@ -452,7 +452,10 @@ const value = async (query, params) => (await db.query(query, params)).rows[0].v
   const pending = '20000000-0000-0000-0000-000000000004';
   await proof(pending, 'pending@knu.ac.kr');
   assert.equal((await enroll(pending, 'pending@knu.ac.kr', 'Pending', '2026123004', 'Dept', '')).result, 'closed');
+  const term = await value('select id as value from seminar_terms');
+  await value("select update_signup_configuration('replace',101,'OPEN-SIGNUP-NO-CODE',$1,now()+interval '30 days',null) as value", [term]);
   await db.exec("reset role; update seminar_terms set start_date=current_date-6, end_date=current_date-1; set role service_role");
+  assert.equal((await enroll(pending, 'pending@knu.ac.kr', 'Pending', '2026123004', 'Dept', '')).result, 'closed');
   await value("select update_signup_configuration('replace',101,'OPEN-SIGNUP-NO-CODE',null,now()+interval '30 days',null) as value");
   const requested = await enroll(pending, 'pending@knu.ac.kr', 'Pending', '2026123004', 'Dept', '');
   assert.equal(requested.result, 'pending');
