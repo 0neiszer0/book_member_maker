@@ -13,7 +13,7 @@
 {% set ns=namespace(active=0,dormant=0,inactive=0,incomplete=0) %}{% for m in members %}{% set st=m.member_status or 'active' %}{% if st=='active' %}{% set ns.active=ns.active+1 %}{% elif st=='dormant' %}{% set ns.dormant=ns.dormant+1 %}{% else %}{% set ns.inactive=ns.inactive+1 %}{% endif %}{% if not m.student_id or not m.department or not m.recruiting_class %}{% set ns.incomplete=ns.incomplete+1 %}{% endif %}{% endfor %}
 <div class="records-content">
 {{ records_nav('members') }}
-  <div class="records-flex records-flex-wrap records-items-end records-justify-between records-gap-4 records-mb-6"><div><p class="records-text-sm records-font-bold records-muted">전체 운영</p><h1 class="">전체 회원 관리</h1><p class="records-muted records-mt-2">회원 정보와 로그인 권한을 관리합니다. 학기별 활동·휴식은 학기 회원 명단에서 변경해주세요.</p></div><div class="records-flex records-flex-wrap records-gap-2"><a class="lms-button" href="{{ url_for('admin_term_members') }}">학기 회원 명단</a><button class="lms-button" id="merge-open">중복 회원 합치기</button><button class="lms-button lms-button-primary" id="member-add">회원 추가</button></div></div>
+  <div class="records-flex records-flex-wrap records-items-end records-justify-between records-gap-4 records-mb-6"><div><p class="records-text-sm records-font-bold records-muted">전체 운영</p><h1 class="">전체 회원 관리</h1><p class="records-muted records-mt-2">회원 정보와 로그인 권한을 관리합니다. 학기별 활동·휴식은 학기 회원 명단에서 변경해주세요.</p></div><div class="records-flex records-flex-wrap records-gap-2"><a class="lms-button" href="{{ url_for('admin_term_members') }}">학기 회원 명단</a><a class="lms-button" href="{{ url_for('admin_privacy_cleanup') }}">개인정보 정리</a><button class="lms-button" id="merge-open">중복 회원 합치기</button><button class="lms-button lms-button-primary" id="member-add">회원 추가</button></div></div>
 
   {% set lo = login_overview or {} %}
   <section class="records-panel records-p-5 records-mb-4" id="login-admin" aria-labelledby="login-admin-title">
@@ -85,7 +85,7 @@
       <td class="records-p-3"><div class="records-font-extrabold">{{ m.name }}</div><div class="records-text-xs records-muted records-mt-1">{% if m.role=='admin' %}관리자{% elif m.role=='officer' %}운영진{% else %}회원{% endif %} · {% if (lo.linked_email or {}).get(m.id) %}학교 메일 {{ lo.linked_email[m.id] }}{% elif m.login_kind=='local' %}아이디 {{ m.login_id }}{% elif m.login_kind=='kakao' %}카카오 (전환 전){% else %}로그인 없음{% endif %}</div></td>
       <td class="records-p-3"><div>{{ m.student_id or '학번 미입력' }}{% if m.student_id_duplicate %}<span class="records-ml-2 records-inline-block records-rounded records-tint records-px-2 records-py-0-5 records-text--10px records-font-extrabold records-accent">중복 · ID {{ m.id }}</span>{% endif %}</div><div class="records-text-xs records-muted">{{ m.department or '학과 미입력' }}</div></td><td class="records-p-3 records-text-center">{{ m.recruiting_class or '-' }}</td><td class="records-p-3 records-text-center records-font-extrabold records-accent">{% if m.activity_count_ambiguous %}<span title="동명이인이라 이름 기준 집계가 모호합니다">&mdash;</span>{% else %}{{ m.seminar_count or 0 }}{% endif %}</td><td class="records-p-3 records-text-center">{% if m.activity_count_ambiguous %}<span class="topic-count" title="동명이인이라 이름 기준 집계가 모호합니다">&mdash;</span>{% else %}<span class="topic-count">{{ m.facilitator_count or 0 }}</span>{% endif %}</td><td class="records-p-3 records-text-center records-font-bold records-accent">{{ m.brick_count or 0 }}</td><td class="records-p-3 records-text-center records-font-bold records-ink">{{ m.study_count or 0 }}</td>
       <td class="records-p-3"><div class="status-control" role="group" aria-label="{{ m.name }} 활동 상태"><button type="button" class="status-choice" data-member-id="{{ m.id }}" data-status="active" aria-pressed="{{ 'true' if st=='active' else 'false' }}">활성</button><button type="button" class="status-choice" data-member-id="{{ m.id }}" data-status="dormant" aria-pressed="{{ 'true' if st=='dormant' else 'false' }}">휴면</button><button type="button" class="status-choice" data-member-id="{{ m.id }}" data-status="inactive" aria-pressed="{{ 'true' if st=='inactive' else 'false' }}">비활성</button></div></td>
-      <td class="records-p-3"><div class="records-flex records-justify-end records-gap-2">{% if m.can_view_activity %}<a class="lms-button" href="{{ url_for('records_member_profile', member_id=m.id) }}">활동</a>{% endif %}<button class="lms-button login-link" type="button" data-id="{{ m.id }}" data-name="{{ m.name }}">로그인 링크</button><button class="edit-member lms-button lms-button-primary" data-id="{{ m.id }}" data-name="{{ m.name }}" data-email="{{ m.email or '' }}" data-department="{{ m.department or '' }}" data-gender="{{ m.gender or '' }}" data-student-id="{{ m.student_id or '' }}" data-recruiting-class="{{ m.recruiting_class or '' }}" data-role="{{ m.role or 'member' }}">편집</button></div></td>
+      <td class="records-p-3"><div class="records-flex records-justify-end records-gap-2">{% if m.can_view_activity %}<a class="lms-button" href="{{ url_for('records_member_profile', member_id=m.id) }}">활동</a>{% endif %}<button class="lms-button login-link" type="button" data-id="{{ m.id }}" data-name="{{ m.name }}">로그인 링크</button>{% if can_manage_roles or m.role not in ('admin', 'officer') or m.id == session.user_id %}<button class="lms-button school-email" type="button" data-url="{{ url_for('admin_set_knu_email', member_id=m.id) }}" data-name="{{ m.name }}" data-email="{{ (lo.linked_email or {}).get(m.id, '') }}">학교 메일</button>{% endif %}<button class="edit-member lms-button lms-button-primary" data-id="{{ m.id }}" data-name="{{ m.name }}" data-email="{{ m.email or '' }}" data-department="{{ m.department or '' }}" data-gender="{{ m.gender or '' }}" data-student-id="{{ m.student_id or '' }}" data-recruiting-class="{{ m.recruiting_class or '' }}" data-role="{{ m.role or 'member' }}">편집</button></div></td>
     </tr>{% else %}<tr><td colspan="9" class="records-p-8 records-text-center records-muted">등록된 회원이 없습니다.</td></tr>{% endfor %}</tbody></table></div>
   </section>
 </div>
@@ -141,6 +141,21 @@ if (otExpiry) {
   }, 1000);
 }
 document.querySelectorAll('.signup-decision').forEach(b=>b.onclick=async()=>{const approve=b.dataset.action==='approve-login';if(!confirm(`${b.dataset.name}님의 가입 신청을 ${approve?'승인':'거절'}할까요?`))return;if(await postJson(`/api/admin/members/${b.dataset.id}/${b.dataset.action}`))location.reload()});
+document.querySelectorAll('.school-email').forEach(button => {
+  button.onclick = async () => {
+    const email = prompt(button.dataset.name + '님의 학교 메일(@knu.ac.kr)을 입력해주세요. 연결을 해제하려면 비워두세요.', button.dataset.email);
+    if (email === null) return;
+    button.disabled = true;
+    try {
+      const result = await postJson(button.dataset.url, {knu_email: email});
+      if (result) location.reload();
+    } catch {
+      alert('학교 메일을 저장하지 못했습니다.');
+    } finally {
+      button.disabled = false;
+    }
+  };
+});
 document.querySelectorAll('.login-link').forEach(b=>b.onclick=async()=>{if(!confirm(`${b.dataset.name}님에게 보낼 일회용 로그인 링크(24시간)를 만들까요? 이전 링크는 막힙니다.`))return;const d=await postJson(`/api/admin/members/${b.dataset.id}/login-link`);if(d)prompt(`${d.name}님의 ${d.kind==='reset'?'비밀번호 재설정':'아이디 만들기'} 링크입니다. ${d.expires}까지 한 번만 쓸 수 있으니 본인에게만 보내주세요.`,d.url)});
 </script>
 </div>

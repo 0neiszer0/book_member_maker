@@ -1,13 +1,165 @@
 {% extends 'lms_admin_base.html' %}
 {% set lms_title='면접 지원자 결과' %}
 {% block title %}면접 지원자 결과 · 책 먹는 호반우{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_admin_aux.css') }}">{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='lms_admin_aux.css') }}">
+<style>
+  .recruitment-dues details { border-top: 1px solid #c7cdd1; margin-top: 12px; padding-top: 12px; }
+  .recruitment-dues summary { cursor: pointer; font-weight: 700; }
+  .recruitment-dues .dues-applicant { border-top: 1px solid #c7cdd1; padding: 8px 0; }
+  .recruitment-dues .dues-applicant[hidden] { display: none; }
+  .recruitment-dues button[aria-pressed="true"] { color: #18542c; border-color: #61996f; background: #e4f5e8; }
+</style>
+{% endblock %}
 {% block content %}<div class="lms-aux">
   <div class="mb-7"><p class="text-sm font-bold muted">전체 운영</p><h1 class="text-3xl font-extrabold tracking-tight">면접 지원자 결과</h1><p class="muted mt-2">차수별 명단과 결과 안내문을 관리하고, 지원자 단톡방에 전용 링크를 공유합니다.</p></div>
   {% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<div class="panel p-4 mb-4 {% if category != 'success' %}text-red-700{% endif %}">{{ message }}</div>{% endfor %}{% endwith %}
   <section class="panel p-5 mb-6"><h2 class="text-lg font-extrabold">새 모집 차수 만들기</h2><form class="flex gap-2 mt-3 flex-wrap" method="post" action="{{ url_for('admin_recruitment_results_create') }}"><input class="field flex-1 min-w-64" name="title" maxlength="120" required placeholder="예: 2026년 하반기 신입 회원 모집"><button class="btn" type="submit">관리 페이지 만들기</button></form></section>
   <section><h2 class="text-lg font-extrabold mb-3">모집 차수</h2><div class="grid md:grid-cols-2 gap-3">
-    {% for campaign in campaigns %}<a class="panel p-5 block hover:border-green-700" href="{{ url_for('admin_recruitment_result_detail', campaign_id=campaign.id) }}"><div class="flex justify-between gap-3"><div><h3 class="font-extrabold text-lg">{{ campaign.title }}</h3><p class="muted text-sm mt-1">지원자 {{ campaign.applicant_count }}명 · 합격 {{ campaign.status_counts.get('accepted', 0) }}명</p></div><div class="text-right"><span class="pill">{{ '발표 중' if campaign.is_published else '발표 전' }}</span><br><span class="pill mt-2">{{ '링크 열림' if campaign.is_active else '링크 닫힘' }}</span></div></div></a>{% else %}<div class="panel p-8 muted text-center md:col-span-2">아직 만든 모집 차수가 없습니다.</div>{% endfor %}
+    {% for campaign in campaigns %}
+      <article class="panel p-5 recruitment-dues">
+        <div class="flex justify-between gap-3">
+          <div>
+            <h3 class="font-extrabold text-lg"><a class="underline" href="{{ url_for('admin_recruitment_result_detail', campaign_id=campaign.id) }}">{{ campaign.title }}</a></h3>
+            <p class="muted text-sm mt-1">지원자 {{ campaign.applicant_count }}명 · 합격 {{ campaign.status_counts.get('accepted', 0) }}명</p>
+          </div>
+          <div><span class="pill">{{ '발표 중' if campaign.is_published else '발표 전' }}</span><br><span class="pill mt-2">{{ '링크 열림' if campaign.is_active else '링크 닫힘' }}</span></div>
+        </div>
+        <details>
+          <summary>합격자 회비 입금 안내 설정</summary>
+          <form class="dues-settings space-y-2 mt-3" method="post" action="{{ url_for('admin_recruitment_dues_settings', campaign_id=campaign.id) }}">
+            <label class="label">입금 계좌<input class="field" name="dues_account_info" maxlength="300" value="{{ campaign.dues_account_info or '' }}"></label>
+            <label class="label">회비 금액<input class="field" name="dues_amount" maxlength="80" value="{{ campaign.dues_amount or '' }}"></label>
+            <label class="label">회장 번호<input class="field" type="tel" name="dues_contact_phone" maxlength="40" value="{{ campaign.dues_contact_phone or '' }}"></label>
+            <label class="label">추가 안내<textarea class="field" name="dues_guide_note" rows="3" maxlength="1000">{{ campaign.dues_guide_note or '' }}</textarea></label>
+            <div class="flex gap-2 items-center">
+              <button class="btn" type="submit">안내 저장</button>
+              <span class="muted text-sm" role="status"></span>
+            </div>
+          </form>
+        </details>
+        <details class="dues-checklist" data-roster-url="{{ url_for('admin_recruitment_dues_roster', campaign_id=campaign.id) }}"
+                 data-campaign-id="{{ campaign.id }}">
+          <summary>합격자 입금 확인</summary>
+          <div class="flex gap-2 items-center justify-between mt-3">
+            <p class="dues-count font-bold text-sm" aria-live="polite"></p>
+            <button class="btn paper dues-filter" type="button" aria-pressed="false" disabled>미입금 합격자만 보기</button>
+          </div>
+          <p class="dues-status muted text-sm mt-2" role="status"></p>
+          <ul class="dues-applicants mt-2" aria-label="합격자 입금 명단"></ul>
+          <template class="dues-row">
+            <li class="dues-applicant flex gap-2 items-center justify-between">
+              <div><strong class="dues-name"></strong><div class="dues-student-id muted text-xs"></div></div>
+              <button class="btn paper" type="button" aria-pressed="false">입금 확인</button>
+            </li>
+          </template>
+        </details>
+      </article>
+    {% else %}<div class="panel p-8 muted text-center md:col-span-2">아직 만든 모집 차수가 없습니다.</div>{% endfor %}
   </div></section>
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function duesRequest(url, body) {
+  const options = body === undefined ? {} : {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-App-CSRF': document.querySelector('meta[name="lms-csrf"]').content},
+    body: JSON.stringify(body),
+  };
+  const response = await fetch(url, options);
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || result.status !== 'success') throw new Error(result.message || '요청을 처리하지 못했습니다.');
+  return result;
+}
+
+document.querySelectorAll('.dues-settings').forEach(form => {
+  const button = form.querySelector('button');
+  const status = form.querySelector('[role="status"]');
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    button.disabled = true;
+    status.textContent = '저장 중…';
+    try {
+      await duesRequest(form.action, Object.fromEntries(new FormData(form)));
+      status.textContent = '회비 입금 안내를 저장했습니다.';
+    } catch (error) {
+      status.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+});
+
+document.querySelectorAll('.dues-checklist').forEach(checklist => {
+  const list = checklist.querySelector('.dues-applicants');
+  const rowTemplate = checklist.querySelector('.dues-row');
+  const count = checklist.querySelector('.dues-count');
+  const status = checklist.querySelector('.dues-status');
+  const filter = checklist.querySelector('.dues-filter');
+  let loading = false;
+
+  function refreshCount() {
+    const rows = Array.from(list.children);
+    const paidCount = rows.filter(row => row.dataset.paid === 'true').length;
+    const unpaidOnly = filter.getAttribute('aria-pressed') === 'true';
+    rows.forEach(row => { row.hidden = unpaidOnly && row.dataset.paid === 'true'; });
+    count.textContent = `입금 완료 ${paidCount} / 합격자 ${rows.length}명`;
+    status.textContent = rows.length === 0 ? '등록된 합격자가 없습니다.'
+      : unpaidOnly && paidCount === rows.length ? '미입금 합격자가 없습니다.' : '';
+  }
+
+  function addApplicant(applicant) {
+    const row = rowTemplate.content.firstElementChild.cloneNode(true);
+    const button = row.querySelector('button');
+    row.querySelector('.dues-name').textContent = applicant.name;
+    row.querySelector('.dues-student-id').textContent = applicant.student_id;
+
+    function setPaid(paid) {
+      row.dataset.paid = String(paid);
+      button.setAttribute('aria-pressed', String(paid));
+      button.textContent = paid ? '입금 확인 취소' : '입금 확인';
+      button.setAttribute('aria-label', applicant.name + ' · ' + button.textContent);
+    }
+    setPaid(Boolean(applicant.dues_paid_at));
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        const url = `/api/admin/recruitment-results/${checklist.dataset.campaignId}/applicants/${applicant.id}/dues`;
+        const result = await duesRequest(url, {});
+        setPaid(result.dues_paid);
+        refreshCount();
+      } catch (error) {
+        status.textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+    list.append(row);
+  }
+
+  filter.addEventListener('click', () => {
+    filter.setAttribute('aria-pressed', String(filter.getAttribute('aria-pressed') !== 'true'));
+    refreshCount();
+  });
+  checklist.addEventListener('toggle', async () => {
+    if (!checklist.open || loading) return;
+    loading = true;
+    filter.disabled = true;
+    list.replaceChildren();
+    count.textContent = '';
+    status.textContent = '합격자 명단을 불러오는 중…';
+    try {
+      const result = await duesRequest(checklist.dataset.rosterUrl);
+      result.applicants.forEach(addApplicant);
+      refreshCount();
+      filter.disabled = !result.applicants.length;
+    } catch (error) {
+      status.textContent = error.message;
+    } finally {
+      loading = false;
+    }
+  });
+});
+</script>
 {% endblock %}
