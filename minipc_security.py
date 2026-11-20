@@ -21,6 +21,12 @@ SENSITIVE_POSTS = MEMBER_POSTS | {'seminar_review_form',
     # ID/password login (local_auth.py)
     'login_password', 'signup', 'account_convert', 'account_setup', 'account_password',
     'admin_signup_code', 'admin_approve_signup', 'admin_reject_signup', 'admin_issue_login_link',
+    'email_auth_request', 'email_auth_verify', 'email_auth_enroll', 'login_pin',
+    'pin_setup', 'pin_reset_confirm',
+}
+SENSITIVE_AUTH_PAGES = {
+    'login', 'login_password', 'signup', 'email_auth_request', 'email_auth_verify',
+    'email_auth_enroll', 'login_pin', 'pin_setup', 'pin_reset_confirm',
 }
 LOGIN_PROVIDERS = ('kakao', 'local')
 
@@ -43,13 +49,13 @@ def active_member(row):
 def session_login_current(row, sess):
     """False when a saved login no longer matches the member's login method.
 
-    ID/password sessions end when the password changes (version bump); Kakao
-    sessions end once the member converted to ID/password login. Sessions that
-    name no provider keep the previous behaviour.
+    Local sessions share one revocation version across passwords and PINs.
+    Kakao sessions end when the member moves to local authentication.
     """
     provider = sess.get('auth_provider')
     if provider == 'local':
         return (row.get('auth_provider') == 'local'
+                and (sess.get('login_method') != 'pin' or row.get('role') == 'member')
                 and int(row.get('auth_session_version') or 0) == int(sess.get('auth_session_version') or 0))
     if provider == 'kakao':
         return row.get('auth_provider') != 'local'
@@ -57,12 +63,18 @@ def session_login_current(row, sess):
 
 
 def has_login_identity(row, sess):
-    """A real person's login: Kakao-linked, or an approved ID/password account."""
+    """A real person's login, including an account linked to verified school email."""
     if str(row.get('social_id') or '').startswith('system:'):
         return False
     if sess.get('auth_provider') == 'local':
         return row.get('auth_provider') == 'local'
     return bool(row.get('social_id'))
+
+
+def has_term_assignment(db, member_id):
+    # Scoped operations may explicitly address a term other than today's.
+    return bool(db.table('term_officers').select('member_id').eq('member_id', member_id)
+                .limit(1).execute().data)
 
 
 def authenticated_member(db):
@@ -125,6 +137,11 @@ def install_security(app, get_db):
         g.trusted_app_proxy = bool(key and hmac.compare_digest(key.encode(), supplied.encode()))
         if app.config.get('REQUIRE_ORIGIN_AUTH') and not g.trusted_app_proxy:
             abort(403)
+        if (request.endpoint not in (None, 'static') and session.get('login_method') == 'pin'
+                and session.get('user_id') and has_term_assignment(get_db(), session['user_id'])):
+            session.clear()
+            flash('운영진은 학교 메일 인증코드 또는 비밀번호로 다시 로그인해주세요.', 'warning')
+            return redirect(url_for('login'), code=303)
         if request.method != 'POST' or request.endpoint not in SENSITIVE_POSTS:
             return
         if request.endpoint in MEMBER_POSTS and not authenticated_member(get_db()):

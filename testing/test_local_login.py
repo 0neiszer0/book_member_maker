@@ -1,9 +1,11 @@
 import importlib
 import os
 import unittest
+from datetime import timedelta
+from types import SimpleNamespace
 from unittest.mock import patch
 
-from testing._fake_supabase import FakeQuery, FakeSupabase
+from testing._fake_supabase import FakeSupabase
 
 os.environ.setdefault("PYTHON_DOTENV_DISABLED", "1")
 os.environ.setdefault("FLASK_SECRET_KEY", "render-smoke-only")
@@ -31,10 +33,76 @@ class IdFakeSupabase(FakeSupabase):
                 taken = {r["login_id"] for r in client.rows.get(table_name, [])}
                 if query.payload.get("login_id") in taken:
                     raise RuntimeError("duplicate key value violates unique constraint")
+            if query.operation == "insert" and table_name == "members" and isinstance(query.payload, dict):
+                query.payload.setdefault("auth_session_version", 0)
+                query.payload.setdefault("pin_failed_attempts", 0)
             return original()
 
         query.execute = execute
         return query
+
+    def rpc(self, name, params):
+        return SimpleNamespace(execute=lambda: SimpleNamespace(data=getattr(self, name)(**params)))
+
+    def ensure_signup_term_member(self, mid):
+        term = next((t for t in self.rows["seminar_terms"] if t.get("is_active")), None)
+        if not term:
+            return
+        roster = self.rows.setdefault("seminar_term_members", [])
+        if not any(r["member_id"] == mid and r["term_id"] == term["id"] for r in roster):
+            roster.append(dict(term_id=term["id"], member_id=mid, status="active", entry_type="new"))
+            term["roster_revision"] = term.get("roster_revision", 0) + 1
+
+    def decide_local_signup(self, p_member, p_actor, p_approve):
+        import local_auth
+
+        target = next((m for m in self.rows["members"] if m["id"] == p_member), None)
+        credential = next((c for c in self.rows["member_credentials"]
+                           if c["member_id"] == p_member and c["status"] == "pending"), None)
+        if not target or not (credential or (target["account_status"] == "pending" and target.get("knu_email_verified_at"))):
+            return "missing"
+        if not p_approve:
+            if credential:
+                self.rows["member_credentials"].remove(credential)
+            if target["account_status"] == "pending":
+                self.rows["members"].remove(target)
+            return "success"
+        new = target["account_status"] == "pending"
+        if target["member_status"] == "blocked" or target["account_status"] == "disabled" \
+                or (not new and (target["member_status"] == "inactive" or target["is_active"] is False)) \
+                or (new and target["member_status"] == "inactive" and target.get("auth_provider") != "local"):
+            return "inactive"
+        target.update(account_status="active", auth_provider="local")
+        if new:
+            target.update(member_status="active", is_active=True)
+            self.ensure_signup_term_member(p_member)
+        if credential:
+            credential.update(status="active", approved_at=local_auth.iso(local_auth.now_utc()), approved_by=p_actor)
+        return "success"
+
+    def update_signup_configuration(self, p_action, p_actor, p_code, p_term, p_expires, p_hours):
+        import local_auth
+
+        now = local_auth.now_utc()
+        setting = next((c for c in self.rows["signup_codes"] if not c.get("revoked_at")), None)
+        if p_action == "ot_open":
+            expires = local_auth.iso(now + timedelta(hours=p_hours))
+            if setting:
+                setting["auto_approve_until"] = expires
+            else:
+                self.table("signup_codes").insert(dict(code=local_auth.OT_SIGNUP_MARKER, created_by=p_actor,
+                                                       created_at=local_auth.iso(now), auto_approve_until=expires)).execute()
+            return expires
+        if p_action == "ot_close":
+            if setting:
+                setting["auto_approve_until"] = None
+            return None
+        if setting:
+            setting["revoked_at"] = local_auth.iso(now)
+        if p_action == "replace":
+            self.table("signup_codes").insert(dict(code=p_code, term_id=p_term, expires_at=p_expires,
+                                                   auto_approve_until=(setting or {}).get("auto_approve_until"),
+                                                   created_by=p_actor, created_at=local_auth.iso(now))).execute()
 
 
 def member(mid, name, sid, **extra):
@@ -72,7 +140,7 @@ class LocalLoginTests(unittest.TestCase):
 
     def setUp(self):
         self.db = IdFakeSupabase(rows())
-        self.patch = patch.object(self.real, "table", self.db.table)
+        self.patch = patch.multiple(self.real, table=self.db.table, rpc=self.db.rpc)
         self.patch.start()
         self.module.app.config.update(TESTING=True)
         self.client = self.module.app.test_client()
@@ -176,6 +244,8 @@ class LocalLoginTests(unittest.TestCase):
         self.assertEqual(self.admin_post(f"/api/admin/members/{cred['member_id']}/approve-login").status_code, 200)
         approved = self.member(cred["member_id"])
         self.assertEqual((approved["account_status"], approved["member_status"], approved["auth_provider"]), ("active", "active", "local"))
+        self.assertIn(dict(term_id="t-1", member_id=cred["member_id"], status="active", entry_type="new"),
+                      self.db.rows["seminar_term_members"])
         fresh = self.module.app.test_client()
         result = self.login("newbie_01", GOOD_PW, client=fresh)
         self.assertEqual(result.status_code, 302)

@@ -1,14 +1,4 @@
-"""ID/password login that replaces Kakao.
-
-- New members sign up with the semester's shared signup code (officers set and
-  rotate it) and wait for officer approval before they can log in.
-- Passwords are Argon2id hashes (argon2-cffi). Officers never see or set them;
-  they can only issue a one-time 24h setup/reset link.
-- Failed logins are throttled per account+IP, per account and per IP.
-- Kakao members convert once ('기존 회원 전환'): while logged in with Kakao, or
-  through an officer-issued link, they choose an ID/password and keep their row.
-- No email or contact details are collected. No passkeys or 2FA by design.
-"""
+"""Local password, school email, and regular-member PIN authentication."""
 import hashlib
 import hmac
 import os
@@ -16,16 +6,19 @@ import re
 import secrets
 import threading
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
+from uuid import uuid4
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 from flask import abort, flash, g, jsonify, redirect, render_template, request, session, url_for
 
 from member_identity import normalize_member_student_id
-from security_utils import forwarded_client_address, safe_internal_next_url
+from minipc_security import SENSITIVE_AUTH_PAGES, has_term_assignment
+from security_utils import forwarded_client_address, safe_internal_next_url, trusted_client_address
+import email_auth_mailer
 import signup_notify
 
 LOGIN_ID_RE = re.compile(r'^[a-z0-9_]{4,20}$')
@@ -42,8 +35,18 @@ SIGNUP_CODE_LIMIT = (10, timedelta(minutes=15))
 SIGNUP_POST_LIMIT = (20, 15 * 60)     # signup form submissions per IP
 SIGNUP_CREATE_LIMIT = (10, 60 * 60)   # pending requests actually created per IP
 # A signup_codes row with this marker means "no code needed, officer approval only".
-# It is term-bound like a real code, so open signup closes by itself when the term ends.
 OPEN_SIGNUP_MARKER = 'OPEN-SIGNUP-NO-CODE'
+OT_SIGNUP_MARKER = 'OT-AUTO-APPROVAL'
+KNU_EMAIL_RE = re.compile(r'^[a-z0-9._%+-]+@knu\.ac\.kr$')
+SIX_DIGITS = re.compile(r'^[0-9]{6}$')
+EMAIL_PURPOSES = {'login': '로그인', 'signup': '회원가입', 'pin_reset': 'PIN 재설정'}
+EMAIL_ERROR = '경북대 학교 메일(@knu.ac.kr)만 사용할 수 있습니다.'
+SIGNUP_CLOSED = '현재 신규 가입 기간이 아닙니다. 운영진에게 문의해주세요.'
+PIN_STAFF = '운영진은 학교 메일 6자리 인증코드 또는 12자 이상 비밀번호로 로그인해주세요.'
+PIN_LOCKED = 'PIN을 5번 틀려 15분간 로그인할 수 없습니다. 학교 메일로 PIN을 재설정할 수 있습니다.'
+PIN_PROOF_EXPIRED = '학교 메일 인증 시간이 지났습니다. 인증코드를 다시 받아주세요.'
+PIN_LOCK_DURATION = timedelta(minutes=15)
+EMAIL_PROOF_DURATION = timedelta(minutes=10)
 HONEYPOT_FIELD = 'website'
 CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 KST = timezone(timedelta(hours=9))
@@ -229,12 +232,32 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
         ).eq('id', member_id).limit(1).execute().data or []
         return rows[0] if rows else None
 
-    def current_term():
-        today = datetime.now(KST).date().isoformat()
+    def email_auth_member(field, value):
+        rows = db().table('members').select(
+            'id,name,student_id,role,is_active,account_status,member_status,social_id,profile_pic,'
+            'knu_email,knu_email_verified_at,pin_hash,pin_failed_attempts,pin_locked_until,auth_provider,auth_session_version'
+        ).eq(field, value).limit(2).execute().data or []
+        return rows[0] if len(rows) == 1 else None
+
+    def signup_terms():
+        today = now_utc().astimezone(KST).date().isoformat()
         rows = db().table('seminar_terms').select('id,name,start_date,end_date,is_active') \
-            .eq('is_active', True).execute().data or []
+            .eq('is_active', True).order('start_date', desc=True).execute().data or []
         within = [r for r in rows if (r.get('start_date') or '') <= today <= (r.get('end_date') or '9999')]
-        return (within or rows or [None])[0]
+        upcoming = sorted((r for r in rows if (r.get('start_date') or '') > today), key=lambda r: r['start_date'])
+        return within, upcoming, rows
+
+    def current_term():
+        within, upcoming, rows = signup_terms()
+        return (within or upcoming or rows or [None])[0]
+
+    def signup_deadline():
+        within, upcoming, _ = signup_terms()
+        term = (within or upcoming or [None])[0]
+        if term and term.get('end_date'):
+            end = datetime.fromisoformat(term['end_date']).replace(tzinfo=KST) + timedelta(days=1)
+            return term['id'], term['name'], iso(end)
+        return None, '', iso(now_utc() + timedelta(days=30))
 
     def term_officer(member_id):
         term = current_term()
@@ -246,17 +269,27 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
     def officer_like(member):
         return bool(member) and (is_officer_role(member) or term_officer(member['id']))
 
-    def active_signup_code():
+    def signup_setting():
         rows = db().table('signup_codes').select('*').is_('revoked_at', 'null') \
             .order('created_at', desc=True).limit(1).execute().data or []
-        code = rows[0] if rows else None
-        if not code:
+        return rows[0] if rows else None
+
+    def ot_deadline(setting):
+        expiry = parse_time((setting or {}).get('auto_approve_until'))
+        return expiry if expiry and expiry > now_utc() else None
+
+    def active_signup_code(setting=None):
+        code = dict(setting if setting is not None else signup_setting() or {})
+        if not code or code.get('code') == OT_SIGNUP_MARKER:
+            return None
+        expires = parse_time(code.get('expires_at'))
+        if expires and expires <= now_utc():
             return None
         if code.get('term_id'):
             terms = db().table('seminar_terms').select('id,name,end_date').eq('id', code['term_id']).limit(1).execute().data or []
             term = terms[0] if terms else None
-            today = datetime.now(KST).date().isoformat()
-            if term and term.get('end_date') and term['end_date'] < today:
+            today = now_utc().astimezone(KST).date().isoformat()
+            if not expires and term and term.get('end_date') and term['end_date'] < today:
                 return None
             code['term_name'] = term.get('name') if term else ''
         code['open'] = code.get('code') == OPEN_SIGNUP_MARKER
@@ -267,14 +300,15 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
                     and member.get('member_status') not in ('inactive', 'blocked')
                     and not str(member.get('social_id') or '').startswith('system:'))
 
-    def start_local_session(member, remember, next_url=None):
+    def start_local_session(member, remember, *, method=None):
         session.clear()
         session.update(user_id=member['id'], user_role=member.get('role') or 'member',
                        user_name=member.get('name') or '', profile_pic=member.get('profile_pic') or '',
                        remember_login=remember, auth_provider='local',
                        auth_session_version=int(member.get('auth_session_version') or 0))
         session.permanent = remember
-        return next_url
+        if method:
+            session['login_method'] = method
 
     def after_login_redirect(member, next_url):
         if session.get('password_upgrade_required'):
@@ -290,6 +324,13 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
                                next_url=safe_internal_next_url(request.values.get('next')) or '', **extra), status
 
     app.extensions['local_auth_login_page'] = login_page
+
+    @app.after_request
+    def protect_auth_responses(response):
+        if request.endpoint in SENSITIVE_AUTH_PAGES:
+            response.headers['Cache-Control'] = 'no-store'
+            response.headers['Referrer-Policy'] = 'no-referrer'
+        return response
 
     # --- login ----------------------------------------------------------------
     @app.post('/login/password')
@@ -324,6 +365,286 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
             session['password_upgrade_required'] = True
             flash(f'운영진 계정은 비밀번호를 {OFFICER_MIN_PASSWORD}자 이상으로 바꿔야 운영 화면을 쓸 수 있어요.', 'warning')
         return after_login_redirect(member, next_url)
+
+    def email_account_active(member):
+        return (can_login(member) and member.get('is_active') is True
+                and member.get('member_status') != 'pending')
+
+    def verified_email_account(member):
+        return (email_account_active(member) and member.get('knu_email_verified_at')
+                and member.get('auth_provider') == 'local')
+
+    def email_page(email='', purpose='login', *, sent=False, error=None, status=200):
+        return login_page(auth_section='email', email=email, email_purpose=purpose,
+                          email_sent=sent, email_error=error, status=status)
+
+    def email_code_digest(code_id, email, purpose, code):
+        return keyed('email-otp', f'{code_id}|{email}|{purpose}|{code}')
+
+    @app.post('/auth/email/request')
+    def email_auth_request():
+        email = (request.form.get('email') or '').strip().lower()
+        purpose = request.form.get('purpose') or 'login'
+        if purpose not in EMAIL_PURPOSES:
+            abort(400)
+        if len(email) > 254 or not KNU_EMAIL_RE.fullmatch(email):
+            return email_page(email, purpose, error=EMAIL_ERROR, status=400)
+        code_id = str(uuid4())
+        code = f'{secrets.randbelow(1_000_000):06d}'
+        trusted_proxy = bool(g.get('trusted_app_proxy'))
+        ip = trusted_client_address(request.headers if trusted_proxy else {}, request.remote_addr, trusted_proxy)
+        allowed = db().rpc('reserve_email_auth_code', {
+            'p_id': code_id, 'p_email': email, 'p_purpose': purpose,
+            'p_code_hash': email_code_digest(code_id, email, purpose, code), 'p_client_ip': keyed('ip', ip),
+        }).execute().data
+        if not allowed:
+            challenge = session.get('email_challenge') or {}
+            sent = challenge.get('email') == email and challenge.get('purpose') == purpose
+            return email_page(email, purpose, sent=sent, error='요청이 너무 잦습니다. 잠시 뒤 다시 시도해주세요.', status=429)
+        try:
+            sender = app.extensions.get('email_auth_sender', email_auth_mailer.send_verification_code)
+            sender(email, code, EMAIL_PURPOSES[purpose])
+        except email_auth_mailer.MailDeliveryError:
+            app.logger.warning('School email verification delivery failed')
+            return email_page(email, purpose, error='메일을 보내지 못했습니다. 잠시 뒤 다시 시도해주세요.', status=503)
+        session.pop('email_grant', None)
+        session['email_challenge'] = {'id': code_id, 'email': email, 'purpose': purpose}
+        return email_page(email, purpose, sent=True)
+
+    @app.post('/auth/email/verify')
+    def email_auth_verify():
+        challenge = session.get('email_challenge') or {}
+        email, purpose = challenge.get('email', ''), challenge.get('purpose', 'login')
+        code = (request.form.get('code') or '').strip()
+        if not challenge:
+            return email_page(email, purpose, error=PIN_PROOF_EXPIRED, status=400)
+        if not SIX_DIGITS.fullmatch(code):
+            return email_page(email, purpose, sent=True, error='인증코드 숫자 6자리를 입력해주세요.', status=400)
+        codes = db().table('email_auth_codes')
+        rows = codes.select('*').eq('id', challenge['id']).limit(1).execute().data or []
+        row = rows[0] if rows else None
+        now = now_utc()
+        if not row or row.get('consumed_at') or parse_time(row['expires_at']) <= now:
+            return email_page(email, purpose, error=PIN_PROOF_EXPIRED, status=400)
+        attempts = row['attempts']
+        if attempts >= 5:
+            return email_page(email, purpose, error='인증코드를 5번 틀렸습니다. 인증코드를 다시 받아주세요.', status=429)
+        matches = hmac.compare_digest(row['code_hash'], email_code_digest(challenge['id'], email, purpose, code))
+        update = {'consumed_at': iso(now)} if matches else {'attempts': attempts + 1}
+        changed = db().table('email_auth_codes').update(update).eq('id', row['id']) \
+            .eq('attempts', attempts).is_('consumed_at', 'null').gte('expires_at', iso(now)).execute().data
+        if not changed:
+            return email_page(email, purpose, sent=True, error='인증 요청이 변경되었습니다. 다시 시도해주세요.', status=409)
+        if not matches:
+            if attempts == 4:
+                return email_page(email, purpose, error='인증코드를 5번 틀렸습니다. 인증코드를 다시 받아주세요.', status=429)
+            return email_page(email, purpose, sent=True, error='인증코드가 맞지 않습니다.', status=401)
+        session.pop('email_challenge', None)
+        next_url = safe_internal_next_url(request.form.get('next'))
+        grant = {'email': email, 'code_id': row['id'], 'until': iso(now + EMAIL_PROOF_DURATION), 'next': next_url}
+        member = email_auth_member('knu_email', email)
+        if member:
+            if member.get('account_status') == 'pending':
+                return email_page(email, purpose, error='가입 승인 대기 중입니다. 운영진이 승인하면 로그인할 수 있어요.', status=403)
+            if not email_account_active(member):
+                return email_page(email, purpose, error='사용할 수 없는 계정입니다. 운영진에게 문의해주세요.', status=403)
+            regular = member.get('role') == 'member' and not has_term_assignment(db(), member['id'])
+            if purpose == 'pin_reset' and not regular:
+                return email_page(email, purpose, error=PIN_STAFF, status=403)
+            if not verified_email_account(member):
+                changed = db().table('members').update({
+                    'knu_email_verified_at': member.get('knu_email_verified_at') or iso(now), 'auth_provider': 'local',
+                }).eq('id', member['id']).eq('knu_email', email).eq('account_status', 'active') \
+                    .eq('is_active', True).eq('auth_session_version', member['auth_session_version']).execute().data or []
+                if not changed or not verified_email_account(changed[0]):
+                    return email_page(email, purpose, error='사용할 수 없는 계정입니다. 운영진에게 문의해주세요.', status=403)
+                member = changed[0]
+            grant.update(member_id=member['id'], version=member['auth_session_version'] or 0)
+            if purpose == 'pin_reset':
+                grant['kind'] = 'reset'
+                session['email_grant'] = grant
+                return redirect(url_for('pin_reset_confirm'), code=303)
+            start_local_session(member, True)
+            if regular and not member.get('pin_hash'):
+                grant['kind'] = 'setup'
+                session['email_grant'] = grant
+                return redirect(url_for('pin_setup'), code=303)
+            return after_login_redirect(member, next_url)
+        if purpose == 'pin_reset':
+            return email_page(email, purpose, error='이 메일로 연결된 회원 계정을 찾을 수 없습니다.', status=400)
+        grant['kind'] = 'enroll'
+        session['email_grant'] = grant
+        return redirect(url_for('email_auth_enroll'), code=303)
+
+    def valid_email_grant(kind):
+        grant = session.get('email_grant') or {}
+        until = parse_time(grant.get('until'))
+        return grant if grant.get('kind') == kind and until and until > now_utc() else None
+
+    @app.route('/auth/email/enroll', methods=['GET', 'POST'])
+    def email_auth_enroll():
+        grant = valid_email_grant('enroll')
+        if not grant:
+            return email_page(error=PIN_PROOF_EXPIRED, status=400)
+        values = {}
+
+        def show(error=None, status=200, pending=False):
+            setting = signup_setting()
+            code = active_signup_code(setting)
+            ot = ot_deadline(setting)
+            return render_template('signup.html', verified_email=grant['email'], values=values,
+                                   code_required=bool(code and not code['open'] and not ot),
+                                   enrollment_pending=pending, error=error, next_url=grant['next'] or ''), status
+
+        if request.method == 'GET':
+            return show()
+        values = dict(name=(request.form.get('name') or '').strip(),
+                      student_id=normalize_member_student_id(request.form.get('student_id')),
+                      department=(request.form.get('department') or '').strip())
+        pin = request.form.get('pin') or ''
+        if not 1 <= len(values['name']) <= 40 or not re.fullmatch(r'[0-9]{4,20}', values['student_id']):
+            return show('이름과 학번을 정확히 입력해주세요.', 400)
+        if len(values['department']) > 60:
+            return show('학과는 60자 이하로 입력해주세요.', 400)
+        if pin and not SIX_DIGITS.fullmatch(pin):
+            return show('PIN은 숫자 6자리로 정해주세요.', 400)
+        try:
+            result = db().rpc('complete_email_signup', {
+                'p_code_id': grant['code_id'], 'p_email': grant['email'], 'p_name': values['name'],
+                'p_student_id': values['student_id'], 'p_department': values['department'],
+                'p_pin_hash': hash_password(pin) if pin else None,
+                'p_signup_code': normalize_code(request.form.get('signup_code')),
+            }).execute().data['result']
+        except Exception:
+            app.logger.warning('School email enrollment could not be completed')
+            return show('가입을 처리하지 못했습니다. 잠시 뒤 다시 시도해주세요.', 503)
+        if result == 'active':
+            member = email_auth_member('knu_email', grant['email'])
+            if verified_email_account(member):
+                start_local_session(member, True)
+                if not member.get('pin_hash') and not has_term_assignment(db(), member['id']):
+                    grant.update(kind='setup', member_id=member['id'], version=member['auth_session_version'] or 0)
+                    session['email_grant'] = grant
+                    return redirect(url_for('pin_setup'), code=303)
+                return after_login_redirect(member, grant['next'])
+        elif result == 'pending':
+            session.pop('email_grant', None)
+            signup_notify.notify_signup('학교 메일 가입', values['name'], app.logger)
+            return show(pending=True)
+        messages = {
+            'closed': (SIGNUP_CLOSED, 403),
+            'department': ('신규 가입에는 학과를 입력해주세요.', 400),
+            'code': ('가입 코드가 맞지 않습니다. 운영진에게 확인해주세요.', 400),
+            'conflict': ('회원 정보가 기존 계정과 일치하지 않거나 이미 연결되어 있습니다. 운영진에게 문의해주세요.', 409),
+            'expired': (PIN_PROOF_EXPIRED, 400),
+        }
+        return show(*messages.get(result, ('가입을 완료하지 못했습니다. 다시 로그인해주세요.', 409)))
+
+    @app.post('/login/pin')
+    def login_pin():
+        identifier = (request.form.get('identifier') or request.form.get('email') or request.form.get('student_id') or '').strip()
+        pin = request.form.get('pin') or ''
+
+        def show(message, status):
+            return login_page(auth_section='pin', pin_error=message, pin_identifier=identifier, status=status)
+
+        if not SIX_DIGITS.fullmatch(pin):
+            return show('PIN 숫자 6자리를 입력해주세요.', 400)
+        if '@' in identifier:
+            email = identifier.lower()
+            if len(email) > 254 or not KNU_EMAIL_RE.fullmatch(email):
+                return show(EMAIL_ERROR, 400)
+            member = email_auth_member('knu_email', email)
+        else:
+            student_id = normalize_member_student_id(identifier)
+            if not re.fullmatch(r'[0-9]{4,20}', student_id):
+                return show('학교 메일 또는 학번을 입력해주세요.', 400)
+            member = email_auth_member('student_id', student_id)
+
+        generic_error = '학교 메일·학번 또는 PIN이 맞지 않습니다.'
+        if can_login(member) and (is_officer_role(member) or has_term_assignment(db(), member['id'])):
+            return show(PIN_STAFF, 403)
+        if not verified_email_account(member):
+            verify_password(None, pin)
+            return show(generic_error, 401)
+        if member.get('role') != 'member':
+            return show(PIN_STAFF, 403)
+        now = now_utc()
+        locked_until = parse_time(member.get('pin_locked_until'))
+        if locked_until and locked_until > now:
+            return show(PIN_LOCKED, 429)
+        if not member.get('pin_hash'):
+            return show('학교 메일로 로그인한 뒤 PIN을 만들어주세요.', 401)
+        verified = verify_password(member['pin_hash'], pin)
+        attempts = member['pin_failed_attempts']
+        # Compare and swap to count concurrent failures and reject a racing PIN reset.
+        for _ in range(6):
+            failed = 0 if verified else (0 if locked_until else attempts) + 1
+            lock = iso(now + PIN_LOCK_DURATION) if failed >= 5 else None
+            query = db().table('members').update({'pin_failed_attempts': failed, 'pin_locked_until': lock}) \
+                .eq('id', member['id']).eq('pin_hash', member['pin_hash']).eq('pin_failed_attempts', attempts) \
+                .eq('auth_session_version', member['auth_session_version']).eq('role', 'member')
+            query = query.eq('pin_locked_until', member['pin_locked_until']) if locked_until else query.is_('pin_locked_until', 'null')
+            changed = query.execute().data or []
+            if changed:
+                if not verified:
+                    return show(PIN_LOCKED, 429) if lock else show(generic_error, 401)
+                if not verified_email_account(changed[0]) or has_term_assignment(db(), member['id']):
+                    return show(generic_error, 401)
+                start_local_session(changed[0], True, method='pin')
+                return after_login_redirect(changed[0], safe_internal_next_url(request.form.get('next')))
+            latest = email_auth_member('knu_email', member['knu_email'])
+            if not latest or latest['id'] != member['id'] or latest['pin_hash'] != member['pin_hash'] \
+                    or latest['auth_session_version'] != member['auth_session_version'] or latest.get('role') != 'member':
+                return show(generic_error, 401)
+            attempts = latest['pin_failed_attempts']
+            locked_until = parse_time(latest.get('pin_locked_until'))
+            if locked_until and locked_until > now:
+                return show(PIN_LOCKED, 429)
+        return show('PIN 로그인 요청이 너무 잦습니다. 잠시 뒤 다시 시도해주세요.', 429)
+
+    def handle_pin_change(kind):
+        grant = valid_email_grant(kind)
+        if not grant or (kind == 'setup' and session.get('user_id') != grant.get('member_id')):
+            return email_page(purpose='pin_reset' if kind == 'reset' else 'login', error=PIN_PROOF_EXPIRED, status=400)
+        member = email_auth_member('knu_email', grant['email'])
+        if not verified_email_account(member) or member['id'] != grant['member_id'] \
+                or member['auth_session_version'] != grant['version'] or (kind == 'setup' and member.get('pin_hash')):
+            return email_page(error=PIN_PROOF_EXPIRED, status=400)
+        if member.get('role') != 'member' or has_term_assignment(db(), member['id']):
+            return email_page(error=PIN_STAFF, status=403)
+        error = None
+        if request.method == 'POST':
+            pin = request.form.get('pin') or ''
+            if not SIX_DIGITS.fullmatch(pin):
+                error = 'PIN은 숫자 6자리로 정해주세요.'
+            elif pin != request.form.get('pin_confirm'):
+                error = 'PIN 확인이 일치하지 않습니다.'
+            else:
+                update = {'pin_hash': hash_password(pin), 'pin_failed_attempts': 0, 'pin_locked_until': None,
+                          'auth_session_version': grant['version'] + 1}
+                query = db().table('members').update(update).eq('id', member['id']).eq('knu_email', grant['email']) \
+                    .eq('auth_session_version', grant['version']).eq('role', 'member').eq('is_active', True) \
+                    .eq('account_status', 'active').eq('auth_provider', 'local')
+                member_status = member.get('member_status')
+                query = query.eq('member_status', member_status) if member_status else query.is_('member_status', 'null')
+                if kind == 'setup':
+                    query = query.is_('pin_hash', 'null')
+                changed = query.execute().data or []
+                if changed and verified_email_account(changed[0]):
+                    start_local_session(changed[0], True)
+                    return after_login_redirect(changed[0], grant['next'])
+                return email_page(error=PIN_PROOF_EXPIRED, status=409)
+        return render_template('account_password.html', kind=kind, error=error,
+                               skip_url=grant['next'] or url_for('my_page')), 400 if error else 200
+
+    @app.route('/account/pin/setup', methods=['GET', 'POST'])
+    def pin_setup():
+        return handle_pin_change('setup')
+
+    @app.route('/account/pin/reset', methods=['GET', 'POST'])
+    def pin_reset_confirm():
+        return handle_pin_change('reset')
 
     # --- signup ---------------------------------------------------------------
     def signup_form(error=None, status=200, **values):
@@ -375,12 +696,17 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
         password = form.get('password') or ''
         if password != (form.get('password_confirm') or ''):
             return signup_form('비밀번호 확인이 일치하지 않습니다.', 400, **values)
-        same_sid = db().table('members').select('id,name,role,social_id,student_id,account_status') \
+        same_sid = db().table('members').select('id,name,role,social_id,student_id,account_status,member_status,is_active,knu_email') \
             .eq('student_id', values['student_id']).execute().data or []
         roster = [m for m in same_sid if (m.get('name') or '').strip() == values['name']]
         target = roster[0] if len(roster) == 1 else None
+        if same_sid and (len(same_sid) != 1 or not target):
+            return signup_form('학번이 기존 명부와 일치합니다. 이름을 확인하거나 운영진에게 문의해주세요.', 409, **values)
         if target:
-            if credential_for(target['id']):
+            if (target.get('member_status') in ('inactive', 'blocked')
+                    or target.get('is_active') is False or target.get('account_status') == 'disabled'):
+                return signup_form('비활성화된 회원은 운영진에게 문의해주세요.', 409, **values)
+            if target.get('knu_email') or credential_for(target['id']):
                 return signup_form('이미 가입 신청했거나 아이디가 있는 회원입니다. 아이디·비밀번호를 잊었다면 운영진에게 재설정 링크를 요청해주세요.', 409, **values)
             if target.get('social_id'):
                 return signup_form('카카오로 쓰던 기존 회원입니다. 아래 ‘기존 회원 전환’으로 카카오 로그인 후 아이디를 만들거나, 운영진에게 전환 링크를 요청해주세요.', 409, existing_kakao=True, **values)
@@ -392,11 +718,16 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
             return signup_form(problem, 400, **values)
         created_member = None
         if not target:
-            created = db().table('members').insert({
-                'name': values['name'], 'student_id': values['student_id'], 'department': values['department'],
-                'role': 'member', 'account_status': 'pending', 'member_status': 'inactive', 'is_active': False,
-                'auth_provider': 'local',
-            }).execute().data or []
+            try:
+                created = db().table('members').insert({
+                    'name': values['name'], 'student_id': values['student_id'], 'department': values['department'],
+                    'role': 'member', 'account_status': 'pending', 'member_status': 'inactive', 'is_active': False,
+                    'auth_provider': 'local',
+                }).execute().data or []
+            except Exception as exc:
+                if getattr(exc, 'code', None) != '23505':
+                    raise
+                return signup_form('학번이 기존 명부와 일치합니다. 운영진에게 문의해주세요.', 409, **values)
             if not created:
                 abort(500)
             created_member = target = created[0]
@@ -408,10 +739,10 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
                 'password_changed_at': iso(now_utc()),
             }).execute()
         except Exception:
-            app.logger.warning('Signup credential insert failed (likely duplicate login id)')
+            app.logger.warning('Signup credential insert failed')
             if created_member:
                 db().table('members').delete().eq('id', created_member['id']).eq('account_status', 'pending').execute()
-            return signup_form('이미 사용 중인 아이디입니다. 다른 아이디를 정해주세요.', 409, **values)
+            return signup_form('이미 사용 중인 아이디이거나 로그인 계정이 연결된 회원입니다.', 409, **values)
         signup_creates.add(ip_key)
         signup_notify.notify_signup(values['login_id'], values['name'], app.logger)
         return render_template('signup_done.html', name=values['name'], login_id=values['login_id'],
@@ -441,6 +772,9 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
     @app.route('/account/convert', methods=['GET', 'POST'])
     @login_required(role='ANY')
     def account_convert():
+        if session.get('login_method') == 'pin':
+            flash('아이디를 만들려면 학교 메일 인증코드로 다시 로그인해주세요.', 'warning')
+            return redirect(url_for('my_page'))
         member = member_row(session['user_id'])
         if not member or credential_for(member['id']):
             flash('이미 아이디로 로그인하는 계정입니다.', 'info')
@@ -564,74 +898,63 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
     def actor_id():
         return session.get('user_id')
 
+    def configure_signup(action, *, code=None, term_id=None, expires=None, hours=None):
+        return db().rpc('update_signup_configuration', {
+            'p_action': action, 'p_actor': actor_id(), 'p_code': code,
+            'p_term': term_id, 'p_expires': expires, 'p_hours': hours,
+        }).execute().data
+
     @app.post('/api/admin/signup-code')
     @login_required(role='admin')
     def admin_signup_code():
         data = request.get_json(silent=True) or {}
         action = data.get('action')
-        current = active_signup_code()
         if action == 'revoke':
-            db().table('signup_codes').update({'revoked_at': iso(now_utc())}).is_('revoked_at', 'null').execute()
+            configure_signup(action)
             return jsonify(status='success', code=None)
-        if action == 'open':
-            term = current_term()
-            db().table('signup_codes').update({'revoked_at': iso(now_utc())}).is_('revoked_at', 'null').execute()
-            db().table('signup_codes').insert({'code': OPEN_SIGNUP_MARKER, 'term_id': term['id'] if term else None,
-                                               'created_by': actor_id(), 'created_at': iso(now_utc())}).execute()
-            app.logger.warning('Signup switched to no-code (approval only) by member %s', actor_id())
-            return jsonify(status='success', code=None, open=True, term=(term or {}).get('name') or '')
-        if action != 'set':
+        if action == 'ot_open':
+            hours = data.get('hours')
+            if type(hours) is not int or hours not in (1, 3, 6):
+                return jsonify(status='error', message='자동승인 시간을 1시간, 3시간, 6시간 중에서 골라주세요.'), 400
+            expires = configure_signup(action, hours=hours)
+            return jsonify(status='success', auto_approve_until=expires)
+        if action == 'ot_close':
+            configure_signup(action)
+            return jsonify(status='success', auto_approve_until=None)
+        if action not in ('set', 'open'):
             return jsonify(status='error', message='알 수 없는 요청입니다.'), 400
-        code = normalize_code(data.get('code')) or generate_signup_code()
-        if code == OPEN_SIGNUP_MARKER:
-            return jsonify(status='error', message='다른 코드를 정해주세요.'), 400
-        if not re.fullmatch(r'[A-Z0-9가-힣_-]{6,40}', code):
-            return jsonify(status='error', message='가입 코드는 띄어쓰기 없이 6~40자로 정해주세요.'), 400
-        if code.lower() in common_passwords():
-            return jsonify(status='error', message='너무 쉬운 코드입니다. 다른 코드를 정해주세요.'), 400
-        term = current_term()
-        db().table('signup_codes').update({'revoked_at': iso(now_utc())}).is_('revoked_at', 'null').execute()
-        db().table('signup_codes').insert({'code': code, 'term_id': term['id'] if term else None,
-                                           'created_by': actor_id(), 'created_at': iso(now_utc())}).execute()
-        app.logger.info('Signup code rotated by member %s (previous=%s)', actor_id(), bool(current))
-        return jsonify(status='success', code=code, term=(term or {}).get('name') or '')
+        opened = action == 'open'
+        code = OPEN_SIGNUP_MARKER if opened else normalize_code(data.get('code')) or generate_signup_code()
+        if not opened:
+            if code in (OPEN_SIGNUP_MARKER, OT_SIGNUP_MARKER):
+                return jsonify(status='error', message='다른 코드를 정해주세요.'), 400
+            if not re.fullmatch(r'[A-Z0-9가-힣_-]{6,40}', code):
+                return jsonify(status='error', message='가입 코드는 띄어쓰기 없이 6~40자로 정해주세요.'), 400
+            if code.lower() in common_passwords():
+                return jsonify(status='error', message='너무 쉬운 코드입니다. 다른 코드를 정해주세요.'), 400
+        term_id, term_name, expires = signup_deadline()
+        configure_signup('replace', code=code, term_id=term_id, expires=expires)
+        app.logger.info('Signup mode set to %s by member %s', action, actor_id())
+        return jsonify(status='success', code=None if opened else code, open=opened, term=term_name, expires_at=expires)
 
-    def pending_target(member_id):
-        credential = credential_for(member_id)
-        if not credential or credential.get('status') != 'pending':
-            return None, None
-        return credential, member_row(member_id)
+    def decide_signup(member_id, *, approve):
+        result = db().rpc('decide_local_signup', {'p_member': member_id, 'p_actor': actor_id(),
+                                                  'p_approve': approve}).execute().data
+        if result == 'missing':
+            return jsonify(status='error', message='승인 대기 중인 가입 신청이 아닙니다.'), 404
+        if result == 'inactive':
+            return jsonify(status='error', message='비활성화되거나 차단된 회원은 승인할 수 없습니다.'), 409
+        return jsonify(status='success')
 
     @app.post('/api/admin/members/<int:member_id>/approve-login')
     @login_required(role='admin')
     def admin_approve_signup(member_id):
-        credential, member = pending_target(member_id)
-        if not credential or not member:
-            return jsonify(status='error', message='승인 대기 중인 가입 신청이 아닙니다.'), 404
-        if member.get('member_status') == 'blocked' or member.get('account_status') == 'disabled':
-            return jsonify(status='error', message='차단된 회원은 승인할 수 없습니다.'), 409
-        update = {'account_status': 'active', 'auth_provider': 'local'}
-        if member.get('member_status') in (None, 'inactive'):
-            update.update(member_status='active', is_active=True)
-        db().table('members').update(update).eq('id', member_id).execute()
-        db().table('member_credentials').update({'status': 'active', 'approved_at': iso(now_utc()),
-                                                 'approved_by': actor_id()}).eq('member_id', member_id).execute()
-        return jsonify(status='success')
+        return decide_signup(member_id, approve=True)
 
     @app.post('/api/admin/members/<int:member_id>/reject-login')
     @login_required(role='admin')
     def admin_reject_signup(member_id):
-        credential, member = pending_target(member_id)
-        if not credential or not member:
-            return jsonify(status='error', message='승인 대기 중인 가입 신청이 아닙니다.'), 404
-        db().table('member_credentials').delete().eq('member_id', member_id).eq('status', 'pending').execute()
-        if member.get('account_status') == 'pending':
-            try:
-                db().table('members').delete().eq('id', member_id).eq('account_status', 'pending').execute()
-            except Exception:
-                app.logger.warning('Rejected signup member row kept (referenced elsewhere)')
-                db().table('members').update({'account_status': 'disabled'}).eq('id', member_id).execute()
-        return jsonify(status='success')
+        return decide_signup(member_id, approve=False)
 
     @app.post('/api/admin/members/<int:member_id>/login-link')
     @login_required(role='admin')
@@ -642,7 +965,8 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
         if is_officer_role(member) and member_id != actor_id() and not primary_admin_check():
             return jsonify(status='error', message='운영진 계정의 링크는 관리자만 만들 수 있습니다.'), 403
         credential = credential_for(member_id)
-        if credential and credential.get('status') == 'pending':
+        if (credential and credential.get('status') == 'pending') or member.get('account_status') == 'pending' \
+                and member.get('auth_provider') == 'local':
             return jsonify(status='error', message='먼저 가입 신청을 승인하거나 거절해주세요.'), 409
         now = now_utc()
         db().table('account_setup_tokens').update({'used_at': iso(now)}).eq('member_id', member_id) \
@@ -672,7 +996,21 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
                 c['existing'] = m.get('account_status') != 'pending'
                 c['member'] = m
             pending.sort(key=lambda c: c.get('created_at') or '')
-        return {'signup_code': active_signup_code(), 'pending_signups': pending, 'credentials': by_member}
+        email_accounts = db().table('members').select(
+            'id,name,student_id,department,knu_email,knu_email_verified_at,account_status'
+        ).eq('auth_provider', 'local').execute().data or []
+        linked = {m['id']: m['knu_email'] for m in email_accounts
+                  if m.get('knu_email') and m.get('knu_email_verified_at')}
+        email_pending = [dict(member_id=m['id'], signup_name=m['name'], signup_student_id=m.get('student_id'),
+                              signup_department=m.get('department'), login_id=linked[m['id']],
+                              created_at=m['knu_email_verified_at'])
+                         for m in email_accounts if m['id'] in linked and m['id'] not in by_member
+                         and m.get('account_status') == 'pending']
+        setting = signup_setting()
+        ot = ot_deadline(setting)
+        return {'signup_code': active_signup_code(setting), 'pending_signups': sorted(
+            pending + email_pending, key=lambda c: c.get('created_at') or ''),
+            'credentials': by_member, 'linked_email': linked, 'auto_approve_until': iso(ot) if ot else None}
 
     app.extensions['local_auth_overview'] = admin_login_overview
     app.extensions['local_auth_credential_for'] = credential_for

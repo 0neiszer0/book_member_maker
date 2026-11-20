@@ -18,22 +18,40 @@
   {% set lo = login_overview or {} %}
   <section class="records-panel records-p-5 records-mb-4" id="login-admin" aria-labelledby="login-admin-title">
     <h2 id="login-admin-title">가입 코드 · 가입 승인</h2>
-    <p class="records-muted records-text-sm records-mt-1">새 회원은 가입 신청(가입 코드를 켜 두면 코드도 입력)을 하고, 운영진이 아래에서 승인하면 아이디로 로그인합니다. 비밀번호는 운영진도 볼 수 없고, 잊은 회원에게는 회원 행의 ‘로그인 링크’로 24시간짜리 일회용 링크를 만들어 보내주세요.</p>
+    <p class="records-muted records-text-sm records-mt-1">이메일 또는 아이디로 들어온 가입 신청을 여기에서 승인할 수 있습니다. 기존 아이디 비밀번호를 잊은 회원에게는 ‘로그인 링크’를 발급해주세요.</p>
     {% if lo.error %}<p class="records-accent records-mt-2" role="alert">가입 정보를 불러오지 못했습니다.</p>{% endif %}
     <div class="records-flex records-flex-wrap records-items-end records-gap-3 records-mt-4">
       {% set sc = lo.signup_code %}
       <div><p class="records-text-xs records-muted records-font-bold">가입 방식</p>
-        {% if sc and sc.open %}<p class="records-text-2xl records-font-extrabold" id="signup-code-value">가입 코드 없이 · 운영진 승인만</p><p class="records-text-xs records-muted">{{ sc.term_name or '' }} · 학기가 끝나면 자동으로 막힙니다</p>
-        {% elif sc %}<p class="records-text-xs records-muted">가입 코드 필요</p><p class="records-text-2xl records-font-extrabold" id="signup-code-value">{{ sc.code }}</p><p class="records-text-xs records-muted">{{ sc.term_name or '' }} · 학기가 끝나면 자동으로 막힙니다</p>
-        {% else %}<p class="records-font-extrabold" id="signup-code-value">없음 · 지금은 가입을 받지 않습니다</p>{% endif %}</div>
+        {% if sc and sc.open %}<p class="records-text-2xl records-font-extrabold" id="signup-code-value">가입 코드 없이 · 운영진 승인</p>
+        {% elif sc %}<p class="records-text-xs records-muted">가입 코드 필요</p><p class="records-text-2xl records-font-extrabold" id="signup-code-value">{{ sc.code }}</p>
+        {% else %}<p class="records-font-extrabold" id="signup-code-value">일반 가입 신청 닫힘</p>{% endif %}
+        {% if sc and sc.expires_at %}<p class="records-text-xs records-muted">{{ sc.expires_at|datetime('%m.%d %H:%M') }}까지</p>
+        {% elif sc and sc.term_name %}<p class="records-text-xs records-muted">{{ sc.term_name }} 종료일까지</p>{% endif %}</div>
       <input id="signup-code-input" class="records-field" placeholder="새 코드 (비우면 자동 생성)" maxlength="40" style="max-width:240px">
       <button class="lms-button lms-button-primary" type="button" id="signup-code-set">{{ '코드 바꾸기' if sc and not sc.open else '가입 코드 켜기' }}</button>
       {% if not (sc and sc.open) %}<button class="lms-button" type="button" id="signup-code-open">코드 없이 받기</button>{% endif %}
       {% if sc %}<button class="lms-button" type="button" id="signup-code-revoke">가입 막기</button>{% endif %}
     </div>
+    <div class="records-flex records-flex-wrap records-items-end records-gap-3 records-mt-4">
+      <label class="records-text-sm records-font-bold">OT 자동승인 시간
+        <select id="ot-duration" class="records-field">
+          <option value="1">1시간</option>
+          <option value="3">3시간</option>
+          <option value="6">6시간</option>
+        </select>
+      </label>
+      <button class="lms-button lms-button-primary" type="button" id="ot-open">OT 즉시 자동승인 열기</button>
+      <button class="lms-button" type="button" id="ot-close" {% if not lo.auto_approve_until %}hidden{% endif %}>자동승인 닫기</button>
+      {% if lo.auto_approve_until %}
+      <p class="records-text-sm" id="ot-expiry" data-until="{{ lo.auto_approve_until }}">
+        <time datetime="{{ lo.auto_approve_until }}">{{ lo.auto_approve_until|datetime('%m.%d %H:%M') }}</time>까지 · <span id="ot-remaining"></span>
+      </p>
+      {% else %}<p class="records-text-sm records-muted">OT 자동승인 닫힘</p>{% endif %}
+    </div>
     <h3 class="records-mt-4 records-font-extrabold">승인 대기 {{ (lo.pending_signups or [])|length }}명</h3>
     {% if lo.pending_signups %}
-    <div class="records-overflow-x-auto"><table class="records-w-full records-text-sm records-mt-2"><thead class="records-tint records-text-left"><tr><th class="records-p-3">신청 내용</th><th class="records-p-3">아이디</th><th class="records-p-3">명부</th><th class="records-p-3">신청</th><th class="records-p-3 records-text-right">처리</th></tr></thead><tbody>
+    <div class="records-overflow-x-auto"><table class="records-w-full records-text-sm records-mt-2"><thead class="records-tint records-text-left"><tr><th class="records-p-3">신청 내용</th><th class="records-p-3">학교 메일·아이디</th><th class="records-p-3">명부</th><th class="records-p-3">신청</th><th class="records-p-3 records-text-right">처리</th></tr></thead><tbody>
     {% for c in lo.pending_signups %}<tr class="records-border-t records-line"><td class="records-p-3"><div class="records-font-extrabold">{{ c.signup_name }}</div><div class="records-text-xs records-muted">{{ c.signup_student_id }} · {{ c.signup_department }}</div></td><td class="records-p-3">{{ c.login_id }}</td><td class="records-p-3">{% if c.existing %}기존 명부 회원과 연결 ({{ c.member.name }}{% if c.member.recruiting_class %} · {{ c.member.recruiting_class }}기{% endif %}){% else %}새 회원{% endif %}</td><td class="records-p-3 records-text-xs">{{ (c.created_at or '')|datetime('%m.%d %H:%M') }}</td><td class="records-p-3"><div class="records-flex records-justify-end records-gap-2"><button class="lms-button lms-button-primary signup-decision" type="button" data-id="{{ c.member_id }}" data-action="approve-login" data-name="{{ c.signup_name }}">승인</button><button class="lms-button signup-decision" type="button" data-id="{{ c.member_id }}" data-action="reject-login" data-name="{{ c.signup_name }}">거절</button></div></td></tr>{% endfor %}
     </tbody></table></div>
     {% else %}<p class="records-muted records-text-sm records-mt-1">대기 중인 가입 신청이 없습니다.</p>{% endif %}
@@ -64,7 +82,7 @@
     <p class="records-px-4 records-pt-3 records-text-xs records-muted">세미나·발제 횟수는 과거 기록에 저장된 이름 기준입니다. 동명이인은 잘못 귀속하지 않고 ‘—’로 표시합니다.</p>
     <div class="records-overflow-x-auto"><table class="records-w-full records-text-sm records-min-w--1160px"><thead class="records-tint records-text-left"><tr><th class="records-p-3">회원</th><th class="records-p-3">학번·학과</th><th class="records-p-3 records-text-center">기수</th><th class="records-p-3 records-text-center">세미나</th><th class="records-p-3 records-text-center">발제</th><th class="records-p-3 records-text-center">벽돌책</th><th class="records-p-3 records-text-center">소모임</th><th class="records-p-3">활동 상태 <span class="records-block records-text--11px records-font-normal records-muted">버튼을 누르면 즉시 저장</span></th><th class="records-p-3 records-text-right">관리</th></tr></thead>
     <tbody id="member-list">{% for m in members %}{% set st=m.member_status or 'active' %}<tr class="member-row records-border-t records-line records-hover {% if m.student_id_duplicate %}records-tint{% endif %}" data-status="{{ st }}" data-incomplete="{{ '1' if not m.student_id or not m.department or not m.recruiting_class else '0' }}" data-duplicate="{{ '1' if m.student_id_duplicate else '0' }}" data-search="{{ ((m.name or '') ~ ' ' ~ (m.student_id or '') ~ ' ' ~ (m.department or ''))|lower }}">
-      <td class="records-p-3"><div class="records-font-extrabold">{{ m.name }}</div><div class="records-text-xs records-muted records-mt-1">{% if m.role=='admin' %}관리자{% elif m.role=='officer' %}운영진{% else %}회원{% endif %} · {% if m.login_kind=='local' %}아이디 {{ m.login_id }}{% elif m.login_kind=='kakao' %}카카오 (전환 전){% else %}로그인 없음{% endif %}</div></td>
+      <td class="records-p-3"><div class="records-font-extrabold">{{ m.name }}</div><div class="records-text-xs records-muted records-mt-1">{% if m.role=='admin' %}관리자{% elif m.role=='officer' %}운영진{% else %}회원{% endif %} · {% if (lo.linked_email or {}).get(m.id) %}학교 메일 {{ lo.linked_email[m.id] }}{% elif m.login_kind=='local' %}아이디 {{ m.login_id }}{% elif m.login_kind=='kakao' %}카카오 (전환 전){% else %}로그인 없음{% endif %}</div></td>
       <td class="records-p-3"><div>{{ m.student_id or '학번 미입력' }}{% if m.student_id_duplicate %}<span class="records-ml-2 records-inline-block records-rounded records-tint records-px-2 records-py-0-5 records-text--10px records-font-extrabold records-accent">중복 · ID {{ m.id }}</span>{% endif %}</div><div class="records-text-xs records-muted">{{ m.department or '학과 미입력' }}</div></td><td class="records-p-3 records-text-center">{{ m.recruiting_class or '-' }}</td><td class="records-p-3 records-text-center records-font-extrabold records-accent">{% if m.activity_count_ambiguous %}<span title="동명이인이라 이름 기준 집계가 모호합니다">&mdash;</span>{% else %}{{ m.seminar_count or 0 }}{% endif %}</td><td class="records-p-3 records-text-center">{% if m.activity_count_ambiguous %}<span class="topic-count" title="동명이인이라 이름 기준 집계가 모호합니다">&mdash;</span>{% else %}<span class="topic-count">{{ m.facilitator_count or 0 }}</span>{% endif %}</td><td class="records-p-3 records-text-center records-font-bold records-accent">{{ m.brick_count or 0 }}</td><td class="records-p-3 records-text-center records-font-bold records-ink">{{ m.study_count or 0 }}</td>
       <td class="records-p-3"><div class="status-control" role="group" aria-label="{{ m.name }} 활동 상태"><button type="button" class="status-choice" data-member-id="{{ m.id }}" data-status="active" aria-pressed="{{ 'true' if st=='active' else 'false' }}">활성</button><button type="button" class="status-choice" data-member-id="{{ m.id }}" data-status="dormant" aria-pressed="{{ 'true' if st=='dormant' else 'false' }}">휴면</button><button type="button" class="status-choice" data-member-id="{{ m.id }}" data-status="inactive" aria-pressed="{{ 'true' if st=='inactive' else 'false' }}">비활성</button></div></td>
       <td class="records-p-3"><div class="records-flex records-justify-end records-gap-2">{% if m.can_view_activity %}<a class="lms-button" href="{{ url_for('records_member_profile', member_id=m.id) }}">활동</a>{% endif %}<button class="lms-button login-link" type="button" data-id="{{ m.id }}" data-name="{{ m.name }}">로그인 링크</button><button class="edit-member lms-button lms-button-primary" data-id="{{ m.id }}" data-name="{{ m.name }}" data-email="{{ m.email or '' }}" data-department="{{ m.department or '' }}" data-gender="{{ m.gender or '' }}" data-student-id="{{ m.student_id or '' }}" data-recruiting-class="{{ m.recruiting_class or '' }}" data-role="{{ m.role or 'member' }}">편집</button></div></td>
@@ -91,8 +109,37 @@ const merge=document.getElementById('merge-panel');document.getElementById('merg
 const csrfHeader=()=>({'Content-Type':'application/json','X-App-CSRF':document.querySelector('meta[name="lms-csrf"]').content});
 async function postJson(url,body){const r=await fetch(url,{method:'POST',headers:csrfHeader(),body:JSON.stringify(body||{})});let d={};try{d=await r.json()}catch(e){}if(!r.ok||d.status!=='success'){alert(d.message||'처리하지 못했습니다.');return null}return d}
 document.getElementById('signup-code-set').onclick=async()=>{const code=document.getElementById('signup-code-input').value.trim();if(!confirm(code?`가입 코드를 ${code}(으)로 바꿀까요? 이전 코드는 바로 막힙니다.`:'새 가입 코드를 자동으로 만들까요? 이전 코드는 바로 막힙니다.'))return;const d=await postJson('/api/admin/signup-code',{action:'set',code});if(d)location.reload()};
-document.getElementById('signup-code-open')?.addEventListener('click',async()=>{if(!confirm('가입 코드 없이 신청을 받을까요? 새 신청은 운영진이 승인해야 로그인할 수 있고, 학기가 끝나면 자동으로 막힙니다.'))return;if(await postJson('/api/admin/signup-code',{action:'open'}))location.reload()});
+document.getElementById('signup-code-open')?.addEventListener('click',async()=>{if(!confirm('가입 코드 없이 신청을 받을까요? OT 자동승인이 닫혀 있으면 운영진이 신청을 승인해야 합니다.'))return;if(await postJson('/api/admin/signup-code',{action:'open'}))location.reload()});
 document.getElementById('signup-code-revoke')?.addEventListener('click',async()=>{if(!confirm('새 가입을 막을까요?'))return;if(await postJson('/api/admin/signup-code',{action:'revoke'}))location.reload()});
+const otClose = document.getElementById('ot-close');
+document.getElementById('ot-open').addEventListener('click', async () => {
+  const hours = Number(document.getElementById('ot-duration').value);
+  if (!confirm(hours + '시간 동안 학교 메일을 인증한 신규 회원을 즉시 승인할까요?')) return;
+  if (await postJson('/api/admin/signup-code', {action: 'ot_open', hours})) location.reload();
+});
+otClose.addEventListener('click', async () => {
+  if (await postJson('/api/admin/signup-code', {action: 'ot_close'})) location.reload();
+});
+const otExpiry = document.getElementById('ot-expiry');
+if (otExpiry) {
+  const deadline = Date.parse(otExpiry.dataset.until);
+  const remaining = document.getElementById('ot-remaining');
+  const updateRemaining = () => {
+    const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+    if (!seconds) {
+      remaining.textContent = '자동승인 종료';
+      otClose.hidden = true;
+      return;
+    }
+    remaining.textContent = Math.floor(seconds / 3600) + '시간 ' +
+      Math.floor(seconds % 3600 / 60) + '분 ' + seconds % 60 + '초 남음';
+  };
+  updateRemaining();
+  const countdown = setInterval(() => {
+    updateRemaining();
+    if (otClose.hidden) clearInterval(countdown);
+  }, 1000);
+}
 document.querySelectorAll('.signup-decision').forEach(b=>b.onclick=async()=>{const approve=b.dataset.action==='approve-login';if(!confirm(`${b.dataset.name}님의 가입 신청을 ${approve?'승인':'거절'}할까요?`))return;if(await postJson(`/api/admin/members/${b.dataset.id}/${b.dataset.action}`))location.reload()});
 document.querySelectorAll('.login-link').forEach(b=>b.onclick=async()=>{if(!confirm(`${b.dataset.name}님에게 보낼 일회용 로그인 링크(24시간)를 만들까요? 이전 링크는 막힙니다.`))return;const d=await postJson(`/api/admin/members/${b.dataset.id}/login-link`);if(d)prompt(`${d.name}님의 ${d.kind==='reset'?'비밀번호 재설정':'아이디 만들기'} 링크입니다. ${d.expires}까지 한 번만 쓸 수 있으니 본인에게만 보내주세요.`,d.url)});
 </script>
