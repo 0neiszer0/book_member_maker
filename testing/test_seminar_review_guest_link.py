@@ -215,6 +215,80 @@ class GuestSeminarReviewTests(unittest.TestCase):
         self.assertIn('id="copy-review-edit-status"', done_html)
         self.assertIn("수정 코드를 복사했습니다.", done_html)
 
+    def _add_staff(self, mid, role):
+        m = member(mid, f"202600000{mid}")
+        m["role"] = role
+        self.db.rows["members"].append(m)
+        return m
+
+    def _login(self, mid, role="member", csrf="staff-csrf"):
+        with self.client.session_transaction() as state:
+            state.clear()
+            state.update(user_id=mid, user_role=role, auth_provider="kakao", sensitive_csrf=csrf)
+
+    def test_admin_and_officer_soft_delete_guest_review_and_unblock_member(self):
+        self.post(author_name="사칭자", student_id="2026000001", review_content="사칭 후기")
+        self.db.rows["seminar_reviews"][0]["id"] = "r-guest-1"
+
+        self._login(1, "member", "member-csrf")
+        blocked_page = self.client.get(PATH).get_data(as_text=True)
+        self.assertIn("내 계정에 연결하기", blocked_page)
+        self.assertIn("운영진에게 후기 삭제를 요청해주세요.", blocked_page)
+        self.client.post(PATH, data={"csrf_token": "member-csrf", "review_content": "진짜 회원 후기"})
+        self.assertEqual(len(self.db.rows["seminar_reviews"]), 1)
+
+        self._add_staff(3, "admin")
+        self._login(3, "admin", "admin-csrf")
+        self.assertEqual(self.client.post("/api/admin/seminar-reviews/r-guest-1/delete").status_code, 403)
+        self.assertEqual(
+            self.client.post("/api/admin/seminar-reviews/r-guest-1/delete", headers={"X-App-CSRF": "wrong"}).status_code,
+            403,
+        )
+        self.assertIsNone(self.db.rows["seminar_reviews"][0].get("deleted_at"))
+
+        res = self.client.post("/api/admin/seminar-reviews/r-guest-1/delete", headers={"X-App-CSRF": "admin-csrf"})
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.get_json(), {"ok": True})
+        self.assertIsNotNone(self.db.rows["seminar_reviews"][0]["deleted_at"])
+
+        second = self.client.post("/api/admin/seminar-reviews/r-guest-1/delete", headers={"X-App-CSRF": "admin-csrf"})
+        self.assertEqual(second.status_code, 404)
+        self.assertFalse(second.get_json()["ok"])
+
+        self._login(1, "member", "member-csrf")
+        unblocked_page = self.client.get(PATH).get_data(as_text=True)
+        self.assertNotIn("내 계정에 연결하기", unblocked_page)
+        submit = self.client.post(PATH, data={"csrf_token": "member-csrf", "review_content": "진짜 회원 후기"})
+        self.assertEqual(submit.status_code, 302)
+        self.assertEqual(len(self.db.rows["seminar_reviews"]), 2)
+        self.assertEqual(self.db.rows["seminar_reviews"][1]["member_id"], 1)
+        self.assertEqual(self.db.rows["seminar_reviews"][1]["identity_kind"], "member")
+
+        self.db.rows["seminar_reviews"].append(dict(
+            id="r-guest-2", form_id="form-1", member_id=None, identity_kind="guest",
+            author_name="손님2", student_id="2026000088", memorable_point="중복", deleted_at=None,
+        ))
+        self._add_staff(4, "officer")
+        self._login(4, "officer", "officer-csrf")
+        officer_res = self.client.post(
+            "/api/admin/seminar-reviews/r-guest-2/delete", headers={"X-App-CSRF": "officer-csrf"}
+        )
+        self.assertEqual(officer_res.status_code, 200)
+        self.assertEqual(officer_res.get_json(), {"ok": True})
+        self.assertIsNotNone(self.db.rows["seminar_reviews"][2]["deleted_at"])
+
+    def test_member_cannot_delete_seminar_review(self):
+        self.db.rows["seminar_reviews"].append(dict(
+            id="r-guest-3", form_id="form-1", member_id=None, identity_kind="guest",
+            author_name="손님", student_id="2026000077", memorable_point="후기", deleted_at=None,
+        ))
+        self._login(1, "member", "member-csrf")
+        res = self.client.post(
+            "/api/admin/seminar-reviews/r-guest-3/delete", headers={"X-App-CSRF": "member-csrf"}
+        )
+        self.assertEqual(res.status_code, 403)
+        self.assertIsNone(self.db.rows["seminar_reviews"][0]["deleted_at"])
+
 
 class ReviewCredentialTests(unittest.TestCase):
     def test_review_and_topic_codes_use_separate_domains(self):

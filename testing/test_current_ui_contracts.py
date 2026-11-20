@@ -137,6 +137,29 @@ class CurrentUiContractsTest(unittest.TestCase):
         self.assertIn('rel="apple-touch-icon"', favicon)
         self.assertIn("icons/icon-192.png", favicon)
 
+    def test_og_preview_image_is_resized_and_lightweight(self):
+        from PIL import Image
+        og_path = ROOT / "static" / "og" / "club-preview-v2.png"
+        self.assertTrue(og_path.exists())
+        self.assertLessEqual(og_path.stat().st_size, 350_000)
+        with Image.open(og_path) as img:
+            self.assertEqual(img.format, "PNG")
+            self.assertEqual(img.size, (1200, 600))
+
+    def test_records_members_template_has_clean_utf8_and_inactive_confirm(self):
+        members = self.read("templates/records_members.html")
+        self.assertNotIn("&#xD69F;", members)
+        self.assertIn("세미나·발제 횟수는 과거 기록에 저장된 이름 기준입니다.", members)
+        self.assertIn("next==='inactive'&&!confirm(", members)
+
+    def test_board_post_and_list_security_and_moderation_contracts(self):
+        post_html = self.read("templates/board_post.html")
+        list_html = self.read("templates/board_list.html")
+        self.assertIn('target="_blank" rel="noopener noreferrer"', post_html)
+        self.assertRegex(post_html, r"deleteComment\([^)]*\)[\s\S]*if\s*\(!r\.ok\)")
+        self.assertIn("delete-link-review", list_html)
+        self.assertIn("session.user_role in ['admin', 'officer']", list_html)
+
 
 if __name__ == "__main__":
     unittest.main()

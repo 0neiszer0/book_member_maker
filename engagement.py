@@ -1041,3 +1041,15 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
         else:
             return jsonify(ok=False, error="올바르지 않은 상태입니다."), 400
         return jsonify(ok=True)
+
+    @app.post("/api/admin/seminar-reviews/<review_id>/delete")
+    @login_required(role="admin")
+    def delete_seminar_review(review_id):
+        now_iso = _now_iso()
+        updated = supabase.table("seminar_reviews").update({
+            "deleted_at": now_iso,
+            "updated_at": now_iso,
+        }).eq("id", str(review_id)).is_("deleted_at", "null").execute().data or []
+        if not updated:
+            return jsonify(ok=False, error="후기를 찾을 수 없거나 이미 삭제되었습니다."), 404
+        return jsonify(ok=True)
