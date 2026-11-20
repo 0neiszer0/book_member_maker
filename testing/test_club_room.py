@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import importlib
 import os
 import unittest
@@ -98,6 +100,28 @@ class RoomTests(unittest.TestCase):
         self.assertIn('참여자 비공개', data.json['bookings'][0]['participants'])
         self.db.rows['members'][0]['is_active'] = False
         self.assertEqual(self.post(body).status_code,403)
+
+    def test_blocked_member_is_not_recognized_as_staff(self):
+        self.login(1, 'officer')
+        self.assertEqual(self.post({**self.body, 'kind': 'meeting'}).status_code, 200)
+        self.db.rows['members'][0]['member_status'] = 'blocked'
+        self.assertEqual(self.post({**self.body, 'kind': 'meeting'}).status_code, 403)
+
+    def test_trusted_proxy_prefers_app_client_ip(self):
+        self.module.app.config['ORIGIN_AUTH_SECRET'] = 's' * 32
+        self.addCleanup(self.module.app.config.update, ORIGIN_AUTH_SECRET='')
+        headers = {
+            'X-Room-CSRF': self.csrf,
+            'X-App-Origin-Auth': 's' * 32,
+            'X-App-Client-IP': '203.0.113.9',
+            'X-Forwarded-For': '198.51.100.1',
+        }
+        self.client.post('/api/club-room/bookings/' + self.identifier, json=self.body, headers=headers)
+        sent = self.rpc_calls[-1][1]
+        expected = hmac.new(b'room-tests-only', b'room-rate:203.0.113.9', hashlib.sha256).hexdigest()
+        spoofed = hmac.new(b'room-tests-only', b'room-rate:198.51.100.1', hashlib.sha256).hexdigest()
+        self.assertEqual(sent['p_fingerprint'], expected)
+        self.assertNotEqual(sent['p_fingerprint'], spoofed)
 
     def test_manage_code_and_meeting_privacy(self):
         read = dict(action='read',edit_code='b'*43)

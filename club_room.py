@@ -6,8 +6,8 @@ import re
 import secrets
 from uuid import UUID
 
-from flask import abort, jsonify, render_template, request, session
-from security_utils import forwarded_client_address
+from flask import abort, g, jsonify, render_template, request, session
+from security_utils import trusted_client_address
 
 KST = timezone(timedelta(hours=9))
 PRIVATE_FIELDS = 'id,kind,starts_at,ends_at,representative,participants,purpose,version,cancelled_at'
@@ -62,7 +62,7 @@ def init_club_room_routes(app, get_db, login_required):
             .eq('id', session['user_id']).limit(1).execute().data or []
         member = rows[0] if rows else {}
         if (member.get('role') in ('admin', 'officer') and member.get('is_active') is not False
-                and member.get('account_status') == 'active' and member.get('member_status') != 'inactive'):
+                and member.get('account_status') == 'active' and member.get('member_status') not in ('inactive', 'blocked')):
             return session['user_id']
         return None
 
@@ -170,7 +170,7 @@ def init_club_room_routes(app, get_db, login_required):
             version = body.get('version')
             if action != 'create' and (type(version) is not int or version < 1):
                 raise ValueError('예약을 다시 불러온 뒤 수정해주세요.')
-            address = forwarded_client_address(request.headers.get('X-Forwarded-For'), request.remote_addr)
+            address = trusted_client_address(request.headers, request.remote_addr, getattr(g, 'trusted_app_proxy', False))
             fingerprint = hmac.new(str(app.secret_key).encode(), ('room-rate:' + address).encode(), hashlib.sha256).hexdigest()
             result = get_db().rpc('club_room_mutate', dict(p_action=action, p_id=booking_id,
                 p_payload=payload, p_digest=digest, p_actor=actor, p_fingerprint=fingerprint,

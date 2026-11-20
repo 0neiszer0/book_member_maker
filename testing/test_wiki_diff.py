@@ -19,6 +19,20 @@ class DiffRowTests(unittest.TestCase):
         rows = diff_rows('a', '<script>x</script>')
         self.assertTrue(all('<script>' not in str(r['text']) for r in rows))
 
+    def test_large_input_skips_inline_marks(self):
+        big_old, big_new = 'A' * 60_000, 'B' * 60_000
+        rows = diff_rows('header\n' + big_old, 'header\n' + big_new)
+        changed = [r for r in rows if r['kind'] in ('del', 'add')]
+        self.assertTrue(changed)
+        self.assertTrue(all('<ins>' not in str(r['text']) and '<del>' not in str(r['text']) for r in changed))
+        self.assertIn(big_new, [str(r['text']) for r in rows if r['kind'] == 'add'])
+
+    def test_long_line_skips_inline_marks(self):
+        rows = diff_rows('short old', 'X' * 5_000)
+        added = [r for r in rows if r['kind'] == 'add']
+        self.assertEqual(str(added[0]['text']), 'X' * 5_000)
+        self.assertNotIn('<ins>', str(added[0]['text']))
+
 
 class DiffRouteTests(base.RouteTests):
     def setUp(self):
@@ -48,6 +62,14 @@ class DiffRouteTests(base.RouteTests):
     def test_logged_out_redirects(self):
         result = self.client.get('/wiki/diff/회칙/전문?old=1&new=2')
         self.assertEqual(result.status_code, 302)
+
+    def test_fallback_to_line_text_still_escapes_markup(self):
+        self.login()
+        long_line = '<script>alert(1)</script>' + 'x' * 5000
+        self.engine.revision_source = lambda client, title, number: {1: 'old', 2: long_line}.get(number)
+        html = self.client.get('/wiki/diff/회칙/전문?old=1&new=2').get_data(as_text=True)
+        self.assertNotIn('<script>alert(1)</script>', html)
+        self.assertIn('&lt;script&gt;alert(1)&lt;/script&gt;', html)
 
 
 class OfficerDiffTests(base.OfficerRouteTests):

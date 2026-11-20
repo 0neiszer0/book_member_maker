@@ -21,6 +21,7 @@ if importlib.util.find_spec('bs4') is None:
 from seminar_rooms import (  # noqa: E402
     crawl,
     extract_club_name,
+    generate_post_content,
     get_room_from_title,
     is_seminar_post,
     parse_dates_from_title,
@@ -176,6 +177,21 @@ class SeminarRoomCacheRepairTests(unittest.TestCase):
             fake_db.upserts[0]['dates'],
             ['2026-08-26', '2026-08-27', '2026-08-28'],
         )
+
+
+class SeminarRoomPhoneDefaultTests(unittest.TestCase):
+    def test_club_phone_default_has_no_hardcoded_number(self):
+        source = (ROOT / 'seminar_rooms.py').read_text(encoding='utf-8')
+        line = next(ln for ln in source.splitlines() if 'CLUB_PHONE =' in ln)
+        self.assertIn("os.environ.get('SEMINAR_CLUB_PHONE', '')", line)
+        self.assertIn('.strip()', line)
+        self.assertNotRegex(line, r'\d{2,4}-\d{3,4}-\d{4}')
+
+    def test_post_content_handles_empty_phone_cleanly(self):
+        content = generate_post_content(phone='')
+        self.assertIn('일시:', content)
+        self.assertIn('목적:', content)
+        self.assertIn('대표자번호:', content)
 
 
 if __name__ == '__main__':
