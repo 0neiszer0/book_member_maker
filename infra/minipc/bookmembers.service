@@ -12,7 +12,7 @@ WorkingDirectory=/opt/book_member_maker
 EnvironmentFile=/etc/book_member_maker/app.env
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=REQUIRE_ORIGIN_AUTH=true
-ExecStart=/opt/book_member_maker/.venv/bin/gunicorn --worker-class gthread --workers 1 --threads 4 --timeout 120 --bind 127.0.0.1:5000 --error-logfile - app:app
+ExecStart=/opt/book_member_maker/.venv/bin/gunicorn --no-control-socket --worker-class gthread --workers 1 --threads 4 --timeout 120 --bind 127.0.0.1:5000 --error-logfile - app:app
 Restart=on-failure
 RestartSec=10
 NoNewPrivileges=true
