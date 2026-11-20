@@ -5170,162 +5170,6 @@ def delete_genre(genre_id):
 
 
 # ============================================================================
-# 스페셜 이벤트 (MT, 워크숍, 강연 등 1회성 행사)
-# ============================================================================
-
-@app.route('/admin/special_events')
-@login_required(role="admin")
-def admin_special_events():
-    """관리자: 스페셜 이벤트 목록 + 생성/관리 페이지"""
-    try:
-        events = supabase.table('special_events').select('*') \
-            .order('event_date', desc=True).execute().data or []
-        event_ids = [evt['id'] for evt in events]
-        attendee_counts = {}
-        if event_ids:
-            attendee_rows = supabase.table('special_event_attendees') \
-                .select('event_id').in_('event_id', event_ids).execute().data or []
-            for attendee in attendee_rows:
-                event_id = attendee.get('event_id')
-                attendee_counts[event_id] = attendee_counts.get(event_id, 0) + 1
-        for evt in events:
-            evt['attendee_count'] = attendee_counts.get(evt['id'], 0)
-        terms = supabase.table('seminar_terms').select('id, name, start_date, end_date') \
-            .order('start_date', desc=True).execute().data or []
-        return render_template('admin_special_events.html', events=events, terms=terms)
-    except Exception as e:
-        app.logger.error(f"admin_special_events error: {e}")
-        flash("스페셜 이벤트 페이지 로드 중 오류.", "danger")
-        return redirect(url_for('admin_dashboard'))
-
-
-@app.route('/admin/special_events/<event_id>')
-@login_required(role="admin")
-def admin_special_event_detail(event_id):
-    """관리자: 단일 이벤트 상세 + 참석자 관리"""
-    try:
-        evt = supabase.table('special_events').select('*').eq('id', event_id).single().execute().data
-        if not evt:
-            flash("이벤트를 찾을 수 없습니다.", "danger")
-            return redirect(url_for('admin_special_events'))
-        attendees = supabase.table('special_event_attendees') \
-            .select('id, member_id, role, note, members(id, name, student_id, department)') \
-            .eq('event_id', event_id).order('created_at').execute().data or []
-        # Actual event attendance can include returning or previously dormant members.
-        all_members = supabase.table('members').select('id, name, student_id, department').order('name').execute().data or []
-        attendee_ids = {a['member_id'] for a in attendees}
-        candidates = [m for m in all_members if m['id'] not in attendee_ids]
-        return render_template('admin_special_event_detail.html',
-                               event=evt, attendees=attendees, candidates=candidates)
-    except Exception as e:
-        app.logger.error(f"admin_special_event_detail error: {e}")
-        flash("이벤트 상세 로드 중 오류.", "danger")
-        return redirect(url_for('admin_special_events'))
-
-
-@app.route('/api/admin/special_events/create', methods=['POST'])
-@login_required(role="admin")
-def create_special_event():
-    try:
-        data = request.json or {}
-        name = (data.get('name') or '').strip()
-        event_date = data.get('event_date')
-        if not name or not event_date:
-            return jsonify({'error': '이름과 날짜는 필수입니다.'}), 400
-        payload = {
-            'name': name,
-            'description': (data.get('description') or '').strip() or None,
-            'event_date': event_date,
-            'end_date': data.get('end_date') or None,
-            'category': (data.get('category') or 'event'),
-            'term_id': data.get('term_id') or None,
-            'created_by': session.get('user_id'),
-        }
-        res = supabase.table('special_events').insert(payload).execute()
-        return jsonify({'status': 'success', 'event': res.data[0]})
-    except Exception as e:
-        app.logger.error(f"create_special_event error: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/admin/special_events/<event_id>/update', methods=['POST'])
-@login_required(role="admin")
-def update_special_event(event_id):
-    try:
-        data = request.json or {}
-        update = {}
-        for k in ('name', 'description', 'event_date', 'end_date', 'category', 'term_id'):
-            if k in data:
-                update[k] = data[k] if data[k] != '' else None
-        if 'is_active' in data:
-            update['is_active'] = bool(data['is_active'])
-        if not update:
-            return jsonify({'error': '수정할 내용이 없습니다.'}), 400
-        supabase.table('special_events').update(update).eq('id', event_id).execute()
-        return jsonify({'status': 'success'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/admin/special_events/<event_id>/toggle_active', methods=['POST'])
-@login_required(role="admin")
-def toggle_special_event(event_id):
-    try:
-        cur = supabase.table('special_events').select('is_active').eq('id', event_id).single().execute().data
-        if not cur:
-            return jsonify({'error': '이벤트를 찾을 수 없습니다.'}), 404
-        new_state = not bool(cur.get('is_active'))
-        supabase.table('special_events').update({'is_active': new_state}).eq('id', event_id).execute()
-        return jsonify({'status': 'success', 'is_active': new_state})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/admin/special_events/<event_id>/delete', methods=['POST'])
-@login_required(role="admin")
-def delete_special_event(event_id):
-    try:
-        # cascade로 참석자도 함께 삭제됨
-        supabase.table('special_events').delete().eq('id', event_id).execute()
-        return jsonify({'status': 'success'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/admin/special_events/<event_id>/attendees/add', methods=['POST'])
-@login_required(role="admin")
-def add_special_event_attendee(event_id):
-    try:
-        data = request.json or {}
-        member_ids = data.get('member_ids') or []
-        if isinstance(member_ids, (int, str)):
-            member_ids = [member_ids]
-        if not member_ids:
-            return jsonify({'error': '추가할 회원을 선택하세요.'}), 400
-        rows = [{'event_id': event_id, 'member_id': int(mid),
-                 'role': data.get('role', 'attendee'),
-                 'note': (data.get('note') or '').strip() or None}
-                for mid in member_ids]
-        # ON CONFLICT DO NOTHING 동작 — 이미 등록된 멤버는 스킵
-        supabase.table('special_event_attendees').upsert(rows, on_conflict='event_id,member_id').execute()
-        return jsonify({'status': 'success', 'added': len(rows)})
-    except Exception as e:
-        app.logger.error(f"add_special_event_attendee error: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/admin/special_events/<event_id>/attendees/<int:member_id>/remove', methods=['POST'])
-@login_required(role="admin")
-def remove_special_event_attendee(event_id, member_id):
-    try:
-        supabase.table('special_event_attendees').delete() \
-            .eq('event_id', event_id).eq('member_id', member_id).execute()
-        return jsonify({'status': 'success'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-# ============================================================================
 # 출석 매트릭스 (관리자 도구)
 # 가로축: 확정된 세미나 회차 날짜, 세로축: 회원, 셀: O/X
 # 데이터 소스: history (확정된 세미나 진행 기록의 present 명단)
@@ -5753,23 +5597,6 @@ def update_bug_report(report_id):
         return jsonify({'status': 'error', 'message': '처리 상태 저장 중 오류가 발생했습니다.'}), 500
 
 
-# --- 기록 허브 ---
-@app.route('/records')
-@login_required(role="admin")
-def records_hub():
-    try:
-        seminar_count = supabase.table('history').select('id', count='exact').execute().count or 0
-        bb_count = supabase.table('brick_books').select('id', count='exact').execute().count or 0
-        sg_count = supabase.table('study_groups').select('id', count='exact').execute().count or 0
-        member_count = supabase.table('members').select('id', count='exact').eq('is_active', True).execute().count or 0
-    except Exception as e:
-        app.logger.warning(f"records_hub count error: {e}")
-        seminar_count = bb_count = sg_count = member_count = 0
-    return render_template('records_hub.html',
-                           seminar_count=seminar_count, brick_book_count=bb_count,
-                           study_group_count=sg_count, member_count=member_count)
-
-
 # --- 회원 관리 ---
 @app.route('/admin/members')
 @login_required(role="admin")
@@ -5871,100 +5698,6 @@ def records_member_profile(member_id):
         app.logger.error(f"records_member_profile error: {e}", exc_info=True)
         flash(f"프로필 로딩 오류: {e}", 'danger')
         return redirect(url_for('records_hub'))
-
-
-# --- 세미나 ---
-@app.route('/records/seminars')
-@login_required(role="admin")
-def records_seminars():
-    term_id = request.args.get('term_id') or ''
-    page = max(1, request.args.get('page', 1, type=int))
-    page_size = 100
-    try:
-        q = supabase.table('history').select('*', count='exact').order('date', desc=True)
-        start, end, _ = _get_term_range(term_id)
-        if start and end:
-            q = q.gte('date', start).lte('date', end)
-        history_response = q.range((page - 1) * page_size, page * page_size - 1).execute()
-        history = history_response.data or []
-        total_history = history_response.count if history_response.count is not None else len(history)
-        total_pages = max(1, math.ceil(total_history / page_size))
-        for row in history:
-            groups = row.get('groups') or []
-            present = []
-            for g in groups:
-                if isinstance(g, list):
-                    present.extend(g)
-                elif isinstance(g, str):
-                    present.append(g)
-            row['present_count'] = len(present)
-            row['group_count'] = len(groups) if groups and isinstance(groups[0], list) else 0
-            row['facilitator_count'] = len(row.get('facilitators') or [])
-
-        # 6개월 단위 버킷 그룹화 (예: "2025년 상반기", "2025년 하반기")
-        buckets = []  # [{'key': str, 'label': str, 'rows': [..]}]
-        seen = {}
-        for row in history:
-            try:
-                d = date.fromisoformat(row['date'])
-                from lms_learning import academic_period
-                key, label = academic_period(d)
-            except Exception:
-                key, label = 'unknown', '날짜 미상'
-            if key not in seen:
-                seen[key] = {'key': key, 'label': label, 'rows': []}
-                buckets.append(seen[key])
-            seen[key]['rows'].append(row)
-        # history는 이미 date desc 정렬이므로 buckets도 자연스럽게 최신순
-        genres = _load_genres()
-        terms = _get_terms_for_filter()
-    except Exception as e:
-        app.logger.error(f"records_seminars error: {e}", exc_info=True)
-        flash(f"오류: {e}", 'danger')
-        history, genres, terms, buckets = [], [], [], []
-        total_history, total_pages = 0, 1
-    return render_template('records_seminars.html', history=history, genres=genres,
-                           terms=terms, selected_term_id=term_id, buckets=buckets,
-                           page=page, total_pages=total_pages, total_history=total_history)
-
-
-@app.route('/records/seminars/<history_id>')
-@login_required(role="admin")
-def records_seminar_detail(history_id):
-    try:
-        row = supabase.table('history').select('*').eq('id', history_id).single().execute().data
-        groups = row.get('groups') or []
-        all_present = []
-        for g in groups:
-            if isinstance(g, list):
-                all_present.extend(g)
-            elif isinstance(g, str):
-                all_present.append(g)
-        member_map = {}
-        if all_present:
-            mres = supabase.table('members').select('id, name, gender').in_('name', list(set(all_present))).execute().data or []
-            member_map = {m['name']: m['id'] for m in mres}
-        else:
-            mres = []
-        member_genders = {m['name']: normalize_gender(m.get('gender')) for m in mres}
-        genres = _load_genres()
-        all_members = supabase.table('members').select('id, name, gender') \
-            .eq('is_active', True).order('name').execute().data or []
-        for member in all_members:
-            member['gender_code'] = normalize_gender(member.get('gender'))
-            member_genders.setdefault(member['name'], member['gender_code'])
-        meeting_history = _meeting_details_from_history(
-            _effective_group_history_rows(), before_date=row.get('date'), exclude_history_id=history_id
-        )
-        return render_template('records_seminar_detail.html',
-                               row=row, groups=groups, member_map=member_map,
-                               genres=genres, total_present=len(all_present),
-                               all_members=all_members, member_genders=member_genders,
-                               meeting_history=meeting_history)
-    except Exception as e:
-        app.logger.error(f"records_seminar_detail error: {e}", exc_info=True)
-        flash(f"오류: {e}", 'danger')
-        return redirect(url_for('records_seminars'))
 
 
 @app.route('/api/admin/history/<history_id>/update_meta', methods=['POST'])
@@ -6360,103 +6093,6 @@ def admin_rebuild_bookclub_matrix():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
-# --- 통계 ---
-@app.route('/records/analytics')
-@login_required(role="admin")
-def records_analytics():
-    term_id = request.args.get('term_id') or ''
-    try:
-        start, end, _ = _get_term_range(term_id)
-        hq = supabase.table('history').select('id, date, genre, present, book_title')
-        if start and end:
-            hq = hq.gte('date', start).lte('date', end)
-        history = hq.order('date').execute().data or []
-        genre_counts, monthly_counts = {}, {}
-        for row in history:
-            g = row.get('genre') or '미분류'
-            genre_counts[g] = genre_counts.get(g, 0) + 1
-            d = row.get('date')
-            if d:
-                ym = str(d)[:7]
-                monthly_counts[ym] = monthly_counts.get(ym, 0) + 1
-
-        attendance_members, attendance_sessions, attendance_matrix = _build_attendance_matrix(start, end)
-        attendance_counts = {
-            member['id']: sum(
-                1 for session_item in attendance_sessions
-                if attendance_matrix.get(member['id'], {}).get(session_item['key'])
-            )
-            for member in attendance_members
-        }
-        visible_attendance_members = [
-            member for member in attendance_members
-            if member.get('is_active') or attendance_counts.get(member['id'], 0) > 0
-        ]
-        # Ranking also uses confirmed actual attendance, never the saved group plan.
-        top_attendees = sorted(
-            [(member['name'], attendance_counts.get(member['id'], 0)) for member in attendance_members
-             if attendance_counts.get(member['id'], 0) > 0],
-            key=lambda item: (-item[1], item[0]),
-        )[:15]
-
-        # 벽돌책/소모임 월별 세션 카운트 (학기 필터 적용)
-        bb_monthly, sg_monthly = {}, {}
-        try:
-            bbq = supabase.table('brick_book_sessions').select('meeting_date')
-            if start and end:
-                bbq = bbq.gte('meeting_date', start).lte('meeting_date', end)
-            bb_sess = bbq.execute().data or []
-            for s in bb_sess:
-                ym = str(s.get('meeting_date') or '')[:7]
-                if ym: bb_monthly[ym] = bb_monthly.get(ym, 0) + 1
-        except Exception: pass
-        try:
-            sgq = supabase.table('study_group_sessions').select('meeting_date')
-            if start and end:
-                sgq = sgq.gte('meeting_date', start).lte('meeting_date', end)
-            sg_sess = sgq.execute().data or []
-            for s in sg_sess:
-                ym = str(s.get('meeting_date') or '')[:7]
-                if ym: sg_monthly[ym] = sg_monthly.get(ym, 0) + 1
-        except Exception: pass
-
-        # 벽돌책/소모임 카운트: 학기 내 세션이 있는 것만
-        if start and end:
-            bb_count = len({s.get('brick_book_id') for s in (supabase.table('brick_book_sessions')
-                .select('brick_book_id, meeting_date').gte('meeting_date', start).lte('meeting_date', end)
-                .execute().data or [])})
-            sg_count = len({s.get('study_group_id') for s in (supabase.table('study_group_sessions')
-                .select('study_group_id, meeting_date').gte('meeting_date', start).lte('meeting_date', end)
-                .execute().data or [])})
-        else:
-            bb_count = supabase.table('brick_books').select('id', count='exact').execute().count or 0
-            sg_count = supabase.table('study_groups').select('id', count='exact').execute().count or 0
-
-        terms = _get_terms_for_filter()
-        return render_template('records_analytics.html',
-                               total_seminars=len(history),
-                               total_brick_books=bb_count,
-                               total_study_groups=sg_count,
-                               genre_counts=genre_counts,
-                               monthly_counts=dict(sorted(monthly_counts.items())),
-                               bb_monthly=dict(sorted(bb_monthly.items())),
-                               sg_monthly=dict(sorted(sg_monthly.items())),
-                               top_attendees=top_attendees,
-                               attendance_members=visible_attendance_members,
-                               attendance_sessions=attendance_sessions,
-                               attendance_matrix=attendance_matrix,
-                               attendance_counts=attendance_counts,
-                               attendance_start_date=start or '',
-                               attendance_end_date=end or '',
-                               terms=terms, selected_term_id=term_id)
-    except Exception as e:
-        app.logger.error(f"records_analytics error: {e}", exc_info=True)
-        flash(f"오류: {e}", 'danger')
-        return redirect(url_for('records_hub'))
-
-
-
-
 # 게시판은 별도 모듈에 두되 기존 Flask 세션/Supabase 클라이언트를 그대로 공유한다.
 from boards import init_board_routes
 init_board_routes(app, supabase, login_required)
@@ -6476,6 +6112,12 @@ from term_membership_routes import init_term_membership_routes
 init_term_membership_routes(app, lambda: supabase, login_required, create_member, seminar_term_create)
 from records_activity_routes import init_records_activity_routes
 init_records_activity_routes(app, lambda: supabase, login_required, _get_term_range, _get_terms_for_filter)
+from special_events_routes import init_special_events_routes
+init_special_events_routes(app, lambda: supabase, login_required, _get_terms_for_filter)
+from records_analytics_routes import init_records_analytics_routes
+init_records_analytics_routes(app, lambda: supabase, login_required, _get_term_range, _get_terms_for_filter,
+                               _load_genres, normalize_gender, _meeting_details_from_history,
+                               _effective_group_history_rows, _build_attendance_matrix)
 
 
 # ==============================================================================
