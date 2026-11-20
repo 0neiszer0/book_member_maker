@@ -1,29 +1,22 @@
 {% extends 'auth_base.html' %}
 {% block title %}로그인 · 책 먹는 호반우{% endblock %}
+{% block head %}
+{{ super() }}
+<style>
+  .auth-migration-notice { margin: 0 0 16px; padding: 10px 12px; border: 1px solid #c7cdd1; background: #f5f5f5; font-size: 13px; line-height: 19px; }
+  .auth-email-actions { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 14px; line-height: 21px; }
+  .lms-page .auth-email-actions button { border: 0; padding: 0; background: none; color: inherit; text-decoration: underline; cursor: pointer; }
+</style>
+{% endblock %}
 {% block content %}
 <section class="auth-card">
-  <h1 class="auth-title">로그인</h1>
-  {% set section = auth_section or ('email' if request.args.get('mode') in ('email', 'pin_reset') else 'pin') %}
   {% set purpose = email_purpose or ('pin_reset' if request.args.get('mode') == 'pin_reset' else 'login') %}
-  <details id="pin-login" class="auth-details" {% if section == 'pin' and not login_error %}open{% endif %}>
-    <summary>6자리 PIN 로그인</summary>
-    <form class="auth-form" method="post" action="{{ url_for('login_pin') }}">
-      <input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
-      <input type="hidden" name="next" value="{{ next_url or '' }}">
-      <label class="auth-label">학교 메일(@knu.ac.kr) 또는 학번
-        <input class="auth-input" name="identifier" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="254" value="{{ pin_identifier or '' }}" required>
-      </label>
-      <label class="auth-label">PIN
-        <input class="auth-input" name="pin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="6" pattern="[0-9]{6}" required>
-      </label>
-      {% if pin_error %}<p class="auth-error" role="alert">{{ pin_error }}</p>{% endif %}
-      <button class="auth-btn auth-btn-primary" type="submit">PIN으로 로그인</button>
-    </form>
-    <p class="auth-help"><a href="{{ url_for('login', mode='pin_reset', next=next_url or None) }}#school-email">PIN을 잊으셨나요? 학교 메일로 재설정</a></p>
-  </details>
-
-  <details id="school-email" class="auth-details" {% if section == 'email' %}open{% endif %}>
-    <summary>학교 메일(@knu.ac.kr) 인증{% if purpose == 'pin_reset' %} · PIN 재설정{% endif %}</summary>
+  <p class="auth-migration-notice">
+    카카오·기존 아이디 로그인은 <strong>경북대 학교 메일(@knu.ac.kr)</strong>로 통합됐어요.
+    기존 회원은 첫 인증 후 이름과 학번을 확인하면 활동 기록이 이어져요.
+  </p>
+  <section id="school-email" aria-labelledby="school-email-title">
+    <h1 id="school-email-title" class="auth-title">{{ 'PIN 재설정' if purpose == 'pin_reset' else '경북대 학교 메일(@knu.ac.kr) 로그인 · 가입' }}</h1>
     {% if email_error %}<p class="auth-error" role="alert">{{ email_error }}</p>{% endif %}
     {% if email_sent %}
     <form class="auth-form" method="post" action="{{ url_for('email_auth_verify') }}">
@@ -31,50 +24,66 @@
       <input type="hidden" name="next" value="{{ next_url or '' }}">
       <p class="auth-help"><strong>{{ email }}</strong>에 보낸 인증코드는 10분간 사용할 수 있어요.</p>
       <label class="auth-label">인증코드
-        <input class="auth-input" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required autofocus>
+        <input class="auth-input" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="예: 123456" required autofocus>
       </label>
       <button class="auth-btn auth-btn-primary" type="submit">인증코드 확인</button>
     </form>
-    {% endif %}
+    <form class="auth-form" method="post" action="{{ url_for('email_auth_request') }}">
+      <input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
+      <input type="hidden" name="next" value="{{ next_url or '' }}">
+      <input type="hidden" name="purpose" value="{{ purpose }}">
+      <input type="hidden" name="email" value="{{ email }}">
+      <div class="auth-email-actions">
+        <button type="submit">인증코드 다시 받기</button>
+        <a href="{{ url_for('login', mode='pin_reset' if purpose == 'pin_reset' else 'email', next=next_url or None) }}#school-email">다른 메일 사용</a>
+      </div>
+    </form>
+    {% else %}
+    <p id="school-email-help" class="auth-help">{{ '경북대 웹메일(@knu.ac.kr)로 6자리 인증코드를 받아 PIN을 재설정합니다.' if purpose == 'pin_reset' else '경북대 웹메일(@knu.ac.kr)로 6자리 인증코드를 받아 로그인·가입합니다.' }}</p>
     <form class="auth-form" method="post" action="{{ url_for('email_auth_request') }}">
       <input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
       <input type="hidden" name="next" value="{{ next_url or '' }}">
       <input type="hidden" name="purpose" value="{{ purpose }}">
       <label class="auth-label">학교 메일(@knu.ac.kr)
-        <input class="auth-input" name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254" value="{{ email or '' }}" required>
+        <input class="auth-input" name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254" value="{{ email or '' }}" placeholder="예: hobanu@knu.ac.kr" aria-describedby="school-email-help" required>
       </label>
-      <button class="auth-btn{% if not email_sent %} auth-btn-primary{% endif %}" type="submit">{{ '인증코드 다시 받기' if email_sent else '인증코드 받기' }}</button>
+      <button class="auth-btn auth-btn-primary" type="submit">인증코드 받기</button>
     </form>
+    {% endif %}
+  </section>
+
+  <details id="pin-login" class="auth-details"{% if auth_section == 'pin' or pin_error %} open{% endif %}>
+    <summary>이미 설정한 6자리 PIN으로 빠른 로그인</summary>
+    <form class="auth-form" method="post" action="{{ url_for('login_pin') }}">
+      <input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
+      <input type="hidden" name="next" value="{{ next_url or '' }}">
+      <label class="auth-label">학교 메일(@knu.ac.kr) 또는 학번
+        <input class="auth-input" name="identifier" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="254" value="{{ pin_identifier or '' }}" placeholder="예: hobanu@knu.ac.kr 또는 2026123456" required>
+      </label>
+      <label class="auth-label">PIN
+        <input class="auth-input" name="pin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="6" pattern="[0-9]{6}" placeholder="숫자 6자리" required>
+      </label>
+      {% if pin_error %}<p class="auth-error" role="alert">{{ pin_error }}</p>{% endif %}
+      <button class="auth-btn auth-btn-primary" type="submit">PIN으로 로그인</button>
+    </form>
+    <p class="auth-help"><a href="{{ url_for('login', mode='pin_reset', next=next_url or None) }}#school-email">PIN을 잊으셨나요? 학교 메일로 재설정</a></p>
   </details>
 
-  <details class="auth-details" {% if login_error %}open{% endif %}>
+  {% if request.args.get('legacy') == '1' or login_error %}
+  <details class="auth-details" open>
     <summary>기존 아이디·비밀번호 로그인</summary>
-  <form class="auth-form" method="post" action="{{ url_for('login_password') }}">
-    <input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
-    <input type="hidden" name="next" value="{{ next_url or '' }}">
-    <label class="auth-label">아이디<input class="auth-input" name="login_id" autocomplete="username" autocapitalize="none" spellcheck="false" required value="{{ login_id or '' }}"></label>
-    <label class="auth-label">비밀번호<input class="auth-input" type="password" name="password" autocomplete="current-password" required></label>
-    <label style="display:flex;gap:10px;align-items:center"><input type="checkbox" name="remember" value="1" checked style="width:20px;height:20px">로그인 상태 유지 <span class="auth-help">마지막 접속 후 30일. 공용 기기에서는 해제하세요.</span></label>
-    {% if login_error %}<p class="auth-error" role="alert">{{ login_error }}</p>{% endif %}
-    <button class="auth-btn auth-btn-primary" type="submit">로그인</button>
-  </form>
-  <p class="auth-help" style="margin-top:12px">아이디나 비밀번호를 잊었다면 운영진에게 재설정 링크를 요청해주세요.</p>
+    <form class="auth-form" method="post" action="{{ url_for('login_password') }}">
+      <input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
+      <input type="hidden" name="next" value="{{ next_url or '' }}">
+      <label class="auth-label">아이디<input class="auth-input" name="login_id" autocomplete="username" autocapitalize="none" spellcheck="false" required value="{{ login_id or '' }}"></label>
+      <label class="auth-label">비밀번호<input class="auth-input" type="password" name="password" autocomplete="current-password" required></label>
+      <label style="display:flex;gap:10px;align-items:center"><input type="checkbox" name="remember" value="1" checked style="width:20px;height:20px">로그인 상태 유지 <span class="auth-help">마지막 접속 후 30일. 공용 기기에서는 해제하세요.</span></label>
+      {% if login_error %}<p class="auth-error" role="alert">{{ login_error }}</p>{% endif %}
+      <button class="auth-btn auth-btn-primary" type="submit">로그인</button>
+    </form>
+    <p class="auth-help" style="margin-top:12px">아이디나 비밀번호를 잊었다면 운영진에게 재설정 링크를 요청해주세요.</p>
   </details>
-
-  <div class="auth-callout">
-    <strong>처음 오셨나요?</strong>
-    <p>학교 메일로 기존 명부와 연결하거나 신규 가입을 신청할 수 있습니다.</p>
-    <a class="auth-btn" href="{{ url_for('signup', next=next_url or None) }}">회원가입</a>
-  </div>
-
-  <details class="auth-details">
-    <summary>카카오로 로그인하던 기존 회원 (기존 회원 전환용)</summary>
-    <p class="auth-help" style="margin:8px 0 12px">카카오로 한 번 로그인한 뒤 아이디·비밀번호를 만들면, 다음부터는 아이디로 로그인합니다. 활동 기록은 그대로 이어집니다.</p>
-    <a class="auth-btn auth-btn-kakao" href="{{ url_for('kakao_login', mode='login', next=url_for('account_convert')) }}">
-      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5c-5.25 0-9.5 3.4-9.5 7.6 0 2.7 1.77 5.08 4.43 6.43l-.9 3.31a.55.55 0 0 0 .82.61l3.9-2.58c.4.05.83.08 1.25.08 5.25 0 9.5-3.4 9.5-7.6S17.25 3.5 12 3.5Z" fill="currentColor"/></svg>
-      카카오로 로그인하고 전환하기
-    </a>
-  </details>
+  {% endif %}
 </section>
 <a class="auth-back" href="{{ url_for('main_index') }}">홈으로 돌아가기</a>
 {% endblock %}

@@ -16,8 +16,8 @@ class CurrentUiContractsTest(unittest.TestCase):
         self.assertIn("{% extends 'auth_base.html' %}", identity)
         self.assertNotIn("eva-", login.lower())
         self.assertNotIn("eva-", identity.lower())
-        self.assertIn("카카오로 로그인", login)
-        self.assertIn("회원가입", login)
+        self.assertIn('id="school-email"', login)
+        self.assertIn("경북대 학교 메일(@knu.ac.kr) 로그인 · 가입", login)
 
     def test_unlinked_kakao_flow_leads_with_signup(self):
         identity = self.read("templates/link_account.html")

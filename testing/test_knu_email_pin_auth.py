@@ -38,12 +38,16 @@ class EmailTestDB(legacy.IdFakeSupabase):
             return {"result": "conflict"}
         if same_id:
             target = same_id[0]
+            credential = next((c for c in self.rows["member_credentials"] if c["member_id"] == target["id"]), None)
             if len(same_id) != 1 or target["name"].strip() != p_name or target["role"] != "member" \
                     or target["account_status"] != "active" or not target["is_active"] \
                     or target["member_status"] in ("inactive", "blocked", "pending") or target.get("knu_email") \
-                    or any(c["member_id"] == target["id"] for c in self.rows["member_credentials"]):
+                    or str(target.get("social_id") or "").startswith("system:") \
+                    or any(o["member_id"] == target["id"] for o in self.rows["term_officers"]) \
+                    or ((credential or target.get("auth_provider") == "local")
+                        and (credential or {}).get("status") != "active"):
                 return {"result": "conflict"}
-            target.update(fields, student_id=p_student_id)
+            target.update(fields, student_id=p_student_id, auth_session_version=target["auth_session_version"] + 1)
         else:
             if not p_department:
                 return {"result": "department"}
@@ -159,6 +163,27 @@ class KnuEmailPinTests(unittest.TestCase):
             session["email_challenge"] = challenge
         self.assertEqual(self.verify(client=replay).status_code, 400)
 
+    def test_code_entry_comes_before_resend_and_pin(self):
+        html = self.send().get_data(as_text=True)
+        self.assertIn('placeholder="예: 123456"', html)
+        self.assertIn('name="email" value="student@knu.ac.kr"', html)
+        self.assertNotIn('name="email" type="email"', html)
+        self.assertLess(html.index('action="/auth/email/verify"'), html.index("인증코드 다시 받기"))
+        self.assertLess(html.index("인증코드 다시 받기"), html.index('id="pin-login"'))
+        self.assertIn('<details id="pin-login" class="auth-details">', html)
+        reset = self.client.get("/login?mode=pin_reset").get_data(as_text=True)
+        self.assertIn('class="auth-title">PIN 재설정</h1>', reset)
+        self.assertIn('name="purpose" value="pin_reset"', reset)
+        failed_pin = self.pin().get_data(as_text=True)
+        self.assertIn('<details id="pin-login" class="auth-details" open>', failed_pin)
+
+    def test_signup_with_verified_grant_redirects_to_enrollment(self):
+        self.send()
+        self.verify()
+        response = self.client.get("/signup")
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.location, "/auth/email/enroll")
+
     def test_expiry_wrong_code_limit_and_rate_limit(self):
         self.linked(pin="123456")
         self.assertEqual(self.send().status_code, 200)
@@ -212,10 +237,31 @@ class KnuEmailPinTests(unittest.TestCase):
             self.assertEqual(self.enroll(name=member["name"], student_id=member["student_id"]).status_code, 409)
             self.assertIsNone(member.get("knu_email"))
         self.member(3).update(member_status="active", is_active=True)
-        self.db.rows["member_credentials"].append(dict(member_id=3, login_id="legacy_user", status="active"))
+        self.db.rows["member_credentials"].append(dict(member_id=3, login_id="legacy_user", status="pending"))
         self.assertEqual(self.enroll(name="이명부", student_id="2022000003").status_code, 409)
         self.assertEqual(self.enroll(name="다른이름", student_id="2022000003").status_code, 409)
         self.assertEqual(len(self.db.rows["members"]), 5)
+
+    def test_active_legacy_login_links_school_email_and_revokes_previous_session(self):
+        self.member(3).update(auth_provider="local", auth_session_version=2)
+        self.db.rows["member_credentials"].append(
+            dict(member_id=3, login_id="legacy_user", status="active", password_hash=local_auth.hash_password(legacy.GOOD_PW))
+        )
+        old = self.app.test_client()
+        response = self.form("/login/password", old, login_id="legacy_user", password=legacy.GOOD_PW, remember="1")
+        self.assertEqual(response.status_code, 302)
+        self.assert_session(3, old)
+
+        self.send()
+        self.verify()
+        self.assertEqual(self.enroll(name="이명부", student_id="2022000003", pin="123456").location, "/mypage")
+        self.assert_session(3)
+        self.assertEqual(self.member(3)["knu_email"], "student@knu.ac.kr")
+        self.assertEqual(self.member(3)["auth_session_version"], 3)
+        self.assertEqual(len(self.db.rows["members"]), 5)
+        self.assertEqual(old.get("/mypage").status_code, 302)
+        with old.session_transaction() as session:
+            self.assertNotIn("user_id", session)
 
     def test_pin_lock_reset_revokes_old_sessions_and_restores_login(self):
         self.linked(pin="123456")
@@ -413,9 +459,15 @@ const value = async (query, params) => (await db.query(query, params)).rows[0].v
   const migration = sql('20261120120000_knu_email_pin_auth.sql');
   await db.exec(migration);
   await db.exec(migration);
+  const legacyLink = sql('20261121010000_allow_legacy_local_email_link.sql');
+  await db.exec(legacyLink);
+  await db.exec(legacyLink);
   assert.equal(await value("select has_table_privilege('anon','email_auth_codes','select') as value"), false);
   assert.equal(await value("select has_function_privilege('authenticated','decide_local_signup(bigint,bigint,boolean)','execute') as value"), false);
   assert.equal(await value("select has_function_privilege('service_role','decide_local_signup(bigint,bigint,boolean)','execute') as value"), true);
+  for (const [role, allowed] of [['anon', false], ['authenticated', false], ['service_role', true]]) {
+    assert.equal(await value("select has_function_privilege($1,'complete_email_signup(uuid,text,text,text,text,text,text)','execute') as value", [role]), allowed);
+  }
   await db.exec("insert into seminar_terms (name,start_date,end_date,is_active,roster_initialized_at) values ('Test', current_date - 1, current_date + 1, true, now())");
   await db.exec("insert into members (id,name,student_id,role,account_status) values (101,'Officer','2026123001','officer','active'), (102,'Roster','2026 123002','member','active')");
   await assert.rejects(db.exec("update members set knu_email='a@other.test' where id=102"), { code: '23514' });
@@ -441,6 +493,50 @@ const value = async (query, params) => (await db.query(query, params)).rows[0].v
   const officer = '20000000-0000-0000-0000-000000000002';
   await proof(officer, 'officer@knu.ac.kr');
   assert.equal((await enroll(officer, 'officer@knu.ac.kr', 'Officer', '2026123001', '', '')).result, 'conflict');
+
+  await db.exec(`
+    insert into members (id,name,student_id,role,auth_provider,account_status,auth_session_version,social_id) values
+      (104,'Legacy','2026123006','member','local','active',4,'converted'),
+      (105,'Kakao','2026123007','member','kakao','active',2,'kakao_user'),
+      (106,'Admin','2026123008','admin','local','active',0,null),
+      (107,'Assignment','2026123009','member','local','active',0,null),
+      (108,'Pending credential','2026123010','member','kakao','active',0,'pending_user'),
+      (109,'System','2026123011','member','kakao','active',0,'system:test'),
+      (110,'Blocked','2026123012','member','local','active',0,null);
+    update members set member_status='blocked' where id=110;
+    insert into member_credentials (member_id,login_id,password_hash,status) values
+      (104,'legacy_user','$argon2id$test','active'),
+      (106,'legacy_admin','$argon2id$test','active'),
+      (107,'legacy_assignment','$argon2id$test','active'),
+      (108,'legacy_pending','$argon2id$test','pending'),
+      (110,'legacy_blocked','$argon2id$test','active');
+    reset role;
+    insert into term_officers (member_id) values (107);
+    set role service_role;
+  `);
+  for (const [mid, name, sid, result] of [
+    [104, 'Legacy', '2026123006', 'active'],
+    [105, 'Kakao', '2026123007', 'active'],
+    [106, 'Admin', '2026123008', 'conflict'],
+    [107, 'Assignment', '2026123009', 'conflict'],
+    [108, 'Pending credential', '2026123010', 'conflict'],
+    [109, 'System', '2026123011', 'conflict'],
+    [110, 'Blocked', '2026123012', 'conflict'],
+    [111, 'Legacy', '2026123006', 'conflict'],
+  ]) {
+    const codeId = '30000000-0000-0000-0000-' + String(mid).padStart(12, '0');
+    const email = 'migration' + mid + '@knu.ac.kr';
+    await proof(codeId, email, 'login');
+    assert.deepEqual(await enroll(codeId, email, name, sid, '', ''),
+      result === 'active' ? { result, member_id: mid } : { result });
+  }
+  assert.deepEqual((await db.query(
+    "select auth_session_version, knu_email from members where id in (104,105) order by id"
+  )).rows, [
+    { auth_session_version: 5, knu_email: 'migration104@knu.ac.kr' },
+    { auth_session_version: 3, knu_email: 'migration105@knu.ac.kr' },
+  ]);
+  assert.equal(await value('select count(knu_email)::integer as value from members where id between 106 and 110'), 0);
   const ot = '20000000-0000-0000-0000-000000000003';
   await proof(ot, 'ot@knu.ac.kr');
   await value("select update_signup_configuration('ot_open',101,null,null,null,1) as value");

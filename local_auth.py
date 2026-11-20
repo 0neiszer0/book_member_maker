@@ -659,7 +659,10 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
         if session.get('user_id') and request.method == 'GET':
             return redirect(url_for('my_page'))
         if request.method == 'GET':
-            return signup_form()
+            if valid_email_grant('enroll'):
+                return redirect(url_for('email_auth_enroll'), code=303)
+            next_url = safe_internal_next_url(request.args.get('next'))
+            return redirect(url_for('login', mode='email', next=next_url), code=303)
         form = request.form
         values = dict(name=(form.get('name') or '').strip(),
                       student_id=normalize_member_student_id(form.get('student_id')),

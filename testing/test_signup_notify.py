@@ -145,7 +145,9 @@ class OpenSignupTests(base.LocalLoginTests):
         self.as_member(1)
 
     def test_open_mode_hides_code_field_and_accepts_signup_without_code(self):
-        html = self.client.get("/signup").get_data(as_text=True)
+        invalid = self.signup(signup_code="", login_id="x")
+        self.assertEqual(invalid.status_code, 400)
+        html = invalid.get_data(as_text=True)
         self.assertNotIn('name="signup_code"', html)
         self.assertIn('name="website"', html)
         result = self.signup(signup_code="")
@@ -180,8 +182,9 @@ class OpenSignupTests(base.LocalLoginTests):
         self.client.get("/logout")
         with self.client.session_transaction() as s:
             s.clear()
-        self.assertIn('name="signup_code"', self.client.get("/signup").get_data(as_text=True))
-        self.assertEqual(self.signup(signup_code="").status_code, 400)
+        invalid = self.signup(signup_code="")
+        self.assertEqual(invalid.status_code, 400)
+        self.assertIn('name="signup_code"', invalid.get_data(as_text=True))
         self.assertEqual(self.signup(signup_code="back2026").status_code, 200)
 
     def test_marker_cannot_be_used_as_code_and_open_mode_ends_with_term(self):

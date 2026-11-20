@@ -190,13 +190,44 @@ class LocalLoginTests(unittest.TestCase):
         return next(m for m in self.db.rows["members"] if m["id"] == mid)
 
     # tests
-    def test_login_page_is_id_password_first_with_kakao_for_conversion(self):
+    def test_login_page_shows_school_email_first_and_collapses_pin(self):
         html = self.client.get("/login").get_data(as_text=True)
-        self.assertIn('action="/login/password"', html)
+        self.assertIn("카카오·기존 아이디 로그인은", html)
+        self.assertIn("활동 기록이 이어져요", html)
+        self.assertIn('<section id="school-email"', html)
+        self.assertIn('placeholder="예: hobanu@knu.ac.kr"', html)
         self.assertIn('name="csrf_token"', html)
-        self.assertIn("기존 회원 전환용", html)
-        self.assertIn('href="/signup', html)
-        self.assertLess(html.index("/login/password"), html.index("/login/kakao"))
+        self.assertIn('<details id="pin-login" class="auth-details">', html)
+        self.assertIn("이미 설정한 6자리 PIN으로 빠른 로그인", html)
+        self.assertIn('placeholder="예: hobanu@knu.ac.kr 또는 2026123456"', html)
+        self.assertIn('placeholder="숫자 6자리"', html)
+        self.assertLess(html.index('action="/auth/email/request"'), html.index('id="pin-login"'))
+        self.assertNotIn("/login/kakao", html)
+        self.assertNotIn('action="/login/password"', html)
+        self.assertNotIn("기존 아이디·비밀번호 로그인", html)
+        self.assertNotIn("처음 오셨나요?", html)
+        self.assertNotIn('href="/signup', html)
+
+    def test_explicit_legacy_mode_and_password_errors_show_password_form(self):
+        from local_auth import GENERIC_LOGIN_ERROR
+
+        html = self.client.get("/login?legacy=1").get_data(as_text=True)
+        self.assertIn('<details class="auth-details" open>', html)
+        self.assertIn('action="/login/password"', html)
+        self.assertNotIn("/login/kakao", html)
+        self.assertNotIn('action="/login/password"', self.client.get("/login?legacy=0").get_data(as_text=True))
+        response = self.login("missing_user", "invalid-password")
+        self.assertEqual(response.status_code, 401)
+        self.assertIn('action="/login/password"', response.get_data(as_text=True))
+        self.assertIn(GENERIC_LOGIN_ERROR, response.get_data(as_text=True))
+
+    def test_direct_signup_redirects_to_school_email_and_keeps_safe_next(self):
+        response = self.client.get("/signup?next=/mypage")
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.location, "/login?mode=email&next=/mypage")
+        response = self.client.get("/signup?next=https://example.test")
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.location, "/login?mode=email")
 
     def test_signup_requires_current_code_and_waits_for_approval(self):
         self.db.rows["signup_codes"] = []
