@@ -59,6 +59,15 @@ class PolicyTests(unittest.TestCase):
 
 
 class FakeEngine:
+    _seq = 0
+
+    def __init__(self):
+        type(self)._seq += 1
+        # A unique cache key per instance keeps the /wiki/random TTL cache from
+        # leaking titles between tests that swap in different FakeEngine objects.
+        self.base_url = 'http://127.0.0.1:5096'
+        self.database = 'fake-engine-%d.db' % type(self)._seq
+
     @contextmanager
     def user(self, member_id):
         yield None
@@ -203,6 +212,32 @@ class RandomPageTests(RouteTests):
         response = self.client.get('/wiki/random')
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response.location.endswith('/wiki/w/%EB%8C%80%EB%AC%B8'), response.location)
+
+    def test_random_reuses_cached_titles_within_ttl(self):
+        self.login()
+        calls = []
+        def titles(client, query, number):
+            calls.append(number)
+            return ['문서%d' % number] if number == 1 else []
+        self.engine.titles = titles
+        with patch('wiki_routes.secrets.choice', side_effect=lambda items: items[0]):
+            self.assertEqual(self.client.get('/wiki/random').status_code, 302)
+            self.assertEqual(self.client.get('/wiki/random').status_code, 302)
+        self.assertEqual(calls, [1], 'second request must reuse the cached title list')
+
+    def test_random_cache_reapplies_per_request_filters(self):
+        self.login()
+        calls = []
+        def titles(client, query, number):
+            calls.append(number)
+            return ['공개', '운영진:비밀'] if number == 1 else []
+        self.engine.titles = titles
+        seen = []
+        with patch('wiki_routes.secrets.choice', side_effect=lambda items: (seen.append(list(items)), items[-1])[1]):
+            self.client.get('/wiki/random')   # miss: caches the raw list, officer page included
+            self.client.get('/wiki/random')   # hit: must still filter the officer page out
+        self.assertEqual(calls, [1], 'the cached title list is reused without re-calling titles')
+        self.assertEqual(seen, [['공개'], ['공개']], 'officer pages are filtered on every request')
 
     def test_random_link_is_in_wiki_sidebar(self):
         self.login()

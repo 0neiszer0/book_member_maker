@@ -31,6 +31,12 @@ jobs:
       - run: node testing/test_seminar_schedule.js
       - run: node testing/test_attendance_roster_race.js
       - run: node testing/test_term_membership.js
+      - run: node testing/test_attendance_grouped_select.js
+      - run: node testing/test_club_room.js
+      - run: node testing/test_integrated_calendar.js
+      - run: node testing/test_role_navigation.js
+      - run: node testing/test_topic_drafts.js
+      - run: node testing/test_worker_proxy.mjs
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

@@ -57,8 +57,19 @@ class OpenNamu:
 
     def provision(self, member_id):
         username, password = self.credentials(member_id)
+        expected = {'pw': sha3_256(password.encode()).hexdigest(), 'acl': self.GROUP, 'encode': 'sha3'}
         # mode=rw cannot silently create a new or accidentally empty wiki.
         with sqlite3.connect(self.database.as_uri() + '?mode=rw', uri=True, timeout=5) as db:
+            # Read-only first pass: the common already-provisioned case takes no write lock.
+            grants = {r[0] for r in db.execute('select acl from alist where name=?', (self.GROUP,))}
+            existing = dict(db.execute('select name,data from user_set where id=?', (username,)))
+            if grants and grants != self.PERMISSIONS:
+                raise EngineUnavailable('Unexpected bridge permissions')
+            if existing and any(existing.get(k) != v for k, v in expected.items()):
+                raise EngineUnavailable('Unexpected bridge account')
+            if grants == self.PERMISSIONS and existing:
+                return username, password
+            # A missing group or account needs a write: lock, then double-check before inserting.
             db.execute('begin immediate')
             grants = {r[0] for r in db.execute('select acl from alist where name=?', (self.GROUP,))}
             if grants and grants != self.PERMISSIONS:
@@ -67,7 +78,6 @@ class OpenNamu:
                 db.executemany('insert into alist(name,acl) values(?,?)',
                                [(self.GROUP, p) for p in sorted(self.PERMISSIONS)])
             existing = dict(db.execute('select name,data from user_set where id=?', (username,)))
-            expected = {'pw': sha3_256(password.encode()).hexdigest(), 'acl': self.GROUP, 'encode': 'sha3'}
             if existing:
                 if any(existing.get(k) != v for k, v in expected.items()):
                     raise EngineUnavailable('Unexpected bridge account')

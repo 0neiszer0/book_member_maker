@@ -35,7 +35,7 @@ USER_AGENT = (
 # 예약 신청 글 기본값 (env 로 덮어쓰기 가능)
 # ─────────────────────────────────────────────
 CLUB_NAME = os.environ.get('SEMINAR_CLUB_NAME', '책 먹는 호반우')
-CLUB_PHONE = os.environ.get('SEMINAR_CLUB_PHONE', '010-6509-3524')
+CLUB_PHONE = os.environ.get('SEMINAR_CLUB_PHONE', '').strip()
 SEMINAR_TIME_SLOT = os.environ.get('SEMINAR_TIME_SLOT', '19:00~21:00')
 SEMINAR_PURPOSE = os.environ.get('SEMINAR_PURPOSE', '동아리 세미나 진행')
 
@@ -410,10 +410,13 @@ def generate_post_content(time_slot: str | None = None,
                           purpose: str | None = None,
                           phone: str | None = None) -> str:
     """예약 신청 글 본문 생성 (원본 seminar_auto.py 와 동일 형식)."""
+    contact = (phone or CLUB_PHONE or '').strip()
+    if not contact:
+        contact = '(미기재)'
     return (
         f"일시: {time_slot or SEMINAR_TIME_SLOT}\n"
         f"목적: {purpose or SEMINAR_PURPOSE}\n"
-        f"대표자번호: {phone or CLUB_PHONE}"
+        f"대표자번호: {contact}"
     )
 
 

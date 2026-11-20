@@ -4,6 +4,7 @@ import hmac
 import os
 import re
 import secrets
+import threading
 import time
 from urllib.parse import unquote, urlsplit
 
@@ -91,6 +92,8 @@ def clean_wiki_html(source):
 
 
 DIFF_CONTEXT = 3
+MAX_INLINE_DIFF_CHARS = 100_000
+MAX_INLINE_LINE_CHARS = 4_000
 
 
 def _inline(old, new):
@@ -111,6 +114,7 @@ def _inline(old, new):
 def diff_rows(old_text, new_text):
     """Line rows like Namuwiki's compare view: kind in same/del/add/skip."""
     old_lines, new_lines = old_text.split('\n'), new_text.split('\n')
+    inline = len(old_text) + len(new_text) <= MAX_INLINE_DIFF_CHARS
     rows = []
     for tag, a1, a2, b1, b2 in difflib.SequenceMatcher(None, old_lines, new_lines, autojunk=False).get_opcodes():
         if tag == 'equal':
@@ -128,11 +132,18 @@ def diff_rows(old_text, new_text):
             continue
         removed, added = old_lines[a1:a2], new_lines[b1:b2]
         pairs = min(len(removed), len(added)) if tag == 'replace' else 0
-        marked = [_inline(removed[i], added[i]) for i in range(pairs)]
+        marked = []
+        for i in range(pairs):
+            if inline and len(removed[i]) <= MAX_INLINE_LINE_CHARS and len(added[i]) <= MAX_INLINE_LINE_CHARS:
+                marked.append(_inline(removed[i], added[i]))
+            else:
+                marked.append(None)
         for i, line in enumerate(removed):
-            rows.append(dict(kind='del', old=a1 + i + 1, new=None, text=marked[i][0] if i < pairs else line))
+            rows.append(dict(kind='del', old=a1 + i + 1, new=None,
+                             text=marked[i][0] if i < pairs and marked[i] is not None else line))
         for i, line in enumerate(added):
-            rows.append(dict(kind='add', old=None, new=b1 + i + 1, text=marked[i][1] if i < pairs else line))
+            rows.append(dict(kind='add', old=None, new=b1 + i + 1,
+                             text=marked[i][1] if i < pairs and marked[i] is not None else line))
     return rows
 
 
@@ -142,6 +153,11 @@ def init_wiki_routes(app, get_db):
     app.config.setdefault('WIKI_DATABASE', os.getenv('WIKI_DATABASE', ''))
     app.config.setdefault('WIKI_IDENTITY_SECRET', os.getenv('WIKI_IDENTITY_SECRET', ''))
     bp = Blueprint('wiki', __name__, url_prefix='/wiki')
+
+    # Thread-safe TTL cache for /wiki/random's raw title list. Created per
+    # init_wiki_routes call so separate app instances never share entries.
+    random_cache = {'lock': threading.Lock(), 'entries': {}}
+    RANDOM_CACHE_TTL = 300
 
     def engine():
         if 'wiki_engine' not in app.extensions:
@@ -270,13 +286,21 @@ def init_wiki_routes(app, get_db):
     def random_page():
         # Pick from titles this member may read; officer pages are never offered.
         backend = engine()
-        candidates = []
-        with backend.user(g.wiki_access.member_id) as client:
-            for number in range(1, 21):
-                batch = backend.titles(client, '', number)
-                candidates += [t if isinstance(t, str) else str(t) for t in batch]
-                if len(batch) < 50:
-                    break
+        key = (backend.base_url, str(backend.database))
+        now = time.monotonic()
+        with random_cache['lock']:
+            entry = random_cache['entries'].get(key)
+            candidates = entry[1] if entry and entry[0] > now else None
+        if candidates is None:
+            candidates = []
+            with backend.user(g.wiki_access.member_id) as client:
+                for number in range(1, 21):
+                    batch = backend.titles(client, '', number)
+                    candidates += [t if isinstance(t, str) else str(t) for t in batch]
+                    if len(batch) < 50:
+                        break
+            with random_cache['lock']:
+                random_cache['entries'][key] = (now + RANDOM_CACHE_TTL, candidates)
         candidates = [t for t in candidates
                       if t.strip() and not is_officer_title(t) and t.strip() != '대문' and can_read_title(g.wiki_access, t)]
         if not candidates:
