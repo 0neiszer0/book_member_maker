@@ -206,5 +206,19 @@ class MemberRoutesTests(unittest.TestCase):
             self.assertEqual(self.db.rows['push_subscriptions'][0]['member_id'],1)
             self.assertNotIn('private-fixture',self.client.get('/api/push/config').get_data(as_text=True))
 
+    def test_manifest_exposes_root_start_url_and_pwa_icons(self):
+        res=self.client.get('/manifest.webmanifest')
+        self.assertEqual(res.status_code,200)
+        data=res.get_json()
+        self.assertEqual(data['start_url'],'/')
+        self.assertEqual(data['scope'],'/')
+        icons={item['sizes']:item for item in data['icons']}
+        self.assertIn('192x192',icons)
+        self.assertIn('512x512',icons)
+        for size,filename in (('192x192','icon-192.png'),('512x512','icon-512.png')):
+            self.assertEqual(icons[size]['type'],'image/png')
+            self.assertEqual(icons[size]['purpose'],'any maskable')
+            self.assertIn(filename,icons[size]['src'])
+
 
 if __name__=='__main__':unittest.main()

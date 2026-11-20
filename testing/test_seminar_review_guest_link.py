@@ -195,6 +195,26 @@ class GuestSeminarReviewTests(unittest.TestCase):
         self.post(author_name="손님", student_id="2026000009", review_content="늦음")
         self.assertEqual(self.db.rows["seminar_reviews"], [])
 
+    def test_soft_deleted_guest_review_is_ignored_by_student_lookup(self):
+        self.db.rows["seminar_reviews"].append(dict(
+            id="r-del", form_id="form-1", member_id=None, identity_kind="guest",
+            author_name="손님", student_id="2026000009", memorable_point="삭제됨",
+            edit_token_hash="0" * 64, deleted_at="2026-10-30T00:00:00Z",
+        ))
+        res = self.post(author_name="손님", student_id="2026000009", review_content="새 후기")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(len(self.db.rows["seminar_reviews"]), 2)
+        self.assertEqual(self.db.rows["seminar_reviews"][1]["memorable_point"], "새 후기")
+
+    def test_form_includes_submit_guard_and_guest_done_includes_copy_button(self):
+        form_html = self.client.get(PATH).get_data(as_text=True)
+        self.assertIn("제출 중...", form_html)
+        self.assertIn("checkValidity", form_html)
+        done_html = self.post(author_name="손님", student_id="2026000009", review_content="좋았다").get_data(as_text=True)
+        self.assertIn('id="copy-review-edit-code"', done_html)
+        self.assertIn('id="copy-review-edit-status"', done_html)
+        self.assertIn("수정 코드를 복사했습니다.", done_html)
+
 
 class ReviewCredentialTests(unittest.TestCase):
     def test_review_and_topic_codes_use_separate_domains(self):
@@ -205,11 +225,12 @@ class ReviewCredentialTests(unittest.TestCase):
         self.assertFalse(topic_edit_token_matches(review_edit_token_digest("code", "k" * 32), "code", "k" * 32))
         self.assertTrue(review_edit_token_matches(review_edit_token_digest("code", "k" * 32), "code", "k" * 32))
 
-    def test_author_label_marks_guests_for_staff_only(self):
+    def test_author_label_marks_guests_for_staff_and_boards(self):
         from engagement import review_author_label
         guest = dict(member_id=None, identity_kind="guest", author_name="손님")
         self.assertEqual(review_author_label(guest), "손님")
         self.assertEqual(review_author_label(guest, staff=True), "손님 (비회원)")
+        self.assertEqual(review_author_label(guest, mark_guest=True), "손님 (비회원)")
         self.assertEqual(review_author_label(dict(member_id=1), {1: {"name": "회원1"}}, staff=True), "회원1")
 
 
@@ -236,7 +257,7 @@ class BoardLinkReviewTests(unittest.TestCase):
         with patch("boards.render_template", return_value="ok") as render:
             client.get("/board/seminar-reviews?history_id=h-1")
             labels = [r["author_label"] for r in render.call_args.kwargs["link_reviews"]]
-            self.assertEqual(labels, ["손님", "회원1"])
+            self.assertEqual(labels, ["손님 (비회원)", "회원1"])
             client.get("/board/seminar-reviews")
             self.assertEqual(render.call_args.kwargs["link_reviews"], [])
 

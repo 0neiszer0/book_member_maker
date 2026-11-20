@@ -31,13 +31,13 @@ GUEST_WINDOW_MINUTES = 15
 REVISION_PRIVATE_KEYS = {"id", "created_at", "updated_at", "deleted_at", "edit_token_hash"}
 
 
-def review_author_label(row, member_by_id=None, staff=False):
+def review_author_label(row, member_by_id=None, staff=False, mark_guest=False):
     """Display name of a link review: the member's name, or the name a guest typed."""
     member = (member_by_id or {}).get(row.get("member_id")) if row.get("member_id") is not None else None
     if member and member.get("name"):
         return member["name"]
     name = (row.get("author_name") or "").strip() or "회원"
-    return f"{name} (비회원)" if staff and row.get("identity_kind") == "guest" else name
+    return f"{name} (비회원)" if (staff or mark_guest) and row.get("identity_kind") == "guest" else name
 
 
 def _student_id(value):
@@ -181,7 +181,7 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
         if not student_id:
             return None
         rows = supabase.table("seminar_reviews").select("*").eq("form_id", form_id) \
-            .eq("student_id", student_id).limit(1).execute().data or []
+            .eq("student_id", student_id).is_("deleted_at", "null").limit(1).execute().data or []
         return rows[0] if rows else None
 
     def review_content_payload():

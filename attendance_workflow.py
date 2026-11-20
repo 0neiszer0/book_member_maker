@@ -2,7 +2,12 @@
 from collections import defaultdict
 from datetime import date
 import re
+import unicodedata
 from seminar_cycle import cycle_monday
+
+
+def normalize_member_name(name):
+    return unicodedata.normalize('NFC', str(name or '').strip())
 
 
 def confirmed_history_session_ids(histories):
@@ -20,12 +25,12 @@ def match_roster_rows(rows, members):
     """Match IDs/names exactly. Never choose the first ambiguous member."""
     by_name, by_student = defaultdict(list), defaultdict(list)
     for member in members:
-        by_name[str(member.get('name') or '').strip()].append(member)
+        by_name[normalize_member_name(member.get('name'))].append(member)
         if member.get('student_id'):
             by_student[str(member['student_id']).strip()].append(member)
     matched, issues, seen = [], [], set()
     for index, row in enumerate(rows, 1):
-        parts = [str(cell).strip() for cell in row if str(cell).strip()]
+        parts = [normalize_member_name(cell) for cell in row if normalize_member_name(cell)]
         if not parts or all(p.lower() in {'이름', '성명', '학번', 'name', 'student_id'} for p in parts):
             continue
         student_ids = [p for p in parts if re.fullmatch(r'\d{6,15}', p)]
@@ -33,7 +38,7 @@ def match_roster_rows(rows, members):
         candidates = by_student.get(student_ids[0], []) if len(student_ids) == 1 else []
         if student_ids:
             if names:
-                candidates = [m for m in candidates if str(m.get('name') or '').strip() in names]
+                candidates = [m for m in candidates if normalize_member_name(m.get('name')) in names]
         elif len(names) == 1:
             candidates = by_name.get(names[0], [])
         reason = None
@@ -55,12 +60,21 @@ def match_roster_rows(rows, members):
 def grouped_member_ids(histories, members):
     """Saved group plan names -> member ids by exact, unique name.
 
-    Returns (ids, issues). ids is None when no group plan exists. Unknown or
-    ambiguous names are reported and never guessed.
+    Prefers active (or term-scoped active) members when matching, falling back
+    to the full member list only if no active member has that name. Returns
+    (ids, issues). ids is None when no group plan exists. Unknown or ambiguous
+    names are reported and never guessed.
     """
-    by_name = defaultdict(list)
+    active_by_name = defaultdict(list)
+    all_by_name = defaultdict(list)
     for member in members:
-        by_name[str(member.get('name') or '').strip()].append(int(member['id']))
+        norm = normalize_member_name(member.get('name'))
+        if not norm:
+            continue
+        mid = int(member['id'])
+        all_by_name[norm].append(mid)
+        if member.get('is_active'):
+            active_by_name[norm].append(mid)
     ids, issues, found, seen = set(), [], False, set()
     for row in histories:
         names = row.get('present')
@@ -70,11 +84,12 @@ def grouped_member_ids(histories, members):
         if names or row.get('groups') is not None:
             found = True
         for raw in names or []:
-            name = str(raw).strip()
+            name = normalize_member_name(raw)
             if not name or name in seen:
                 continue
             seen.add(name)
-            hits = by_name.get(name, [])
+            active_hits = active_by_name.get(name, [])
+            hits = active_hits if active_hits else all_by_name.get(name, [])
             if len(hits) == 1:
                 ids.add(hits[0])
             else:
@@ -120,7 +135,9 @@ def build_term_attendance(members, histories, sessions, events, event_attendees,
     by_id = {int(m['id']): m for m in members}
     by_name = defaultdict(list)
     for member in members:
-        by_name[member.get('name')].append(int(member['id']))
+        norm = normalize_member_name(member.get('name'))
+        if norm:
+            by_name[norm].append(int(member['id']))
     session_by_id = {str(s['id']): s for s in sessions}
     excluded_by_session = defaultdict(set)
     for row in no_shows:
@@ -163,7 +180,8 @@ def build_term_attendance(members, histories, sessions, events, event_attendees,
         excluded = excluded_by_session[str(row.get('seminar_session_id'))]
         ids = [int(mid) for mid in row.get('actual_member_ids') or [] if int(mid) not in excluded]
         if row.get('actual_member_ids') is None:
-            for name in row.get('present') or []:
+            for raw_name in row.get('present') or []:
+                name = normalize_member_name(raw_name)
                 matches = by_name.get(name, [])
                 if len(matches) == 1 and matches[0] not in excluded:
                     ids.append(matches[0])

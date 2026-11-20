@@ -4,7 +4,7 @@ import json
 import re
 from pathlib import Path
 
-PUBLIC_FILE = re.compile(r'(?:[\w-]+\.(?:css|js)|fonts/[\w-]+\.woff2|fonts/(?:Lato|NotoSansKR)-OFL\.txt|icons/favicon(?:\.svg|-32\.png)|og/club-preview(?:-v2)?\.png)', re.ASCII)
+PUBLIC_FILE = re.compile(r'(?:[\w-]+\.(?:css|js)|fonts/[\w-]+\.woff2|fonts/(?:Lato|NotoSansKR)-OFL\.txt|icons/(?:favicon(?:\.svg|-32\.png)|icon-(?:192|512)\.png)|og/club-preview(?:-v2)?\.png)', re.ASCII)
 
 
 def validate_static_assets(app, manifest_path=None):

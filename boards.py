@@ -201,7 +201,7 @@ def init_board_routes(app, supabase, login_required):
         from engagement import review_author_label
         names = member_map(r['member_id'] for r in reviews if r.get('member_id') is not None)
         for row in reviews:
-            row['author_label'] = review_author_label(row, names)
+            row['author_label'] = review_author_label(row, names, mark_guest=True)
             row['content'] = '\n\n'.join(filter(None, [row.get('memorable_point'), row.get('discussion_point'), row.get('free_text')]))
         return reviews
 

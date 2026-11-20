@@ -235,10 +235,6 @@
                                         {% endif %}
                                     </td>
                                     <td class="p-3 text-center space-x-2 whitespace-nowrap">
-                                        <button onclick="copySeminarLink('{{ term.share_url }}')"
-                                            class="bg-gray-700 hover:bg-gray-600 text-white py-1.5 px-3 rounded shadow">
-                                            링크 복사
-                                        </button>
                                         <a href="/admin/seminar_terms/{{ term.id }}"
                                             class="bg-blue-700 hover:bg-blue-600 text-white py-1.5 px-3 rounded shadow inline-block">
                                             회차 관리
@@ -595,15 +591,7 @@
             }
         }
 
-        // --- 세미나 출석 투표 학기 관리 ---
-        function copySeminarLink(url) {
-            navigator.clipboard.writeText(url).then(() => {
-                alert('세미나 투표 링크가 복사되었습니다!\n단톡방에 공유해주세요.\n' + url);
-            }).catch(() => {
-                prompt('아래 링크를 복사하세요:', url);
-            });
-        }
-
+        // --- 세미나 학기 관리 ---
         async function deleteSeminarTerm(termId, name) {
             if (!confirm(`'${name}' 학기를 삭제하시겠습니까?\n모든 회차와 투표 기록도 함께 삭제됩니다.`)) return;
             try {
@@ -640,7 +628,7 @@
                     const carry = data.carried_from?.length
                         ? `\n${data.carried_from.join('·')} 활동 회원 ${data.carried_member_count}명이 자동으로 포함되었습니다.`
                         : '\n이어받을 확정 명단이 없어 빈 명단으로 시작합니다.';
-                    alert(`학기가 생성되었습니다 (회차 ${data.session_count}개).${carry}\n공유 링크:\n${data.share_url}`);
+                    alert(`학기가 생성되었습니다 (회차 ${data.session_count}개).${carry}`);
                     window.location.reload();
                 } else {
                     alert('생성 실패: ' + (data.message || '오류'));

@@ -153,6 +153,46 @@ class AttendanceRouteTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/seminar_vote/counts').status_code, 410)
         self.assertFalse(any(call[0] in {'update', 'insert', 'delete'} for call in self.fake.calls))
 
+    def test_individual_and_bulk_group_matching_agree_on_scoped_homonyms(self):
+        self.fake.rows['members'] = [
+            {'id': 1, 'name': '운영', 'student_id': '202600001', 'role': 'admin', 'is_active': True, 'member_status': 'active', 'account_status': 'active'},
+            {'id': 2, 'name': '동명', 'student_id': '202600002', 'is_active': True},
+            {'id': 3, 'name': '동명', 'student_id': '202600003', 'is_active': True},
+        ]
+        self.fake.rows['seminar_terms'][0]['roster_initialized_at'] = '2026-08-01T00:00:00Z'
+        self.fake.rows['seminar_term_members'] = [
+            {'term_id': 'term', 'member_id': 1, 'status': 'active'},
+            {'term_id': 'term', 'member_id': 2, 'status': 'active'},
+            {'term_id': 'term', 'member_id': 3, 'status': 'left'},
+        ]
+        self.fake.rows['history'] = [
+            {'id': 10, 'date': '2026-08-13', 'seminar_session_id': 'thu', 'groups': [['동명']], 'present': ['동명']},
+        ]
+        html = self.client.get('/admin/seminar_sessions/thu/roster').get_data(as_text=True)
+        self.assertEqual(self.checked_actual(html), {2})
+        self.assertIn('id="use-grouped" data-ids="[2]"', html)
+        preview = self.client.post('/api/admin/term_attendance/term/preview', headers=self.headers, json={'session_ids': ['thu']})
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual(preview.get_json()['items'][0]['names'], ['동명'])
+
+    def test_pending_sessions_excludes_inactive_and_break_weeks(self):
+        self.fake.rows['seminar_weeks'] = [
+            {'id': 'w-normal', 'term_id': 'term', 'book_title': '정상 책', 'note': ''},
+            {'id': 'w-break', 'term_id': 'term', 'book_title': '', 'note': '중간고사 휴회'},
+        ]
+        self.fake.rows['seminar_sessions'] = [
+            {'id': 'thu', 'term_id': 'term', 'seminar_week_id': 'w-normal', 'day_type': 'thu', 'meeting_date': '2026-08-13', 'is_active': True, 'planned_member_ids': [1]},
+            {'id': 'inactive-s', 'term_id': 'term', 'seminar_week_id': 'w-normal', 'day_type': 'mon', 'meeting_date': '2026-08-10', 'is_active': False, 'planned_member_ids': [1]},
+            {'id': 'break-s', 'term_id': 'term', 'seminar_week_id': 'w-break', 'day_type': 'thu', 'meeting_date': '2026-08-20', 'is_active': True, 'planned_member_ids': [1]},
+        ]
+        html = self.client.get('/admin/term_attendance?term_id=term').get_data(as_text=True)
+        self.assertIn('value="thu"', html)
+        self.assertNotIn('value="inactive-s"', html)
+        self.assertNotIn('value="break-s"', html)
+        for skipped in ('inactive-s', 'break-s'):
+            res = self.client.post('/api/admin/term_attendance/term/preview', headers=self.headers, json={'session_ids': [skipped]})
+            self.assertEqual(res.status_code, 409)
+
 
 if __name__ == '__main__':
     unittest.main()
