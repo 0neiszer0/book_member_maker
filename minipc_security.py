@@ -17,6 +17,7 @@ MEMBER_POSTS = {
 SENSITIVE_POSTS = MEMBER_POSTS | {'seminar_review_form',
     'link_account_submit', 'link_lookup', 'handle_notification', 'boards.write', 'boards.edit', 'seminar_session_toggle',
     'delete_member', 'set_member_status', 'edit_member', 'merge_members', 'create_member',
+    'delete_seminar_review',
     # ID/password login (local_auth.py)
     'login_password', 'signup', 'account_convert', 'account_setup', 'account_password',
     'admin_signup_code', 'admin_approve_signup', 'admin_reject_signup', 'admin_issue_login_link',
