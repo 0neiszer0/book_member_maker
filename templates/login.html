@@ -23,6 +23,7 @@
       <input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
       <input type="hidden" name="next" value="{{ next_url or '' }}">
       <p class="auth-help"><strong>{{ email }}</strong>에 보낸 인증코드는 10분간 사용할 수 있어요.</p>
+      <p class="auth-help">메일이 보이지 않으면 스팸메일함도 확인해 주세요.</p>
       <label class="auth-label">인증코드
         <input class="auth-input" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="예: 123456" required autofocus>
       </label>

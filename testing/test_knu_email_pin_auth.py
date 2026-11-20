@@ -196,7 +196,10 @@ class KnuEmailPinTests(unittest.TestCase):
         self.assertEqual(self.verify(client=replay).status_code, 400)
 
     def test_code_entry_comes_before_resend_and_pin(self):
-        html = self.send().get_data(as_text=True)
+        response = self.send()
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("메일이 보이지 않으면 스팸메일함도 확인해 주세요.", html)
         self.assertIn('placeholder="예: 123456"', html)
         self.assertIn('name="email" value="student@knu.ac.kr"', html)
         self.assertNotIn('name="email" type="email"', html)
@@ -441,9 +444,9 @@ class KnuEmailPinTests(unittest.TestCase):
 
 class MailerTests(unittest.TestCase):
     def test_resend_and_brevo_payloads(self):
-        for provider, key_name, endpoint in (
-            ("resend", "RESEND_API_KEY", "https://api.resend.com/emails"),
-            ("brevo", "BREVO_API_KEY", "https://api.brevo.com/v3/smtp/email"),
+        for provider, key_name, endpoint, text_key, html_key in (
+            ("resend", "RESEND_API_KEY", "https://api.resend.com/emails", "text", "html"),
+            ("brevo", "BREVO_API_KEY", "https://api.brevo.com/v3/smtp/email", "textContent", "htmlContent"),
         ):
             with self.subTest(provider=provider), patch.dict(os.environ, {"MAIL_PROVIDER": provider, key_name: "secret"}), \
                     patch.object(email_auth_mailer.requests, "post") as post:
@@ -451,7 +454,19 @@ class MailerTests(unittest.TestCase):
 
                 self.assertEqual(post.call_args.args, (endpoint,))
                 self.assertEqual(post.call_args.kwargs["timeout"], 10)
-                self.assertIn("012345", str(post.call_args.kwargs["json"]))
+                payload = post.call_args.kwargs["json"]
+                self.assertIn("012345", payload[text_key])
+                self.assertIn("책 먹는 호반우", payload["subject"])
+                self.assertIn("012345", payload[html_key])
+                self.assertIn("경북대학교 중앙 독서동아리 · 책 먹는 호반우", payload[html_key])
+
+    def test_html_verification_email_escapes_code_and_purpose(self):
+        env = {"MAIL_PROVIDER": "resend", "RESEND_API_KEY": "secret"}
+        with patch.dict(os.environ, env), patch.object(email_auth_mailer.requests, "post") as post:
+            email_auth_mailer.send_verification_code("user@knu.ac.kr", "<012345>", "로그인 & 가입")
+        html = post.call_args.kwargs["json"]["html"]
+        self.assertIn("&lt;012345&gt;", html)
+        self.assertIn("로그인 &amp; 가입", html)
 
     def test_smtp_tls_and_failure_without_credentials_in_error(self):
         env = {"MAIL_PROVIDER": "smtp", "SMTP_HOST": "smtp.example.com", "SMTP_PORT": "587",
@@ -462,7 +477,9 @@ class MailerTests(unittest.TestCase):
             client = smtp.return_value.__enter__.return_value
             client.starttls.assert_called_once()
             client.login.assert_called_once_with("smtp-user", "private-password")
-            self.assertIn("012345", client.send_message.call_args.args[0].get_content())
+            message = client.send_message.call_args.args[0]
+            self.assertIn("012345", message.get_body(preferencelist=("plain",)).get_content())
+            self.assertIn("012345", message.get_body(preferencelist=("html",)).get_content())
             client.login.side_effect = OSError("private-password")
             with self.assertRaisesRegex(email_auth_mailer.MailDeliveryError, "^Verification email delivery failed[.]$"):
                 email_auth_mailer.send_verification_code("user@knu.ac.kr", "012345", "로그인")
