@@ -1,0 +1,262 @@
+{% extends 'lms_admin_base.html' %}
+{% set lms_title = '임원 인수인계 위키 설문' %}
+{% block title %}임원 인수인계 위키 설문 | 책 먹는 호반우{% endblock %}
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='lms_engagement.css') }}">
+{% endblock %}
+{% block content %}
+<section class="eg-header">
+  <div class="eg-kicker">전체 운영</div>
+  <div class="lms-toolbar">
+    <h1>임원 인수인계 위키 설문</h1>
+    <div class="eg-actions">
+      <a class="lms-button" href="{{ (officer_wiki_url() if officer_wiki_url is defined else none) or '/wiki/w/운영진:대문' }}">운영진 위키 열기</a>
+    </div>
+  </div>
+  <p class="eg-lead">로그인 없이 임원진이 인수인계 내용을 작성할 수 있는 링크를 발급하고, 직책별 응답을 모아 위키용 초안으로 복사합니다.</p>
+</section>
+
+<p id="handover-admin-status" class="eg-admin-status" role="status" hidden></p>
+
+<section class="eg-panel" style="margin-bottom:20px">
+  <h2>새 인수인계 설문 만들기</h2>
+  <form id="handover-create-form" class="eg-form">
+    <div class="eg-grid">
+      <label>
+        <span>설문 제목 <strong style="color:#d20f17">*</strong></span>
+        <input class="eg-input" name="title" maxlength="120" required placeholder="예: 2026-2학기 임원진 위키 인수인계 설문">
+      </label>
+      <label>
+        <span>대상 학기 · 기수 라벨 <span class="eg-help">선택</span></span>
+        <input class="eg-input" name="term_label" maxlength="60" placeholder="예: 2026-2학기">
+      </label>
+    </div>
+    <button class="lms-button lms-button-primary" type="submit">설문 만들고 링크 복사</button>
+  </form>
+</section>
+
+{% for form in forms %}
+<section class="eg-panel handover-form-card" style="margin-bottom:24px" data-form-id="{{ form.id }}">
+  <div class="lms-toolbar" style="margin-bottom:16px">
+    <div>
+      <div class="eg-kicker">{{ form.term_label or '공통 인수인계' }} · 응답 {{ form.response_count }}건</div>
+      <h2 style="margin:4px 0 0">{{ form.title }}</h2>
+    </div>
+    <div class="eg-actions">
+      <span class="eg-chip">{{ '진행 중' if form.status == 'open' else '마감됨' }}</span>
+      <button type="button" class="lms-button copy-handover-link" data-url="{{ form.share_url }}">공유 링크 복사</button>
+      <a class="lms-button" href="{{ url_for('handover_public_form', token=form.share_token) }}" target="_blank" rel="noopener noreferrer">폼 열기</a>
+      <button type="button" class="lms-button lms-button-primary copy-wiki-draft" data-target="wiki-draft-{{ form.id }}">위키용 초안 복사</button>
+      <button type="button" class="lms-button toggle-handover-status" data-id="{{ form.id }}" data-status="{{ 'closed' if form.status == 'open' else 'open' }}">{{ '마감하기' if form.status == 'open' else '다시 열기' }}</button>
+    </div>
+  </div>
+
+  <div class="lms-form-field" style="margin-bottom:16px">
+    <label for="share-url-{{ form.id }}" class="lms-small">비로그인 공유 링크</label>
+    <input id="share-url-{{ form.id }}" class="eg-input" type="text" readonly value="{{ form.share_url }}" onfocus="this.select()">
+  </div>
+
+  <details style="margin-bottom:16px">
+    <summary style="cursor:pointer;font-weight:700">위키용 초안 미리보기 (openNamu/Markdown)</summary>
+    <textarea id="wiki-draft-{{ form.id }}" class="eg-textarea" rows="10" readonly style="margin-top:10px;font-family:monospace;font-size:13px">{{ form.wiki_draft }}</textarea>
+  </details>
+
+  {% if form.grouped_responses %}
+  <div class="eg-actions handover-role-filters" style="margin-bottom:14px" role="group" aria-label="직책별 필터">
+    <button type="button" class="lms-button lms-button-primary handover-role-filter" data-role="ALL" aria-pressed="true">전체 ({{ form.response_count }})</button>
+    {% for role_name, items in form.grouped_responses %}
+    <button type="button" class="lms-button handover-role-filter" data-role="{{ role_name }}" aria-pressed="false">{{ role_name }} ({{ items|length }})</button>
+    {% endfor %}
+  </div>
+
+  <div class="handover-role-groups">
+    {% for role_name, items in form.grouped_responses %}
+    <div class="handover-role-group" data-role-group="{{ role_name }}" style="margin-top:16px">
+      <div class="eg-section-head">
+        <h2>{{ role_name }}</h2>
+        <span>{{ items|length }}건</span>
+      </div>
+      {% for resp in items %}
+      <article class="eg-comment" style="padding:16px;border:1px solid #c7cdd1;border-top:0" data-response-id="{{ resp.id }}">
+        <div class="lms-section-toolbar" style="margin-bottom:8px">
+          <div>
+            <strong>{{ resp.author_name or '익명' }}</strong>
+            {% if resp.term_cohort %}<span class="eg-muted"> · {{ resp.term_cohort }}</span>{% endif %}
+            {% if resp.created_at %}<span class="eg-muted"> · {{ resp.created_at|datetime }}</span>{% endif %}
+          </div>
+          <button type="button" class="lms-button delete-handover-response" data-id="{{ resp.id }}">삭제</button>
+        </div>
+        <div class="eg-muted" style="color:#2d3b45">
+          <p style="margin:0 0 8px"><strong>1. 핵심 업무 3가지 (시기 포함)</strong><br><span style="white-space:pre-wrap">{{ resp.core_tasks }}</span></p>
+          {% if resp.hardships_and_tips %}
+          <p style="margin:0 0 8px"><strong>2. 처음 맡았을 때 헤맸던 점 · 미리 알았으면 좋았을 점</strong><br><span style="white-space:pre-wrap">{{ resp.hardships_and_tips }}</span></p>
+          {% endif %}
+          {% if resp.assets_and_links %}
+          <p style="margin:0 0 8px"><strong>3. 파일·링크·디자인 원본·양식 위치</strong><br><span style="white-space:pre-wrap">{{ resp.assets_and_links }}</span></p>
+          {% endif %}
+          {% if resp.common_issues %}
+          <p style="margin:0 0 8px"><strong>4. 자주 생기는 트러블과 해결 요령</strong><br><span style="white-space:pre-wrap">{{ resp.common_issues }}</span></p>
+          {% endif %}
+          {% if resp.next_officer_note %}
+          <p style="margin:0"><strong>5. 다음 기수 임원에게 남기는 한 줄 팁</strong><br><span style="white-space:pre-wrap">{{ resp.next_officer_note }}</span></p>
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="eg-muted">아직 접수된 응답이 없습니다. 공유 링크를 임원진 단톡방에 전달해보세요.</p>
+  {% endif %}
+</section>
+{% else %}
+<section class="eg-panel eg-empty">
+  <p class="eg-muted">아직 생성된 인수인계 설문이 없습니다. 위 폼에서 첫 설문을 만들어보세요.</p>
+</section>
+{% endfor %}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(function() {
+  function setNotice(message, reload) {
+    if (reload) {
+      sessionStorage.setItem('handover-admin-status', message);
+      location.reload();
+      return;
+    }
+    var el = document.getElementById('handover-admin-status');
+    if (!el) return;
+    el.textContent = message;
+    el.hidden = false;
+    el.scrollIntoView({ block: 'nearest' });
+  }
+  var prev = sessionStorage.getItem('handover-admin-status');
+  if (prev) {
+    sessionStorage.removeItem('handover-admin-status');
+    setNotice(prev, false);
+  }
+  function csrfToken() {
+    var meta = document.querySelector('meta[name="lms-csrf"]');
+    return meta ? meta.content : '';
+  }
+  async function postJson(url, payload) {
+    var res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-App-CSRF': csrfToken()
+      },
+      body: JSON.stringify(payload || {})
+    });
+    var data = await res.json().catch(function() { return {}; });
+    if (!res.ok || data.ok === false) {
+      throw new Error(data.error || '요청을 처리하지 못했습니다.');
+    }
+    return data;
+  }
+  async function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    throw new Error('클립보드 복사를 지원하지 않는 환경입니다.');
+  }
+
+  var createForm = document.getElementById('handover-create-form');
+  if (createForm) {
+    createForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      var fd = new FormData(createForm);
+      try {
+        var result = await postJson('/api/admin/handover/create', {
+          title: fd.get('title') || '',
+          term_label: fd.get('term_label') || ''
+        });
+        try {
+          await copyText(result.share_url);
+          setNotice('인수인계 설문을 만들고 공유 링크를 복사했습니다.', true);
+        } catch (err) {
+          setNotice('인수인계 설문을 만들었습니다.', true);
+        }
+      } catch (err) {
+        setNotice(err.message, false);
+      }
+    });
+  }
+
+  document.querySelectorAll('.copy-handover-link').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
+      try {
+        await copyText(btn.dataset.url || '');
+        setNotice('공유 링크를 클립보드에 복사했습니다.', false);
+      } catch (err) {
+        setNotice('링크를 직접 선택해 복사해주세요.', false);
+      }
+    });
+  });
+
+  document.querySelectorAll('.copy-wiki-draft').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
+      var target = document.getElementById(btn.dataset.target || '');
+      if (!target) return;
+      try {
+        await copyText(target.value || '');
+        setNotice('위키용 초안을 클립보드에 복사했습니다. 운영진 위키에 바로 붙여넣으세요.', false);
+      } catch (err) {
+        target.closest('details')?.setAttribute('open', '');
+        target.focus();
+        target.select();
+        setNotice('위키용 초안을 선택했습니다. Ctrl+C로 복사해주세요.', false);
+      }
+    });
+  });
+
+  document.querySelectorAll('.toggle-handover-status').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
+      try {
+        await postJson('/api/admin/handover/' + encodeURIComponent(btn.dataset.id) + '/status', {
+          status: btn.dataset.status
+        });
+        setNotice('설문 상태를 변경했습니다.', true);
+      } catch (err) {
+        setNotice(err.message, false);
+      }
+    });
+  });
+
+  document.querySelectorAll('.delete-handover-response').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
+      if (!confirm('이 인수인계 응답을 삭제할까요? 삭제 후 되돌릴 수 없습니다.')) return;
+      try {
+        await postJson('/api/admin/handover/responses/' + encodeURIComponent(btn.dataset.id) + '/delete', {});
+        setNotice('응답을 삭제했습니다.', true);
+      } catch (err) {
+        setNotice(err.message, false);
+      }
+    });
+  });
+
+  document.querySelectorAll('.handover-form-card').forEach(function(card) {
+    var buttons = card.querySelectorAll('.handover-role-filter');
+    var groups = card.querySelectorAll('.handover-role-group');
+    buttons.forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var role = btn.dataset.role;
+        buttons.forEach(function(b) {
+          var active = b === btn;
+          b.classList.toggle('lms-button-primary', active);
+          b.setAttribute('aria-pressed', String(active));
+        });
+        groups.forEach(function(g) {
+          g.hidden = role !== 'ALL' && g.dataset.roleGroup !== role;
+        });
+      });
+    });
+  });
+})();
+</script>
+{% endblock %}

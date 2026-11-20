@@ -1,0 +1,99 @@
+{% extends 'engagement_base.html' %}
+{% set engagement_title = form.title %}
+{% block head %}
+{{ super() }}
+<meta name="robots" content="noindex,nofollow">
+{% endblock %}
+{% block content %}
+<section class="eg-header">
+  <div class="eg-kicker">임원진 위키 인수인계 설문{% if form.term_label %} · {{ form.term_label }}{% endif %}</div>
+  <h1>{{ form.title }}</h1>
+  <p class="eg-lead">차기 임원진에게 물려줄 운영 노하우를 남겨주세요. 로그인 없이 바로 제출할 수 있으며, 제출된 내용은 운영진 위키 인수인계 문서로 정리됩니다.</p>
+</section>
+
+<div class="eg-flash eg-flash-danger" role="note">
+  <strong>주의:</strong> 비밀번호·계좌번호·개인 전화번호는 적지 마세요.
+</div>
+
+{% if submitted %}
+<section class="eg-panel eg-form" aria-live="polite">
+  <div class="eg-flash">
+    <strong>인수인계 설문을 제출했습니다.</strong>
+    <p class="eg-muted" style="margin:6px 0 0">{{ submitted_role }} 직책으로 작성해주셔서 감사합니다.</p>
+  </div>
+  <div class="eg-actions">
+    <a class="lms-button lms-button-primary" href="{{ url_for('handover_public_form', token=share_token) }}">다른 직책·내용 추가 작성하기</a>
+    <a class="lms-button" href="{{ url_for('main_index') }}">홈으로 이동</a>
+  </div>
+</section>
+{% else %}
+<form class="eg-panel eg-form" method="post" action="{{ url_for('handover_public_form', token=share_token) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden">
+    <label>웹사이트<input name="website" tabindex="-1" autocomplete="off"></label>
+  </div>
+
+  <div class="eg-identity">
+    <strong>로그인 없이 바로 작성할 수 있어요.</strong>
+    <span class="eg-help">실명이나 익명 모두 가능하며, 직책과 핵심 업무만 필수입니다.</span>
+  </div>
+
+  {% if not is_open %}
+  <div class="eg-flash eg-flash-danger" role="alert">현재 설문이 마감되어 새 응답을 받을 수 없습니다.</div>
+  {% endif %}
+  {% if error_message %}
+  <div class="eg-flash eg-flash-danger" role="alert">{{ error_message }}</div>
+  {% endif %}
+
+  <label>
+    <span>임원 직책 <strong style="color:#d20f17">*</strong></span>
+    <select class="eg-select" name="role_name" required {% if not is_open %}disabled{% endif %}>
+      <option value="">직책을 선택하세요</option>
+      {% for role in roles %}
+      <option value="{{ role }}" {% if form_values.get('role_name') == role %}selected{% endif %}>{{ role }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <div class="eg-grid">
+    <label>
+      <span>이름 <span class="eg-help">선택 · 익명 가능</span></span>
+      <input class="eg-input" name="author_name" maxlength="40" autocomplete="name" placeholder="예: 홍길동 (비워두면 익명)" value="{{ form_values.get('author_name', '') }}" {% if not is_open %}disabled{% endif %}>
+    </label>
+    <label>
+      <span>기수 · 활동 학기 <span class="eg-help">선택</span></span>
+      <input class="eg-input" name="term_cohort" maxlength="40" placeholder="예: 26-2학기 / 15기" value="{{ form_values.get('term_cohort', '') }}" {% if not is_open %}disabled{% endif %}>
+    </label>
+  </div>
+
+  <label>
+    <span>1. 한 학기 동안 맡은 핵심 업무 3가지 (시기 포함) <strong style="color:#d20f17">*</strong></span>
+    <textarea class="eg-textarea" name="core_tasks" rows="5" maxlength="3000" required placeholder="예:&#10;1) 3월 초: OT 장소 대관 및 신입 부원 안내&#10;2) 매주 목요일: 세미나 출석 체크 및 공지 업로드&#10;3) 6월 중순: 종강총회 결산 정리" {% if not is_open %}disabled{% endif %}>{{ form_values.get('core_tasks', '') }}</textarea>
+  </label>
+
+  <label>
+    <span>2. 처음 맡았을 때 가장 헤맸거나 미리 알았으면 좋았을 점 <span class="eg-help">선택</span></span>
+    <textarea class="eg-textarea" name="hardships_and_tips" rows="4" maxlength="3000" placeholder="초반에 놓치기 쉬웠던 일정, 타 부서와의 협업 포인트 등" {% if not is_open %}disabled{% endif %}>{{ form_values.get('hardships_and_tips', '') }}</textarea>
+  </label>
+
+  <label>
+    <span>3. 차기 임원에게 넘길 파일·링크·디자인 원본·양식 위치 (비밀번호 제외) <span class="eg-help">선택</span></span>
+    <textarea class="eg-textarea" name="assets_and_links" rows="4" maxlength="2000" placeholder="구글 드라이브 폴더명, 미리캔버스/피그마 프로젝트 위치, 문서 양식 위치 등 (계정 비밀번호는 적지 마세요)" {% if not is_open %}disabled{% endif %}>{{ form_values.get('assets_and_links', '') }}</textarea>
+  </label>
+
+  <label>
+    <span>4. 자주 생기는 트러블과 해결 요령 <span class="eg-help">선택</span></span>
+    <textarea class="eg-textarea" name="common_issues" rows="4" maxlength="2000" placeholder="예: 대관 신청 시간 제한, 명단 누락 시 처리 방법 등" {% if not is_open %}disabled{% endif %}>{{ form_values.get('common_issues', '') }}</textarea>
+  </label>
+
+  <label>
+    <span>5. 다음 기수 임원에게 남기는 솔직한 한 줄 팁 <span class="eg-help">선택</span></span>
+    <textarea class="eg-textarea" name="next_officer_note" rows="3" maxlength="1500" placeholder="응원의 한마디나 현실적인 팁을 편하게 남겨주세요" {% if not is_open %}disabled{% endif %}>{{ form_values.get('next_officer_note', '') }}</textarea>
+  </label>
+
+  {% if is_open %}
+  <button class="lms-button lms-button-primary" type="submit">인수인계 제출하기</button>
+  {% endif %}
+</form>
+{% endif %}
+{% endblock %}

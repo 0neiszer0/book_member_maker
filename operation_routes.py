@@ -193,3 +193,7 @@ def init_operation_routes(app, get_db, login_required):
         check_csrf()
         result = get_db().rpc('complete_operation_task', {'p_task': task_id, 'p_actor': session['user_id']}).execute().data or {}
         return jsonify(result), 200 if result.get('accepted') else 403
+
+    from officer_handover import init_officer_handover_routes
+    init_officer_handover_routes(app, get_db, login_required)
+

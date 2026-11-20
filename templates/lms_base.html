@@ -8,14 +8,16 @@
 <link rel="stylesheet" href="{{ url_for('static',filename='lms_feedback.css') }}">
 <script defer src="{{ url_for('static',filename='lms_feedback.js') }}"></script>
 <link rel="stylesheet" href="{{ url_for('static',filename='lms_improvements.css') }}">
+{% if not lms_isolated_auth|default(false) %}<link rel="stylesheet" href="{{ url_for('static',filename='quick_search.css') }}">{% endif %}
 <script defer src="{{ url_for('static',filename='member_notifications.js') }}"></script>
 {% block head %}{% endblock %}
 <script defer src="{{ url_for('static',filename='lms_navigation.js') }}"></script>
 <script defer src="{{ url_for('static',filename='lms_flash.js') }}"></script>
+{% if not lms_isolated_auth|default(false) %}<script defer src="{{ url_for('static',filename='quick_search.js') }}"></script>{% endif %}
 </head><body class="lms-page lms-nav-expanded {% if lms_isolated_auth|default(false) %}lms-isolated-auth{% endif %} {% if lms_course %}lms-course-page{% endif %} {% if lms_aside %}lms-has-aside{% endif %} {% if lms_page == 'dashboard' %}lms-dashboard-page{% endif %}" data-lms-page="{{ lms_page|default('content') }}">
 <a class="lms-skip" href="#lms-content">본문으로 건너뛰기</a>
 {% if not lms_isolated_auth|default(false) %}{% include '_lms_navigation.html' %}
-<div class="lms-mobile-header"><button type="button" data-lms-menu aria-label="전역 메뉴 열기">{{ icon('menu') }}</button><div class="lms-mobile-heading">{% if lms_course %}<span class="lms-mobile-course-name">{{ course_breadcrumb_label|default(lms_course.name) }}</span>{% endif %}<span>{{ lms_title|default('책 먹는 호반우') }}</span></div>{% if lms_course %}<button type="button" data-lms-course-toggle aria-label="강의실 메뉴 열기">{{ icon('chevron') }}</button>{% endif %}</div>
+<div class="lms-mobile-header"><button type="button" data-lms-menu aria-label="전역 메뉴 열기">{{ icon('menu') }}</button><div class="lms-mobile-heading">{% if lms_course %}<span class="lms-mobile-course-name">{{ course_breadcrumb_label|default(lms_course.name) }}</span>{% endif %}<span>{{ lms_title|default('책 먹는 호반우') }}</span></div><button type="button" data-lms-quick-search aria-label="기능 빠른 검색 (Ctrl+K)"><svg class="lms-icon" width="22" height="22" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="7"/><path d="m17.5 17.5 6 6"/></svg></button>{% if lms_course %}<button type="button" data-lms-course-toggle aria-label="강의실 메뉴 열기">{{ icon('chevron') }}</button>{% endif %}</div>
 {% endif %}<div class="lms-wrapper">
 {% if lms_page != 'dashboard' and not lms_isolated_auth|default(false) %}<header class="lms-breadcrumb"><button type="button" data-lms-course-toggle aria-label="{{ '위키' if lms_page == 'wiki' else '강의실' }} 메뉴 접기" aria-expanded="true">{{ icon('menu') }}</button><nav aria-label="현재 위치"><a href="{{ course_breadcrumb_href|default(url_for('seminars',term_id=lms_course.id) if lms_course else url_for('main_index')) }}">{% if lms_course %}{{ course_breadcrumb_label|default(lms_course.name) }}{% else %}책 먹는 호반우{% endif %}</a><span aria-hidden="true">›</span><span>{{ lms_title|default('') }}</span></nav></header>{% endif %}
 <div class="lms-columns">
@@ -25,6 +27,53 @@
 {% block content %}{% endblock %}</main>
 {% if lms_aside %}<aside class="lms-right-panel">{% block aside %}{% endblock %}</aside>{% endif %}
 </div></div>
-{% if not lms_isolated_auth|default(false) %}{% include '_lms_feedback.html' %}{% endif %}
+{% if not lms_isolated_auth|default(false) %}{% include '_lms_feedback.html' %}
+{% if session.user_role %}
+{% set _qs_base = [
+  {'title': '홈', 'url': url_for('main_index'), 'group': '회원', 'keywords': '대시보드 홈 메인', 'description': '내 활동과 다음 세미나 요약 보기'},
+  {'title': '세미나 일정', 'url': url_for('seminars'), 'group': '회원', 'keywords': '세미나 일정 투표 발제', 'description': '학기 세미나 일정·발제문·도서 확인'},
+  {'title': '지금 참여하기', 'url': url_for('engagement_now'), 'group': '회원', 'keywords': '후기 벽돌책 모집 책추천 참여', 'description': '진행 중인 후기·벽돌책·책 추천'},
+  {'title': '내 활동', 'url': url_for('my_page'), 'group': '회원', 'keywords': '마이페이지 내활동 기록', 'description': '내 프로필과 활동 기록 보기'},
+  {'title': '내 학기 참석 현황', 'url': url_for('my_term_attendance'), 'group': '회원', 'keywords': '출석 참석 횟수 현황', 'description': '이번 학기 출석·인정 횟수 확인'},
+  {'title': '캘린더', 'url': url_for('lms_calendar'), 'group': '회원', 'keywords': '캘린더 달력 일정 세미나', 'description': '월간 세미나·행사 일정 확인'},
+  {'title': '게시판', 'url': url_for('boards.index'), 'group': '회원', 'keywords': '공지 게시판 후기 글', 'description': '동아리 공지사항·게시판 목록'},
+  {'title': '책 추천', 'url': url_for('book_suggestions'), 'group': '회원', 'keywords': '도서 추천 책', 'description': '함께 읽을 책 추천과 공감'},
+  {'title': '동아리방 시간표·신청', 'url': url_for('club_room'), 'group': '회원', 'keywords': '동방 동아리방 예약 시간표', 'description': '동아리방 이용 시간표와 예약 신청'},
+  {'title': '이용 안내', 'url': url_for('help_member'), 'group': '회원', 'keywords': '도움말 안내', 'description': '사이트 이용 방법과 안내'}
+] %}
+{% if wiki_url|default('') %}{% set _qs_base = _qs_base + [{'title': '회원 위키', 'url': wiki_url, 'group': '회원', 'keywords': '위키 가이드 문서', 'description': '동아리 회원 위키 바로가기'}] %}{% endif %}
+{% if session.user_role in ['admin', 'officer'] %}
+{% set _qs_staff = [
+  {'title': '운영 관리 대시보드', 'url': url_for('admin_dashboard'), 'group': '운영진', 'keywords': '운영 관리 대시보드', 'description': '동아리 운영 현황 한눈에 보기'},
+  {'title': '세미나 운영', 'url': url_for('admin_seminars'), 'group': '운영진', 'keywords': '세미나 회차 생성 관리', 'description': '세미나 회차·도서·발제·사회자 관리'},
+  {'title': '조 편성', 'url': url_for('bookclub_index'), 'group': '운영진', 'keywords': '조편성 팀짜기 그룹', 'description': '세미나 조 편성 생성·수정'},
+  {'title': '학기 출석·명단 관리', 'url': url_for('admin_term_attendance'), 'group': '운영진', 'keywords': '출석 확정 명단', 'description': '학기 출석 확정 및 현황 관리'},
+  {'title': '전체 회원·가입 승인', 'url': url_for('records_members'), 'group': '운영진', 'keywords': '회원 가입 승인 코드 비활성', 'description': '전체 회원 목록·가입 승인·계정 관리'},
+  {'title': '학기 회원 명단', 'url': url_for('admin_term_members'), 'group': '운영진', 'keywords': '학기 명단 휴회 활동', 'description': '학기별 활동·휴회 회원 명단 관리'},
+  {'title': '벽돌책·도서 추천 관리', 'url': url_for('admin_engagement'), 'group': '운영진', 'keywords': '벽돌책 모집 선정', 'description': '벽돌책 모집 및 추천 도서 관리'},
+  {'title': '스페셜 이벤트', 'url': url_for('admin_special_events'), 'group': '운영진', 'keywords': '행사 OT 종강총회 이벤트', 'description': 'OT·종강총회 등 특별 행사 관리'},
+  {'title': '기록·통계', 'url': url_for('records_hub'), 'group': '운영진', 'keywords': '기록 통계 벽돌책 소모임', 'description': '세미나·벽돌책·소모임 누적 기록'},
+  {'title': '임원 인수인계 위키 설문', 'url': url_for('admin_handover_surveys'), 'group': '운영진', 'keywords': '인수인계 위키 설문 임원', 'description': '비로그인 인수인계 링크 발급·위키 초안 복사'},
+  {'title': '운영진 위키', 'url': (officer_wiki_url() if officer_wiki_url is defined else none) or '/wiki/w/운영진:대문', 'group': '운영진', 'keywords': '운영진 위키 인수인계', 'description': '운영진 전용 위키 문서'}
+] %}
+{% set _qs_items = _qs_base + _qs_staff %}
+{% else %}
+{% set _qs_items = _qs_base %}
+{% endif %}
+{% else %}
+{% set _qs_items = [
+  {'title': '홈', 'url': url_for('main_index'), 'group': '공개', 'keywords': '대시보드 홈 메인', 'description': '동아리 소식과 주요 안내 보기'},
+  {'title': '지금 참여하기', 'url': url_for('engagement_now'), 'group': '공개', 'keywords': '후기 벽돌책 모집 책추천 참여', 'description': '진행 중인 활동과 참여 링크'},
+  {'title': '캘린더', 'url': url_for('lms_calendar'), 'group': '공개', 'keywords': '캘린더 달력 일정 세미나', 'description': '월간 세미나·행사 일정 확인'},
+  {'title': '동아리방 시간표·신청', 'url': url_for('club_room'), 'group': '공개', 'keywords': '동방 동아리방 예약 시간표', 'description': '동아리방 시간표 확인'},
+  {'title': '게시판', 'url': url_for('boards.index'), 'group': '공개', 'keywords': '공지 게시판 글', 'description': '공개 공지사항·게시판 목록'},
+  {'title': '책 추천', 'url': url_for('book_suggestions'), 'group': '공개', 'keywords': '도서 추천 책', 'description': '추천 도서 둘러보기'},
+  {'title': '이용 안내', 'url': url_for('help_member'), 'group': '공개', 'keywords': '도움말 안내', 'description': '사이트 이용 안내'},
+  {'title': '로그인', 'url': url_for('login'), 'group': '공개', 'keywords': '로그인 회원가입', 'description': '회원 로그인 및 가입'}
+] %}
+{% if wiki_enabled|default(false) and wiki_url|default('') %}{% set _qs_items = _qs_items + [{'title': '회원 위키', 'url': wiki_url, 'group': '공개', 'keywords': '위키 가이드 문서', 'description': '동아리 회원 위키 바로가기'}] %}{% endif %}
+{% endif %}
+<script id="lms-quick-search-items" type="application/json">{{ _qs_items | tojson }}</script>
+{% endif %}
 {% block scripts %}{% endblock %}
 </body></html>
