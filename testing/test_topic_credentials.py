@@ -44,7 +44,7 @@ class TopicCredentialIntegrationContracts(unittest.TestCase):
         cls.root = Path(__file__).resolve().parents[1]
 
     def test_new_guest_credentials_are_hashed_and_legacy_pin_is_only_compatibility(self):
-        source = (self.root / "app.py").read_text(encoding="utf-8")
+        source = (self.root / "topic_routes.py").read_text(encoding="utf-8")
         self.assertIn("topic_edit_token_digest", source)
         self.assertIn("topic_edit_token_matches", source)
         self.assertIn("legacy_pin_matches", source)

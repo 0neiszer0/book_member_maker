@@ -51,7 +51,7 @@ class TopicLifecycleTest(unittest.TestCase):
         self.assertFalse(topic_event_is_open(event, today=date(2026, 8, 10)))
 
     def test_app_checks_deadline_on_page_load_and_submission(self):
-        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        source = (ROOT / "topic_routes.py").read_text(encoding="utf-8")
         self.assertIn("def _auto_close_topic_events", source)
         self.assertIn("event_data = _topic_event_for_submission([event_data], request.args.get('session_id'))", source)
         self.assertGreaterEqual(source.count("발제문 제출 마감(세미나 주 화요일 23:59)이 지나 제출이 마감되었습니다."), 2)
