@@ -3724,14 +3724,14 @@ def _load_weekly_seminar_view(term_id=None):
         review_form_ids = [row['id'] for row in review_forms]
         if review_form_ids:
             review_submissions = supabase.table('seminar_reviews').select(
-                'id, form_id, member_id, author_name, identity_kind, memorable_point, discussion_point, free_text, created_at, updated_at'
+                'id, form_id, member_id, student_id, author_name, identity_kind, image_path, memorable_point, discussion_point, free_text, created_at, updated_at'
             ) \
                 .in_('form_id', review_form_ids).is_('deleted_at', 'null').execute().data or []
     submissions = []
     if topic_ids:
         submissions = supabase.table('topic_submissions').select('event_id').in_('event_id', topic_ids).execute().data or []
 
-    all_members = supabase.table('members').select('id, name, student_id, department, is_active') \
+    all_members = supabase.table('members').select('id, name, student_id, department, is_active, recruiting_class') \
         .order('name').execute().data or []
     active_members = [row for row in scope_members(supabase, all_members, term=term) if row.get('is_active')]
     member_by_id = {row['id']: row for row in all_members}
@@ -3748,7 +3748,9 @@ def _load_weekly_seminar_view(term_id=None):
     reviews_by_form = defaultdict(list)
     for row in review_submissions:
         review_count[row['form_id']] += 1
-        row['member'] = {'name': review_author_label(row, member_by_id, staff=True)}
+        row['author_label'] = review_author_label(row, member_by_id, staff=True)
+        row['image_url'] = review_image_url(supabase, row)
+        row['member'] = {'name': row['author_label']}
         row['review_content'] = '\n\n'.join(filter(None, [
             row.get('memorable_point'),
             row.get('discussion_point'),
@@ -5036,7 +5038,7 @@ _auto_close_topic_events = _topic_routes_api.auto_close_topic_events
 _authenticated_topic_member = _topic_routes_api.authenticated_topic_member
 
 # 공개 링크 중심 참여 흐름(후기·책 추천·벽돌책)을 별도 모듈로 관리한다.
-from engagement import init_engagement_routes, review_author_label
+from engagement import init_engagement_routes, review_author_label, review_image_url
 init_engagement_routes(app, supabase, login_required, _voting_window_for,
                        topic_event_lifecycle=_auto_close_topic_events)
 

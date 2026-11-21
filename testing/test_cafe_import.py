@@ -18,6 +18,10 @@ class CafeImportRuleTests(unittest.TestCase):
         self.assertEqual(cafe.review_title('『페스트』 의학과 22학번 서효명', self.names)[0], '페스트')
         self.assertEqual(cafe.review_title('불안 22학번 치의학과 장현준', self.names)[0], '불안')
 
+    def test_keep_review_title_removes_student_year_but_keeps_name(self):
+        title, _ = cafe.review_title('책 제목 22학번 홍길동', ['홍길동'], 'keep')
+        self.assertEqual(title, '책 제목 홍길동')
+
     def test_redact_removes_names_and_student_years(self):
         self.assertEqual(cafe.redact('경제통상학부 24학번 서효명입니다', self.names), '경제통상학부 ○○○입니다')
 
@@ -120,6 +124,10 @@ class CafeImportApplyTests(unittest.TestCase):
             with patch.dict(os.environ, env), patch('supabase.create_client', return_value=db):
                 cafe.apply([held], state)
                 cafe.apply([held], state)
+                post_id = db.rows['posts'][0]['id']
+                cafe.apply([dict(held, title='복원 제목', content='복원 제목')], state, refresh_existing=True)
+                self.assertEqual(db.rows['posts'][0]['id'], post_id)
+                self.assertEqual(db.rows['posts'][0]['title'], '복원 제목')
                 self.assertEqual(len(db.rows['posts']), 1)
                 cafe.apply([dict(held, content='본문', images=[str(image)])], state)
                 self.assertEqual(db.rows['posts'][0]['content'], '본문')

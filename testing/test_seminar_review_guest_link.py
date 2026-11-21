@@ -57,6 +57,38 @@ class GuestSeminarReviewTests(unittest.TestCase):
         data.setdefault("csrf_token", self.csrf())
         return self.client.post(PATH, data=data)
 
+    def test_guest_and_member_photo_upload_and_preview(self):
+        import io
+        from types import SimpleNamespace
+        from PIL import Image
+        class Bucket:
+            def __init__(self): self.objects = {}
+            def upload(self, path, data, options): self.objects[path] = data
+            def create_signed_url(self, path, expires): return {'signedURL': 'https://storage.example/' + path}
+        bucket = Bucket()
+        def photo():
+            stream = io.BytesIO()
+            Image.new('RGB', (10, 10), 'red').save(stream, 'PNG')
+            stream.seek(0)
+            return (stream, 'photo.png')
+        with patch.object(type(self.real), 'storage', new_callable=__import__('unittest.mock', fromlist=['PropertyMock']).PropertyMock, return_value=SimpleNamespace(from_=lambda _: bucket)):
+            response = self.post(author_name='손님', student_id='2026000009', review_content='좋아요', photo=photo())
+            self.assertEqual(response.status_code, 200)
+            guest = self.db.rows['seminar_reviews'][0]
+            self.assertEqual(guest['image_mime_type'], 'image/webp')
+            self.assertIn(guest['image_path'], bucket.objects)
+            with self.client.session_transaction() as state:
+                state.update(user_id=1, auth_provider='kakao')
+            self.db.rows['members'][0]['recruiting_class'] = '14'
+            response = self.post(review_content='회원 후기', photo=photo())
+            self.assertEqual(response.status_code, 302)
+            review = self.db.rows['seminar_reviews'][1]
+            self.assertIn(review['image_path'], bucket.objects)
+            html = self.client.get(PATH).get_data(as_text=True)
+            self.assertIn('https://storage.example/' + review['image_path'], html)
+            from engagement import review_author_label
+            self.assertEqual(review_author_label(review, {1: self.db.rows['members'][0]}), '14기 회원1')
+
     def test_guest_form_renders_without_login(self):
         html = self.client.get(PATH).get_data(as_text=True)
         self.assertIn('name="author_name"', html)

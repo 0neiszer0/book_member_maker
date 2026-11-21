@@ -14,9 +14,21 @@ ROLE_LEVEL = {'member': 0, 'officer': 1, 'admin': 2}
 IMAGE_TYPES = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif'}
 
 
+def post_author_label(post):
+    from engagement import cohort_name
+    author = post.get('author') or {}
+    name = author.get('name') or '회원'
+    if author.get('social_id') == 'system:cafe-archive' or name == '카페 보관':
+        first = (post.get('content') or '').split('\n', 1)[0]
+        match = re.match(r'^카페에서 옮긴 글\s*·\s*(?:작성:\s*)?([^·]+?)\s*·', first)
+        return match.group(1).strip() if match else '카페 보관'
+    return cohort_name(name, author.get('recruiting_class'))
+
+
 def init_board_routes(app, supabase, login_required):
     bp = Blueprint('boards', __name__)
     app.jinja_env.filters['board_content'] = render_content
+    app.jinja_env.globals['post_author_label'] = post_author_label
 
     @bp.before_request
     def load_classroom_context():
@@ -86,7 +98,7 @@ def init_board_routes(app, supabase, login_required):
         member_ids = list({int(value) for value in ids if value is not None})
         if not member_ids:
             return {}
-        rows = supabase.table('members').select('id, name, department, student_id') \
+        rows = supabase.table('members').select('id, name, department, student_id, recruiting_class, social_id') \
             .in_('id', member_ids).execute().data or []
         return {row['id']: row for row in rows}
 
@@ -193,14 +205,19 @@ def init_board_routes(app, supabase, login_required):
             if not forms:
                 return []
             reviews = supabase.table('seminar_reviews').select(
-                'id,member_id,author_name,identity_kind,memorable_point,discussion_point,free_text,created_at,updated_at'
+                'id,member_id,student_id,author_name,identity_kind,image_path,memorable_point,discussion_point,free_text,created_at,updated_at'
             ).in_('form_id', [f['id'] for f in forms]).is_('deleted_at', 'null').order('created_at').execute().data or []
         except Exception:
             app.logger.warning('seminar link reviews unavailable for board view')
             return []
-        from engagement import review_author_label
+        from engagement import review_author_label, review_image_url
         names = member_map(r['member_id'] for r in reviews if r.get('member_id') is not None)
+        guest_ids = [r['student_id'] for r in reviews if not r.get('member_id') and r.get('student_id')]
+        if guest_ids:
+            for member in supabase.table('members').select('id,name,student_id,recruiting_class').in_('student_id', guest_ids).execute().data or []:
+                names[member['id']] = member
         for row in reviews:
+            row['image_url'] = review_image_url(supabase, row)
             row['author_label'] = review_author_label(row, names, mark_guest=True)
             row['content'] = '\n\n'.join(filter(None, [row.get('memorable_point'), row.get('discussion_point'), row.get('free_text')]))
         return reviews
@@ -247,6 +264,10 @@ def init_board_routes(app, supabase, login_required):
         members = member_map(post['author_id'] for post in posts)
         for post in posts:
             post['author'] = members.get(post['author_id'], {'name': '알 수 없음'})
+        if posts:
+            attachments = supabase.table('post_attachments').select('post_id,mime_type').in_('post_id', [p['id'] for p in posts]).execute().data or []
+            for post in posts:
+                post['image_count'] = sum(1 for a in attachments if a['post_id'] == post['id'] and (a.get('mime_type') or '').startswith('image/'))
         link_reviews = seminar_link_reviews(history_id) if history_id and page == 1 and not search else []
         return render_template('board_list.html', board=board, posts=posts, page=page,
                                has_next=has_next, q=search, history_id=history_id, can_write=allowed(board['write_role']),
