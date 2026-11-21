@@ -1,8 +1,10 @@
 {% extends 'engagement_base.html' %}
+{% from '_knu_email_input.html' import knu_email_input %}
 {% set engagement_title = form.title %}
 {% block head %}
 {{ super() }}
 <meta name="robots" content="noindex,nofollow">
+<script defer src="{{ url_for('static', filename='auth_code_boxes.js') }}"></script>
 {% endblock %}
 {% block content %}
 <section class="eg-header">
@@ -67,7 +69,7 @@
     <label>
       <span>경북대 학교 메일 (@knu.ac.kr)</span>
       <span class="eg-help">선택 · 운영진 사이트 로그인 연결용 (위키 초안에는 포함되지 않아요)</span>
-      <input class="eg-input" name="knu_email" type="email" inputmode="email" autocapitalize="none" spellcheck="false" maxlength="254" placeholder="예: hobanu@knu.ac.kr" value="{{ form_values.get('knu_email', '') }}" {% if not is_open %}disabled{% endif %}>
+      {{ knu_email_input(name='knu_email', value=form_values.get('knu_email', ''), disabled=not is_open) }}
     </label>
   </div>
 

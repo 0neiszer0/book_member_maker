@@ -80,6 +80,8 @@ class SemesterMembershipTests(unittest.TestCase):
         self.assertEqual(self.client.get('/admin/term_members?term_id=fall').status_code, 200)
         response = self.client.post('/api/admin/seminar_sessions/thu/roster/preview', headers=self.headers, json={'method':'selected', 'member_ids':[]})
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()['expected_count'], 0)
+        response = self.client.post('/api/admin/seminar_sessions/thu/roster/preview', headers=self.headers, json={'method':'selected', 'member_ids':[3]})
         self.assertEqual(response.get_json()['expected_count'], 1)
         self.fake.rows['seminar_sessions'][0]['day_type'] = 'mon'
         response = self.client.post('/api/admin/seminar_sessions/thu/roster/preview', headers=self.headers, json={'method':'selected', 'member_ids':[2]})

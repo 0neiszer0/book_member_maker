@@ -1,3 +1,4 @@
+@import url('knu_email.css');
 /* Participation and book recommendations use the shared LMS shell and controls. */
 .eg-header{margin:0 0 24px}
 .eg-header .lms-toolbar h1{margin:0}

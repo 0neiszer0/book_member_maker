@@ -103,4 +103,19 @@
   }
 
   document.querySelectorAll('[data-auth-code]').forEach(enhance);
+
+  document.querySelectorAll('[data-knu-email-input]').forEach(input => {
+    function stripSchoolDomain() {
+      const local = input.value.trim().match(/^([^@\s]+)@knu\.ac\.kr$/i);
+      if (local) input.value = local[1];
+    }
+
+    stripSchoolDomain();
+    input.addEventListener('input', event => {
+      // Let a typed address finish before stripping its suffix.
+      if (event.inputType !== 'insertText' || event.data?.length !== 1) stripSchoolDomain();
+    });
+    input.addEventListener('change', stripSchoolDomain);
+    input.addEventListener('blur', stripSchoolDomain);
+  });
 })();

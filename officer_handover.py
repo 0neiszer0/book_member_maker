@@ -11,7 +11,7 @@ import uuid
 from flask import abort, g, jsonify, make_response, render_template, request, session
 from db_read import all_rows
 from engagement_utils import clean_text
-from local_auth import KNU_EMAIL_RE
+from local_auth import normalize_knu_email_input, valid_knu_email_input
 from member_notifications import check_csrf
 from security_utils import trusted_client_address
 
@@ -257,9 +257,9 @@ def init_officer_handover_routes(app, get_db, login_required):
 
         role_name = (request.form.get("role_name") or "").strip()
         core_tasks = clean_text(request.form.get("core_tasks"), 3000)
-        raw_email = request.form.get("knu_email", "").strip()
-        knu_email = raw_email.lower()
-        if raw_email and (len(raw_email) > 254 or not raw_email.isascii() or not KNU_EMAIL_RE.fullmatch(knu_email)):
+        raw_email = request.form.get("knu_email", "")
+        knu_email = normalize_knu_email_input(raw_email)
+        if knu_email and not valid_knu_email_input(raw_email, knu_email):
             return _render_public(
                 form,
                 token_str,

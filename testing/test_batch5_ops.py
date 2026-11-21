@@ -120,7 +120,7 @@ class Batch5RoutesTests(unittest.TestCase):
         self.login(2)
         self.assertEqual(self.set_email(1, 'admin@knu.ac.kr').status_code, 403)
         self.assertEqual(self.set_email(4, 'other@knu.ac.kr').status_code, 403)
-        self.assertEqual(self.set_email(3, 'member@knu.ac.kr').status_code, 200)
+        self.assertEqual(self.set_email(3, ' Member ').get_json()['knu_email'], 'member@knu.ac.kr')
         self.assertEqual(self.set_email(2, '  STAFF@KNU.AC.KR  ').get_json()['knu_email'], 'staff@knu.ac.kr')
         officer = self.db.rows['members'][1]
         self.assertEqual(officer['auth_provider'], 'local')
@@ -136,7 +136,7 @@ class Batch5RoutesTests(unittest.TestCase):
         target = self.db.rows['members'][2]
         target.update(knu_email='member@knu.ac.kr', knu_email_verified_at='verified', pin_hash='secret-pin',
                       pin_failed_attempts=4, pin_locked_until='locked')
-        for invalid in ('a@other.test', 'a@knu.ac.kr.fake', '@knu.ac.kr', '한글@knu.ac.kr', False, None):
+        for invalid in ('user@gmail.com', 'a@knu.ac.kr.fake', '@knu.ac.kr', '한글@knu.ac.kr', False, None):
             with self.subTest(invalid=invalid):
                 self.assertEqual(self.set_email(3, invalid).status_code, 400)
         self.assertEqual(self.set_email(99, 'a@knu.ac.kr').status_code, 404)

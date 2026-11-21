@@ -14,15 +14,18 @@ class AdminSeminarTemplateTests(unittest.TestCase):
         css = (Path(__file__).parents[1] / 'static' / 'lms_operations.css').read_text(encoding='utf-8')
         self.assertRegex(css, r'\.lms-operations :is\(\.chip[^)]*\)\{display:inline-flex;flex:none;')
 
-    def test_bulk_absence_picker_is_present(self):
-        self.assertIn('여러 명 한 번에 선택', self.source)
-        self.assertIn('class="absence-checkbox"', self.source)
-        self.assertIn('member_ids:memberIds', self.source)
+    def test_both_cards_use_attendance_lists(self):
+        self.assertIn('for m in thu.attendees', self.source)
+        self.assertIn('for m in mon.attendees', self.source)
+        self.assertEqual(self.source.count('카카오톡 참석 명단 반영·출석 확정'), 2)
+        self.assertNotIn('absence-picker', self.source)
 
     def test_no_show_picker_is_available_on_each_session(self):
         self.assertIn('macro no_show_panel(seminar_session)', self.source)
         self.assertIn('미연락 불참', self.source)
         self.assertIn('/no_shows', self.source)
+        self.assertIn('{{ no_show_panel(thu) }}', self.source)
+        self.assertIn('{{ no_show_panel(mon) }}', self.source)
 
     def test_review_management_is_rendered_inside_each_session(self):
         self.assertIn('macro review_panel(seminar_session)', self.source)

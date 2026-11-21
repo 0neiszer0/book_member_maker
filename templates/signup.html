@@ -1,5 +1,6 @@
 {% extends 'auth_base.html' %}
 {% from '_auth_code.html' import auth_code %}
+{% from '_knu_email_input.html' import knu_email_input %}
 {% block title %}회원가입 · 책 먹는 호반우{% endblock %}
 {% block content %}
 <section class="auth-card">
@@ -25,7 +26,7 @@
     <input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
     <input type="hidden" name="next" value="{{ next_url or '' }}">
     <input type="hidden" name="purpose" value="signup">
-    <label class="auth-label">학교 메일(@knu.ac.kr)<input class="auth-input" name="email" type="email" autocomplete="email" maxlength="254" required></label>
+    <label class="auth-label">학교 메일 아이디{{ knu_email_input(required=true) }}</label>
     <button class="auth-btn auth-btn-primary" type="submit">학교 메일 인증코드 받기</button>
   </form>
   <details class="auth-details" {% if error %}open{% endif %}>

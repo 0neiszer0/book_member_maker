@@ -61,32 +61,23 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
             abort(400)
         members = db().table('members').select('id,name,student_id,department,is_active').order('name').execute().data or []
         audit = db().table('seminar_roster_imports').select('*').eq('session_id', session_id).order('created_at', desc=True).limit(10).execute().data or []
-        mode = 'absence' if target.get('day_type') == 'thu' else 'attendance'
         terms = db().table('seminar_terms').select('*').eq('id', target.get('term_id')).limit(1).execute().data or []
         term = terms[0] if terms else {}
         target['term_revision'] = term.get('roster_revision', 0)
         scoped = scope_members(db(), members, term=term)
         active = {int(m['id']) for m in scoped if m.get('is_active')}
-        if mode == 'absence' and audit:
-            eligible = set(audit[0].get('member_ids') or []) | set(audit[0].get('expected_member_ids') or [])
-        else:
-            eligible = active | set(target.get('planned_member_ids') or [])
-        if target.get('planned_member_ids') is not None:
-            planned = set(target['planned_member_ids'])
-        elif mode == 'absence':
-            absent = db().table('seminar_absences').select('member_id').eq('session_id', session_id).is_('cancelled_at', 'null').execute().data or []
-            planned = eligible - {r['member_id'] for r in absent}
-        else:
+        planned = target.get('planned_member_ids')
+        eligible = active | set(planned or [])
+        if planned is None:
             votes = db().table('seminar_votes').select('member_id').eq('session_id', session_id).eq('attending', True).execute().data or []
-            planned = {r['member_id'] for r in votes}
+            planned = sorted({r['member_id'] for r in votes})
         no_shows = db().table('seminar_no_shows').select('member_id').eq('session_id', session_id).is_('cancelled_at', 'null').execute().data or []
-        return target, scoped, audit, mode, sorted(eligible), sorted(planned), {r['member_id'] for r in no_shows}
+        return target, scoped, audit, sorted(eligible), planned, {r['member_id'] for r in no_shows}
 
     @app.get('/admin/seminar_sessions/<session_id>/roster')
     @login_required(role='admin')
     def admin_seminar_roster(session_id):
-        target, members, audit, mode, eligible, planned, no_shows = roster_context(session_id)
-        input_ids = sorted(set(eligible) - set(planned)) if mode == 'absence' else planned
+        target, members, audit, eligible, planned, no_shows = roster_context(session_id)
         histories = db().table('history').select('seminar_session_id,present,groups,actual_member_ids,attendance_confirmed_at') \
             .eq('seminar_session_id', session_id).execute().data or []
         target['attendance_confirmed'] = attendance_is_confirmed(target, confirmed_history_session_ids(histories))
@@ -132,7 +123,7 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
         for row in audit:
             row['created_label'] = local_stamp(row.get('created_at'))
         return render_template('admin_seminar_roster.html', seminar=target, members=members,
-                               audit=audit, mode=mode, eligible_ids=eligible, input_ids=input_ids,
+                               audit=audit, eligible_ids=eligible,
                                planned_ids=planned, actual_ids=actual, csrf_token=csrf_token(),
                                grouped_ids=grouped, group_issues=group_issues, grouped_skipped=grouped_skipped,
                                default_basis=default_basis,
@@ -144,7 +135,7 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
     def seminar_roster_preview(session_id):
         check_csrf()
         try:
-            target, members, audit, mode, eligible, planned, _ = roster_context(session_id)
+            target, members, _, eligible, planned, _ = roster_context(session_id)
             body = request.get_json(silent=True) or request.form
             method = body.get('method', 'text')
             if method not in {'text', 'file', 'selected'}:
@@ -188,9 +179,9 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
                     raw_rows = parse_roster_text(str(body.get('text') or ''))
                 matches, issues = match_roster_rows(raw_rows, selectable)
                 ids = [int(m['id']) for m in matches]
-            expected = expected_member_ids(mode, ids, eligible)
+            expected = expected_member_ids('attendance', ids, eligible)
             by_id = {int(m['id']): m for m in members}
-            payload = {'session_id': session_id, 'user_id': session.get('user_id'), 'mode': mode,
+            payload = {'session_id': session_id, 'user_id': session.get('user_id'), 'mode': 'attendance',
                        'member_ids': sorted(ids), 'expected_member_ids': expected,
                        'previous_member_ids': planned, 'previous_updated_at': target.get('roster_updated_at'),
                        'term_revision': target['term_revision']}
@@ -206,6 +197,8 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
             return jsonify(status='error', message='명단을 읽지 못했습니다. 파일 형식과 회원 정보를 확인해주세요.'), 400
 
     def apply_preview(payload):
+        if payload.get('mode') != 'attendance':
+            return jsonify(status='error', message='참석 명단을 다시 미리보기한 뒤 반영해주세요.'), 409
         try:
             result = db().rpc('apply_seminar_roster_for_term', {
                 'p_session_id': payload['session_id'], 'p_member_ids': payload['member_ids'],
@@ -238,12 +231,12 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
     @login_required(role='admin')
     def seminar_roster_undo(session_id):
         check_csrf()
-        target, members, audit, mode, eligible, planned, _ = roster_context(session_id)
+        target, _, audit, _, planned, _ = roster_context(session_id)
         if not audit:
             return jsonify(status='error', message='되돌릴 명단 반영 내역이 없습니다.'), 400
         previous = sorted(audit[0].get('previous_member_ids') or [])
-        return apply_preview({'session_id': session_id, 'mode': mode,
-                              'member_ids': sorted(set(eligible) - set(previous)) if mode == 'absence' else previous,
+        return apply_preview({'session_id': session_id, 'mode': 'attendance',
+                              'member_ids': previous,
                               'expected_member_ids': previous, 'previous_member_ids': planned,
                               'previous_updated_at': target.get('roster_updated_at'),
                               'term_revision': target['term_revision']})
@@ -252,7 +245,7 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
     @login_required(role='admin')
     def seminar_attendance_confirm(session_id):
         check_csrf()
-        target, members, _, _, _, _, no_shows = roster_context(session_id)
+        target, members, _, _, _, no_shows = roster_context(session_id)
         if target.get('meeting_date', '') > datetime.now(KST).date().isoformat():
             return jsonify(status='error', message='아직 진행하지 않은 세미나는 출석을 확정할 수 없습니다.'), 400
         body = request.get_json(silent=True) or {}

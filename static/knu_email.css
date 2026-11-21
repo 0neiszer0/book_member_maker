@@ -1,0 +1,4 @@
+.knu-email-group{box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:stretch;min-width:0;width:100%;border:1px solid #8f969c;border-radius:5px;background:#fff}
+.knu-email-group:focus-within{border-color:#0374b5;outline:2px solid #0374b5;outline-offset:1px}
+.lms-page .knu-email-group input:not([type=checkbox]):not([type=radio]):not([type=hidden]){box-sizing:border-box;width:100%;min-width:0;border:0;border-radius:4px 0 0 4px;outline:none}
+.knu-email-suffix{display:flex;align-items:center;padding-inline:clamp(6px,2.5vw,12px);border-left:1px solid #c7cdd1;border-radius:0 4px 4px 0;background:#f2f4f5;color:#374854;font-size:14px;font-weight:700;white-space:nowrap}

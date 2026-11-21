@@ -255,7 +255,8 @@ class QuickSearchAndHandoverTests(unittest.TestCase):
     def test_public_handover_saves_normalized_school_email_without_exporting_it(self):
         path = f"/handover/{FORM_TOKEN}"
         token, html = self._public_csrf(path)
-        self.assertIn('name="knu_email" type="email" inputmode="email"', html)
+        self.assertIn('name="knu_email" type="text" inputmode="email"', html)
+        self.assertIn('class="knu-email-group"', html)
         self.assertIn("위키 초안에는 포함되지 않아요", html)
         response = self.client.post(path, data={
             "csrf_token": token, "role_name": "총무", "author_name": "김철수",
@@ -265,6 +266,11 @@ class QuickSearchAndHandoverTests(unittest.TestCase):
         self.assertNotIn("hobanu+staff@knu.ac.kr", response.get_data(as_text=True))
         stored = self.fake.rows["officer_handover_responses"]
         self.assertEqual(stored[0]["knu_email"], "hobanu+staff@knu.ac.kr")
+        bare = self.client.post(path, data={
+            "csrf_token": token, "role_name": "총무", "core_tasks": "업무", "knu_email": " Hobanu ",
+        })
+        self.assertEqual(bare.status_code, 200)
+        self.assertEqual(stored[1]["knu_email"], "hobanu@knu.ac.kr")
         draft = build_handover_wiki_draft(self.fake.rows["officer_handover_forms"][0], stored)
         self.assertIn("세미나 출석 정리", draft)
         self.assertNotIn(stored[0]["knu_email"], draft)
@@ -272,7 +278,7 @@ class QuickSearchAndHandoverTests(unittest.TestCase):
     def test_public_handover_rejects_non_school_email_and_preserves_form_values(self):
         path = f"/handover/{FORM_TOKEN}"
         token, _ = self._public_csrf(path)
-        for email in ("hobanu@example.test", "hobanu@knu.ac.kr.example", "K@knu.ac.kr", "a" * 245 + "@knu.ac.kr"):
+        for email in ("user@gmail.com", "hobanu@knu.ac.kr.example", "K@knu.ac.kr", "a" * 245 + "@knu.ac.kr"):
             with self.subTest(email=email):
                 response = self.client.post(path, data={
                     "csrf_token": token, "role_name": "총무", "author_name": "김철수",

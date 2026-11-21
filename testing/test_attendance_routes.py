@@ -1,5 +1,6 @@
 import importlib
 import os
+from datetime import date
 from io import BytesIO
 from types import SimpleNamespace
 import unittest
@@ -59,7 +60,73 @@ class AttendanceRouteTests(unittest.TestCase):
         self.assertEqual(captured['name'], 'apply_seminar_roster_for_term')
         self.assertEqual(captured['params']['p_term_revision'], 0)
         self.assertEqual(captured['params']['p_member_ids'], [2])
-        self.assertEqual(captured['params']['p_expected_member_ids'], [1])
+        self.assertEqual(captured['params']['p_expected_member_ids'], [2])
+        self.assertEqual(captured['params']['p_previous_member_ids'], [])
+        self.assertEqual(captured['params']['p_mode'], 'attendance')
+
+    def test_thursday_undo_uses_the_previous_attendance_list_from_legacy_audit(self):
+        self.fake.rows['seminar_sessions'][0]['planned_member_ids'] = [2, 1]
+        self.fake.rows['seminar_roster_imports'] = [{
+            'session_id': 'thu', 'mode': 'absence', 'member_ids': [],
+            'expected_member_ids': [2, 1], 'previous_member_ids': [1],
+            'created_at': '2026-08-12T06:00:00+00:00',
+        }]
+        html = self.client.get('/admin/seminar_sessions/thu/roster').get_data(as_text=True)
+        self.assertIn('본 세미나 참석 명단', html)
+        self.assertIn('불참 (이전 방식)', html)
+        with patch.object(self.fake, 'rpc', create=True) as rpc:
+            rpc.return_value.execute.return_value.data = {'accepted': True}
+            result = self.client.post('/api/admin/seminar_sessions/thu/roster/undo', headers=self.headers)
+        self.assertEqual(result.status_code, 200)
+        params = rpc.call_args.args[1]
+        self.assertEqual((params['p_mode'], params['p_member_ids'], params['p_expected_member_ids']),
+                         ('attendance', [1], [1]))
+        self.assertEqual(params['p_previous_member_ids'], [2, 1])
+
+    def test_thursday_and_monday_creation_use_opt_in(self):
+        for day_type, day in [('thu', date(2026, 8, 13)), ('mon', date(2026, 8, 17))]:
+            with self.subTest(day_type=day_type):
+                weeks = {self.module._week_start(day).isoformat(): 'week'}
+                payload = self.module._session_payload('term', day, day_type, weeks)
+                self.assertEqual(payload['participation_mode'], 'opt_in')
+                self.assertEqual(payload['is_active'], day_type == 'thu')
+
+    def test_no_show_recording_uses_votes_and_confirmed_actual_attendance(self):
+        for target in self.fake.rows['seminar_sessions']:
+            with self.subTest(day=target['day_type']):
+                session_id = target['id']
+                url = f'/api/admin/seminar_sessions/{session_id}/no_shows'
+                target.update(participation_mode='opt_in', planned_member_ids=None)
+                self.fake.rows['seminar_votes'] = [{'session_id': session_id, 'member_id': 2, 'attending': True}]
+                self.fake.rows['seminar_no_shows'] = []
+                with patch.object(self.module, '_rebuild_matrix_for_session') as rebuild:
+                    self.assertEqual(self.client.post(url, json={'member_ids': [1]}).status_code, 400)
+                    added = self.client.post(url, json={'member_ids': [2], 'note': 'test'})
+                    self.assertEqual(added.get_json()['added_count'], 1)
+                    self.fake.rows['seminar_no_shows'] = self.fake.rows['seminar_no_shows'][0]
+                    self.assertEqual(self.client.delete(f'{url}/2').status_code, 200)
+                    self.assertEqual(rebuild.call_count, 2)
+
+                    target.update(actual_member_ids=[1], attendance_confirmed_at='2026-08-20T00:00:00+00:00')
+                    self.assertEqual(self.client.post(url, json={'member_ids': [2]}).status_code, 400)
+                    self.assertEqual(self.client.post(url, json={'member_ids': [1]}).get_json()['added_count'], 1)
+                    self.assertEqual(target['actual_member_ids'], [])
+
+    def test_no_show_without_attendance_list_can_use_active_roster(self):
+        target = self.fake.rows['seminar_sessions'][0]
+        target['participation_mode'] = 'opt_in'
+        url = '/api/admin/seminar_sessions/thu/no_shows'
+        self.fake.rows['members'].append({'id': 3, 'name': 'Declined', 'is_active': True})
+        self.fake.rows['seminar_votes'] = [{'session_id': 'thu', 'member_id': 3, 'attending': False}]
+        self.fake.rows['seminar_absences'] = [{'session_id': 'thu', 'member_id': 2, 'cancelled_at': None}]
+        self.assertEqual(self.client.post(url, json={'member_ids': [2]}).status_code, 400)
+        self.assertEqual(self.client.post(url, json={'member_ids': [3]}).status_code, 400)
+        with patch.object(self.module, '_rebuild_matrix_for_session'):
+            self.assertEqual(self.client.post(url, json={'member_ids': [1]}).get_json()['added_count'], 1)
+        legacy = '/api/admin/seminar_sessions/thu/absences'
+        self.assertEqual(self.client.post(legacy, json={'member_ids': [1]}).status_code, 410)
+        self.assertEqual(self.client.delete(f'{legacy}/2').status_code, 410)
+        self.assertIsNone(self.fake.rows['seminar_absences'][0]['cancelled_at'])
 
     def test_unknown_names_prevent_partial_apply_token(self):
         result = self.client.post('/api/admin/seminar_sessions/mon/roster/preview', headers=self.headers, json={'method': 'text', 'text': '운영\n모르는사람'}).get_json()
@@ -100,7 +167,7 @@ class AttendanceRouteTests(unittest.TestCase):
         self.fake.calls.clear()
         html = self.client.get('/admin/seminar_sessions/thu/roster').get_data(as_text=True)
         self.assertEqual(self.checked_actual(html), {2})  # not the whole eligible roster
-        self.assertIn('예정 2명 / 조 편성 1명 · 기본 선택: 조 편성 명단', html)
+        self.assertIn('예정 0명 / 조 편성 1명 · 기본 선택: 조 편성 명단', html)
         self.assertIn('id="use-grouped" data-ids="[2]"', html)
         self.assertIn('모르는사람(회원 명단에 없음)', html)
         self.assertIn('불참으로 기록돼 선택하지 않은 사람: 불참자', html)
@@ -114,11 +181,17 @@ class AttendanceRouteTests(unittest.TestCase):
         self.assertIn('기본 선택: 참석 예정 명단', html)
         self.assertIn('조 편성 명단으로 선택', html)
 
-    def test_without_group_plan_the_page_is_unchanged(self):
+    def test_thursday_without_a_roster_uses_explicit_attendance_votes_only(self):
         html = self.client.get('/admin/seminar_sessions/thu/roster').get_data(as_text=True)
         self.assertIn('조 편성 없음', html)
         self.assertNotIn('id="use-grouped"', html)
-        self.assertEqual(self.checked_actual(html), {1, 2})
+        self.assertEqual(self.checked_actual(html), set())
+        self.fake.rows['seminar_votes'] = [
+            {'session_id': 'thu', 'member_id': 1, 'attending': False},
+            {'session_id': 'thu', 'member_id': 2, 'attending': True},
+        ]
+        html = self.client.get('/admin/seminar_sessions/thu/roster').get_data(as_text=True)
+        self.assertEqual(self.checked_actual(html), {2})
 
     def test_confirmed_attendance_is_not_replaced_by_group_plan(self):
         self.add_group_plan()

@@ -112,7 +112,7 @@ def operations_summary(db, term_id=None, session_id=None, today=None):
             {'key': 'book', 'label': '도서 입력', 'done': title != '도서 미정', 'action': '도서·사회자 편집'},
             {'key': 'moderator', 'label': '사회자 입력', 'done': bool(str(target.get('moderator_name') or '').strip()), 'action': '사회자 입력'},
             {'key': 'topics', 'label': '발제문 수집 준비', 'done': bool(event), 'action': '발제문 수집 열기'},
-            {'key': 'roster', 'label': '카카오톡 참석·불참 명단 반영', 'done': bool(target.get('roster_updated_at')), 'action': '명단 반영'},
+            {'key': 'roster', 'label': '카카오톡 참석 명단 반영', 'done': bool(target.get('roster_updated_at')), 'action': '명단 반영'},
             {'key': 'groups', 'label': '조 편성 저장', 'done': target['id'] in grouped_sessions, 'action': '조 편성'},
         ]
         if target['meeting_date'] <= today.isoformat():

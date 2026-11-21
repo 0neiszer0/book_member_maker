@@ -1,5 +1,6 @@
 {% extends 'auth_base.html' %}
 {% from '_auth_code.html' import auth_code %}
+{% from '_knu_email_input.html' import knu_email_input %}
 {% block title %}로그인 · 책 먹는 호반우{% endblock %}
 {% block head %}
 {{ super() }}
@@ -44,8 +45,8 @@
       <input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
       <input type="hidden" name="next" value="{{ next_url or '' }}">
       <input type="hidden" name="purpose" value="{{ purpose }}">
-      <label class="auth-label">학교 메일(@knu.ac.kr)
-        <input class="auth-input" name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254" value="{{ email or '' }}" placeholder="예: hobanu@knu.ac.kr" aria-describedby="school-email-help" required>
+      <label class="auth-label">학교 메일 아이디
+        {{ knu_email_input(value=email or '', describedby='school-email-help', required=true) }}
       </label>
       <button class="auth-btn auth-btn-primary" type="submit">인증코드 받기</button>
     </form>
@@ -57,8 +58,8 @@
     <form class="auth-form" method="post" action="{{ url_for('login_pin') }}">
       <input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
       <input type="hidden" name="next" value="{{ next_url or '' }}">
-      <label class="auth-label">학교 메일(@knu.ac.kr) 또는 학번
-        <input class="auth-input" name="identifier" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="254" value="{{ pin_identifier or '' }}" placeholder="예: hobanu@knu.ac.kr 또는 2026123456" required>
+      <label class="auth-label">학교 메일 아이디 또는 학번
+        <input class="auth-input" name="identifier" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="254" value="{{ pin_identifier or '' }}" placeholder="예: hobanu 또는 2026123456" required>
       </label>
       {{ auth_code('pin', 'PIN', 'login-pin', 'current-password', masked=true) }}
       {% if pin_error %}<p class="auth-error" role="alert">{{ pin_error }}</p>{% endif %}

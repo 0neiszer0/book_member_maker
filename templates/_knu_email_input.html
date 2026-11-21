@@ -1,0 +1,8 @@
+{% macro knu_email_input(name='email', value='', describedby='', required=false, disabled=false) %}
+<span class="knu-email-group">
+  <input name="{{ name }}" type="text" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false"
+         maxlength="254" placeholder="예: hobanu" value="{{ value }}" data-knu-email-input
+         {% if describedby %}aria-describedby="{{ describedby }}"{% endif %}{% if required %} required{% endif %}{% if disabled %} disabled{% endif %}>
+  <span class="knu-email-suffix" aria-hidden="true">@knu.ac.kr</span>
+</span>
+{% endmacro %}

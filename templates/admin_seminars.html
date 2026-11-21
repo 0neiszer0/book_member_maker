@@ -118,7 +118,7 @@
           <button type="button" class="btn primary mt-3" data-open-schedule="{{ week.id }}">도서·사회자 함께 편집</button>
         </div>
         <div class="rounded-2xl border ops-border p-4 order-3">
-          <div class="flex justify-between gap-2"><div><p class="text-xs font-bold muted">추가 세미나</p><h3 class="font-extrabold">참석 투표</h3></div>{% if mon and mon.is_active %}<span class="chip">예정 {{ mon.expected_count }}명</span>{% endif %}</div>
+          <div class="flex justify-between gap-2"><div><p class="text-xs font-bold muted">추가 세미나</p><h3 class="font-extrabold">참석 명단</h3></div>{% if mon and mon.is_active %}<span class="chip">예정 {{ mon.expected_count }}명</span>{% endif %}</div>
           {% if mon and mon.is_active %}
             <p class="text-sm muted mt-2">{{ mon.meeting_date|seminar_date }} · 정원·선착순 제한 없음</p>
             <div class="flex flex-wrap gap-2 mt-3"><a class="btn primary" href="{{ url_for('admin_seminar_roster', session_id=mon.id) }}">카카오톡 참석 명단 반영·출석 확정</a></div>
@@ -131,34 +131,13 @@
           {% else %}<p class="muted text-sm mt-3">추가 세미나를 운영하지 않는 주차입니다.</p>{% if mon %}<button type="button" class="btn soft enable-additional" data-session-id="{{ mon.id }}">필요할 때 추가 세미나 열기</button>{% endif %}{% endif %}
         </div>
         <div class="rounded-2xl border ops-border p-4 order-2">
-          <div class="flex justify-between gap-2"><div><p class="text-xs font-bold muted">본 세미나</p><h3 class="font-extrabold">불참 기록</h3></div>{% if thu %}<span class="chip">예정 {{ thu.expected_count }}명</span>{% endif %}</div>
+          <div class="flex justify-between gap-2"><div><p class="text-xs font-bold muted">본 세미나</p><h3 class="font-extrabold">참석 명단</h3></div>{% if thu %}<span class="chip">예정 {{ thu.expected_count }}명</span>{% endif %}</div>
           {% if thu %}
-            <p class="text-sm muted mt-2">{{ thu.meeting_date|seminar_date }} · 불참 {{ thu.absences|length }}명</p>
-            <div class="flex flex-wrap gap-2 mt-3"><a class="btn primary" href="{{ url_for('admin_seminar_roster', session_id=thu.id) }}">카카오톡 불참 명단 반영·출석 확정</a></div>
+            <p class="text-sm muted mt-2">{{ thu.meeting_date|seminar_date }} · 정원·선착순 제한 없음</p>
+            <div class="flex flex-wrap gap-2 mt-3"><a class="btn primary" href="{{ url_for('admin_seminar_roster', session_id=thu.id) }}">카카오톡 참석 명단 반영·출석 확정</a></div>
             <p class="text-sm muted mt-2">{{ '실제 출석 확정됨' if thu.attendance_confirmed else '실제 출석 미확정' }} · {{ '명단 반영됨' if thu.roster_updated_at else '투표 결과 반영 전' }}</p>
             <p class="text-sm mt-2">사회자: <span data-moderator-display="{{ thu.id }}">{{ thu.moderator_name or '미입력' }}</span> <button type="button" class="underline" data-open-schedule="{{ week.id }}" data-focus-session="{{ thu.id }}">수정</button>{% if week.topic_event %} · <a class="underline" href="{{ url_for('download_topics_word', event_id=week.topic_event.id, session_id=thu.id) }}">이 회차 Word</a>{% endif %}</p>
-            {% if thu.planned_member_ids is none %}
-            <div class="flex flex-wrap gap-1 mt-3">{% for a in thu.absences %}<button class="chip absence-cancel" title="불참 취소" data-session-id="{{ thu.id }}" data-member-id="{{ a.member.id }}">{{ a.member.name }}{% if a.note %} · {{ a.note }}{% endif %} ×</button>{% else %}<span class="text-sm muted">등록된 불참자가 없습니다.</span>{% endfor %}</div>
-            <details class="absence-picker mt-3 rounded-xl border ops-border ops-surface p-3">
-              <summary class="font-bold cursor-pointer">여러 명 한 번에 선택</summary>
-              <div class="mt-3">
-                <div class="flex flex-wrap items-center gap-2">
-                  <input class="field absence-search flex-1 min-w-[180px]" type="search" placeholder="이름·학번·학과 검색" aria-label="불참 회원 검색">
-                  <span class="chip absence-selected-count">0명 선택</span>
-                </div>
-                <div class="flex flex-wrap gap-2 mt-2"><button type="button" class="btn soft select-visible-absences">검색 결과 전체 선택</button><button type="button" class="btn soft clear-absence-selection">선택 해제</button></div>
-                <div class="grid sm:grid-cols-2 gap-2 mt-3 max-h-60 overflow-y-auto pr-1 absence-options">
-                  {% set picker = namespace(count=0) %}
-                  {% for m in all_members %}{% if m.id not in thu.absent_member_ids %}{% set picker.count = picker.count + 1 %}
-                    <label class="absence-option flex items-center gap-2" data-search="{{ (m.name ~ ' ' ~ (m.student_id or '') ~ ' ' ~ (m.department or ''))|lower }}"><input class="absence-checkbox" type="checkbox" value="{{ m.id }}"><span class="min-w-0"><strong>{{ m.name }}</strong><span class="block text-xs muted truncate">{{ m.student_id or '학번 없음' }} · {{ m.department or '학과 없음' }}</span></span></label>
-                  {% endif %}{% endfor %}
-                  {% if picker.count == 0 %}<p class="text-sm muted sm:col-span-2">모든 활성 회원이 이미 불참자로 등록되어 있습니다.</p>{% endif %}
-                </div>
-                <input class="field bulk-absence-note mt-3" placeholder="선택한 회원에게 공통 메모 추가(선택)">
-                <button type="button" class="btn primary add-absences mt-2" data-session-id="{{ thu.id }}" {% if picker.count == 0 %}disabled{% endif %}>선택한 회원 불참 처리</button>
-              </div>
-            </details>
-            {% endif %}
+            <div class="flex flex-wrap gap-1 mt-3">{% for m in thu.attendees %}<span class="chip">{{ m.name }}</span>{% else %}<span class="text-sm muted">반영된 참석 예정자가 없습니다.</span>{% endfor %}</div>
             <div class="flex flex-wrap gap-2 mt-4"><a class="btn primary" href="{{ url_for('bookclub_index', session_id=thu.id) }}">조 편성</a>{% if thu.history %}<a class="btn soft" href="{{ url_for('records_seminar_detail', history_id=thu.history.id) }}">진행 기록</a>{% endif %}{% if not thu.review_form %}<button class="btn soft open-review" data-session-id="{{ thu.id }}">후기 받기</button>{% endif %}</div>
             {{ review_panel(thu) }}
             {{ no_show_panel(thu) }}
@@ -177,11 +156,8 @@
 {% block scripts %}
 <script>
 async function api(url, options={}){const r=await fetch(url,{headers:{'Content-Type':'application/json'},...options});const j=await r.json();if(!r.ok||j.status==='error')throw new Error(j.message||j.error||'처리하지 못했습니다.');return j}
-function updateAbsenceSelection(picker){const count=picker.querySelectorAll('.absence-checkbox:checked').length;picker.querySelector('.absence-selected-count').textContent=count+'명 선택'}
 function updateNoShowSelection(picker){const count=picker.querySelectorAll('.no-show-checkbox:checked').length;picker.querySelector('.no-show-selected-count').textContent=count+'명 선택'}
 document.addEventListener('input',e=>{
- if(e.target.matches('.absence-search')){const picker=e.target.closest('.absence-picker'),query=e.target.value.trim().toLowerCase();picker.querySelectorAll('.absence-option').forEach(option=>option.hidden=!option.dataset.search.includes(query))}
- if(e.target.matches('.absence-checkbox'))updateAbsenceSelection(e.target.closest('.absence-picker'))
  if(e.target.matches('.no-show-search')){const picker=e.target.closest('.no-show-picker'),query=e.target.value.trim().toLowerCase();picker.querySelectorAll('.no-show-option').forEach(option=>option.hidden=!option.dataset.search.includes(query))}
  if(e.target.matches('.no-show-checkbox'))updateNoShowSelection(e.target.closest('.no-show-picker'))
 })
@@ -203,10 +179,6 @@ document.addEventListener('click',async e=>{
   if(e.target.closest('.open-review')){const b=e.target.closest('.open-review'),result=await api('/api/admin/seminar_sessions/'+b.dataset.sessionId+'/review-form',{method:'POST',body:'{}'});await navigator.clipboard.writeText(result.url);alert('후기 링크를 열고 복사했습니다.');location.reload()}
   if(e.target.closest('.review-form-status')){const b=e.target.closest('.review-form-status');await api('/api/admin/engagement/forms/seminar/'+b.dataset.formId+'/status',{method:'POST',body:JSON.stringify({status:b.dataset.status})});location.reload()}
   if(e.target.closest('.save-capacity')){const b=e.target.closest('.save-capacity');await api('/api/admin/seminar_sessions/'+b.dataset.sessionId+'/capacity',{method:'PATCH',body:JSON.stringify({capacity:Number(b.parentElement.querySelector('.capacity').value)})});location.reload()}
-  if(e.target.closest('.select-visible-absences')){const picker=e.target.closest('.absence-picker');picker.querySelectorAll('.absence-option:not([hidden]) .absence-checkbox').forEach(input=>input.checked=true);updateAbsenceSelection(picker);return}
-  if(e.target.closest('.clear-absence-selection')){const picker=e.target.closest('.absence-picker');picker.querySelectorAll('.absence-checkbox').forEach(input=>input.checked=false);updateAbsenceSelection(picker);return}
-  if(e.target.closest('.add-absences')){const b=e.target.closest('.add-absences'),picker=b.closest('.absence-picker'),memberIds=[...picker.querySelectorAll('.absence-checkbox:checked')].map(input=>Number(input.value));if(!memberIds.length)throw new Error('불참 회원을 한 명 이상 선택해주세요.');b.disabled=true;b.textContent='저장 중…';await api('/api/admin/seminar_sessions/'+b.dataset.sessionId+'/absences',{method:'POST',body:JSON.stringify({member_ids:memberIds,note:picker.querySelector('.bulk-absence-note').value})});location.reload()}
-  if(e.target.closest('.absence-cancel')){const b=e.target.closest('.absence-cancel');if(confirm('이 불참 기록을 취소할까요? 기록 자체는 이력에 남습니다.')){await api('/api/admin/seminar_sessions/'+b.dataset.sessionId+'/absences/'+b.dataset.memberId,{method:'DELETE'});location.reload()}}
   if(e.target.closest('.select-visible-no-shows')){const picker=e.target.closest('.no-show-picker');picker.querySelectorAll('.no-show-option:not([hidden]) .no-show-checkbox').forEach(input=>input.checked=true);updateNoShowSelection(picker);return}
   if(e.target.closest('.clear-no-show-selection')){const picker=e.target.closest('.no-show-picker');picker.querySelectorAll('.no-show-checkbox').forEach(input=>input.checked=false);updateNoShowSelection(picker);return}
   if(e.target.closest('.add-no-shows')){const b=e.target.closest('.add-no-shows'),picker=b.closest('.no-show-picker'),memberIds=[...picker.querySelectorAll('.no-show-checkbox:checked')].map(input=>Number(input.value));if(!memberIds.length)throw new Error('미연락 불참 회원을 한 명 이상 선택해주세요.');b.disabled=true;b.textContent='저장 중…';await api('/api/admin/seminar_sessions/'+b.dataset.sessionId+'/no_shows',{method:'POST',body:JSON.stringify({member_ids:memberIds,note:picker.querySelector('.bulk-no-show-note').value})});location.reload()}

@@ -47,6 +47,17 @@ class CurrentUiContractsTest(unittest.TestCase):
         self.assertIn('name="action" value="create"', identity)
         self.assertIn("이미 동아리 명부에 등록되어 있어요", identity)
 
+    def test_school_email_inputs_share_a_responsive_suffix(self):
+        for template in ("login", "signup", "officer_handover_form"):
+            self.assertIn("import knu_email_input", self.read(f"templates/{template}.html"))
+        macro = self.read("templates/_knu_email_input.html")
+        self.assertIn('type="text" inputmode="email"', macro)
+        self.assertIn('data-knu-email-input', macro)
+        self.assertIn('aria-hidden="true">@knu.ac.kr</span>', macro)
+        for stylesheet in ("lms_auth.css", "lms_engagement.css"):
+            self.assertIn("@import url('knu_email.css');", self.read(f"static/{stylesheet}"))
+        self.assertIn(".knu-email-group:focus-within", self.read("static/knu_email.css"))
+
     def test_seminar_reviews_are_managed_in_seminar_screen(self):
         seminars = self.read("templates/admin_seminars.html")
         engagement = self.read("templates/admin_engagement.html")

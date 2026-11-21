@@ -111,6 +111,21 @@ class MakingTeamDayDefaultTests(unittest.TestCase):
         html = response.get_data(as_text=True)
         self.assertIn('<a href="?day=mon" class="groups-fill lms-button">', html)
 
+    def test_unmigrated_future_thursday_uses_votes_and_past_thursday_keeps_legacy_defaults(self):
+        target = self.fake.rows['seminar_sessions'][0]
+        target['participation_mode'] = 'absence_only'
+        for meeting_date, checked in [('2099-08-13', False), ('2000-08-13', True)]:
+            target['meeting_date'] = meeting_date
+            with patch.object(self.module, 'get_next_seminar_dates', return_value=[date.fromisoformat(meeting_date)]):
+                for query in ('?session_id=thu', '?day=thu'):
+                    with self.subTest(meeting_date=meeting_date, query=query):
+                        page = self.client.get('/making_team' + query).get_data(as_text=True)
+                        self.assertIn(f'id="cnt-voted">{int(checked)}</strong>', page)
+        target['meeting_date'] = '2099-08-13'
+        self.fake.rows['seminar_votes'] = [{'session_id': 'thu', 'member_id': 1, 'attending': True}]
+        page = self.client.get('/making_team?session_id=thu').get_data(as_text=True)
+        self.assertIn('id="cnt-voted">1</strong>', page)
+
 
 if __name__ == '__main__':
     unittest.main()

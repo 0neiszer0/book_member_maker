@@ -13,7 +13,7 @@
         <div class="groups-flex groups-items-start groups-justify-between groups-gap-4 groups-flex-wrap">
             <div>
                 <h1 class="work-header-title  ">조 편성 작업</h1>
-                <p class="groups-text-sm groups-mt-1">{% if selected_session %}{{ selected_session.meeting_date|seminar_date }} · {% if selected_session.day_type == 'mon' %}추가 세미나{% else %}본 세미나{% endif %} · {{ selected_session.book_title or '도서 미입력' }}{% else %}추가 세미나 참석과 본 세미나 불참 기록을 기준으로 명단을 준비했습니다.{% endif %}</p>
+                <p class="groups-text-sm groups-mt-1">{% if selected_session %}{{ selected_session.meeting_date|seminar_date }} · {% if selected_session.day_type == 'mon' %}추가 세미나{% else %}본 세미나{% endif %} · {{ selected_session.book_title or '도서 미입력' }}{% else %}본 세미나와 추가 세미나의 참석 명단을 기준으로 조를 편성합니다.{% endif %}</p>
             </div>
             <div class="groups-flex groups-gap-2 groups-flex-wrap groups-items-center">
                 <button type="button" id="manage-history-btn" class=" lms-button">이전 세미나 기록</button>

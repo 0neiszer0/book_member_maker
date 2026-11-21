@@ -12,7 +12,7 @@ class GuidesAndRecordEditingTest(unittest.TestCase):
     def test_member_guide_leads_with_current_required_flow_and_links(self):
         guide = self.read("templates/help_member.html")
         self.assertIn("참여 전 확인할 3가지", guide)
-        self.assertIn("해당 회차의 카카오톡 투표와 공지에 따라", guide)
+        self.assertIn("참석할 회차의 카카오톡 참석 투표에 참여해주세요.", guide)
         self.assertIn("추가 세미나는 개설된 회차만", guide)
         self.assertIn("회차에 맞는 발제문 제출", guide)
         self.assertIn("url_for('seminars')", guide)
@@ -24,7 +24,8 @@ class GuidesAndRecordEditingTest(unittest.TestCase):
         for section_id in ("weekly", "term-start", "term-end", "yearly", "records"):
             self.assertIn(f'id="{section_id}"', guide)
         self.assertIn("날짜·도서 편집", guide)
-        self.assertIn("무단 불참자는", guide)
+        self.assertIn("본 세미나와 추가 세미나 모두 참석 투표자를 입력합니다.", guide)
+        self.assertIn("미연락 불참자는", guide)
 
     def test_seminar_records_use_one_edit_dialog(self):
         template = self.read("templates/records_seminars.html")

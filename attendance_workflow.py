@@ -21,6 +21,26 @@ def attendance_is_confirmed(seminar, confirmed_history_ids=()):
                 or str(seminar.get('id')) in confirmed_history_ids)
 
 
+def uses_legacy_absence_roster(seminar, today):
+    """Only historical grouping can infer attendance from an old absence roster."""
+    return seminar.get('participation_mode') == 'absence_only' and (
+        attendance_is_confirmed(seminar) or seminar['meeting_date'] < today
+    )
+
+
+def no_show_roster_ids(seminar, active_ids, vote_ids, legacy_absent_ids):
+    """Prefer a saved roster, then a confirmed snapshot, then available votes."""
+    planned = seminar.get('planned_member_ids')
+    if planned is not None:
+        return set(planned)
+    actual = seminar.get('actual_member_ids')
+    if seminar.get('attendance_confirmed_at') and actual is not None:
+        return set(actual)
+    if seminar.get('participation_mode') == 'opt_in' and vote_ids:
+        return active_ids & vote_ids
+    return active_ids - legacy_absent_ids
+
+
 def match_roster_rows(rows, members):
     """Match IDs/names exactly. Never choose the first ambiguous member."""
     by_name, by_student = defaultdict(list), defaultdict(list)

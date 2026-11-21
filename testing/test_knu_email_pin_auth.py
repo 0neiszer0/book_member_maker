@@ -292,6 +292,26 @@ class KnuEmailPinTests(unittest.TestCase):
         failed_pin = self.pin().get_data(as_text=True)
         self.assertIn('<details id="pin-login" class="auth-details" open>', failed_pin)
 
+    def test_school_email_requests_and_pin_login_accept_bare_school_ids(self):
+        response = self.client.get("/login")
+        self.assertIn('class="knu-email-group"', response.get_data(as_text=True))
+        self.assertIn('placeholder="예: hobanu"', response.get_data(as_text=True))
+        self.assertEqual(self.send(email=" Hobanu ").status_code, 200)
+        self.assertEqual(self.sent[-1][0], "hobanu@knu.ac.kr")
+        self.now += timedelta(minutes=2)
+        self.assertEqual(self.send(email="HOBANU@KNU.AC.KR").status_code, 200)
+        self.assertEqual(self.sent[-1][0], "hobanu@knu.ac.kr")
+        self.assertEqual(self.send(email="user@gmail.com").status_code, 400)
+        self.assertEqual(self.send(email="K").status_code, 400)
+
+        self.linked(pin="123456", email="hobanu@knu.ac.kr")
+        for identifier in (" Hobanu ", "hobanu@knu.ac.kr", "2022 000003"):
+            with self.subTest(identifier=identifier):
+                self.assertEqual(self.pin(identifier=identifier, client=self.app.test_client()).status_code, 302)
+        invalid = self.pin(identifier="user@gmail.com", client=self.app.test_client())
+        self.assertEqual(invalid.status_code, 400)
+        self.assertIn(local_auth.EMAIL_ERROR, invalid.get_data(as_text=True))
+
     def test_signup_with_verified_grant_redirects_to_enrollment(self):
         self.send()
         self.verify()

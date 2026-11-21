@@ -1,3 +1,4 @@
+@import url('knu_email.css');
 /* Account and applicant forms use the LMS type, input, and button geometry. */
 .auth-card,.auth-section,.auth-profile,.auth-details,.auth-back{max-width:620px}
 .auth-card,.auth-section{border:1px solid #c7cdd1;padding:24px;background:#fff}

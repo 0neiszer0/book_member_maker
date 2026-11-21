@@ -87,6 +87,15 @@ def normalize_login_id(value):
     return str(value or '').strip().lower()
 
 
+def normalize_knu_email_input(raw):
+    value = (raw or '').strip().lower()
+    return value + '@knu.ac.kr' if value and '@' not in value else value
+
+
+def valid_knu_email_input(raw, email):
+    return raw.strip().isascii() and len(email) <= 254 and bool(KNU_EMAIL_RE.fullmatch(email))
+
+
 def password_problem(password, *, officer=False, login_id='', student_id='', name=''):
     """Return a Korean message describing why the password is not allowed, or None."""
     password = password or ''
@@ -388,12 +397,13 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
 
     @app.post('/auth/email/request')
     def email_auth_request():
-        email = (request.form.get('email') or '').strip().lower()
+        raw_email = request.form.get('email', '')
+        email = normalize_knu_email_input(raw_email)
         purpose = request.form.get('purpose') or 'login'
         if purpose not in EMAIL_PURPOSES:
             abort(400)
-        if len(email) > 254 or not KNU_EMAIL_RE.fullmatch(email):
-            return email_page(email, purpose, error=EMAIL_ERROR, status=400)
+        if not valid_knu_email_input(raw_email, email):
+            return email_page(raw_email, purpose, error=EMAIL_ERROR, status=400)
         code_id = str(uuid4())
         code = f'{secrets.randbelow(1_000_000):06d}'
         trusted_proxy = bool(g.get('trusted_app_proxy'))
@@ -555,16 +565,16 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
 
         if not SIX_DIGITS.fullmatch(pin):
             return show('PIN 숫자 6자리를 입력해주세요.', 400)
-        if '@' in identifier:
-            email = identifier.lower()
-            if len(email) > 254 or not KNU_EMAIL_RE.fullmatch(email):
+        student_id = normalize_member_student_id(identifier)
+        if not identifier or re.fullmatch(r'[0-9]+', student_id):
+            if not re.fullmatch(r'[0-9]{4,20}', student_id):
+                return show('학교 메일 아이디 또는 학번을 입력해주세요.', 400)
+            member = email_auth_member('student_id', student_id)
+        else:
+            email = normalize_knu_email_input(identifier)
+            if not valid_knu_email_input(identifier, email):
                 return show(EMAIL_ERROR, 400)
             member = email_auth_member('knu_email', email)
-        else:
-            student_id = normalize_member_student_id(identifier)
-            if not re.fullmatch(r'[0-9]{4,20}', student_id):
-                return show('학교 메일 또는 학번을 입력해주세요.', 400)
-            member = email_auth_member('student_id', student_id)
 
         generic_error = '학교 메일·학번 또는 PIN이 맞지 않습니다.'
         if can_login(member) and (is_officer_role(member) or has_term_assignment(db(), member['id'])):
@@ -971,9 +981,8 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
         value = data.get('knu_email') if isinstance(data, dict) else None
         if not isinstance(value, str):
             return jsonify(status='error', message=EMAIL_ERROR), 400
-        value = value.strip()
-        email = value.lower()
-        if value and (not value.isascii() or len(value) > 254 or not KNU_EMAIL_RE.fullmatch(email)):
+        email = normalize_knu_email_input(value)
+        if email and not valid_knu_email_input(value, email):
             return jsonify(status='error', message=EMAIL_ERROR), 400
         only_if_unlinked = data.get('only_if_unlinked') is True
         if only_if_unlinked and not email:
