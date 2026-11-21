@@ -53,7 +53,7 @@ from home_overview import date_label, member_seminar_summary, operations_summary
 from attendance_workflow import (attendance_is_confirmed, confirmed_history_session_ids,
                                  no_show_roster_ids, uses_legacy_absence_roster)
 from security_utils import forwarded_client_address, safe_internal_next_url
-from minipc_security import install_security, session_login_current
+from minipc_security import install_security, session_login_current, LOGIN_PROVIDERS
 from local_auth import install_local_auth
 from session_cookie import QuietRefreshSessionInterface
 from static_assets import install_static_assets
@@ -4484,12 +4484,19 @@ def _date_in_range(d, start, end):
 @app.route('/help/admin')
 @login_required(role="admin")
 def help_admin():
+    if app.config.get('WIKI_ENABLED') and request.args.get('classic') != '1':
+        return redirect(url_for('wiki.document', title='운영진:운영 안내'))
     return render_template('help_admin.html')
 
 
 @app.route('/help/member')
 @login_required(role="ANY")
 def help_member():
+    if (app.config.get('WIKI_ENABLED')
+            and request.args.get('classic') != '1'
+            and session.get('user_id')
+            and session.get('auth_provider') in LOGIN_PROVIDERS):
+        return redirect(url_for('wiki.document', title='사이트 이용 안내'))
     return render_template('help_member.html')
 
 

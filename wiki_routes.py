@@ -67,7 +67,7 @@ def clean_wiki_html(source):
         if href.startswith('/w/'):
             a['href'] = url_for('wiki.document', title=unquote(parsed.path[3:]), _anchor=parsed.fragment or None)
         elif parsed.scheme in ('http', 'https') and parsed.hostname == 'knu-read.xyz':
-            a['href'] = (parsed.path or '/') + ('?' + parsed.query if parsed.query else '')
+            a['href'] = (parsed.path or '/') + ('?' + parsed.query if parsed.query else '') + ('#' + parsed.fragment if parsed.fragment else '')
         elif href.startswith('#') or parsed.scheme in ('http', 'https'):
             a['rel'] = 'noreferrer noopener'
         elif href.startswith('/edit/'):
