@@ -89,12 +89,14 @@ class LandingAndSearchTests(unittest.TestCase):
 
         dash = BeautifulSoup(self.client.get("/").data, "html.parser")
         self.assertIsNone(dash.select_one(".lms-breadcrumb"))
+        self.assertIsNone(dash.select_one(".lms-global [data-lms-quick-search]"))
         self.assertIsNotNone(dash.select_one(".lms-dashboard-heading [data-lms-quick-search]"))
         self.assertIsNotNone(dash.select_one(".lms-mobile-header [data-lms-quick-search]"))
         self.assertIsNotNone(dash.select_one("a[href='/landing']"))
         self.assertNotIn("notion", str(dash).lower())
 
         cal = BeautifulSoup(self.client.get("/calendar").data, "html.parser")
+        self.assertIsNone(cal.select_one(".lms-global [data-lms-quick-search]"))
         self.assertIsNotNone(cal.select_one(".lms-breadcrumb [data-lms-quick-search]"))
         self.assertIsNotNone(cal.select_one(".lms-mobile-header [data-lms-quick-search]"))
         self.assertIsNotNone(cal.select_one("a[href='/landing']"))

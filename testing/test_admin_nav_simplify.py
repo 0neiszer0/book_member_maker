@@ -113,16 +113,32 @@ class AdminNavigationSimplifyTests(unittest.TestCase):
         _, links = course_menu(html)
         texts = [t for _, _, t in links]
         self.assertIn('맡은 업무', texts)
-        for staff_only in ('도서·일정·사회자', '발제문 관리', '학기 설정', '학기 참석 현황'):
+        for staff_only in ('세미나 운영', '도서·일정·사회자', '발제문 관리', '출석·조 편성', '학기 설정', '학기 참석 현황'):
             self.assertNotIn(staff_only, texts)
 
     def test_officer_settings_links_follow_capabilities(self):
         self.login('officer')
         _, links = course_menu(self.page('/seminars?term_id=term'))
         texts = [t for _, _, t in links]
-        self.assertIn('도서·일정·사회자', texts)
+        self.assertIn('세미나 운영', texts)
+        for removed in ('도서·일정·사회자', '발제문 관리', '출석·조 편성'):
+            self.assertNotIn(removed, texts)
         self.assertNotIn('>전체 설정</a>', self.page('/admin/dashboard'), 'global settings stay primary-admin only')
         self.assertEqual(self.client.get('/operations/settings').status_code, 403)
+
+    def test_seminar_subpages_highlight_consolidated_seminar_operations_link(self):
+        self.login('admin')
+        for path in (
+            '/admin/seminars?term_id=term',
+            '/admin/seminars?term_id=term&section=topics',
+            '/admin/seminars?term_id=term&section=attendance',
+            '/admin/topics/event/view',
+            '/admin/seminar_sessions/wed/roster',
+        ):
+            with self.subTest(path=path):
+                menu, landed = course_menu(self.page(path))
+                self.assertEqual(menu, '학기 강의실 메뉴')
+                self.assertIn('세미나 운영', [t for _, current, t in landed if current])
 
 
 if __name__ == '__main__':

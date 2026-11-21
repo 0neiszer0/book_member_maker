@@ -8,22 +8,23 @@
 {% macro review_panel(seminar_session) -%}
   {% if seminar_session.review_form %}
   {% set form=seminar_session.review_form %}
-  <details class="session-review mt-4 rounded-xl border ops-border ops-surface p-3">
+  <details class="session-review op-subpanel mt-4 rounded-xl border ops-border ops-surface p-3">
     <summary class="cursor-pointer list-none">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <strong>이 회차 후기</strong>
-        <span class="flex items-center gap-2"><span class="chip">{{ '접수 중' if form.status == 'open' else '마감' }}</span><span class="chip">{{ form.submission_count }}명 제출</span><span aria-hidden="true">⌄</span></span>
+        <span class="flex items-center gap-2"><span class="chip op-status-pill">{{ '접수 중' if form.status == 'open' else '마감' }}</span><span class="chip op-status-pill">{{ form.submission_count }}명 제출</span><span aria-hidden="true">⌄</span></span>
       </div>
     </summary>
     <div class="flex flex-wrap gap-2 mt-3 pb-3 border-b ops-border">
-      <button class="btn soft" data-copy="{{ form.share_url }}">후기 링크 복사</button>
-      <button class="btn soft review-form-status" data-form-id="{{ form.id }}" data-status="{{ 'closed' if form.status == 'open' else 'open' }}">{{ '접수 마감' if form.status == 'open' else '다시 열기' }}</button>
+      <button type="button" class="btn soft op-btn-secondary op-btn-compact" data-copy="{{ form.share_url }}">후기 링크 복사</button>
+      <button type="button" class="btn soft op-btn-secondary op-btn-compact review-form-status" data-form-id="{{ form.id }}" data-status="{{ 'closed' if form.status == 'open' else 'open' }}">{{ '접수 마감' if form.status == 'open' else '다시 열기' }}</button>
     </div>
     <div class="pt-3">
       {% for review in form.submissions %}
       <article class="review-entry">
-        <div class="flex flex-wrap items-center justify-between gap-2 mb-2"><strong>{{ review.member.name or '회원 정보 없음' }}</strong><span class="text-xs muted">{{ (review.updated_at or review.created_at or '')[:10] }}</span></div>
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2"><strong>{{ review.author_label or (review.member.name if review.member is defined and review.member else none) or review.author_name or '회원 정보 없음' }}</strong><span class="text-xs muted">{{ (review.updated_at or review.created_at or '')[:10] }}</span></div>
         <p class="review-content">{{ review.review_content }}</p>
+        {% if review.image_url %}<a class="op-review-photo-link" href="{{ review.image_url }}" target="_blank" rel="noopener"><img src="{{ review.image_url }}" alt="후기 첨부 사진" class="op-review-photo" loading="lazy"></a>{% endif %}
       </article>
       {% else %}<p class="text-sm muted">아직 제출된 후기가 없습니다.</p>{% endfor %}
     </div>
@@ -32,11 +33,11 @@
 {%- endmacro %}
 
 {% macro no_show_panel(seminar_session) -%}
-  <details class="no-show-picker mt-3 rounded-xl border ops-border ops-surface p-3">
+  <details class="no-show-picker op-subpanel mt-3 rounded-xl border ops-border ops-surface p-3">
     <summary class="cursor-pointer list-none">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <strong>미연락 불참</strong>
-        <span class="flex items-center gap-2"><span class="chip">{{ seminar_session.no_shows|length }}명</span><span aria-hidden="true">⌄</span></span>
+        <span class="flex items-center gap-2"><span class="chip op-status-pill">{{ seminar_session.no_shows|length }}명</span><span aria-hidden="true">⌄</span></span>
       </div>
     </summary>
     <p class="text-xs muted mt-2">참석 예정이었지만 별도 연락 없이 오지 않은 회원을 남깁니다.</p>
@@ -49,16 +50,16 @@
     <div class="mt-3">
       <div class="flex flex-wrap items-center gap-2">
         <input class="field no-show-search flex-1 min-w-[180px]" type="search" placeholder="이름·학번·학과 검색" aria-label="미연락 불참 회원 검색">
-        <span class="chip no-show-selected-count">0명 선택</span>
+        <span class="chip op-status-pill no-show-selected-count">0명 선택</span>
       </div>
-      <div class="flex flex-wrap gap-2 mt-2"><button type="button" class="btn soft select-visible-no-shows">검색 결과 전체 선택</button><button type="button" class="btn soft clear-no-show-selection">선택 해제</button></div>
+      <div class="flex flex-wrap gap-2 mt-2"><button type="button" class="btn soft op-btn-secondary op-btn-compact select-visible-no-shows">검색 결과 전체 선택</button><button type="button" class="btn soft op-btn-secondary op-btn-compact clear-no-show-selection">선택 해제</button></div>
       <div class="grid sm:grid-cols-2 gap-2 mt-3 max-h-52 overflow-y-auto pr-1 no-show-options">
         {% for member in seminar_session.no_show_candidates %}
         <label class="member-option no-show-option flex items-center gap-2" data-search="{{ (member.name ~ ' ' ~ (member.student_id or '') ~ ' ' ~ (member.department or ''))|lower }}"><input class="no-show-checkbox" type="checkbox" value="{{ member.id }}"><span class="min-w-0"><strong>{{ member.name }}</strong><span class="block text-xs muted truncate">{{ member.student_id or '학번 없음' }} · {{ member.department or '학과 없음' }}</span></span></label>
         {% endfor %}
       </div>
       <input class="field bulk-no-show-note mt-3" placeholder="선택한 회원에게 공통 메모 추가(선택)">
-      <button type="button" class="btn primary add-no-shows mt-2" data-session-id="{{ seminar_session.id }}">선택한 회원 기록</button>
+      <button type="button" class="btn primary op-btn-primary add-no-shows mt-2" data-session-id="{{ seminar_session.id }}">선택한 회원 기록</button>
     </div>
     {% endif %}
   </details>
@@ -70,7 +71,7 @@
 <div class="max-w-[1500px] mx-auto px-4 lg:px-8 py-7">
  <div>
   <div class="min-w-0">
-  <div class="flex flex-wrap items-end justify-between gap-4 mb-6">
+  <div class="flex flex-wrap items-end justify-between gap-4 mb-5">
     <div><p class="text-sm font-bold muted">학기 운영</p><h1 class="text-3xl font-extrabold tracking-tight">{{ lms_title }}</h1><p class="muted mt-2">학기별 도서·발제문과 회차별 출석·조 편성을 관리합니다.</p></div>
     <div class="flex flex-wrap gap-2">
       <select class="field !w-auto" id="seminar-term-select" aria-label="조회할 학기">
@@ -79,70 +80,91 @@
     </div>
   </div>
 
+  <div class="op-view-bar" role="navigation" aria-label="세미나 운영 보기 전환">
+    <div class="op-view-tabs">
+      <a class="op-view-tab{% if ops_section not in ['topics', 'attendance'] %} is-active{% endif %}" href="{{ url_for('admin_seminars', term_id=term.id) if term else url_for('admin_seminars') }}" {% if ops_section not in ['topics', 'attendance'] %}aria-current="page"{% endif %}>전체</a>
+      <a class="op-view-tab{% if ops_section == 'topics' %} is-active{% endif %}" href="{{ url_for('admin_seminars', term_id=term.id, section='topics') if term else url_for('admin_seminars', section='topics') }}" {% if ops_section == 'topics' %}aria-current="page"{% endif %}>발제문</a>
+      <a class="op-view-tab{% if ops_section == 'attendance' %} is-active{% endif %}" href="{{ url_for('admin_seminars', term_id=term.id, section='attendance') if term else url_for('admin_seminars', section='attendance') }}" {% if ops_section == 'attendance' %}aria-current="page"{% endif %}>출석·조 편성</a>
+    </div>
+    <a class="btn soft op-btn-secondary op-schedule-jump" href="{{ url_for('admin_seminars', term_id=term.id, schedule=1, _anchor='schedule-tool') if term else '#schedule-tool' }}" data-open-schedule-tool>일정·도서 일괄 편집</a>
+  </div>
+
   {% include '_lms_operations_schedule_editor.html' %}
 
   {% if not term %}<div class="panel p-8 text-center muted">등록된 학기가 없습니다. 위 ‘학기·도서 일정 도구 → 새 학기 만들기’에서 학기를 만들어주세요.</div>{% endif %}
   <div class="space-y-5">
   {% for week in weeks %}
     {% set mon=week.sessions_by_day.get('mon') %}{% set thu=week.sessions_by_day.get('thu') %}
-    <section class="panel p-4 lg:p-6" id="week-{{ week.id }}" data-week="{{ week.id }}" data-schedule-date="{{ thu.meeting_date if thu else (mon.meeting_date if mon else week.week_start) }}">
-      <div class="flex flex-wrap items-start justify-between gap-3 mb-5">
-        <div>
-          <p class="ops-topic-book">{{ week.book_title or '도서 미정' }}</p><div class="flex flex-wrap items-center gap-2"><h2 class="text-xl font-extrabold">{% if thu %}{{ thu.meeting_date|seminar_date }} 본 세미나{% elif mon %}{{ mon.meeting_date|seminar_date }} 추가 세미나{% else %}세미나 일정{% endif %}</h2>{% if week.needs_review %}<span class="chip !bg-amber-100 !text-amber-800">도서 확인 필요</span>{% endif %}{% if week.is_past %}<span class="chip">지난 세미나</span>{% endif %}</div>
-          <div class="flex flex-wrap gap-2 mt-2">{% if thu %}<span class="chip">본 세미나 · {{ thu.meeting_date|seminar_date }}</span>{% endif %}{% if mon %}<span class="chip">추가 세미나 · {{ mon.meeting_date|seminar_date }}</span>{% endif %}</div>
-          {% if thu and mon %}<p class="muted text-sm mt-2">두 회차는 같은 도서와 발제문을 사용하고, 참석자와 조 편성은 따로 관리합니다.</p>{% endif %}
+    {% set mon_active = mon and mon.is_active %}
+    <section class="panel op-week-panel p-4 lg:p-6" id="week-{{ week.id }}" data-week="{{ week.id }}" data-schedule-date="{{ thu.meeting_date if thu else (mon.meeting_date if mon else week.week_start) }}">
+      <div class="flex flex-wrap items-start justify-between gap-3 mb-5 op-week-head">
+        <div class="op-week-heading">
+          <p class="ops-topic-book">{{ week.book_title or '도서 미정' }}</p>
+          <div class="flex flex-wrap items-center gap-2"><h2 class="text-xl font-extrabold">{% if thu %}{{ thu.meeting_date|seminar_date }} 본 세미나{% elif mon %}{{ mon.meeting_date|seminar_date }} 추가 세미나{% else %}세미나 일정{% endif %}</h2>{% if week.needs_review %}<span class="chip op-pill-amber">도서 확인 필요</span>{% endif %}{% if week.is_past %}<span class="chip op-status-pill">지난 세미나</span>{% endif %}</div>
+          <div class="flex flex-wrap gap-2 mt-2">{% if thu %}<span class="chip op-status-pill">본 세미나 · {{ thu.meeting_date|seminar_date }}</span>{% endif %}{% if mon %}<span class="chip op-status-pill">추가 세미나 · {{ mon.meeting_date|seminar_date }}</span>{% endif %}</div>
+          {% if thu and mon_active %}<p class="muted text-sm mt-2">두 회차는 같은 도서와 발제문을 사용하고, 참석자와 조 편성은 따로 관리합니다.</p>{% endif %}
         </div>
         <div class="flex items-center self-start gap-2 flex-wrap ops-topic-actions">
           {% if week.topic_event %}
-            <span class="chip">발제문 {{ week.topic_event.submission_count }}명 제출</span>
             {% set te = week.topic_event %}
-            {% if te.late_open and te.is_active %}<span class="chip">추가 제출 중 · {{ te.late_until_date }} 23:59까지</span>{% elif te.late_until_date and te.is_active %}<span class="chip">추가 제출 {{ te.late_until_date }}까지 예정</span>{% endif %}
-            {% if not te.original_expired %}<button class="btn soft toggle-topic" data-event-id="{{ te.id }}">{% if te.is_active %}접수 마감{% else %}다시 열기{% endif %}</button>{% endif %}
-            <span class="inline-flex items-center gap-1" aria-label="추가 제출 기간">{% if te.original_expired and not te.late_open %}<span class="text-sm">추가 제출 열기</span>{% else %}<span class="text-sm">추가 제출</span>{% endif %}
-              {% for n in (1, 3, 7) %}<button class="btn soft topic-late" data-event-id="{{ te.id }}" data-days="{{ n }}" title="원래 마감{{ '' if not te.original_expired else '(이미 지남) 대신 오늘' }}부터 {{ n }}일 뒤 23:59까지">+{{ n }}일</button>{% endfor %}
-              <input type="date" class="ops-field topic-late-date" data-event-id="{{ te.id }}" value="{{ te.late_until_date or '' }}" aria-label="추가 제출 마감 날짜" style="max-width:150px">
-              {% if te.late_until_date %}<button class="btn soft topic-late-close" data-event-id="{{ te.id }}">추가 제출 끝내기</button>{% endif %}
-            </span>
-            <button class="btn soft" data-copy="{{ week.topic_event.share_url }}">링크 복사</button>
-            <a class="btn soft" href="{{ url_for('view_admin_topics', event_id=week.topic_event.id) }}">제출 관리</a>
-            <a class="btn soft" href="{{ url_for('download_topics_word', event_id=week.topic_event.id) }}">Word</a>
-          {% else %}<button class="btn primary open-topic" data-week-id="{{ week.id }}">발제문 수집 열기</button>{% endif %}
+            <span class="chip op-topic-pill">발제문 {{ te.submission_count }}명 제출</span>
+            {% if te.late_open and te.is_active %}<span class="chip op-topic-pill op-pill-amber">추가 제출 중 · {{ te.late_until_date }} 23:59까지</span>{% elif te.late_until_date and te.is_active %}<span class="chip op-topic-pill op-pill-amber">추가 제출 {{ te.late_until_date }}까지 예정</span>{% endif %}
+            <a class="btn soft op-btn-secondary" href="{{ url_for('view_admin_topics', event_id=te.id) }}">제출 관리</a>
+            <button type="button" class="btn soft op-btn-secondary" data-copy="{{ te.share_url }}">링크 복사</button>
+            <a class="btn soft op-btn-secondary" href="{{ url_for('download_topics_word', event_id=te.id) }}">Word</a>
+            {% if not te.original_expired %}<button type="button" class="btn soft op-btn-secondary toggle-topic" data-event-id="{{ te.id }}">{% if te.is_active %}접수 마감{% else %}다시 열기{% endif %}</button>{% endif %}
+            <details class="op-extend-menu"{% if (te.late_open or te.late_until_date) and te.is_active %} open{% endif %}>
+              <summary>추가 제출 연장</summary>
+              <div class="op-extend-body" aria-label="추가 제출 기간">
+                {% if te.original_expired and not te.late_open %}<span class="text-xs muted">추가 제출 열기</span>{% else %}<span class="text-xs muted">추가 제출</span>{% endif %}
+                {% for n in (1, 3, 7) %}<button type="button" class="btn soft op-btn-secondary op-btn-compact topic-late" data-event-id="{{ te.id }}" data-days="{{ n }}" title="원래 마감{{ '' if not te.original_expired else '(이미 지남) 대신 오늘' }}부터 {{ n }}일 뒤 23:59까지">+{{ n }}일</button>{% endfor %}
+                <input type="date" class="ops-field topic-late-date" data-event-id="{{ te.id }}" value="{{ te.late_until_date or '' }}" aria-label="추가 제출 마감 날짜" style="max-width:150px">
+                {% if te.late_until_date %}<button type="button" class="btn soft op-btn-secondary op-btn-compact topic-late-close" data-event-id="{{ te.id }}">추가 제출 끝내기</button>{% endif %}
+              </div>
+            </details>
+          {% else %}<button type="button" class="btn primary op-btn-primary open-topic" data-week-id="{{ week.id }}">발제문 수집 열기</button>{% endif %}
         </div>
       </div>
-      <div class="grid lg:grid-cols-[1.15fr_1fr_1fr] gap-4 ops-session-tools">
-        <div class="rounded-2xl ops-surface p-4 order-1">
+      <div class="grid gap-4 ops-session-tools {% if mon_active %}ops-session-tools-3col lg:grid-cols-[1.15fr_1fr_1fr]{% else %}ops-session-tools-2col{% endif %}">
+        <div class="rounded-2xl ops-surface p-4 order-1 op-book-card">
           <h3 class="font-extrabold mb-3">세미나 도서</h3>
           <p class="font-bold schedule-book-display">{{ week.book_title or '도서 미정' }}</p>
-          <p class="muted schedule-author-display">{{ week.book_author or '' }}</p>
-          <p class="muted schedule-note-display" style="white-space:pre-wrap;overflow-wrap:anywhere">{{ week.note or '' }}</p>
-          <button type="button" class="btn soft mt-3" data-open-schedule="{{ week.id }}">도서·사회자 함께 편집</button>
+          <p class="muted schedule-author-display mt-1">{{ week.book_author or '' }}</p>
+          <p class="muted schedule-note-display mt-2 text-sm" style="white-space:pre-wrap;overflow-wrap:anywhere">{{ week.note or '' }}</p>
+          <div class="mt-4"><button type="button" class="btn soft op-btn-secondary" data-open-schedule="{{ week.id }}">도서·사회자 함께 편집</button></div>
+          {% if not mon_active %}
+          <div class="op-mon-inactive-note">
+            <span>추가 세미나 미운영</span>
+            {% if mon %}<button type="button" class="op-link-btn enable-additional" data-session-id="{{ mon.id }}">추가 세미나 열기</button>{% else %}<span class="muted">일정 편집에서 개설</span>{% endif %}
+          </div>
+          {% endif %}
         </div>
-        <div class="rounded-2xl border ops-border p-4 order-3">
-          <div class="flex justify-between gap-2"><div><p class="text-xs font-bold muted">추가 세미나</p><h3 class="font-extrabold">참석 명단</h3></div>{% if mon and mon.is_active %}<span class="chip">예정 {{ mon.expected_count }}명</span>{% endif %}</div>
-          {% if mon and mon.is_active %}
-            {% set mon_is_lead = loop.first and not thu %}
-            {% set mon_needs_roster = not mon.roster_updated_at %}
-            <p class="text-sm muted mt-2">{{ mon.meeting_date|seminar_date }} · 정원·선착순 제한 없음</p>
-            <div class="flex flex-wrap gap-2 mt-3"><a class="{% if mon_is_lead and mon_needs_roster %}lms-button lms-button-primary lms-button-cta{% else %}btn soft{% endif %}" href="{{ url_for('admin_seminar_roster', session_id=mon.id) }}">카카오톡 참석 명단 반영·출석 확정</a></div>
-            <p class="text-sm muted mt-2">{{ '실제 출석 확정됨' if mon.attendance_confirmed else '실제 출석 미확정' }} · {{ '명단 반영됨' if mon.roster_updated_at else '투표 결과 반영 전' }}</p>
-            <p class="text-sm mt-2">사회자: <span data-moderator-display="{{ mon.id }}">{{ mon.moderator_name or '미입력' }}</span> <button type="button" class="underline" data-open-schedule="{{ week.id }}" data-focus-session="{{ mon.id }}">수정</button>{% if week.topic_event %} · <a class="underline" href="{{ url_for('download_topics_word', event_id=week.topic_event.id, session_id=mon.id) }}">이 회차 Word</a>{% endif %}</p>
-            <div class="flex flex-wrap gap-1 mt-3">{% for m in mon.attendees %}<span class="chip">{{ m.name }}</span>{% else %}<span class="text-sm muted">반영된 참석 예정자가 없습니다.</span>{% endfor %}</div>
-            <div class="flex flex-wrap gap-2 mt-4"><a class="{% if mon_is_lead and not mon_needs_roster %}lms-button lms-button-primary lms-button-cta{% elif not week.is_past %}btn primary{% else %}btn soft{% endif %}" href="{{ url_for('bookclub_index', session_id=mon.id) }}">조 편성</a>{% if mon.history %}<a class="btn soft" href="{{ url_for('records_seminar_detail', history_id=mon.history.id) }}">진행 기록</a>{% endif %}{% if not mon.review_form %}<button class="btn soft open-review" data-session-id="{{ mon.id }}">후기 받기</button>{% endif %}</div>
-            {{ review_panel(mon) }}
-            {{ no_show_panel(mon) }}
-          {% else %}<p class="muted text-sm mt-3">추가 세미나를 운영하지 않는 주차입니다.</p>{% if mon %}<button type="button" class="btn soft enable-additional" data-session-id="{{ mon.id }}">필요할 때 추가 세미나 열기</button>{% endif %}{% endif %}
+        {% if mon_active %}
+        <div class="rounded-2xl border ops-border p-4 order-3 op-session-card">
+          <div class="op-session-header"><div><p class="text-xs font-bold op-session-eyebrow">추가 세미나</p><h3 class="font-extrabold">참석 명단</h3></div><span class="chip op-status-pill">예정 {{ mon.expected_count }}명</span></div>
+          {% set mon_is_lead = loop.first and not thu %}
+          {% set mon_needs_roster = not mon.roster_updated_at %}
+          <p class="text-sm muted mt-2">{{ mon.meeting_date|seminar_date }} · 정원·선착순 제한 없음</p>
+          <div class="flex flex-wrap gap-2 mt-3"><a class="{% if mon_is_lead and mon_needs_roster %}lms-button lms-button-primary lms-button-cta {% endif %}op-btn-primary" href="{{ url_for('admin_seminar_roster', session_id=mon.id) }}">카카오톡 참석 명단 반영·출석 확정</a></div>
+          <p class="text-sm muted mt-2">{{ '실제 출석 확정됨' if mon.attendance_confirmed else '실제 출석 미확정' }} · {{ '명단 반영됨' if mon.roster_updated_at else '투표 결과 반영 전' }}</p>
+          <p class="text-sm mt-2 op-moderator-row"><span>사회자: <strong data-moderator-display="{{ mon.id }}">{{ mon.moderator_name or '미입력' }}</strong></span> <button type="button" class="op-inline-edit-btn" data-open-schedule="{{ week.id }}" data-focus-session="{{ mon.id }}">수정</button>{% if week.topic_event %}<span class="muted" aria-hidden="true">·</span><a class="op-inline-link" href="{{ url_for('download_topics_word', event_id=week.topic_event.id, session_id=mon.id) }}">이 회차 Word</a>{% endif %}</p>
+          <div class="flex flex-wrap gap-1 mt-3 op-attendee-chips">{% for m in mon.attendees %}<span class="chip op-member-chip">{{ m.name }}</span>{% else %}<span class="text-sm muted">반영된 참석 예정자가 없습니다.</span>{% endfor %}</div>
+          <div class="flex flex-wrap gap-2 mt-4 op-session-actions"><a class="{% if mon_is_lead and not mon_needs_roster %}lms-button lms-button-primary lms-button-cta op-btn-primary{% else %}btn soft op-btn-secondary{% endif %}" href="{{ url_for('bookclub_index', session_id=mon.id) }}">조 편성</a>{% if mon.history %}<a class="btn soft op-btn-secondary" href="{{ url_for('records_seminar_detail', history_id=mon.history.id) }}">진행 기록</a>{% endif %}{% if not mon.review_form %}<button type="button" class="btn soft op-btn-secondary open-review" data-session-id="{{ mon.id }}">후기 받기</button>{% endif %}</div>
+          {{ review_panel(mon) }}
+          {{ no_show_panel(mon) }}
         </div>
-        <div class="rounded-2xl border ops-border p-4 order-2">
-          <div class="flex justify-between gap-2"><div><p class="text-xs font-bold muted">본 세미나</p><h3 class="font-extrabold">참석 명단</h3></div>{% if thu %}<span class="chip">예정 {{ thu.expected_count }}명</span>{% endif %}</div>
+        {% endif %}
+        <div class="rounded-2xl border ops-border p-4 order-2 op-session-card">
+          <div class="op-session-header"><div><p class="text-xs font-bold op-session-eyebrow">본 세미나</p><h3 class="font-extrabold">참석 명단</h3></div>{% if thu %}<span class="chip op-status-pill">예정 {{ thu.expected_count }}명</span>{% endif %}</div>
           {% if thu %}
             {% set thu_is_lead = loop.first %}
             {% set thu_needs_roster = not thu.roster_updated_at %}
             <p class="text-sm muted mt-2">{{ thu.meeting_date|seminar_date }} · 정원·선착순 제한 없음</p>
-            <div class="flex flex-wrap gap-2 mt-3"><a class="{% if thu_is_lead and thu_needs_roster %}lms-button lms-button-primary lms-button-cta{% else %}btn soft{% endif %}" href="{{ url_for('admin_seminar_roster', session_id=thu.id) }}">카카오톡 참석 명단 반영·출석 확정</a></div>
+            <div class="flex flex-wrap gap-2 mt-3"><a class="{% if thu_is_lead and thu_needs_roster %}lms-button lms-button-primary lms-button-cta {% endif %}op-btn-primary" href="{{ url_for('admin_seminar_roster', session_id=thu.id) }}">카카오톡 참석 명단 반영·출석 확정</a></div>
             <p class="text-sm muted mt-2">{{ '실제 출석 확정됨' if thu.attendance_confirmed else '실제 출석 미확정' }} · {{ '명단 반영됨' if thu.roster_updated_at else '투표 결과 반영 전' }}</p>
-            <p class="text-sm mt-2">사회자: <span data-moderator-display="{{ thu.id }}">{{ thu.moderator_name or '미입력' }}</span> <button type="button" class="underline" data-open-schedule="{{ week.id }}" data-focus-session="{{ thu.id }}">수정</button>{% if week.topic_event %} · <a class="underline" href="{{ url_for('download_topics_word', event_id=week.topic_event.id, session_id=thu.id) }}">이 회차 Word</a>{% endif %}</p>
-            <div class="flex flex-wrap gap-1 mt-3">{% for m in thu.attendees %}<span class="chip">{{ m.name }}</span>{% else %}<span class="text-sm muted">반영된 참석 예정자가 없습니다.</span>{% endfor %}</div>
-            <div class="flex flex-wrap gap-2 mt-4"><a class="{% if thu_is_lead and not thu_needs_roster %}lms-button lms-button-primary lms-button-cta{% elif not week.is_past %}btn primary{% else %}btn soft{% endif %}" href="{{ url_for('bookclub_index', session_id=thu.id) }}">조 편성</a>{% if thu.history %}<a class="btn soft" href="{{ url_for('records_seminar_detail', history_id=thu.history.id) }}">진행 기록</a>{% endif %}{% if not thu.review_form %}<button class="btn soft open-review" data-session-id="{{ thu.id }}">후기 받기</button>{% endif %}</div>
+            <p class="text-sm mt-2 op-moderator-row"><span>사회자: <strong data-moderator-display="{{ thu.id }}">{{ thu.moderator_name or '미입력' }}</strong></span> <button type="button" class="op-inline-edit-btn" data-open-schedule="{{ week.id }}" data-focus-session="{{ thu.id }}">수정</button>{% if week.topic_event %}<span class="muted" aria-hidden="true">·</span><a class="op-inline-link" href="{{ url_for('download_topics_word', event_id=week.topic_event.id, session_id=thu.id) }}">이 회차 Word</a>{% endif %}</p>
+            <div class="flex flex-wrap gap-1 mt-3 op-attendee-chips">{% for m in thu.attendees %}<span class="chip op-member-chip">{{ m.name }}</span>{% else %}<span class="text-sm muted">반영된 참석 예정자가 없습니다.</span>{% endfor %}</div>
+            <div class="flex flex-wrap gap-2 mt-4 op-session-actions"><a class="{% if thu_is_lead and not thu_needs_roster %}lms-button lms-button-primary lms-button-cta op-btn-primary{% else %}btn soft op-btn-secondary{% endif %}" href="{{ url_for('bookclub_index', session_id=thu.id) }}">조 편성</a>{% if thu.history %}<a class="btn soft op-btn-secondary" href="{{ url_for('records_seminar_detail', history_id=thu.history.id) }}">진행 기록</a>{% endif %}{% if not thu.review_form %}<button type="button" class="btn soft op-btn-secondary open-review" data-session-id="{{ thu.id }}">후기 받기</button>{% endif %}</div>
             {{ review_panel(thu) }}
             {{ no_show_panel(thu) }}
           {% else %}<p class="muted text-sm mt-3">이 주차에는 본 세미나가 없습니다.</p>{% endif %}
@@ -159,6 +181,7 @@
 {% endblock %}
 {% block scripts %}
 <script>
+if(new URLSearchParams(location.search).get('schedule')==='1'){const t=document.getElementById('schedule-tool');if(t)t.open=true;}
 async function api(url, options={}){const r=await fetch(url,{headers:{'Content-Type':'application/json'},...options});const j=await r.json();if(!r.ok||j.status==='error')throw new Error(j.message||j.error||'처리하지 못했습니다.');return j}
 function updateNoShowSelection(picker){const count=picker.querySelectorAll('.no-show-checkbox:checked').length;picker.querySelector('.no-show-selected-count').textContent=count+'명 선택'}
 document.addEventListener('input',e=>{
@@ -171,6 +194,7 @@ document.addEventListener('change',async e=>{
  try{await api('/api/admin/topic_events/'+e.target.dataset.eventId+'/late_window',{method:'POST',body:JSON.stringify({until:e.target.value})});location.reload()}catch(err){alert(err.message)}
 })
 document.addEventListener('click',async e=>{
+ const schedJump=e.target.closest('[data-open-schedule-tool]');if(schedJump){const tool=document.getElementById('schedule-tool');if(tool&&getComputedStyle(tool).display!=='none'){e.preventDefault();tool.open=true;tool.scrollIntoView({behavior:'smooth',block:'start'});return}}
  const copy=e.target.closest('[data-copy]');if(copy){await navigator.clipboard.writeText(copy.dataset.copy);copy.textContent='복사됨';return}
  const box=e.target.closest('[data-week]');
  try{

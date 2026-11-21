@@ -13,9 +13,7 @@
 <a href="{{ url_for('my_term_attendance', term_id=term.id) }}" {% if page == 'attendance' %}aria-current="page"{% endif %}>내 출석</a>
 {% if not show_operations %}<a href="{{ url_for('operation_workbench',term_id=term.id) }}" {% if ep == 'operation_workbench' %}aria-current="page"{% endif %}>맡은 업무</a>{% endif %}
 {% if show_operations %}<p class="lms-term-name lms-nav-group-label">학기 운영</p>
-{% if is_staff %}<a href="{{ url_for('admin_seminars', term_id=term.id, schedule=1, _anchor='schedule-tool') }}" {% if ep in ['admin_seminars','seminar_session_moderator'] and section not in ['topics','attendance'] %}aria-current="page"{% endif %}>도서·일정·사회자</a>
-<a href="{{ url_for('admin_seminars', term_id=term.id, section='topics') }}" {% if (ep == 'admin_seminars' and section == 'topics') or ep in ['view_admin_topics','topic_document_setup'] %}aria-current="page"{% endif %}>발제문 관리</a>
-<a href="{{ url_for('admin_seminars', term_id=term.id, section='attendance') }}" {% if (ep == 'admin_seminars' and section == 'attendance') or ep in ['admin_seminar_roster','bookclub_index'] %}aria-current="page"{% endif %}>출석·조 편성</a>{% endif %}
+{% if is_staff %}<a href="{{ url_for('admin_seminars', term_id=term.id) }}" {% if ep in ['admin_seminars','seminar_session_moderator','view_admin_topics','topic_document_setup','admin_seminar_roster','bookclub_index'] %}aria-current="page"{% endif %}>세미나 운영</a>{% endif %}
 {% if can_attendance %}<a href="{{ url_for('admin_term_attendance', term_id=term.id) }}" {% if ep == 'admin_term_attendance' %}aria-current="page"{% endif %}>{{ '학기 참석 현황' if is_staff else '출석 확인·확정' }}</a>{% endif %}
 <a href="{{ url_for('operation_workbench',term_id=term.id) }}" {% if ep == 'operation_workbench' %}aria-current="page"{% endif %}>맡은 업무</a>
 {% if can_members %}<a href="{{ url_for('admin_term_members', term_id=term.id) }}" {% if page == 'term_settings' %}aria-current="page"{% endif %}>학기 설정</a>
