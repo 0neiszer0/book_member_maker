@@ -70,6 +70,11 @@ class Wave32OperationsUiRenderTests(unittest.TestCase):
             spec.loader.exec_module(cls.module)
 
     def setUp(self):
+        from unittest.mock import MagicMock
+        self.fake.storage = MagicMock()
+        self.fake.storage.from_.return_value.create_signed_url.return_value = {
+            'signedURL': 'https://example.test/review.jpg',
+        }
         self.fake.rows = {
             'members': [
                 {'id': 1, 'name': '홍윤서', 'role': 'admin', 'is_active': True, 'member_status': 'active', 'account_status': 'active', 'student_id': '202600001', 'department': '국문과', 'recruiting_class': 28},
@@ -103,7 +108,7 @@ class Wave32OperationsUiRenderTests(unittest.TestCase):
                     'id': 'rs-1', 'form_id': 'rf-1', 'member_id': 2,
                     'author_name': None,
                     'memorable_point': '인상 깊은 문장',
-                    'image_url': 'https://example.test/review.jpg',
+                    'image_path': 'seminar/review.jpg',
                     'deleted_at': None,
                     'created_at': '2099-11-20T09:00:00Z',
                 },
