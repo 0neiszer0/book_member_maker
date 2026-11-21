@@ -409,8 +409,8 @@ def init_wiki_routes(app, get_db):
                                 officer_doc=is_officer_title(title))
                 if request.form.get('action') == 'preview':
                     preview = render_draft(backend, client, title, content)
-                elif not summary or not content.strip():
-                    notice, status = '본문과 편집 요약을 입력해 주세요.', 400
+                elif not content.strip():
+                    notice, status = '문서 본문을 입력해 주세요.', 400
                 else:
                     # Refresh immediately before saving, not only when opening
                     # the editor (including after a preview or roster change).
@@ -425,7 +425,7 @@ def init_wiki_routes(app, get_db):
                         notice, status = notice or denied, status if notice else 403
                     else:
                         try:
-                            backend.save(client, title, content, summary, version)
+                            backend.save(client, title, content, summary or '문서 편집', version)
                             return redirect(url_for('wiki.document', title=title), code=303)
                         except EditConflict as exc:
                             notice, status = str(exc), 409

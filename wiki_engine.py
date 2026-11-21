@@ -163,4 +163,7 @@ class OpenNamu:
         latest = history[0][0] if history and history[0][0] else '0'
         if latest != version:
             raise EditConflict('다른 회원이 먼저 수정했습니다. 작성한 내용은 아래에 유지했습니다. 최신 문서와 비교한 뒤 다시 편집해 주세요.')
+        raw = self.json(client, '/api/v2/raw/' + quote(title, safe=''))
+        if raw['response'] == 'ok' and raw.get('data', '').replace('\r', '') == content.replace('\r', ''):
+            return
         raise EditRejected('위키가 저장을 거절했습니다. 문서 권한·편집 제한을 확인해 주세요. 작성한 내용은 아래에 유지했습니다.')

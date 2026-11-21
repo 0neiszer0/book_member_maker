@@ -8,7 +8,7 @@ from unittest.mock import patch
 from testing._fake_supabase import FakeSupabase
 from wiki_access import wiki_access, is_officer_title, strip_officer_includes
 from wiki_routes import clean_wiki_html
-from wiki_engine import EngineUnavailable
+from wiki_engine import EngineUnavailable, OpenNamu, EditConflict, EditRejected
 
 
 def wiki_fixture(today=None):
@@ -127,6 +127,24 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(self.client.get('/wiki/w/대문').status_code,200)
         self.client.get('/logout')
         self.assertEqual(self.client.get('/wiki/pages').status_code,302)
+
+    def test_save_with_blank_summary_uses_default(self):
+        self.login()
+        with patch.object(self.engine, 'save') as save:
+            result = self.client.post('/wiki/edit/대문', data={
+                'wiki_csrf': 'token', 'version': '1', 'content': 'changed', 'summary': '', 'action': 'save'})
+        self.assertEqual(result.status_code, 303)
+        self.assertTrue(result.location.endswith('/wiki/w/%EB%8C%80%EB%AC%B8'))
+        save.assert_called_once_with(None, '대문', 'changed', '문서 편집', '1')
+
+    def test_save_with_blank_content_shows_notice(self):
+        self.login()
+        with patch.object(self.engine, 'save') as save:
+            result = self.client.post('/wiki/edit/대문', data={
+                'wiki_csrf': 'token', 'version': '1', 'content': '  ', 'summary': '', 'action': 'save'})
+        self.assertEqual(result.status_code, 400)
+        self.assertEqual(result.get_data(as_text=True).count('문서 본문을 입력해 주세요.'), 2)
+        save.assert_not_called()
 
     def test_revoke_open_editor_and_selected_term_cannot_grant_edit(self):
         self.login(); self.assertEqual(self.client.get('/wiki/edit/대문').status_code,200)
@@ -445,6 +463,25 @@ for _name in [n for n in vars(RouteTests) if n.startswith('test_')]:
     setattr(RandomPageTests, _name, None)
 for _name in [n for n in vars(OfficerRouteTests) if n.startswith('test_')]:
     setattr(OfficerNavTests, _name, None)
+
+
+class OpenNamuSaveTests(unittest.TestCase):
+    def test_nonredirect_save_outcomes(self):
+        from types import SimpleNamespace
+        engine = object.__new__(OpenNamu)
+        response = SimpleNamespace(status_code=200, headers={})
+        with patch.object(engine, 'request', return_value=response), \
+             patch.object(engine, 'history', return_value=[['1']]), \
+             patch.object(engine, 'json', return_value={'response': 'ok', 'data': 'same\ntext'}):
+            engine.save(None, '운영진:운영 안내', 'same\r\ntext', 'summary', '1')
+            with self.assertRaises(EditRejected):
+                engine.save(None, '운영진:운영 안내', 'changed', 'summary', '1')
+        with patch.object(engine, 'request', return_value=response), \
+             patch.object(engine, 'history', return_value=[['2']]), \
+             patch.object(engine, 'json') as raw:
+            with self.assertRaises(EditConflict):
+                engine.save(None, '운영진:운영 안내', 'same', 'summary', '1')
+            raw.assert_not_called()
 
 
 if __name__=='__main__': unittest.main()
