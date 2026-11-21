@@ -24,6 +24,15 @@
 .auth-form{margin-top:16px}
 .lms-page .auth-label{display:grid;gap:6px;font-size:14px;line-height:21px}
 .auth-input{width:100%;min-width:0}
+.auth-code{position:relative;min-width:0}
+.auth-code [data-auth-code-value].auth-code-enhanced{position:absolute;width:1px;height:1px;min-height:0;padding:0;border:0;clip-path:inset(50%);overflow:hidden}
+.auth-code-controls[hidden]{display:none}
+.auth-code-boxes{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:clamp(4px,2vw,8px);width:min(100%,328px)}
+.lms-page .auth-code-boxes .auth-code-box{box-sizing:border-box;width:100%;min-width:0;height:clamp(44px,12vw,56px);padding:0;border:1px solid #8f969c;border-radius:7px;text-align:center;font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.lms-page .auth-code-boxes .auth-code-box:focus{border-color:#0374b5;outline:2px solid #0374b5;outline-offset:1px}
+.lms-page .auth-code-boxes .auth-code-box[aria-invalid="true"]:not(:focus){border-color:#a82623}
+.lms-page .auth-code-toggle{justify-self:start;min-height:44px;padding:0;border:0;background:transparent;color:#343c44;text-decoration:underline}
+.auth-code-error{display:block;margin:0}
 .auth-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 .auth-result{border:1px solid #c7cdd1;background:#f5f5f5;padding:12px 16px;font-size:14px;line-height:21px}
 .auth-result strong{display:block;font-size:16px;line-height:24px;font-weight:700}

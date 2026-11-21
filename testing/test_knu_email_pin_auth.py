@@ -131,6 +131,21 @@ class KnuEmailPinTests(unittest.TestCase):
             self.assertEqual(session["auth_provider"], "local")
             self.assertTrue(session.permanent)
 
+    def assert_digit_widget(self, html, field_id, name, *, masked=True, required=True):
+        field = html.split(f'id="{field_id}-label"', 1)[1].split('</div>\n</div>', 1)[0]
+        original = field.split('data-auth-code-value', 1)[1].split('>', 1)[0]
+        self.assertIn(f'id="{field_id}" name="{name}" data-auth-code-value', field)
+        self.assertEqual(field.count('data-auth-code-digit'), 6)
+        self.assertIn('pattern="[0-9]{6}"', original)
+        self.assertEqual(' required' in original, required)
+        self.assertEqual('type="password"' in original, masked)
+        self.assertEqual('data-auth-code-toggle aria-pressed="false"' in field, masked)
+        self.assertEqual('PIN 보기' in field, masked)
+        self.assertIn('data-auth-code-controls hidden', field)
+        if not masked:
+            self.assertIn('autocomplete="one-time-code"', original)
+            self.assertEqual(field.count('autocomplete="one-time-code"'), 2)
+
     def test_login_response_headers(self):
         response = self.client.get("/login")
         self.assertEqual(response.status_code, 200)
@@ -268,6 +283,9 @@ class KnuEmailPinTests(unittest.TestCase):
         self.assertLess(html.index('action="/auth/email/verify"'), html.index("인증코드 다시 받기"))
         self.assertLess(html.index("인증코드 다시 받기"), html.index('id="pin-login"'))
         self.assertIn('<details id="pin-login" class="auth-details">', html)
+        self.assertIn('auth_code_boxes.js', html)
+        self.assert_digit_widget(html, 'login-code', 'code', masked=False)
+        self.assert_digit_widget(html, 'login-pin', 'pin')
         reset = self.client.get("/login?mode=pin_reset").get_data(as_text=True)
         self.assertIn('class="auth-title">PIN 재설정</h1>', reset)
         self.assertIn('name="purpose" value="pin_reset"', reset)
@@ -280,6 +298,9 @@ class KnuEmailPinTests(unittest.TestCase):
         response = self.client.get("/signup")
         self.assertEqual(response.status_code, 303)
         self.assertEqual(response.location, "/auth/email/enroll")
+        enrolled = self.client.get(response.location)
+        self.assertEqual(enrolled.status_code, 200)
+        self.assert_digit_widget(enrolled.get_data(as_text=True), 'signup-pin', 'pin', required=False)
 
     def test_expiry_wrong_code_limit_and_rate_limit(self):
         self.linked(pin="123456")
@@ -374,7 +395,10 @@ class KnuEmailPinTests(unittest.TestCase):
         self.assertEqual(self.verify().location, "/account/pin/reset")
         with self.client.session_transaction() as session:
             self.assertNotIn("user_id", session)
-        self.assertEqual(self.client.get("/account/pin/reset").status_code, 200)
+        page = self.client.get("/account/pin/reset")
+        self.assertEqual(page.status_code, 200)
+        self.assert_digit_widget(page.get_data(as_text=True), 'new-pin', 'pin')
+        self.assert_digit_widget(page.get_data(as_text=True), 'confirm-pin', 'pin_confirm')
         self.assertEqual(self.form("/account/pin/reset", pin="246810", pin_confirm="111111").status_code, 400)
         self.assertEqual(self.form("/account/pin/reset", pin="246810", pin_confirm="246810").location, "/mypage")
         self.assert_session(3)
@@ -389,7 +413,10 @@ class KnuEmailPinTests(unittest.TestCase):
         self.send()
         self.assertEqual(self.verify().location, "/account/pin/setup")
         self.assert_session(3)
-        self.assertEqual(self.client.get("/account/pin/setup").status_code, 200)
+        page = self.client.get("/account/pin/setup")
+        self.assertEqual(page.status_code, 200)
+        self.assert_digit_widget(page.get_data(as_text=True), 'new-pin', 'pin')
+        self.assert_digit_widget(page.get_data(as_text=True), 'confirm-pin', 'pin_confirm')
         self.assertEqual(self.form("/account/pin/setup", pin="123456", pin_confirm="123456").status_code, 302)
         self.member(3).update(pin_failed_attempts=5, pin_locked_until=local_auth.iso(self.now - timedelta(seconds=1)))
         fresh = self.app.test_client()

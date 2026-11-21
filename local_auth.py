@@ -16,7 +16,7 @@ from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatc
 from flask import abort, flash, g, jsonify, redirect, render_template, request, session, url_for
 
 from member_identity import normalize_member_student_id
-from minipc_security import SENSITIVE_AUTH_PAGES, has_term_assignment
+from minipc_security import SENSITIVE_AUTH_PAGES, active_member, has_term_assignment
 from privacy_cleanup import init_privacy_cleanup_routes
 from recruitment_dues_routes import init_recruitment_dues_routes
 from security_utils import forwarded_client_address, safe_internal_next_url, trusted_client_address
@@ -975,9 +975,12 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
         email = value.lower()
         if value and (not value.isascii() or len(value) > 254 or not KNU_EMAIL_RE.fullmatch(email)):
             return jsonify(status='error', message=EMAIL_ERROR), 400
+        only_if_unlinked = data.get('only_if_unlinked') is True
+        if only_if_unlinked and not email:
+            return jsonify(status='error', message=EMAIL_ERROR), 400
 
         members = db().table('members')
-        rows = members.select('id,role,social_id,knu_email,auth_session_version') \
+        rows = members.select('id,role,social_id,knu_email,auth_session_version,is_active,account_status,member_status') \
             .eq('id', member_id).limit(1).execute().data or []
         if not rows or str(rows[0].get('social_id') or '').startswith('system:'):
             return jsonify(status='error', message='회원을 찾을 수 없습니다.'), 404
@@ -985,6 +988,8 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
         staff = is_officer_role(member)
         if staff and member_id != actor_id() and not primary_admin_check():
             return jsonify(status='error', message='다른 운영진의 학교 메일은 관리자만 변경할 수 있습니다.'), 403
+        if only_if_unlinked and (member.get('knu_email') is not None or not active_member(member)):
+            return jsonify(status='error', message='학교 메일이 연결되지 않은 활성 계정을 선택해주세요.'), 409
 
         version = member['auth_session_version']
         fields = {
@@ -1002,6 +1007,10 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
         query = members.update(fields).eq('id', member_id).eq('auth_session_version', version)
         role = member.get('role')
         query = query.eq('role', role) if role is not None else query.is_('role', 'null')
+        if only_if_unlinked:
+            query = query.is_('knu_email', 'null').eq('is_active', True).eq('account_status', 'active')
+            member_status = member.get('member_status')
+            query = query.eq('member_status', member_status) if member_status is not None else query.is_('member_status', 'null')
         try:
             updated = query.execute().data
         except Exception as exc:

@@ -9,7 +9,9 @@ import time
 import uuid
 
 from flask import abort, g, jsonify, make_response, render_template, request, session
+from db_read import all_rows
 from engagement_utils import clean_text
+from local_auth import KNU_EMAIL_RE
 from member_notifications import check_csrf
 from security_utils import trusted_client_address
 
@@ -142,6 +144,44 @@ def build_handover_wiki_draft(form, responses):
     return "\n".join(lines).rstrip()
 
 
+def _match_handover_emails(db, responses):
+    with_email = [response for response in responses if response.get("knu_email")]
+    if not with_email:
+        return []
+
+    members = all_rows(
+        db.table("members").select("id,name,role,knu_email,social_id,member_status")
+        .eq("is_active", True).eq("account_status", "active").order("name").order("id")
+    )
+    active_members = [
+        member for member in members
+        if member.get("member_status") not in ("inactive", "blocked")
+        and not str(member.get("social_id") or "").startswith("system:")
+    ]
+    linked_emails = {member["knu_email"] for member in active_members if member.get("knu_email")}
+    names = defaultdict(list)
+    for member in active_members:
+        names[member.get("name")].append(member)
+
+    actor_id = session.get("user_id")
+    is_admin = session.get("user_role") == "admin"
+
+    def can_link(member):
+        return member.get("knu_email") is None and (
+            is_admin or member["id"] == actor_id or member.get("role") == "member"
+        )
+
+    for response in with_email:
+        response["email_linked"] = response["knu_email"] in linked_emails
+        author_name = response.get("author_name")
+        matches = names.get(author_name, []) if author_name else []
+        response["email_matches"] = [member for member in matches if can_link(member)]
+        response["email_preselect"] = matches[0]["id"] if len(matches) == 1 and can_link(matches[0]) else None
+
+    return [member for member in active_members if member.get("role") in ("admin", "officer")
+            and can_link(member)]
+
+
 def init_officer_handover_routes(app, get_db, login_required):
     def _render_public(form, token, status_code=200, **extra):
         secret = app.secret_key or os.environ.get("FLASK_SECRET_KEY", "")
@@ -217,6 +257,16 @@ def init_officer_handover_routes(app, get_db, login_required):
 
         role_name = (request.form.get("role_name") or "").strip()
         core_tasks = clean_text(request.form.get("core_tasks"), 3000)
+        raw_email = request.form.get("knu_email", "").strip()
+        knu_email = raw_email.lower()
+        if raw_email and (len(raw_email) > 254 or not raw_email.isascii() or not KNU_EMAIL_RE.fullmatch(knu_email)):
+            return _render_public(
+                form,
+                token_str,
+                status_code=400,
+                error_message="경북대 학교 메일(@knu.ac.kr) 형식으로 입력해주세요.",
+                form_values=request.form,
+            )
         if role_name not in OFFICER_HANDOVER_ROLES:
             return _render_public(
                 form,
@@ -240,6 +290,7 @@ def init_officer_handover_routes(app, get_db, login_required):
             "role_name": role_name,
             "author_name": clean_text(request.form.get("author_name"), 40) or None,
             "term_cohort": clean_text(request.form.get("term_cohort"), 40) or None,
+            "knu_email": knu_email or None,
             "core_tasks": core_tasks,
             "hardships_and_tips": clean_text(request.form.get("hardships_and_tips"), 3000) or None,
             "assets_and_links": clean_text(request.form.get("assets_and_links"), 2000) or None,
@@ -276,6 +327,7 @@ def init_officer_handover_routes(app, get_db, login_required):
             .data
             or []
         )
+        unlinked_staff = _match_handover_emails(db, responses)
         by_form = {}
         for row in responses:
             by_form.setdefault(row.get("form_id"), []).append(row)
@@ -288,11 +340,14 @@ def init_officer_handover_routes(app, get_db, login_required):
             form["grouped_responses"] = _group_responses_by_role(form_responses)
             form["wiki_draft"] = build_handover_wiki_draft(form, form_responses)
 
-        return render_template(
+        response = make_response(render_template(
             "admin_handover_surveys.html",
             forms=forms,
             roles=OFFICER_HANDOVER_ROLES,
-        )
+            unlinked_staff=unlinked_staff,
+        ))
+        response.cache_control.no_store = True
+        return response
 
     @app.post("/api/admin/handover/create")
     @login_required(role="admin")

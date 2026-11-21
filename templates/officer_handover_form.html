@@ -64,6 +64,11 @@
       <span>기수 · 활동 학기 <span class="eg-help">선택</span></span>
       <input class="eg-input" name="term_cohort" maxlength="40" placeholder="예: 26-2학기 / 15기" value="{{ form_values.get('term_cohort', '') }}" {% if not is_open %}disabled{% endif %}>
     </label>
+    <label>
+      <span>경북대 학교 메일 (@knu.ac.kr)</span>
+      <span class="eg-help">선택 · 운영진 사이트 로그인 연결용 (위키 초안에는 포함되지 않아요)</span>
+      <input class="eg-input" name="knu_email" type="email" inputmode="email" autocapitalize="none" spellcheck="false" maxlength="254" placeholder="예: hobanu@knu.ac.kr" value="{{ form_values.get('knu_email', '') }}" {% if not is_open %}disabled{% endif %}>
+    </label>
   </div>
 
   <label>

@@ -3,12 +3,13 @@ import importlib.util
 import json
 import os
 import re
+import subprocess
 import sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from officer_handover import OFFICER_HANDOVER_ROLES
+from officer_handover import OFFICER_HANDOVER_ROLES, build_handover_wiki_draft
 from testing._fake_supabase import FakeSupabase
 from testing.test_home_overview import fixture
 
@@ -249,6 +250,40 @@ class QuickSearchAndHandoverTests(unittest.TestCase):
         self.assertEqual(stored[0]["role_name"], "학술지원부장")
         self.assertEqual(stored[0]["author_name"], "김철수")
         self.assertEqual(stored[0]["form_id"], "form-open")
+        self.assertIsNone(stored[0]["knu_email"])
+
+    def test_public_handover_saves_normalized_school_email_without_exporting_it(self):
+        path = f"/handover/{FORM_TOKEN}"
+        token, html = self._public_csrf(path)
+        self.assertIn('name="knu_email" type="email" inputmode="email"', html)
+        self.assertIn("위키 초안에는 포함되지 않아요", html)
+        response = self.client.post(path, data={
+            "csrf_token": token, "role_name": "총무", "author_name": "김철수",
+            "core_tasks": "세미나 출석 정리", "knu_email": "  Hobanu+Staff@KNU.AC.KR  ",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("hobanu+staff@knu.ac.kr", response.get_data(as_text=True))
+        stored = self.fake.rows["officer_handover_responses"]
+        self.assertEqual(stored[0]["knu_email"], "hobanu+staff@knu.ac.kr")
+        draft = build_handover_wiki_draft(self.fake.rows["officer_handover_forms"][0], stored)
+        self.assertIn("세미나 출석 정리", draft)
+        self.assertNotIn(stored[0]["knu_email"], draft)
+
+    def test_public_handover_rejects_non_school_email_and_preserves_form_values(self):
+        path = f"/handover/{FORM_TOKEN}"
+        token, _ = self._public_csrf(path)
+        for email in ("hobanu@example.test", "hobanu@knu.ac.kr.example", "K@knu.ac.kr", "a" * 245 + "@knu.ac.kr"):
+            with self.subTest(email=email):
+                response = self.client.post(path, data={
+                    "csrf_token": token, "role_name": "총무", "author_name": "김철수",
+                    "core_tasks": "기존 작성 내용", "knu_email": email,
+                })
+                self.assertEqual(response.status_code, 400)
+                html = response.get_data(as_text=True)
+                self.assertIn("경북대 학교 메일(@knu.ac.kr) 형식으로 입력해주세요.", html)
+                self.assertIn(f'value="{email}"', html)
+                self.assertIn("기존 작성 내용", html)
+        self.assertEqual(self.fake.rows["officer_handover_responses"], [])
 
     def test_public_handover_rejects_closed_form(self):
         path = f"/handover/{CLOSED_TOKEN}"
@@ -263,6 +298,50 @@ class QuickSearchAndHandoverTests(unittest.TestCase):
         self.assertEqual(self.fake.rows["officer_handover_responses"], [])
 
     # --- 3. Admin Handover Endpoints & Auth/CSRF Tests ---
+    def test_handover_school_email_actions_match_active_accounts_without_overwriting(self):
+        self.login("admin")
+        target = self.fake.rows["members"][0]
+        target["auth_session_version"] = 0
+        staff = {"id": 3, "name": "Fallback Staff", "role": "officer", "is_active": True,
+                 "account_status": "active", "member_status": "active", "auth_session_version": 0}
+        self.fake.rows["members"].extend([
+            staff,
+            dict(staff, id=4, name="Disabled Staff", is_active=False),
+            dict(staff, id=5, name="System Staff", social_id="system:synthetic"),
+        ])
+        email = "handover@knu.ac.kr"
+        self.fake.rows["officer_handover_responses"].append({
+            "id": "email-response", "form_id": "form-open", "role_name": "총무",
+            "author_name": target["name"], "core_tasks": "세미나 출석 정리", "knu_email": email,
+        })
+        response = self.client.get("/admin/handover")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("no-store", response.headers["Cache-Control"])
+        html = response.get_data(as_text=True)
+        self.assertIn(email, html)
+        self.assertIn("메일 복사", html)
+        self.assertIn("계정에 학교 메일 연결", html)
+        self.assertIn('<option value="1" selected>', html)
+        self.assertIn("Fallback Staff", html)
+        self.assertNotIn("Disabled Staff", html)
+        self.assertNotIn("System Staff", html)
+        wiki = re.search(r'<textarea id="wiki-draft-form-open"[^>]*>(.*?)</textarea>', html, re.S)
+        self.assertIsNotNone(wiki)
+        self.assertNotIn(email, wiki.group(1))
+
+        payload = {"knu_email": email, "only_if_unlinked": True}
+        endpoint = "/api/admin/members/1/knu-email"
+        headers = {"X-App-CSRF": "test-csrf"}
+        self.assertEqual(self.client.post(endpoint, json=payload).status_code, 403)
+        self.assertEqual(self.client.post("/api/admin/members/4/knu-email", json=payload, headers=headers).status_code, 409)
+        self.assertEqual(self.client.post(endpoint, json=payload, headers=headers).get_json()["status"], "success")
+        article = self.client.get("/admin/handover").get_data(as_text=True).split('data-response-id="email-response"')[1].split('</article>')[0]
+        self.assertIn("연결 완료", article)
+        self.assertNotIn("계정에 학교 메일 연결", article)
+        self.assertEqual(self.client.post(endpoint, json=dict(payload, knu_email="different@knu.ac.kr"),
+                                          headers=headers).status_code, 409)
+        self.assertEqual(target["knu_email"], email)
+
     def test_admin_handover_endpoints_enforce_auth_and_csrf(self):
         # Guest cannot access admin endpoints
         self.assertEqual(self.client.get("/admin/handover").status_code, 302)
@@ -374,6 +453,38 @@ class QuickSearchAndHandoverTests(unittest.TestCase):
         self.assertIn("create table if not exists public.officer_handover_responses", sql.lower())
         self.assertIn("create index if not exists", sql.lower())
         self.assertIn("rollback:", sql.lower())
+
+    @unittest.skipUnless(os.environ.get("KNU_TEST_PGLITE_MODULE"), "Set KNU_TEST_PGLITE_MODULE to a local PGlite module")
+    def test_handover_school_email_migration_reapplies_and_checks_domain(self):
+        program = """
+const {PGlite} = require(process.env.KNU_TEST_PGLITE_MODULE);
+const {readFileSync} = require('node:fs');
+const assert = require('node:assert/strict');
+const db = new PGlite();
+const sql = name => readFileSync('supabase/migrations/' + name, 'utf8');
+(async () => {
+  await db.exec('create role anon; create role authenticated; create role service_role bypassrls');
+  await db.exec(sql('20261120120500_officer_handover_surveys.sql'));
+  const migration = sql('20261121030000_handover_knu_email.sql');
+  await db.exec(migration);
+  await db.exec(migration);
+  const {rows: [{id}]} = await db.query("insert into officer_handover_forms(title) values ('Test') returning id");
+  const insert = email => db.query(
+    "insert into officer_handover_responses(form_id, role_name, core_tasks, knu_email) values ($1, 'Role', 'Work', $2)",
+    [id, email]
+  );
+  await insert(null);
+  await insert('staff+test@knu.ac.kr');
+  await assert.rejects(insert('staff@elsewhere.test'), {code: '23514'});
+  const {rows: [{allowed}]} = await db.query(
+    "select has_column_privilege('anon', 'officer_handover_responses', 'knu_email', 'select') as allowed");
+  assert.equal(allowed, false);
+  await db.close();
+})().catch(error => { console.error(error); process.exitCode = 1; });
+"""
+        result = subprocess.run(["node", "-e", program], cwd=ROOT, capture_output=True,
+                                text=True, encoding="utf-8", timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
 if __name__ == "__main__":

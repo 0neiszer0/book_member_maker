@@ -1,0 +1,25 @@
+{% macro auth_code(name, label, field_id, autocomplete, masked=false, required=true, autofocus=false, help_text='') %}
+<div class="auth-label auth-code" data-auth-code data-digit-mask="{{ 'true' if masked else 'false' }}">
+  <label id="{{ field_id }}-label" for="{{ field_id }}">{{ label }}</label>
+  {% if help_text %}<span id="{{ field_id }}-help" class="auth-help">{{ help_text }}</span>{% endif %}
+  <input class="auth-input" id="{{ field_id }}" name="{{ name }}" data-auth-code-value
+         type="{{ 'password' if masked else 'text' }}" inputmode="numeric" autocomplete="{{ autocomplete }}"
+         maxlength="6" pattern="[0-9]{6}" placeholder="{{ '숫자 6자리' if masked else '예: 123456' }}"{% if required %} required{% endif %}{% if autofocus %} autofocus{% endif %}
+         {% if help_text %}aria-describedby="{{ field_id }}-help"{% endif %}>
+  <div class="auth-code-controls" data-auth-code-controls hidden>
+    <div class="auth-code-boxes" id="{{ field_id }}-boxes" role="group" aria-labelledby="{{ field_id }}-label"
+         {% if help_text %}aria-describedby="{{ field_id }}-help"{% endif %}>
+      {% for number in range(1, 7) %}
+      <input class="auth-code-box" id="{{ field_id }}-digit-{{ number }}" data-auth-code-digit
+             type="{{ 'password' if masked else 'text' }}" inputmode="numeric" spellcheck="false"
+             autocomplete="{{ 'one-time-code' if not masked and loop.first else 'off' }}"
+             aria-label="{{ label }} {{ number }}번째 숫자">
+      {% endfor %}
+    </div>
+    {% if masked %}
+    <button class="auth-code-toggle" type="button" data-auth-code-toggle aria-pressed="false" aria-controls="{{ field_id }}-boxes">PIN 보기</button>
+    {% endif %}
+    <span class="auth-error auth-code-error" data-auth-code-error role="status"></span>
+  </div>
+</div>
+{% endmacro %}

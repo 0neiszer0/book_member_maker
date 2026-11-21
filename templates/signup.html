@@ -1,4 +1,5 @@
 {% extends 'auth_base.html' %}
+{% from '_auth_code.html' import auth_code %}
 {% block title %}회원가입 · 책 먹는 호반우{% endblock %}
 {% block content %}
 <section class="auth-card">
@@ -15,7 +16,7 @@
       </div>
       <label class="auth-label">학과 <span class="auth-help">신규 가입 시 필수</span><input class="auth-input" name="department" maxlength="60" value="{{ values.department or '' }}"></label>
       {% if code_required %}<label class="auth-label">가입 코드 <span class="auth-help">신규 가입 시 필수</span><input class="auth-input" name="signup_code" autocomplete="off" autocapitalize="characters" maxlength="40"></label>{% endif %}
-      <label class="auth-label">PIN <span class="auth-help">선택 · 다음부터 숫자 6자리로 로그인</span><input class="auth-input" name="pin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="6" pattern="[0-9]{6}"></label>
+      {{ auth_code('pin', 'PIN', 'signup-pin', 'new-password', masked=true, required=false, help_text='선택 · 다음부터 숫자 6자리로 로그인') }}
       {% if error %}<p class="auth-error" role="alert">{{ error }}</p>{% endif %}
       <button class="auth-btn auth-btn-primary" type="submit">계속하기</button>
     </form>

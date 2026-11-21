@@ -19,6 +19,28 @@ class CurrentUiContractsTest(unittest.TestCase):
         self.assertIn('id="school-email"', login)
         self.assertIn("경북대 학교 메일(@knu.ac.kr) 로그인 · 가입", login)
 
+    def test_auth_digit_inputs_use_shared_progressive_enhancement(self):
+        auth = self.read("templates/auth_base.html")
+        macro = self.read("templates/_auth_code.html")
+        css = self.read("static/lms_auth.css")
+        script = self.read("static/auth_code_boxes.js")
+        self.assertIn('<script defer src="{{ url_for(\'static\', filename=\'auth_code_boxes.js\') }}">', auth)
+        self.assertIn('data-auth-code-controls hidden', macro)
+        self.assertIn('data-digit-mask=', macro)
+        self.assertIn('range(1, 7)', macro)
+        self.assertIn('data-auth-code-toggle aria-pressed="false"', macro)
+        self.assertIn('grid-template-columns:repeat(6,minmax(0,1fr))', css)
+        self.assertIn('auth-code-enhanced', script)
+        for template, fields in (
+            ("templates/login.html", ("login-code", "login-pin")),
+            ("templates/signup.html", ("signup-pin",)),
+            ("templates/account_password.html", ("new-pin", "confirm-pin")),
+        ):
+            page = self.read(template)
+            for field in fields:
+                self.assertIn(f"'{field}'", page)
+            self.assertIn("import auth_code", page)
+
     def test_unlinked_kakao_flow_leads_with_signup(self):
         identity = self.read("templates/link_account.html")
         self.assertIn("회원가입을<br>진행할게요", identity)

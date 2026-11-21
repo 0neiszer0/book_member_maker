@@ -1,4 +1,5 @@
 {% extends 'auth_base.html' %}
+{% from '_auth_code.html' import auth_code %}
 {% block title %}로그인 · 책 먹는 호반우{% endblock %}
 {% block head %}
 {{ super() }}
@@ -24,9 +25,7 @@
       <input type="hidden" name="next" value="{{ next_url or '' }}">
       <p class="auth-help"><strong>{{ email }}</strong>에 보낸 인증코드는 10분간 사용할 수 있어요.</p>
       <p class="auth-help">메일이 보이지 않으면 스팸메일함도 확인해 주세요.</p>
-      <label class="auth-label">인증코드
-        <input class="auth-input" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="예: 123456" required autofocus>
-      </label>
+      {{ auth_code('code', '인증코드', 'login-code', 'one-time-code', autofocus=true) }}
       <button class="auth-btn auth-btn-primary" type="submit">인증코드 확인</button>
     </form>
     <form class="auth-form" method="post" action="{{ url_for('email_auth_request') }}">
@@ -61,9 +60,7 @@
       <label class="auth-label">학교 메일(@knu.ac.kr) 또는 학번
         <input class="auth-input" name="identifier" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="254" value="{{ pin_identifier or '' }}" placeholder="예: hobanu@knu.ac.kr 또는 2026123456" required>
       </label>
-      <label class="auth-label">PIN
-        <input class="auth-input" name="pin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="6" pattern="[0-9]{6}" placeholder="숫자 6자리" required>
-      </label>
+      {{ auth_code('pin', 'PIN', 'login-pin', 'current-password', masked=true) }}
       {% if pin_error %}<p class="auth-error" role="alert">{{ pin_error }}</p>{% endif %}
       <button class="auth-btn auth-btn-primary" type="submit">PIN으로 로그인</button>
     </form>

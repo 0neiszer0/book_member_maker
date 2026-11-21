@@ -87,6 +87,46 @@
           </div>
           <button type="button" class="lms-button delete-handover-response" data-id="{{ resp.id }}">삭제</button>
         </div>
+        {% if resp.knu_email %}
+        <div class="eg-identity lms-form-field">
+          <div class="eg-actions">
+            <span>학교 메일 <strong>{{ resp.knu_email }}</strong></span>
+            <button type="button" class="lms-button copy-handover-email" data-email="{{ resp.knu_email }}">메일 복사</button>
+            {% if resp.email_linked %}<span class="eg-chip">연결 완료</span>{% endif %}
+          </div>
+          {% if not resp.email_linked %}
+            {% set matched_ids = resp.email_matches | map(attribute='id') | list %}
+            {% set fallback = unlinked_staff | rejectattr('id', 'in', matched_ids) | list %}
+            {% if resp.email_matches or fallback %}
+            <form class="link-handover-email eg-form" data-email="{{ resp.knu_email }}">
+              <label>
+                <span>학교 메일을 연결할 계정</span>
+                <select class="eg-select" name="member_id" required>
+                  <option value=""{% if not resp.email_preselect %} selected{% endif %}>계정 선택</option>
+                  {% if resp.email_matches %}
+                  <optgroup label="이름 일치">
+                    {% for member in resp.email_matches %}
+                    <option value="{{ member.id }}"{% if member.id == resp.email_preselect %} selected{% endif %}>{{ member.name }} · ID #{{ member.id }}</option>
+                    {% endfor %}
+                  </optgroup>
+                  {% endif %}
+                  {% if fallback %}
+                  <optgroup label="학교 메일 미연결 운영진">
+                    {% for member in fallback %}
+                    <option value="{{ member.id }}">{{ member.name }} · ID #{{ member.id }}</option>
+                    {% endfor %}
+                  </optgroup>
+                  {% endif %}
+                </select>
+              </label>
+              <button type="submit" class="lms-button">계정에 학교 메일 연결</button>
+            </form>
+            {% else %}
+            <p class="eg-help">연결할 수 있는 미연결 계정이 없습니다.</p>
+            {% endif %}
+          {% endif %}
+        </div>
+        {% endif %}
         <div class="eg-muted" style="color:#2d3b45">
           <p style="margin:0 0 8px"><strong>1. 핵심 업무 3가지 (시기 포함)</strong><br><span style="white-space:pre-wrap">{{ resp.core_tasks }}</span></p>
           {% if resp.hardships_and_tips %}
@@ -153,8 +193,8 @@
       body: JSON.stringify(payload || {})
     });
     var data = await res.json().catch(function() { return {}; });
-    if (!res.ok || data.ok === false) {
-      throw new Error(data.error || '요청을 처리하지 못했습니다.');
+    if (!res.ok || data.ok === false || data.status === 'error') {
+      throw new Error(data.message || data.error || '요청을 처리하지 못했습니다.');
     }
     return data;
   }
@@ -211,6 +251,37 @@
         target.focus();
         target.select();
         setNotice('위키용 초안을 선택했습니다. Ctrl+C로 복사해주세요.', false);
+      }
+    });
+  });
+
+  document.querySelectorAll('.copy-handover-email').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
+      try {
+        await copyText(btn.dataset.email);
+        setNotice('학교 메일을 복사했습니다.', false);
+      } catch (err) {
+        setNotice('학교 메일 주소를 직접 선택해 복사해주세요.', false);
+      }
+    });
+  });
+
+  document.querySelectorAll('.link-handover-email').forEach(function(form) {
+    form.addEventListener('submit', async function(event) {
+      event.preventDefault();
+      var memberId = form.elements.member_id.value;
+      var button = form.querySelector('button');
+      button.disabled = true;
+      try {
+        var result = await postJson('/api/admin/members/' + encodeURIComponent(memberId) + '/knu-email', {
+          knu_email: form.dataset.email,
+          only_if_unlinked: true
+        });
+        if (result.status !== 'success') throw new Error('학교 메일을 연결하지 못했습니다.');
+        setNotice('계정에 학교 메일을 연결했습니다.', true);
+      } catch (err) {
+        setNotice(err.message, false);
+        button.disabled = false;
       }
     });
   });
