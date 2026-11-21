@@ -143,8 +143,10 @@ class OverviewRouteTests(unittest.TestCase):
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
-        for path in ('/club-room', '/calendar', '/archive', '/login'):
+        for path in ('/archive', '/login'):
             self.assertIn('href="' + path + '"', html)
+        for retired_path in ('/club-room', '/calendar'):
+            self.assertNotIn('href="' + retired_path + '"', html)
         for private_path in ('/admin/dashboard', '/mypage', '/seminars', '/applicant-result/'):
             self.assertNotIn('href="' + private_path, html)
         self.assertIn('최근 커리큘럼', html)
