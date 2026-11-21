@@ -51,7 +51,7 @@ class TopicDocumentIdentityTests(unittest.TestCase):
 
 class TopicLimitContractTests(unittest.TestCase):
     def test_default_limit_is_two_in_app_template_and_migration(self):
-        app_source = (ROOT / 'app.py').read_text(encoding='utf-8')
+        app_source = (ROOT / 'topic_routes.py').read_text(encoding='utf-8')
         template_source = (ROOT / 'templates' / 'topic_submit.html').read_text(encoding='utf-8')
         migration_source = (ROOT / 'migrations' / '029_default_two_topics.sql').read_text(encoding='utf-8')
 
