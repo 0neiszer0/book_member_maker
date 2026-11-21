@@ -8,9 +8,9 @@ from typing import Any
 
 from flask import abort, make_response, render_template, request
 
-DATA_DIR = Path(__file__).resolve().parent / "data"
-PUBLIC_ARCHIVE_PATH = DATA_DIR / "public_archive.json"
-PRE_SEMINAR_PATH = DATA_DIR / "member_pre_seminar_materials.json"
+CONTENT_DIR = Path(__file__).resolve().parent / "content"
+PUBLIC_ARCHIVE_PATH = CONTENT_DIR / "public_archive.json"
+PRE_SEMINAR_PATH = CONTENT_DIR / "member_pre_seminar_materials.json"
 
 _JSON_CACHE: dict[Path, tuple[tuple[int, int], dict[str, Any]]] = {}
 

@@ -20,8 +20,8 @@ os.environ.setdefault("SUPABASE_URL", "http://127.0.0.1:9")
 os.environ.setdefault("SUPABASE_SERVICE_KEY", "ci-test-only")
 
 ROOT = Path(__file__).resolve().parents[1]
-PUBLIC_ARCHIVE_JSON = ROOT / "data" / "public_archive.json"
-PRE_SEMINAR_JSON = ROOT / "data" / "member_pre_seminar_materials.json"
+PUBLIC_ARCHIVE_JSON = ROOT / "content" / "public_archive.json"
+PRE_SEMINAR_JSON = ROOT / "content" / "member_pre_seminar_materials.json"
 
 
 class PublicArchiveAndPreSeminarTests(unittest.TestCase):
@@ -69,8 +69,8 @@ class PublicArchiveAndPreSeminarTests(unittest.TestCase):
     # --- 1. Snapshot Data Integrity & Strict Automated PII Scan ---
 
     def test_snapshot_files_exist_with_expected_coverage(self):
-        self.assertTrue(PUBLIC_ARCHIVE_JSON.exists(), "data/public_archive.json must exist")
-        self.assertTrue(PRE_SEMINAR_JSON.exists(), "data/member_pre_seminar_materials.json must exist")
+        self.assertTrue(PUBLIC_ARCHIVE_JSON.exists(), "content/public_archive.json must exist")
+        self.assertTrue(PRE_SEMINAR_JSON.exists(), "content/member_pre_seminar_materials.json must exist")
 
         pub = json.loads(PUBLIC_ARCHIVE_JSON.read_text(encoding="utf-8"))
         books = pub.get("books", [])

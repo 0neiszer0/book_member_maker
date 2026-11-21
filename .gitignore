@@ -5,8 +5,6 @@ __pycache__/
 
 # Local exports can contain member names, preferences, and activity history.
 data/*.json
-!data/public_archive.json
-!data/member_pre_seminar_materials.json
 data/*.csv
 .claude/
 .idea/

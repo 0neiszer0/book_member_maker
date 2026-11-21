@@ -6,8 +6,8 @@ Reads:
   2. Notion API via C:\\Users\\HOME\\.config\\knu-read\\notion.env.txt (read-only; when available)
 
 Writes (inside this repository):
-  - data/public_archive.json
-  - data/member_pre_seminar_materials.json
+  - content/public_archive.json
+  - content/member_pre_seminar_materials.json
 """
 
 from __future__ import annotations
@@ -37,9 +37,9 @@ except ImportError:
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DATA_DIR = REPO_ROOT / "data"
-PUBLIC_ARCHIVE_PATH = DATA_DIR / "public_archive.json"
-PRE_SEMINAR_PATH = DATA_DIR / "member_pre_seminar_materials.json"
+CONTENT_DIR = REPO_ROOT / "content"
+PUBLIC_ARCHIVE_PATH = CONTENT_DIR / "public_archive.json"
+PRE_SEMINAR_PATH = CONTENT_DIR / "member_pre_seminar_materials.json"
 
 ARCHIVE1_DIR = Path(r"H:\내 드라이브\책반우 네이버카페 원본 (2026-10-31)")
 ARCHIVE2_DIR = Path(r"H:\내 드라이브\책반우 네이버카페 추가 백업 (2026-11-01~2026-11-20)")
@@ -1317,7 +1317,7 @@ def verify_zero_pii(payload: Any, member_names: set[str], label: str, check_nim:
 
 
 def main() -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    CONTENT_DIR.mkdir(parents=True, exist_ok=True)
     pdf_pages, member_names, article_member_names = load_backup_pdfs()
     anonymizer = TextAnonymizer(member_names)
 
