@@ -68,9 +68,8 @@
             </details>
         </section>
         <aside class="settings-panel">
-            <h2 class="  groups-mb-4">편성 설정</h2>
+            <h2 class="groups-mb-4">편성 설정</h2>
             <label>그룹 수<input type="number" name="group_count" min="1" max="30" placeholder="자동 계산"></label>
-            <p id="group-size-preview" class="groups-text-xs groups-mt-2 groups-mb-3"></p>
             <label>그룹 이름<input type="text" name="group_names" placeholder="A팀, B팀, C팀"></label>
             {% if can_manage_pair_restrictions %}
             <details class="restriction-panel">
@@ -94,7 +93,14 @@
                 </div>
             </details>
             {% endif %}
-            <button type="button" id="generate-btn" class=" lms-button lms-button-primary">조 편성 시작</button>
+            <div class="groups-cta-box">
+                <div class="groups-cta-meta">
+                    <span class="groups-cta-label">조 편성 실행</span>
+                    <span class="groups-cta-badge" id="cta-summary-badge">0명 선택</span>
+                </div>
+                <p id="group-size-preview" class="groups-cta-preview"></p>
+                <button type="button" id="generate-btn" class="lms-button lms-button-primary lms-button-cta"><span>조 편성 시작</span><span aria-hidden="true">→</span></button>
+            </div>
         </aside>
     </form>
 
@@ -137,17 +143,20 @@
             const cntFacilitators = document.getElementById('cnt-facilitators');
             const groupCountInput = document.querySelector('input[name="group_count"]');
             const groupSizePreview = document.getElementById('group-size-preview');
+            const ctaSummaryBadge = document.getElementById('cta-summary-badge');
             function updateCounts() {
                 const selectedCount = document.querySelectorAll('input[name="present"]:checked').length;
                 cntPresent.textContent = selectedCount;
                 cntFacilitators.textContent = document.querySelectorAll('input[name="facilitators"]:checked').length;
                 if (!selectedCount) {
+                    if (ctaSummaryBadge) ctaSummaryBadge.textContent = '0명 선택';
                     groupSizePreview.textContent = '참석자를 선택하면 예상 조 수와 인원이 표시됩니다.';
                     return;
                 }
                 const requested = Number(groupCountInput.value) || Math.ceil(selectedCount / 4);
                 const groupCount = Math.max(1, Math.min(requested, Math.max(1, Math.floor(selectedCount / 4))));
                 const maxSize = Math.ceil(selectedCount / groupCount);
+                if (ctaSummaryBadge) ctaSummaryBadge.textContent = `${selectedCount}명 · ${groupCount}개 조`;
                 groupSizePreview.textContent = `현재 ${selectedCount}명 · 예상 ${groupCount}개 조 · 조당 ${groupCount === 1 ? selectedCount : `4~${maxSize}`}명`;
             }
             document.querySelectorAll('input[name="present"], input[name="facilitators"]').forEach(cb => {
