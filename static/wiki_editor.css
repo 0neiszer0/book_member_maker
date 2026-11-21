@@ -82,6 +82,38 @@
 .picker-grid { display: grid; grid-template-columns: repeat(6, 26px); gap: 2px; margin-bottom: 10px; }
 .picker-grid button { width: 26px; height: 26px; padding: 0; border: 1px solid #b0bec5; background: #fff; }
 .picker-grid button.picked { border-color: #0374b5; background: #d2eaf7; }
+/* Direct resizing on rendered preview tables */
+.wiki-table-shell { position: relative; }
+.wiki-live-tip { flex: 1 1 220px; color: #56616a; font-size: 12px; }
+.wiki-table-bar {
+    position: absolute; z-index: 3; display: none; align-items: center; gap: 4px;
+    transform: translateX(-100%); padding: 2px 4px; white-space: nowrap;
+    font-size: 12px; background: #fffffff0; border: 1px solid #c7cdd1; border-radius: 999px;
+    box-shadow: 0 2px 8px #18232c30;
+}
+.wiki-table-bar span { padding: 0 4px; color: #273238; }
+.wiki-table-bar button {
+    min-height: 24px; padding: 0 8px; font: inherit; font-size: 12px; color: #273238;
+    background: #f5f7f8; border: 1px solid #c7cdd1; border-radius: 999px; cursor: pointer;
+}
+.wiki-table-bar button:hover:not(:disabled) { color: #fff; background: #d20f17; border-color: #d20f17; }
+.wiki-table-bar button:disabled { opacity: .4; cursor: default; }
+.wiki-table-shell:hover .wiki-table-bar, .wiki-table-shell:focus-within .wiki-table-bar { display: inline-flex; }
+.wiki-col-handle, .wiki-table-edge { position: absolute; z-index: 2; width: 10px; touch-action: none; user-select: none; }
+.wiki-col-handle { cursor: col-resize; }
+.wiki-table-edge { cursor: ew-resize; }
+.wiki-col-handle::after, .wiki-table-edge::after {
+    content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 3px; margin-left: -1.5px;
+    border-radius: 2px; background: transparent; transition: background .12s;
+}
+.wiki-table-shell:hover .wiki-col-handle::after { background: #d20f1730; }
+.wiki-table-shell:hover .wiki-table-edge::after { top: 35%; bottom: 35%; background: #56616a80; }
+.wiki-col-handle:hover::after, .wiki-col-handle.dragging::after,
+.wiki-table-edge:hover::after, .wiki-table-edge.dragging::after { background: #d20f17; }
+.wiki-resize-badge {
+    position: fixed; z-index: 1000; padding: 3px 9px; pointer-events: none; font-size: 12px; font-weight: 700;
+    color: #fff; background: #d20f17; border-radius: 999px; box-shadow: 0 2px 8px #18232c50;
+}
 @media (min-width: 960px) {
     #wiki-workspace.split { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
