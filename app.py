@@ -80,10 +80,6 @@ if not app.secret_key:
 # Supabase 클라이언트 초기화
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
-NOTION_PUBLIC_WIKI_URL = os.environ.get(
-    "NOTION_PUBLIC_WIKI_URL",
-    "https://quaint-sapphire-900.notion.site/bookbook",
-).split('?', 1)[0]
 PUBLIC_BASE_URL = os.environ.get(
     "PUBLIC_BASE_URL", "https://book-member-maker.onrender.com"
 ).rstrip("/")
@@ -111,6 +107,10 @@ install_security(app, lambda: supabase)
 install_static_assets(app)
 install_storage_media(app)
 init_wiki_routes(app, lambda: supabase)
+from universal_search import init_universal_search
+from public_archive_routes import render_public_landing
+init_universal_search(app, lambda: supabase)
+app.add_url_rule('/landing', 'public_landing', render_public_landing)
 
 
 @app.context_processor
@@ -120,8 +120,7 @@ def public_navigation_context():
             return None
         rows = supabase.table('seminar_terms').select('id,name').eq('id', seminar['term_id']).limit(1).execute().data or []
         return rows[0] if rows else None
-    return {"notion_public_wiki_url": NOTION_PUBLIC_WIKI_URL,
-            "wiki_url": url_for('wiki.home') if app.config['WIKI_ENABLED'] else NOTION_PUBLIC_WIKI_URL,
+    return {"wiki_url": url_for('wiki.home') if app.config['WIKI_ENABLED'] else url_for('public_archive'),
             "wiki_enabled": app.config['WIKI_ENABLED'], 'operation_term_for': operation_term_for}
 
 
@@ -153,7 +152,8 @@ def add_default_social_preview(response):
         return response
     # Public and legacy pages do not always include the shared header. Load
     # the current theme last so their page-local old palette cannot leak out.
-    uses_lms_layout = '<meta name="app-layout" content="canvas">' in page
+    uses_lms_layout = any(f'<meta name="app-layout" content="{layout}">' in page
+                          for layout in ('canvas', 'public-landing'))
     theme_href = url_for("static", filename="theme.css")
     if not uses_lms_layout and 'data-wood-theme="1"' not in page and theme_href not in page:
         theme_link = f'\n  <link rel="stylesheet" href="{theme_href}" data-wood-theme="1">\n'
@@ -591,24 +591,35 @@ def keep_alive_endpoint():
         }), 200
 
 
+@app.get('/topics/<token>')
+def shared_topic_link(token):
+    return redirect(url_for('view_shared_topics', token=token, session_id=request.args.get('session_id')))
+
+
+@app.get('/boards/<slug>/<post_id>')
+def board_post_link(slug, post_id):
+    return redirect(url_for('boards.post_detail', slug=slug, post_id=post_id))
+
+
 @app.route('/')
 def main_index():
+    if not (session.get('user_id') and session.get('user_role')):
+        return render_public_landing()
     home = attendance = None
     home_error = attendance_error = False
-    if session.get('user_id') and session.get('user_role'):
-        open_due_topic_events(supabase, datetime.now(timezone(timedelta(hours=9))).date())
-        try:
-            home = member_seminar_summary(supabase, session['user_id'])
-        except Exception:
-            app.logger.exception('Home seminar summary failed')
-            home_error = True
-        try:
-            _, term, report = _term_attendance_report((home or {}).get('term', {}).get('id') if (home or {}).get('term') else None)
-            mine = next((m for m in (report or {}).get('members', []) if str(m['id']) == str(session['user_id'])), None)
-            attendance = {'term': term, 'mine': mine, 'minimum': (report or {}).get('minimum', 3)}
-        except Exception:
-            app.logger.exception('Home attendance summary failed')
-            attendance_error = True
+    open_due_topic_events(supabase, datetime.now(timezone(timedelta(hours=9))).date())
+    try:
+        home = member_seminar_summary(supabase, session['user_id'])
+    except Exception:
+        app.logger.exception('Home seminar summary failed')
+        home_error = True
+    try:
+        _, term, report = _term_attendance_report((home or {}).get('term', {}).get('id') if (home or {}).get('term') else None)
+        mine = next((m for m in (report or {}).get('members', []) if str(m['id']) == str(session['user_id'])), None)
+        attendance = {'term': term, 'mine': mine, 'minimum': (report or {}).get('minimum', 3)}
+    except Exception:
+        app.logger.exception('Home attendance summary failed')
+        attendance_error = True
     return render_template('main_index.html', home=home, attendance=attendance,
                            home_error=home_error, attendance_error=attendance_error)
 
@@ -2830,7 +2841,7 @@ def bookclub_api_delete_history():
 def view_document(doc_title):
     if app.config['WIKI_ENABLED']:
         return redirect(url_for('wiki.document', title=doc_title), code=302)
-    return redirect(NOTION_PUBLIC_WIKI_URL, code=302)
+    return redirect(url_for('public_archive'), code=302)
     """
     데이터베이스에서 문서를 찾아 제목과 내용을 보여주는 페이지.
     """
@@ -2858,7 +2869,7 @@ def view_document(doc_title):
 def create_document_page():
     if app.config['WIKI_ENABLED']:
         return redirect(url_for('wiki.new'), code=302)
-    return redirect(NOTION_PUBLIC_WIKI_URL, code=302)
+    return redirect(url_for('public_archive'), code=302)
 
 
 # 2. 문서 생성 요청을 처리하는 API 라우트
@@ -2867,7 +2878,7 @@ def create_document_page():
 def handle_create_document():
     return jsonify({
         "status": "error", "message": "앱 위키 편집은 종료되었습니다.",
-        "wiki_url": url_for('wiki.home') if app.config['WIKI_ENABLED'] else NOTION_PUBLIC_WIKI_URL,
+        "wiki_url": url_for('wiki.home') if app.config['WIKI_ENABLED'] else url_for('public_archive'),
     }), 410
     data = request.json
     title = data.get('title')
@@ -2901,7 +2912,7 @@ def handle_create_document():
 def view_all_documents():
     if app.config['WIKI_ENABLED']:
         return redirect(url_for('wiki.pages'), code=302)
-    return redirect(NOTION_PUBLIC_WIKI_URL, code=302)
+    return redirect(url_for('public_archive'), code=302)
     """
     지금까지 생성된 모든 문서의 목록을 보여주는 페이지.
     """
@@ -2927,7 +2938,7 @@ def view_all_documents():
 def edit_document_page(doc_title):
     if app.config['WIKI_ENABLED']:
         return redirect(url_for('wiki.edit', title=doc_title), code=302)
-    return redirect(NOTION_PUBLIC_WIKI_URL, code=302)
+    return redirect(url_for('public_archive'), code=302)
     try:
         doc_res = supabase.table('documents').select('*').eq('title', doc_title).single().execute()
         document = doc_res.data
@@ -2957,7 +2968,7 @@ def edit_document_page(doc_title):
 def handle_edit_document(doc_id):
     return jsonify({
         "status": "error", "message": "앱 위키 편집은 종료되었습니다.",
-        "wiki_url": url_for('wiki.home') if app.config['WIKI_ENABLED'] else NOTION_PUBLIC_WIKI_URL,
+        "wiki_url": url_for('wiki.home') if app.config['WIKI_ENABLED'] else url_for('public_archive'),
     }), 410
     data = request.json
     content = data.get('content')
@@ -3022,7 +3033,7 @@ def get_document_history(doc_id):
 def handle_delete_document(doc_id):
     return jsonify({
         "status": "error", "message": "기존 위키 자료는 보존 기간이라 삭제할 수 없습니다.",
-        "wiki_url": url_for('wiki.home') if app.config['WIKI_ENABLED'] else NOTION_PUBLIC_WIKI_URL,
+        "wiki_url": url_for('wiki.home') if app.config['WIKI_ENABLED'] else url_for('public_archive'),
     }), 410
     try:
         # 삭제 권한 확인을 위해 먼저 문서의 작성자 정보를 가져옵니다.

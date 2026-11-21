@@ -96,6 +96,10 @@ class CurrentUiContractsTest(unittest.TestCase):
                 if 'name="app-layout" content="canvas"' in head:
                     self.assertIn("filename='lms.css'", head, template.name)
                     self.assertIn('name="color-scheme" content="light"', head, template.name)
+                elif 'name="app-layout" content="public-landing"' in head:
+                    # The external landing page ships its own self-contained stylesheet.
+                    self.assertIn("filename='public_landing.css'", head, template.name)
+                    self.assertIn('name="color-scheme" content="light"', head, template.name)
                 else:
                     self.assertIn("{% include '_app_theme_head.html' %}", head, template.name)
 

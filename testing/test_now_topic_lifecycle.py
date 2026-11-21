@@ -49,7 +49,11 @@ class NowTopicLifecycleTests(unittest.TestCase):
         with patch.object(self.module, 'supabase', self.fake), \
                 patch.object(self.module, 'datetime', clock), \
                 patch('engagement.render_template', side_effect=lambda template, **context: jsonify(cards=context['cards'])):
-            response = self.app.test_client().get('/now')
+            client = self.app.test_client()
+            # 발제문 cards are only listed for signed-in members.
+            with client.session_transaction() as state:
+                state.update(user_id=1, user_role='member')
+            response = client.get('/now')
         self.assertEqual(response.status_code, 200)
         return response.get_json()['cards']
 

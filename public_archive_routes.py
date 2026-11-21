@@ -51,6 +51,18 @@ def _book_matches_query(book: dict[str, Any], needle: str) -> bool:
     return needle.lower() in joined
 
 
+def render_public_landing():
+    archive = _load_json_snapshot(PUBLIC_ARCHIVE_PATH)
+    books = archive.get("books", [])
+    return render_template(
+        "public_landing.html",
+        semester_count=len(archive.get("semesters", [])),
+        book_count=len(books),
+        recent_books=sorted(books, key=lambda b: b.get("date") or "", reverse=True)[:6],
+        programs=archive.get("special_programs", []),
+    )
+
+
 def init_public_archive_routes(app, login_required):
     @app.get("/archive")
     def public_archive():

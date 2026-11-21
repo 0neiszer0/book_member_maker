@@ -19,7 +19,7 @@
 {% if not lms_isolated_auth|default(false) %}{% include '_lms_navigation.html' %}
 <div class="lms-mobile-header"><button type="button" data-lms-menu aria-label="전역 메뉴 열기">{{ icon('menu') }}</button><div class="lms-mobile-heading">{% if lms_course %}<span class="lms-mobile-course-name">{{ course_breadcrumb_label|default(lms_course.name) }}</span>{% endif %}<span>{{ lms_title|default('책 먹는 호반우') }}</span></div><button type="button" data-lms-quick-search aria-label="기능 빠른 검색 (Ctrl+K)"><svg class="lms-icon" width="22" height="22" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="7"/><path d="m17.5 17.5 6 6"/></svg></button>{% if lms_course %}<button type="button" data-lms-course-toggle aria-label="강의실 메뉴 열기">{{ icon('chevron') }}</button>{% endif %}</div>
 {% endif %}<div class="lms-wrapper">
-{% if lms_page != 'dashboard' and not lms_isolated_auth|default(false) %}<header class="lms-breadcrumb"><button type="button" data-lms-course-toggle aria-label="{{ '위키' if lms_page == 'wiki' else '강의실' }} 메뉴 접기" aria-expanded="true">{{ icon('menu') }}</button><nav aria-label="현재 위치"><a href="{{ course_breadcrumb_href|default(url_for('seminars',term_id=lms_course.id) if lms_course else url_for('main_index')) }}">{% if lms_course %}{{ course_breadcrumb_label|default(lms_course.name) }}{% else %}책 먹는 호반우{% endif %}</a><span aria-hidden="true">›</span><span>{{ lms_title|default('') }}</span></nav></header>{% endif %}
+{% if not lms_isolated_auth|default(false) %}<header class="lms-breadcrumb">{% if lms_page != 'dashboard' %}<button type="button" data-lms-course-toggle aria-label="{{ '위키' if lms_page == 'wiki' else '강의실' }} 메뉴 접기" aria-expanded="true">{{ icon('menu') }}</button><nav aria-label="현재 위치"><a href="{{ course_breadcrumb_href|default(url_for('seminars',term_id=lms_course.id) if lms_course else url_for('main_index')) }}">{% if lms_course %}{{ course_breadcrumb_label|default(lms_course.name) }}{% else %}책 먹는 호반우{% endif %}</a><span aria-hidden="true">›</span><span>{{ lms_title|default('') }}</span></nav>{% endif %}<button class="top-search" type="button" data-lms-quick-search>통합 검색 <kbd>Ctrl K</kbd></button></header>{% endif %}
 <div class="lms-columns">
 {% if lms_course %}<aside class="lms-course-menu" id="lms-course-menu">{% block course_navigation %}{% with term=lms_course %}{% include '_classroom_nav.html' %}{% endwith %}{% endblock %}</aside>{% endif %}
 <main class="lms-content" id="lms-content">
@@ -43,8 +43,8 @@
   {'title': '세미나 전 자료', 'url': url_for('member_pre_seminar'), 'group': '회원', 'keywords': '세미나 전 자료 논문 서평 작가 배경', 'description': '회원 전용 세미나 전 읽기 자료·학술 논문·서평 모음'},
   {'title': '이용 안내', 'url': url_for('help_member'), 'group': '회원', 'keywords': '도움말 안내', 'description': '사이트 이용 방법과 안내'}
 ] %}
-{% if wiki_url|default('') %}{% set _qs_base = _qs_base + [{'title': '회원 위키', 'url': wiki_url, 'group': '회원', 'keywords': '위키 가이드 문서', 'description': '동아리 회원 위키 바로가기'}] %}{% endif %}
-{% if session.user_role in ['admin', 'officer'] %}
+{% if wiki_enabled and wiki_url|default('') %}{% set _qs_base = _qs_base + [{'title': '회원 위키', 'url': wiki_url, 'group': '회원', 'keywords': '위키 가이드 문서', 'description': '동아리 회원 위키 바로가기'}] %}{% endif %}
+{% if session.user_role in ['admin', 'officer'] and not session.member_preview %}
 {% set _qs_staff = [
   {'title': '운영 관리 대시보드', 'url': url_for('admin_dashboard'), 'group': '운영진', 'keywords': '운영 관리 대시보드', 'description': '동아리 운영 현황 한눈에 보기'},
   {'title': '세미나 운영', 'url': url_for('admin_seminars'), 'group': '운영진', 'keywords': '세미나 회차 생성 관리', 'description': '세미나 회차·도서·발제·사회자 관리'},
