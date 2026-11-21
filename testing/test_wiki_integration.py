@@ -92,6 +92,13 @@ class RouteTests(unittest.TestCase):
         config = patch.dict(cls.module.app.config, TESTING=True, WIKI_ENABLED=True, SESSION_COOKIE_SECURE=False)
         config.start()
         cls.addClassCleanup(config.stop)
+        # app.py caches PUBLIC_BASE_URL at import time; when the full suite has
+        # already imported ``app`` under another module, the env patch above is
+        # too late for that module-level constant. Pin it so the app-wide
+        # same-origin guard accepts the fixture's ``Origin: http://localhost``.
+        base_url = patch.object(cls.module, 'PUBLIC_BASE_URL', 'http://localhost')
+        base_url.start()
+        cls.addClassCleanup(base_url.stop)
 
     def setUp(self):
         from datetime import datetime, timezone
