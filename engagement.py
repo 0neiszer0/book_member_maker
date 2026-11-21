@@ -301,30 +301,32 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
         cards = []
         # 세미나 참석/불참 투표는 카카오톡에서 진행합니다.
 
-        topic_rows = (
-            supabase.table("topic_events")
-            .select("id,meeting_date,book_title,book_author,share_token,created_at,is_active,seminar_week_id,seminar_session_id,late_until")
-            .eq("is_active", True)
-            .order("meeting_date")
-            .execute().data or []
-        )
-        # 이 화면에 먼저 들어와도 세미나 화면과 동일한 공유 회차 마감 기준을 적용한다.
-        if topic_event_lifecycle:
-            topic_rows = topic_event_lifecycle(topic_rows)
-        else:
-            topic_rows = [row for row in topic_rows if topic_event_is_open(row)]
-        for row in topic_rows:
-            if not row.get("is_active"):
-                continue
-            deadline = topic_event_close_at(row)
-            close_at = deadline.astimezone(timezone.utc).isoformat() if deadline else None
-            cards.append({
-                "kind": "발제문",
-                "title": row.get("book_title") or "이번 세미나 발제문",
-                "description": f"{row.get('meeting_date')} 세미나 · 먼저 제출된 발제문을 확인하고 중복을 피할 수 있어요.",
-                "url": url_for("view_shared_topics", token=row["share_token"]),
-                "close_at": close_at,
-            })
+        logged_in = bool(session.get("user_id") and session.get("user_role"))
+        if logged_in:
+            topic_rows = (
+                supabase.table("topic_events")
+                .select("id,meeting_date,book_title,book_author,share_token,created_at,is_active,seminar_week_id,seminar_session_id,late_until")
+                .eq("is_active", True)
+                .order("meeting_date")
+                .execute().data or []
+            )
+            # 이 화면에 먼저 들어와도 세미나 화면과 동일한 공유 회차 마감 기준을 적용한다.
+            if topic_event_lifecycle:
+                topic_rows = topic_event_lifecycle(topic_rows)
+            else:
+                topic_rows = [row for row in topic_rows if topic_event_is_open(row)]
+            for row in topic_rows:
+                if not row.get("is_active"):
+                    continue
+                deadline = topic_event_close_at(row)
+                close_at = deadline.astimezone(timezone.utc).isoformat() if deadline else None
+                cards.append({
+                    "kind": "발제문",
+                    "title": row.get("book_title") or "이번 세미나 발제문",
+                    "description": f"{row.get('meeting_date')} 세미나 · 먼저 제출된 발제문을 확인하고 중복을 피할 수 있어요.",
+                    "url": url_for("view_shared_topics", token=row["share_token"]),
+                    "close_at": close_at,
+                })
 
         seminar_forms = [
             form for form in (
@@ -398,10 +400,11 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
         return render_template(
             "engagement_now.html",
             cards=cards,
+            logged_in=logged_in,
             remembered_member=current_member(),
             social_meta=_social_meta(
                 "지금 참여하기 · 책 먹는 호반우",
-                "현재 열려 있는 발제문, 세미나 후기, 벽돌책 모집과 책 추천을 한곳에서 확인하세요.",
+                "현재 열려 있는 발제문, 세미나 후기, 벽돌책 모집과 책 추천을 한곳에서 확인하세요." if logged_in else "열려 있는 신청·후기를 확인하세요.",
                 f"{_public_base()}/now",
             ),
         )

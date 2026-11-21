@@ -160,3 +160,20 @@
     display:none;
   }
 }
+
+.top-search, .lms-breadcrumb > .top-search {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: auto;
+  margin-left: auto;
+  padding: .45rem .8rem;
+  border: 1px solid #c6c1b9;
+  border-radius: .35rem;
+  background: white;
+  color: #403c38;
+  font: inherit;
+  cursor: pointer;
+}
+.top-search kbd { font-size: .75rem; color: #665e57; }

@@ -76,8 +76,10 @@ class FlaskRenderSmokeTests(unittest.TestCase):
         self.assertEqual(home.status_code, 200)
         self.assertEqual(login.status_code, 200)
         html = home.get_data(as_text=True)
-        self.assertIn('/static/lms.css', html)
-        self.assertIn('name="app-layout" content="canvas"', html)
+        # Logged-out visitors get the standalone external landing page.
+        self.assertIn('/static/public_landing.css', html)
+        self.assertIn('name="app-layout" content="public-landing"', html)
+        self.assertNotIn('id="lms-global"', html)
         for legacy_asset in ('/static/theme.css', '/static/tailwind.css', 'data-critical-theme="wood"', 'wd-topbar'):
             self.assertNotIn(legacy_asset, html)
         self.assertIn('property="og:title"', html)

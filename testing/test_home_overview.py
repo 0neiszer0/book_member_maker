@@ -143,13 +143,12 @@ class OverviewRouteTests(unittest.TestCase):
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
-        for path in ('/club-room', '/now', '/books/suggestions', '/login'):
+        for path in ('/club-room', '/calendar', '/archive', '/login'):
             self.assertIn('href="' + path + '"', html)
         for private_path in ('/admin/dashboard', '/mypage', '/seminars', '/applicant-result/'):
             self.assertNotIn('href="' + private_path, html)
-        self.assertEqual(html.count('id="cr-home-status"'), 1)
-        self.assertIn('aria-label="로그인 없이 이용하기"', html)
-        self.assertIn('이름·학번', html)
+        self.assertIn('최근 커리큘럼', html)
+        self.assertNotIn('id="lms-global"', html)
 
     def test_guest_empty_participation_links_remain_public(self):
         from flask import render_template

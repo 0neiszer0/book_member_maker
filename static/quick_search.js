@@ -16,6 +16,10 @@
   let emptyEl = null;
   let countEl = null;
   let filtered = allItems.slice();
+  let remote = [];
+  let timer;
+  let controller;
+  let loading = false;
   let activeIndex = 0;
   let lastTrigger = null;
 
@@ -53,8 +57,11 @@
 
     input = document.createElement('input');
     input.type = 'search';
+    input.maxLength = 100;
+    input.setAttribute('role', 'combobox');
+    input.setAttribute('aria-expanded', 'true');
     input.className = 'lms-qs-input';
-    input.placeholder = '기능이나 메뉴 검색 (예: 세미나, 출석, 조 편성, 인수인계)';
+    input.placeholder = '메뉴, 책, 활동 검색';
     input.setAttribute('autocomplete', 'off');
     input.setAttribute('aria-label', '기능 검색어 입력');
     input.setAttribute('aria-controls', 'lms-qs-listbox');
@@ -83,6 +90,7 @@
     const keysHint = document.createElement('span');
     keysHint.textContent = '↑↓ 이동 · Enter 열기 · Esc 닫기';
     countEl = document.createElement('span');
+    countEl.setAttribute('role', 'status');
     foot.append(keysHint, countEl);
 
     dialog.append(head, list, emptyEl, foot);
@@ -99,7 +107,7 @@
     });
 
     input.addEventListener('input', () => {
-      renderResults(input.value);
+      search(input.value);
     });
 
     input.addEventListener('keydown', (e) => {
@@ -144,6 +152,41 @@
     return score;
   }
 
+  function cancelSearch() {
+    clearTimeout(timer);
+    controller?.abort();
+    controller = null;
+  }
+
+  function search(value) {
+    cancelSearch();
+    remote = [];
+    const query = value.trim();
+    loading = Boolean(query);
+    renderResults(query);
+    if (!query) return;
+    const pending = new AbortController();
+    controller = pending;
+    timer = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ q: query });
+        if (dataEl.dataset.scope === 'public') params.set('scope', 'public');
+        const response = await fetch('/api/search?' + params, { signal: pending.signal });
+        if (response.ok) {
+          const data = await response.json();
+          if (!pending.signal.aborted && Array.isArray(data.results)) remote = data.results;
+        }
+      } catch {
+        // Local menu matches remain available when the network is unavailable.
+      } finally {
+        if (!pending.signal.aborted) {
+          loading = false;
+          renderResults(query);
+        }
+      }
+    }, 180);
+  }
+
   function renderResults(query) {
     const tokens = String(query || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
     if (!tokens.length) {
@@ -156,11 +199,17 @@
         .map((entry) => entry.item);
     }
 
+    const groups = new Map();
+    for (const item of remote) {
+      if (!groups.has(item.group)) groups.set(item.group, []);
+      groups.get(item.group).push(item);
+    }
+    filtered = filtered.map(item => ({ ...item, group: '메뉴' })).concat(...groups.values());
     activeIndex = 0;
     list.replaceChildren();
-    emptyEl.hidden = filtered.length > 0;
+    emptyEl.hidden = loading || filtered.length > 0;
     list.hidden = filtered.length === 0;
-    if (countEl) countEl.textContent = `${filtered.length}개 기능`;
+    if (countEl) countEl.textContent = loading ? '검색 중…' : `${filtered.length}개 결과`;
 
     filtered.forEach((item, index) => {
       const li = document.createElement('li');
@@ -169,6 +218,7 @@
       const link = document.createElement('a');
       link.className = 'lms-qs-item' + (index === activeIndex ? ' is-active' : '');
       link.href = item.url || '#';
+      link.id = 'lms-qs-option-' + index;
       link.setAttribute('role', 'option');
       link.setAttribute('aria-selected', index === activeIndex ? 'true' : 'false');
 
@@ -213,10 +263,13 @@
       li.append(link);
       list.append(li);
     });
+    if (filtered.length) input.setAttribute('aria-activedescendant', 'lms-qs-option-0');
+    else input.removeAttribute('aria-activedescendant');
   }
 
   function moveSelection(nextIndex) {
     activeIndex = nextIndex;
+    input.setAttribute('aria-activedescendant', 'lms-qs-option-' + nextIndex);
     const links = list.querySelectorAll('.lms-qs-item');
     links.forEach((link, idx) => {
       const selected = idx === activeIndex;
@@ -232,7 +285,7 @@
     const dlg = ensureDialog();
     lastTrigger = trigger || document.activeElement;
     input.value = '';
-    renderResults('');
+    search('');
     if (!dlg.open) {
       if (typeof dlg.showModal === 'function') {
         dlg.showModal();
@@ -245,6 +298,7 @@
 
   function closePalette() {
     if (!dialog || !dialog.open) return;
+    cancelSearch();
     if (typeof dialog.close === 'function') {
       dialog.close();
     } else {

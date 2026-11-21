@@ -3,7 +3,7 @@
 {% block content %}
 <header class="eg-header">
   <div class="lms-toolbar"><h1>지금 참여하기</h1><span class="eg-muted">현재 열린 활동 {{ cards|length }}개</span></div>
-  <p class="eg-lead">열려 있는 신청·발제문·후기를 확인하세요. 로그인 없이 이용할 수 있고, 일부 활동은 이름·학번 확인이 필요해요.</p>
+  <p class="eg-lead">열려 있는 신청·{% if logged_in %}발제문·{% endif %}후기를 확인하세요. 로그인 없이 이용할 수 있고, 일부 활동은 이름·학번 확인이 필요해요.</p>
 </header>
 
 {% if remembered_member %}
