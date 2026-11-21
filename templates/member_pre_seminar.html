@@ -1,0 +1,148 @@
+{% extends 'lms_base.html' %}
+{% set lms_title = active_book.title + ' · 세미나 전 자료' if active_book else '세미나 전 자료' %}
+{% set lms_page = 'pre_seminar' %}
+{% block title %}{{ lms_title }} · 책 먹는 호반우{% endblock %}
+{% block head %}
+<style>
+.pre-shell{max-width:1120px}
+.pre-hero{padding:20px 24px;border:1px solid #d8dcdf;border-top:3px solid #d20f17;border-radius:4px;background:#fafafa;margin-bottom:20px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.pre-eyebrow{font-size:12px;font-weight:700;color:#8e2026;margin:0 0 6px}
+.pre-hero h1{margin:0 0 6px;font-size:25px;line-height:1.35;color:#2d3b45}
+.pre-lead{margin:0;font-size:14.5px;color:#4c5860;line-height:1.6}
+.pre-filter-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px}
+.pre-filter-tab{display:inline-flex;align-items:center;padding:6px 12px;border:1px solid #c7cdd1;border-radius:3px;background:#fff;color:#2d3b45;font-size:14px;text-decoration:none}
+.pre-filter-tab[aria-current="page"]{background:#d20f17;border-color:#d20f17;color:#fff;font-weight:700}
+.pre-layout{display:grid;grid-template-columns:280px 1fr;gap:24px;align-items:start}
+.pre-sidebar{border:1px solid #d8dcdf;border-radius:4px;background:#fff;padding:14px}
+.pre-sem-group+ .pre-sem-group{margin-top:16px;padding-top:14px;border-top:1px solid #e3e6e8}
+.pre-sem-heading{font-size:12.5px;font-weight:700;color:#56616a;margin:0 0 8px}
+.pre-book-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.pre-book-link{display:block;padding:8px 10px;border-radius:3px;color:#2d3b45;font-size:14px;line-height:1.4;text-decoration:none;border-left:3px solid transparent}
+.pre-book-link:hover{background:#f5f5f5;text-decoration:none}
+.pre-book-link[aria-current="page"]{background:#fff5f5;border-left-color:#d20f17;color:#8e2026;font-weight:700}
+.pre-book-link small{display:block;font-size:12px;color:#56616a;font-weight:400;margin-top:2px}
+.pre-detail{border:1px solid #d8dcdf;border-radius:4px;background:#fff;padding:24px}
+.pre-detail-head{padding-bottom:16px;margin-bottom:20px;border-bottom:1px solid #d8dcdf;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.pre-detail-head h2{margin:4px 0 6px;font-size:24px;line-height:1.35;color:#2d3b45;font-weight:700}
+.pre-edition{font-size:13.5px;color:#56616a;margin:4px 0 0}
+.pre-sec{margin-bottom:24px}
+.pre-sec:last-child{margin-bottom:0}
+.pre-sec-h{font-size:18px;font-weight:700;color:#2d3b45;margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid #eef0f2}
+.pre-sec-h3{font-size:16px;font-weight:700;color:#2d3b45;margin:16px 0 8px}
+.pre-p{font-size:15px;line-height:1.78;color:#2d3b45;margin:0 0 10px;overflow-wrap:anywhere}
+.pre-ul{margin:0 0 12px;padding-left:20px;font-size:15px;line-height:1.75;color:#2d3b45}
+.pre-ul li+li{margin-top:6px}
+.pre-quote{margin:10px 0 12px;padding:10px 14px;border-left:3px solid #d20f17;background:#fafafa;font-size:14.5px;line-height:1.7;color:#3d4952}
+.pre-table-wrap{overflow-x:auto;margin:10px 0 14px}
+.pre-table{width:100%;border-collapse:collapse;font-size:14px}
+.pre-table td{border:1px solid #d8dcdf;padding:8px 10px;vertical-align:top;line-height:1.55}
+.pre-table tr:first-child td{background:#f5f5f5;font-weight:700}
+.pre-ext-link{color:#0374b5;text-decoration:underline;overflow-wrap:anywhere}
+.pre-refs{margin-top:24px;padding:16px;background:#fafafa;border:1px solid #e3e6e8;border-radius:4px}
+.pre-refs h3{margin:0 0 10px;font-size:15px;font-weight:700;color:#2d3b45}
+.pre-refs ul{margin:0;padding-left:18px;font-size:14px;line-height:1.7}
+.pre-refs li+li{margin-top:6px}
+@media(max-width:860px){.pre-layout{grid-template-columns:1fr}.pre-detail{padding:16px}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="pre-shell">
+  <section class="pre-hero">
+    <div>
+      <p class="pre-eyebrow">회원 전용 자료실 · 로그인 필요</p>
+      <h1>세미나 전 읽기 자료</h1>
+      <p class="pre-lead">{{ description or '세미나 전에 함께 살펴보면 좋은 작가 배경, 학술 논문, 서평과 참고 링크를 모았습니다.' }}</p>
+    </div>
+    <a class="lms-button" href="{{ url_for('public_archive') }}">공개 아카이브로 이동</a>
+  </section>
+
+  <nav class="pre-filter-tabs" aria-label="자료실 학기 필터">
+    <a class="pre-filter-tab" href="{{ url_for('member_pre_seminar') }}" {% if not selected_semester %}aria-current="page"{% endif %}>전체 ({{ all_books|length }}권)</a>
+    {% for sem in semesters %}
+    <a class="pre-filter-tab" href="{{ url_for('member_pre_seminar', semester=sem.id) }}" {% if selected_semester == sem.id %}aria-current="page"{% endif %}>{{ sem.label }}</a>
+    {% endfor %}
+  </nav>
+
+  <div class="pre-layout">
+    <aside class="pre-sidebar" aria-label="세미나 전 자료 도서 목록">
+      {% for grp in grouped_books %}
+      <div class="pre-sem-group">
+        <h2 class="pre-sem-heading">{{ grp.label }} ({{ grp.books|length }}권)</h2>
+        <ul class="pre-book-list">
+          {% for b in grp.books %}
+          <li>
+            <a class="pre-book-link" href="{{ url_for('member_pre_seminar_book', slug=b.slug) }}" {% if active_book and active_book.slug == b.slug %}aria-current="page"{% endif %}>
+              {{ b.title }}
+              <small>{{ b.author }} · {{ b.date }}</small>
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+    </aside>
+
+    <section class="pre-detail" aria-label="선택된 도서 세미나 전 자료">
+      {% if active_book %}
+      <header class="pre-detail-head">
+        <div>
+          <p class="pre-eyebrow">{{ active_book.semester_label }} · {{ active_book.date }} · {{ active_book.author }}</p>
+          <h2>{{ active_book.title }}</h2>
+          {% if active_book.edition_note %}<p class="pre-edition">{{ active_book.edition_note }}</p>{% endif %}
+        </div>
+        <a class="lms-button" href="{{ url_for('public_archive_book', slug=active_book.slug) }}">발제문·토의 기록 보기</a>
+      </header>
+
+      {% macro render_runs(runs) -%}
+        {%- for run in runs -%}
+          {%- if run.href -%}<a class="pre-ext-link" href="{{ run.href }}" target="_blank" rel="noopener noreferrer">{{ run.text }}</a>{%- else -%}{{ run.text }}{%- endif -%}
+        {%- endfor -%}
+      {%- endmacro %}
+
+      {% for sec in active_book.sections %}
+      <section class="pre-sec">
+        {% if sec.level == 3 %}
+        <h3 class="pre-sec-h3">{{ sec.heading }}</h3>
+        {% else %}
+        <h3 class="pre-sec-h">{{ sec.heading }}</h3>
+        {% endif %}
+
+        {% for item in sec.get('items', []) %}
+          {% if item.type == 'p' %}
+            <p class="pre-p">{{ render_runs(item.get('runs', [])) }}</p>
+          {% elif item.type == 'li' %}
+            <ul class="pre-ul"><li>{{ render_runs(item.get('runs', [])) }}</li></ul>
+          {% elif item.type == 'quote' %}
+            <blockquote class="pre-quote">{{ render_runs(item.get('runs', [])) }}</blockquote>
+          {% elif item.type == 'table' %}
+            <div class="pre-table-wrap">
+              <table class="pre-table">
+                <tbody>
+                  {% for row in item.get('rows', []) %}
+                  <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endif %}
+        {% endfor %}
+      </section>
+      {% endfor %}
+
+      {% if active_book.references %}
+      <section class="pre-refs" aria-label="참고 링크 모음">
+        <h3>참고 링크 바로가기</h3>
+        <ul>
+          {% for ref in active_book.references %}
+          <li><a class="pre-ext-link" href="{{ ref.url }}" target="_blank" rel="noopener noreferrer">{{ ref.title }}</a></li>
+          {% endfor %}
+        </ul>
+      </section>
+      {% endif %}
+      {% else %}
+      <p class="lms-empty">표시할 세미나 전 자료가 없습니다.</p>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

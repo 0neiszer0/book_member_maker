@@ -39,6 +39,8 @@
   {'title': '게시판', 'url': url_for('boards.index'), 'group': '회원', 'keywords': '공지 게시판 후기 글', 'description': '동아리 공지사항·게시판 목록'},
   {'title': '책 추천', 'url': url_for('book_suggestions'), 'group': '회원', 'keywords': '도서 추천 책', 'description': '함께 읽을 책 추천과 공감'},
   {'title': '동아리방 시간표·신청', 'url': url_for('club_room'), 'group': '회원', 'keywords': '동방 동아리방 예약 시간표', 'description': '동아리방 이용 시간표와 예약 신청'},
+  {'title': '역대 커리큘럼·발제·토의 아카이브', 'url': url_for('public_archive'), 'group': '회원', 'keywords': '아카이브 커리큘럼 발제문 토의 일지 도서 필담 미식회', 'description': '역대 커리큘럼 도서·발제문·서기 정리 토의 기록'},
+  {'title': '세미나 전 자료', 'url': url_for('member_pre_seminar'), 'group': '회원', 'keywords': '세미나 전 자료 논문 서평 작가 배경', 'description': '회원 전용 세미나 전 읽기 자료·학술 논문·서평 모음'},
   {'title': '이용 안내', 'url': url_for('help_member'), 'group': '회원', 'keywords': '도움말 안내', 'description': '사이트 이용 방법과 안내'}
 ] %}
 {% if wiki_url|default('') %}{% set _qs_base = _qs_base + [{'title': '회원 위키', 'url': wiki_url, 'group': '회원', 'keywords': '위키 가이드 문서', 'description': '동아리 회원 위키 바로가기'}] %}{% endif %}
@@ -66,6 +68,7 @@
   {'title': '지금 참여하기', 'url': url_for('engagement_now'), 'group': '공개', 'keywords': '후기 벽돌책 모집 책추천 참여', 'description': '진행 중인 활동과 참여 링크'},
   {'title': '캘린더', 'url': url_for('lms_calendar'), 'group': '공개', 'keywords': '캘린더 달력 일정 세미나', 'description': '월간 세미나·행사 일정 확인'},
   {'title': '동아리방 시간표·신청', 'url': url_for('club_room'), 'group': '공개', 'keywords': '동방 동아리방 예약 시간표', 'description': '동아리방 시간표 확인'},
+  {'title': '역대 커리큘럼·발제·토의 아카이브', 'url': url_for('public_archive'), 'group': '공개', 'keywords': '아카이브 커리큘럼 발제문 토의 일지 도서 필담 미식회', 'description': '역대 커리큘럼 도서·발제문·서기 정리 토의 기록'},
   {'title': '게시판', 'url': url_for('boards.index'), 'group': '공개', 'keywords': '공지 게시판 글', 'description': '공개 공지사항·게시판 목록'},
   {'title': '책 추천', 'url': url_for('book_suggestions'), 'group': '공개', 'keywords': '도서 추천 책', 'description': '추천 도서 둘러보기'},
   {'title': '이용 안내', 'url': url_for('help_member'), 'group': '공개', 'keywords': '도움말 안내', 'description': '사이트 이용 안내'},
