@@ -197,3 +197,6 @@ def init_operation_routes(app, get_db, login_required):
     from officer_handover import init_officer_handover_routes
     init_officer_handover_routes(app, get_db, login_required)
 
+    from public_archive_routes import init_public_archive_routes
+    init_public_archive_routes(app, login_required)
+

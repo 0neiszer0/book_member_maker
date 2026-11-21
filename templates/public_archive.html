@@ -1,0 +1,153 @@
+{% extends 'lms_base.html' %}
+{% set lms_title = '역대 커리큘럼·발제·토의 아카이브' %}
+{% set lms_page = 'archive' %}
+{% block title %}역대 커리큘럼·발제·토의 아카이브 · 책 먹는 호반우{% endblock %}
+{% block head %}
+<style>
+.arc-shell{max-width:1080px}
+.arc-hero{padding:20px 24px;border:1px solid #d8dcdf;background:#fafafa;border-radius:4px;margin-bottom:24px;border-top:3px solid #d20f17}
+.arc-hero-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.arc-hero h1{margin:0 0 8px;font-size:26px;line-height:1.35;color:#2d3b45}
+.arc-lead{margin:0;color:#4c5860;font-size:15px;line-height:1.65;max-width:740px}
+.arc-hero-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.arc-eyebrow{font-size:12px;font-weight:700;color:#a20e14;letter-spacing:.03em;margin:0 0 6px}
+.arc-controls{margin-bottom:24px}
+.arc-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;border-bottom:1px solid #c7cdd1;padding-bottom:12px}
+.arc-tab{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border:1px solid #c7cdd1;border-radius:3px;background:#fff;color:#2d3b45;font-size:14px;text-decoration:none}
+.arc-tab:hover{background:#f5f5f5;text-decoration:none}
+.arc-tab[aria-current="page"]{background:#d20f17;border-color:#d20f17;color:#fff;font-weight:700}
+.arc-tab-count{font-size:12px;opacity:.85}
+.arc-search-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.arc-search-form input[type="search"]{flex:1 1 260px;min-width:200px}
+.arc-result-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:14px 0 12px;font-size:14px;color:#56616a}
+.arc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;margin-bottom:36px}
+.arc-card{display:flex;flex-direction:column;justify-content:space-between;padding:18px;border:1px solid #d8dcdf;border-radius:4px;background:#fff;color:inherit;text-decoration:none;transition:border-color .15s,box-shadow .15s}
+.arc-card:hover{border-color:#d20f17;box-shadow:0 2px 8px rgba(0,0,0,.07);text-decoration:none}
+.arc-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;font-size:12px;color:#56616a}
+.arc-sem-pill{display:inline-block;padding:2px 8px;border-radius:3px;background:#f7e9e9;color:#8e2026;font-weight:700}
+.arc-card h2{font-size:18px;line-height:1.4;margin:0 0 6px;color:#2d3b45;font-weight:700}
+.arc-card-author{font-size:14px;color:#4c5860;margin:0 0 12px}
+.arc-badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:auto;padding-top:10px;border-top:1px solid #eef0f2}
+.arc-badge{display:inline-block;padding:3px 8px;border-radius:3px;font-size:12px;background:#f5f5f5;color:#2d3b45;border:1px solid #dcdfe2}
+.arc-badge-accent{background:#fff5f5;border-color:#ebc7c9;color:#9d131a;font-weight:600}
+.arc-badge-muted{color:#56616a;background:#fafafa}
+.arc-programs{margin-top:12px;padding-top:24px;border-top:2px solid #e3e6e8}
+.arc-programs-head{margin-bottom:16px}
+.arc-programs-head h2{margin:0 0 6px;font-size:21px;color:#2d3b45}
+.arc-programs-head p{margin:0;color:#56616a;font-size:14px}
+.arc-program-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.arc-program-card{padding:20px;border:1px solid #d8dcdf;border-radius:4px;background:#fff}
+.arc-program-card h3{margin:8px 0 6px;font-size:18px;font-weight:700;color:#2d3b45}
+.arc-program-period{font-size:13px;color:#56616a;margin:0 0 10px}
+.arc-program-summary{font-size:14px;line-height:1.7;color:#2d3b45;margin:0 0 12px}
+.arc-program-list{margin:0;padding-left:18px;font-size:14px;line-height:1.65;color:#4c5860}
+.arc-program-list li+li{margin-top:4px}
+@media(max-width:767px){.arc-hero{padding:16px}.arc-grid{grid-template-columns:1fr}.arc-program-grid{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="arc-shell">
+  <section class="arc-hero">
+    <div class="arc-hero-top">
+      <div>
+        <p class="arc-eyebrow">{{ club_name }}</p>
+        <h1>역대 커리큘럼·발제·토의 아카이브</h1>
+        <p class="arc-lead">2025-2학기부터 이어온 선정 도서와 부원들이 직접 작성한 발제문, 서기가 정리한 전체 토의 기록을 누구나 열람할 수 있습니다. 모든 기록은 개인정보 보호를 위해 익명화하여 공개합니다.</p>
+      </div>
+      {% if session.user_role %}
+      <div class="arc-hero-actions">
+        <a class="lms-button lms-button-primary" href="{{ url_for('member_pre_seminar') }}">회원 전용 세미나 전 자료</a>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="arc-controls" aria-label="커리큘럼 필터 및 검색">
+    <nav class="arc-tabs" aria-label="학기별 커리큘럼">
+      <a class="arc-tab" href="{{ url_for('public_archive', q=query or None) }}" {% if not selected_semester %}aria-current="page"{% endif %}>
+        전체 <span class="arc-tab-count">({{ total_books }})</span>
+      </a>
+      {% for sem in semesters %}
+      <a class="arc-tab" href="{{ url_for('public_archive', semester=sem.id, q=query or None) }}" {% if selected_semester == sem.id %}aria-current="page"{% endif %}>
+        {{ sem.label }} <span class="arc-tab-count">({{ sem.count }})</span>
+      </a>
+      {% endfor %}
+    </nav>
+
+    <form class="arc-search-form" method="get" action="{{ url_for('public_archive') }}">
+      {% if selected_semester %}<input type="hidden" name="semester" value="{{ selected_semester }}">{% endif %}
+      <label class="lms-sr" for="archive-search-input">도서명, 작가, 주제 검색</label>
+      <input id="archive-search-input" type="search" name="q" value="{{ query }}" placeholder="도서명·작가·발제·토의 키워드로 검색">
+      <button type="submit" class="lms-button lms-button-primary">검색</button>
+      {% if query or selected_semester %}
+      <a class="lms-button" href="{{ url_for('public_archive') }}">초기화</a>
+      {% endif %}
+    </form>
+
+    <div class="arc-result-meta">
+      <span>표시 중인 도서 <strong>{{ books|length }}권</strong>{% if selected_semester %} · 선택 학기: {{ selected_semester }}{% endif %}{% if query %} · 검색어: “{{ query }}”{% endif %}</span>
+      <span>도서를 누르면 발제문과 전체 토의 내용을 볼 수 있습니다.</span>
+    </div>
+  </section>
+
+  {% if books %}
+  <section class="arc-grid" aria-label="커리큘럼 도서 목록">
+    {% for book in books %}
+    <a class="arc-card" href="{{ url_for('public_archive_book', slug=book.slug) }}">
+      <div>
+        <div class="arc-card-head">
+          <span class="arc-sem-pill">{{ book.semester_label }}</span>
+          <span>{{ book.date }}</span>
+        </div>
+        <h2>{{ book.title }}</h2>
+        <p class="arc-card-author">{{ book.author }}{% if book.genre %} · {{ book.genre }}{% endif %}</p>
+      </div>
+      <div class="arc-badges">
+        {% if book.has_prompts %}
+        <span class="arc-badge arc-badge-accent">발제문 {{ book.prompt_count }}문항</span>
+        {% endif %}
+        {% if book.has_discussion %}
+        <span class="arc-badge arc-badge-accent">전체 토의</span>
+        {% endif %}
+        {% if book.status_note %}
+        <span class="arc-badge arc-badge-muted">{{ book.status_note }}</span>
+        {% elif not book.has_prompts and not book.has_discussion %}
+        <span class="arc-badge arc-badge-muted">기록 정리 중</span>
+        {% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </section>
+  {% else %}
+  <section class="lms-alert" role="status">
+    조건에 맞는 커리큘럼 도서를 찾지 못했습니다. 다른 검색어나 학기를 선택해보세요.
+  </section>
+  {% endif %}
+
+  {% if special_programs %}
+  <section class="arc-programs" aria-labelledby="arc-programs-title">
+    <div class="arc-programs-head">
+      <h2 id="arc-programs-title">연합세미나 · 내부 문예 공모전</h2>
+      <p>정기 세미나 밖에서도 타 동아리와의 교류 세미나와 부원 창작 백일장을 꾸준히 이어오고 있습니다.</p>
+    </div>
+    <div class="arc-program-grid">
+      {% for prog in special_programs %}
+      <article class="arc-program-card">
+        <span class="arc-sem-pill">{{ prog.badge }}</span>
+        <h3>{{ prog.title }}</h3>
+        <p class="arc-program-period">{{ prog.period }}</p>
+        <p class="arc-program-summary">{{ prog.summary }}</p>
+        {% if prog.highlights %}
+        <ul class="arc-program-list">
+          {% for item in prog.highlights %}
+          <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

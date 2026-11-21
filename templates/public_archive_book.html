@@ -1,0 +1,136 @@
+{% extends 'lms_base.html' %}
+{% set lms_title = book.title %}
+{% set lms_page = 'archive' %}
+{% block title %}{{ book.title }} · 공개 아카이브 · 책 먹는 호반우{% endblock %}
+{% block head %}
+<style>
+.arc-book-shell{max-width:920px}
+.arc-back-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.arc-book-header{padding:22px 24px;border:1px solid #d8dcdf;border-top:3px solid #d20f17;border-radius:4px;background:#fafafa;margin-bottom:24px}
+.arc-book-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:#56616a;margin-bottom:8px}
+.arc-sem-pill{display:inline-block;padding:2px 8px;border-radius:3px;background:#f7e9e9;color:#8e2026;font-weight:700}
+.arc-book-header h1{margin:0 0 8px;font-size:28px;line-height:1.35;color:#2d3b45}
+.arc-book-sub{margin:0 0 12px;font-size:16px;color:#4c5860}
+.arc-badges{display:flex;flex-wrap:wrap;gap:6px}
+.arc-badge{display:inline-block;padding:3px 9px;border-radius:3px;font-size:12px;background:#fff;border:1px solid #dcdfe2;color:#2d3b45}
+.arc-badge-accent{background:#fff5f5;border-color:#ebc7c9;color:#9d131a;font-weight:600}
+.arc-section{margin-bottom:32px}
+.arc-section-title{font-size:20px;line-height:1.4;margin:0 0 14px;padding-bottom:8px;border-bottom:2px solid #2d3b45;color:#2d3b45;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.arc-section-title small{font-size:13px;color:#56616a;font-weight:400}
+.arc-prompt-group{margin-bottom:22px;border:1px solid #d8dcdf;border-radius:4px;background:#fff;overflow:hidden}
+.arc-prompt-group-head{padding:10px 16px;background:#f5f5f5;border-bottom:1px solid #d8dcdf;font-size:14px;font-weight:700;color:#2d3b45}
+.arc-question-list{list-style:none;margin:0;padding:0}
+.arc-question-item{padding:16px;border-bottom:1px solid #eef0f2}
+.arc-question-item:last-child{border-bottom:0}
+.arc-q-text{font-size:15.5px;line-height:1.75;color:#2d3b45;margin:0;white-space:pre-line;overflow-wrap:anywhere}
+.arc-q-num{font-weight:700;color:#a20e14;margin-right:6px}
+.arc-q-ref{margin:10px 0 0;padding:10px 14px;border-left:3px solid #c7cdd1;background:#fafafa;font-size:14px;line-height:1.7;color:#4c5860;white-space:pre-line;overflow-wrap:anywhere}
+.arc-session-block{margin-bottom:24px;border:1px solid #d8dcdf;border-radius:4px;background:#fff;overflow:hidden}
+.arc-session-head{padding:10px 16px;background:#f5f5f5;border-bottom:1px solid #d8dcdf;font-size:14px;font-weight:700;color:#2d3b45}
+.arc-turn-list{display:flex;flex-direction:column}
+.arc-turn{padding:14px 16px;border-bottom:1px solid #eef0f2}
+.arc-turn:last-child{border-bottom:0}
+.arc-turn-topic{background:#fff8f8}
+.arc-speaker{display:inline-block;font-size:12.5px;font-weight:700;color:#8e2026;background:#f7e9e9;padding:2px 8px;border-radius:3px;margin-bottom:6px}
+.arc-turn-topic .arc-speaker{background:#2d3b45;color:#fff}
+.arc-turn-body{margin:0;font-size:15px;line-height:1.78;color:#2d3b45;overflow-wrap:anywhere;white-space:pre-line}
+.arc-empty-card{padding:20px;border:1px solid #d8dcdf;border-radius:4px;background:#fafafa;color:#4c5860;font-size:14.5px;line-height:1.65}
+.arc-pager{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:20px;border-top:1px solid #c7cdd1}
+.arc-pager a{max-width:48%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:767px){.arc-book-header{padding:16px}.arc-pager a{max-width:100%;width:100%;justify-content:center}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="arc-book-shell">
+  <div class="arc-back-row">
+    <a class="lms-button" href="{{ url_for('public_archive', semester=book.semester) }}">← {{ book.semester_label }} 목록으로</a>
+    <a class="lms-button" href="{{ url_for('public_archive') }}">전체 아카이브</a>
+  </div>
+
+  <header class="arc-book-header">
+    <div class="arc-book-meta">
+      <span class="arc-sem-pill">{{ book.semester_label }}</span>
+      <span>세미나 일자 {{ book.date }}</span>
+      {% if book.genre %}<span>· {{ book.genre }}</span>{% endif %}
+    </div>
+    <h1>{{ book.title }}</h1>
+    <p class="arc-book-sub">저자: {{ book.author }}</p>
+    <div class="arc-badges">
+      {% if book.has_prompts %}<span class="arc-badge arc-badge-accent">발제문 {{ book.prompt_count }}문항</span>{% endif %}
+      {% if book.has_discussion %}<span class="arc-badge arc-badge-accent">전체 토의 기록 ({{ book.discussion_turn_count }}건의 발언)</span>{% endif %}
+      {% if book.status_note %}<span class="arc-badge">{{ book.status_note }}</span>{% endif %}
+    </div>
+  </header>
+
+  <section class="arc-section" aria-labelledby="prompts-heading">
+    <h2 class="arc-section-title" id="prompts-heading">
+      <span>도서별 발제문</span>
+      <small>개인정보 보호를 위해 발제자 표기는 익명 처리되었습니다.</small>
+    </h2>
+    {% if book.prompts %}
+      {% for grp in book.prompts %}
+      <article class="arc-prompt-group">
+        <div class="arc-prompt-group-head">{{ grp.label }}</div>
+        <ol class="arc-question-list">
+          {% for q in grp.questions %}
+          <li class="arc-question-item">
+            <p class="arc-q-text"><span class="arc-q-num">{{ q.number }}.</span>{{ q.question }}</p>
+            {% if q.reference %}
+            <blockquote class="arc-q-ref">{{ q.reference }}</blockquote>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ol>
+      </article>
+      {% endfor %}
+    {% else %}
+      <div class="arc-empty-card">
+        {% if book.status_note %}
+          <strong>{{ book.status_note }}</strong> — 이 도서의 텍스트 발제문 파일이 아직 등록되지 않았습니다.
+        {% else %}
+          이 도서의 텍스트 발제문 기록이 보관되어 있지 않습니다.
+        {% endif %}
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="arc-section" aria-labelledby="discussion-heading">
+    <h2 class="arc-section-title" id="discussion-heading">
+      <span>전체 토의 내용 (서기 정리본)</span>
+      <small>발언자는 익명 라벨로 변환되었습니다.</small>
+    </h2>
+    {% if book.discussion_sections %}
+      {% for sec in book.discussion_sections %}
+      <article class="arc-session-block">
+        <div class="arc-session-head">{{ sec.session_label }}</div>
+        <div class="arc-turn-list">
+          {% for turn in sec.turns %}
+          <div class="arc-turn {% if turn.speaker == '토의 주제' %}arc-turn-topic{% endif %}">
+            <span class="arc-speaker">{{ turn.speaker }}</span>
+            <p class="arc-turn-body">{{ turn.text }}</p>
+          </div>
+          {% endfor %}
+        </div>
+      </article>
+      {% endfor %}
+    {% else %}
+      <div class="arc-empty-card">
+        {% if book.status_note %}
+          <strong>{{ book.status_note }}</strong> — 해당 세미나 회차는 텍스트 서기 정리본 대신 별도 기록으로 보관 중이거나 진행 예정입니다.
+        {% else %}
+          이 도서의 서기 정리 토의 기록이 보관되어 있지 않습니다.
+        {% endif %}
+      </div>
+    {% endif %}
+  </section>
+
+  <nav class="arc-pager" aria-label="이전·다음 커리큘럼 도서">
+    {% if prev_book %}
+    <a class="lms-button" href="{{ url_for('public_archive_book', slug=prev_book.slug) }}">← 이전: {{ prev_book.title }}</a>
+    {% else %}<span></span>{% endif %}
+    {% if next_book %}
+    <a class="lms-button" href="{{ url_for('public_archive_book', slug=next_book.slug) }}">다음: {{ next_book.title }} →</a>
+    {% endif %}
+  </nav>
+</div>
+{% endblock %}
