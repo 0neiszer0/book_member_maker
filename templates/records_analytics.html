@@ -1,9 +1,8 @@
 {% extends 'lms_admin_base.html' %}
-{% from '_records_base.html' import records_nav, term_filter %}
-{% from '_lms_icons.html' import icon %}
+{% from '_records_base.html' import records_header, records_nav, records_stats, term_filter %}
 {% set lms_title = '활동 통계' %}
 {% set lms_page = 'records' %}
-{% block title %}통계 - 기록 시스템{% endblock %}
+{% block title %}활동 통계 · 기록·통계{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='lms_records.css') }}">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
@@ -11,39 +10,21 @@
 {% block content %}
 <div class="records-page">
 <div class="records-content">
-        {{ records_nav('analytics') }}
-        {{ term_filter(terms, selected_term_id, 'records_analytics') }}
-
-        <div class="records-flex records-justify-between records-items-center records-gap-3 records-mb-6 records-flex-wrap">
-            <h1 class="records-accent">{{ icon('dashboard', 18) }} 통계</h1>
-            <div class="records-flex records-gap-2 records-flex-wrap">
-                <a href="{{ url_for('admin_attendance_matrix', term_id=selected_term_id) }}" class="lms-button">출석표 크게 보기</a>
-                <a href="{{ url_for('admin_attendance_matrix_export', term_id=selected_term_id) }}" class="lms-button">{{ icon('document', 18) }} 엑셀 내려받기</a>
+        {% call records_header('활동 통계', '출석 현황과 월별 활동 추이를 확인하세요.') %}
+            <a href="{{ url_for('admin_attendance_matrix', term_id=selected_term_id) }}" class="lms-button">출석표 크게 보기</a>
+                <a href="{{ url_for('admin_attendance_matrix_export', term_id=selected_term_id) }}" class="lms-button">엑셀 내려받기</a>
                 <button id="rebuild-matrix" class="lms-button">만남 매트릭스 재계산</button>
-            </div>
-        </div>
+        {% endcall %}
+        {{ records_nav('analytics') }}
 
-        <!-- 요약 -->
-        <div class="records-grid records-grid-cols-1 records-sm-grid-cols-3 records-gap-4 records-mb-8">
-            <div class="records-panel records-p-5 records-rounded-lg records-text-center">
-                <div class="records-text-xs records-muted">총 세미나</div>
-                <div class="records-text-3xl records-font-bold records-accent">{{ total_seminars }}</div>
-            </div>
-            <div class="records-panel records-p-5 records-rounded-lg records-text-center">
-                <div class="records-text-xs records-muted">총 벽돌책</div>
-                <div class="records-text-3xl records-font-bold records-accent">{{ total_brick_books }}</div>
-            </div>
-            <div class="records-panel records-p-5 records-rounded-lg records-text-center">
-                <div class="records-text-xs records-muted">총 소모임</div>
-                <div class="records-text-3xl records-font-bold records-accent">{{ total_study_groups }}</div>
-            </div>
-        </div>
+        <div class="records-toolbar">{{ term_filter(terms, selected_term_id, 'records_analytics') }}</div>
+        {{ records_stats([('총 세미나', total_seminars), ('총 벽돌책', total_brick_books), ('총 소모임', total_study_groups)]) }}
 
         <!-- 날짜별 출석표와 최소 참석 기준 -->
-        <section class="records-panel records-p-4 records-sm-p-5 records-rounded-lg records-mb-8" aria-labelledby="attendance-heading">
+        <section class="records-surface" aria-labelledby="attendance-heading">
             <div class="records-flex records-items-start records-justify-between records-gap-4 records-flex-wrap records-mb-4">
                 <div>
-                    <h2 id="attendance-heading" class="records-accent">{{ icon('calendar', 18) }} 날짜별 세미나 출석표</h2>
+                    <h2 id="attendance-heading" class="records-accent">날짜별 세미나 출석표</h2>
                     <p class="records-text-xs records-muted records-mt-1">각 날짜의 O를 보면 누가 언제 참석했는지 확인할 수 있습니다. 현재 화면의 학기 필터가 그대로 적용됩니다.</p>
                 </div>
                 <a class="lms-button" href="{{ url_for('admin_term_attendance', term_id=selected_term_id) }}">OT·벽돌책 포함 학기 참석 현황</a>
@@ -91,37 +72,37 @@
         </section>
 
         <!-- 차트 그리드 -->
-        <div class="analytics-charts records-grid records-grid-cols-1 records-lg-grid-cols-2 records-gap-6 records-mb-6">
-            <div class="records-panel records-p-5 records-rounded-lg">
+        <div class="analytics-charts records-chart-grid">
+            <div class="records-surface">
                 <h2 class="records-accent records-mb-3">세미나 - 장르별 분포</h2>
                 {% if genre_counts %}<canvas id="genreChart" height="200"></canvas>{% else %}<p>아직 기록이 없어요.</p>{% endif %}
             </div>
-            <div class="records-panel records-p-5 records-rounded-lg">
+            <div class="records-surface">
                 <h2 class="records-accent records-mb-3">월별 세미나 회차 수</h2>
                 {% if monthly_counts %}<canvas id="monthlyChart" height="200"></canvas>{% else %}<p>아직 기록이 없어요.</p>{% endif %}
             </div>
-            <div class="records-panel records-p-5 records-rounded-lg">
+            <div class="records-surface">
                 <h2 class="records-accent records-mb-3">벽돌책 - 월별 세션</h2>
                 {% if bb_monthly %}<canvas id="bbMonthlyChart" height="200"></canvas>{% else %}<p>아직 기록이 없어요.</p>{% endif %}
             </div>
-            <div class="records-panel records-p-5 records-rounded-lg">
+            <div class="records-surface">
                 <h2 class="records-accent records-mb-3">소모임 - 월별 세션</h2>
                 {% if sg_monthly %}<canvas id="sgMonthlyChart" height="200"></canvas>{% else %}<p>아직 기록이 없어요.</p>{% endif %}
             </div>
         </div>
 
         <!-- 출석 랭킹 -->
-        <div class="records-panel records-p-5 records-rounded-lg">
-            <h2 class="records-accent records-mb-4">{{ icon('dashboard', 18) }} 세미나 출석 TOP 15</h2>
+        <div class="records-surface">
+            <h2 class="records-accent records-mb-4">세미나 출석 TOP 15</h2>
             <div class="records-space-y-1">
                 {% for name, count in top_attendees %}
-                <div class="records-flex records-items-center records-justify-between records-p-2 records-tint records-rounded">
+                <div class="records-ranking-row">
                     <div class="records-flex records-items-center records-gap-3">
                         <span class="records-font-bold records-muted records-w-6 records-text-right">{{ loop.index }}.</span>
                         <span class="records-font-semibold">{{ name }}</span>
                     </div>
                     <div class="records-flex records-items-center records-gap-2">
-                        <div class="records-w-32 records-sm-w-48 records-tint records-rounded-full records-h-2 records-overflow-hidden">
+                        <div class="records-ranking-track">
                             {% set max_count = top_attendees[0][1] if top_attendees else 1 %}
                             <div class="records-accent-fill records-h-full" style="width: {{ (count / max_count * 100)|round(1) }}%"></div>
                         </div>
@@ -142,7 +123,7 @@
         Chart.defaults.borderColor = themeColor('--lms-line', '#c7cdd1');
         Chart.defaults.font.family = "Pretendard, 'Noto Sans KR', sans-serif";
 
-        const PALETTE = ['#0374b5', '#d20f17', '#56616a', '#b45500', '#30734c', '#8060a0'];
+        const PALETTE = ['#d20f17', '#2d3b45', '#30734c', '#b45500', '#56616a', '#8060a0'];
 
         function makePie(canvasId, labels, data) {
             new Chart(document.getElementById(canvasId), {
@@ -186,7 +167,7 @@
             makePie('genreChart', Object.keys(genreData), Object.values(genreData));
         }
         if (Object.keys(monthlyData).length) {
-            makeBar('monthlyChart', Object.keys(monthlyData), Object.values(monthlyData), '#0374b5');
+            makeBar('monthlyChart', Object.keys(monthlyData), Object.values(monthlyData), '#d20f17');
         }
         if (Object.keys(bbMonthly).length) {
             makeBar('bbMonthlyChart', Object.keys(bbMonthly), Object.values(bbMonthly), '#b45500');

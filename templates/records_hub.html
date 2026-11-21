@@ -1,9 +1,8 @@
 {% extends 'lms_admin_base.html' %}
-{% from '_records_base.html' import records_nav %}
-{% from '_lms_icons.html' import icon %}
-{% set lms_title = '기록 시스템' %}
+{% from '_records_base.html' import records_header, records_nav, records_stats %}
+{% set lms_title = '기록·통계' %}
 {% set lms_page = 'records' %}
-{% block title %}기록 시스템 - 책 먹는 호반우{% endblock %}
+{% block title %}기록·통계{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='lms_records.css') }}">
 
@@ -11,59 +10,31 @@
 {% block content %}
 <div class="records-page">
 <div class="records-content">
+        {{ records_header('기록·통계', '회원과 모임의 활동 현황을 확인하세요.') }}
         {{ records_nav('hub') }}
 
-        <div class="records-mb-8">
-            <h1 class="records-sm-text-3xl  records-accent records-mb-2">{{ icon('book', 18) }} 기록 시스템</h1>
-            <p class="records-muted records-text-sm">회원명부를 기준으로 세미나·벽돌책·소모임 활동을 한눈에.</p>
-        </div>
+        {{ records_stats([('활성 회원', member_count), ('세미나 회차', seminar_count), ('벽돌책', brick_book_count), ('소모임', study_group_count)]) }}
 
-        <!-- 통계 -->
-        <div class="records-grid records-grid-cols-2 records-md-grid-cols-4 records-gap-4 records-mb-8">
-            <div class="records-panel records-p-5 records-rounded-lg">
-                <div class="records-text-xs records-muted records-mb-1">활성 회원</div>
-                <div class="records-text-3xl records-font-bold records-accent">{{ member_count }}</div>
-            </div>
-            <div class="records-panel records-p-5 records-rounded-lg">
-                <div class="records-text-xs records-muted records-mb-1">세미나 회차</div>
-                <div class="records-text-3xl records-font-bold records-accent">{{ seminar_count }}</div>
-            </div>
-            <div class="records-panel records-p-5 records-rounded-lg">
-                <div class="records-text-xs records-muted records-mb-1">벽돌책</div>
-                <div class="records-text-3xl records-font-bold records-accent">{{ brick_book_count }}</div>
-            </div>
-            <div class="records-panel records-p-5 records-rounded-lg">
-                <div class="records-text-xs records-muted records-mb-1">소모임</div>
-                <div class="records-text-3xl records-font-bold records-accent">{{ study_group_count }}</div>
-            </div>
-        </div>
-
-        <!-- 카테고리 카드 -->
-        <div class="records-grid records-grid-cols-1 records-md-grid-cols-2 records-lg-grid-cols-3 records-gap-5">
-            <a href="{{ url_for('records_members') }}" class="records-panel records-p-6 records-rounded-lg records-block">
-                <div class="records-text-3xl records-mb-3">{{ icon('account', 18) }}</div>
-                <h2 class="records-accent records-mb-2">회원명부</h2>
-                <p class="records-text-sm records-muted">전체 회원 목록과 개인별 활동 이력 보기.</p>
+        <div class="records-directory">
+            <a href="{{ url_for('records_members') }}" class="records-card">
+                <h2>회원명부 <span aria-hidden="true">→</span></h2>
+                <p>전체 회원 목록과 개인별 활동 이력 보기.</p>
             </a>
-            <a href="{{ url_for('records_seminars') }}" class="records-panel records-p-6 records-rounded-lg records-block">
-                <div class="records-text-3xl records-mb-3">{{ icon('book', 18) }}</div>
-                <h2 class="records-accent records-mb-2">세미나 진행 현황</h2>
-                <p class="records-text-sm records-muted">날짜·도서·장르·참여명단으로 본 모든 세미나 회차.</p>
+            <a href="{{ url_for('records_seminars') }}" class="records-card">
+                <h2>세미나 진행 현황 <span aria-hidden="true">→</span></h2>
+                <p>날짜·도서·장르·참여명단으로 본 모든 세미나 회차.</p>
             </a>
-            <a href="{{ url_for('records_brick_books') }}" class="records-panel records-p-6 records-rounded-lg records-block">
-                <div class="records-text-3xl records-mb-3">{{ icon('folder', 18) }}</div>
-                <h2 class="records-accent records-mb-2">벽돌책</h2>
-                <p class="records-text-sm records-muted">진행 중·완료된 벽돌책 모임과 참여자 관리.</p>
+            <a href="{{ url_for('records_brick_books') }}" class="records-card">
+                <h2>벽돌책 <span aria-hidden="true">→</span></h2>
+                <p>진행 중·완료된 벽돌책 모임과 참여자 관리.</p>
             </a>
-            <a href="{{ url_for('records_study_groups') }}" class="records-panel records-p-6 records-rounded-lg records-block">
-                <div class="records-text-3xl records-mb-3">{{ icon('account', 18) }}</div>
-                <h2 class="records-accent records-mb-2">소모임</h2>
-                <p class="records-text-sm records-muted">자율 소모임 운영 현황과 회차 기록.</p>
+            <a href="{{ url_for('records_study_groups') }}" class="records-card">
+                <h2>소모임 <span aria-hidden="true">→</span></h2>
+                <p>자율 소모임 운영 현황과 회차 기록.</p>
             </a>
-            <a href="{{ url_for('records_analytics') }}" class="records-panel records-p-6 records-rounded-lg records-block">
-                <div class="records-text-3xl records-mb-3">{{ icon('dashboard', 18) }}</div>
-                <h2 class="records-accent records-mb-2">통계</h2>
-                <p class="records-text-sm records-muted">장르·시기별 분포와 출석 랭킹.</p>
+            <a href="{{ url_for('records_analytics') }}" class="records-card">
+                <h2>통계 <span aria-hidden="true">→</span></h2>
+                <p>장르·시기별 분포와 출석 랭킹.</p>
             </a>
         </div>
     </div>

@@ -132,7 +132,7 @@ class CurrentUiContractsTest(unittest.TestCase):
     def test_seminar_detail_imports_its_shared_genre_script(self):
         detail = self.read("templates/records_seminar_detail.html")
         self.assertIn(
-            "{% from '_records_base.html' import records_nav, genre_script %}",
+            "{% from '_records_base.html' import records_header, records_nav, genre_script %}",
             detail,
         )
         self.assertIn("{{ genre_script() }}", detail)
