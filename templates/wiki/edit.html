@@ -1,14 +1,50 @@
 {% extends 'wiki/base.html' %}
+{% block head %}{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='wiki_editor.css') }}">
+<script defer src="{{ url_for('static', filename='wiki_editor.js') }}"></script>
+{% endblock %}
+{% macro button(command, label, hint='') -%}
+<button type="button" data-command="{{ command }}"{% if hint %} title="{{ hint }}" aria-label="{{ hint }}"{% endif %}>{{ label }}</button>
+{%- endmacro %}
 {% block wiki_content %}
 <header class="wiki-heading"><h1>{{ doc.title }} <small>편집</small></h1><a href="{{ url_for('wiki.document',title=doc.title) }}">최신 문서 보기</a></header>
 <p class="wiki-help">나무마크로 작성합니다. {% if officer_doc %}운영진 전용 문서라 저장해도 운영진만 읽을 수 있으며{% else %}저장하면 회원들이 읽을 수 있으며{% endif %} 수정 이력에 남습니다. <a href="{{ url_for('wiki.document',title='위키 편집 안내') }}">편집 안내</a> · <a href="{{ url_for('wiki.document',title='문서 편집 가이드') }}">문법 가이드</a></p>
 {% if notice %}<p class="lms-alert" role="alert">{{ notice }}</p>{% endif %}
 {% include 'wiki/_syntax_help.html' %}
-<form method="post" class="wiki-editor">
+<form method="post" class="wiki-editor" data-preview-url="{{ url_for('wiki.preview', title=doc.title) }}">
 <input type="hidden" name="wiki_csrf" value="{{ wiki_csrf }}"><input type="hidden" name="version" value="{{ doc.version }}">
-<label for="wiki-content">문서 내용</label><textarea id="wiki-content" name="content" rows="23" required spellcheck="false">{{ doc.source }}</textarea>
+<label for="wiki-content">문서 내용</label>
+<div id="wiki-ribbon" hidden>
+  <div class="ribbon-tools" role="group" aria-label="문서 편집 도구">
+    <span>{{ button('undo','↶','실행 취소') }}{{ button('redo','↷','다시 실행') }}</span>
+    <span><select id="wiki-style" aria-label="문단 스타일"><option value="">본문</option>{% for n in range(1,4) %}<option value="{{ '=' * (n+1) }}">제목 {{ n }}</option>{% endfor %}</select>
+    {{ button('bold','B','굵게 (Ctrl+B)') }}{{ button('italic','I','기울임 (Ctrl+I)') }}{{ button('underline','U','밑줄 (Ctrl+U)') }}{{ button('strike','S','취소선') }}</span>
+    <span><select id="wiki-color" aria-label="글자색"><option value="">글자색</option>{% for hex,name in [('000000','검정'),('d20f17','빨강'),('0374b5','파랑'),('2e7d32','초록'),('b45500','주황'),('6a1b9a','보라'),('56616a','회색')] %}<option value="#{{ hex }}">{{ name }}</option>{% endfor %}</select>{{ button('large','크게') }}{{ button('small','작게') }}</span>
+    <span>{{ button('bullets','• 목록','글머리 기호 목록') }}{{ button('numbers','1. 목록','번호 목록') }}{{ button('quote','인용') }}{{ button('fold','접기') }}</span>
+    <span>{{ button('rule','가로선') }}{{ button('break','줄바꿈') }}{{ button('toc','목차') }}</span>
+    <span>{{ button('link','링크','링크 (Ctrl+K)') }}{{ button('note','각주') }}{{ button('table','표 ▾','표 삽입') }}</span>
+    <button type="button" data-command="split" aria-controls="wiki-live" aria-pressed="false">분할 미리보기</button>
+  </div>
+  <div id="wiki-context" hidden><span></span>{{ button('editTable','표 비주얼 편집 · 열 너비 조절') }}</div>
+</div>
+<div id="wiki-workspace"><textarea id="wiki-content" name="content" rows="23" required spellcheck="false">
+{{ doc.source }}</textarea>
+<section id="wiki-live" hidden aria-label="실시간 미리보기"><header><strong>미리보기</strong>{{ button('refresh','새로 고침') }}</header><p role="status"></p><article class="wiki-prose"></article></section></div>
 <label for="wiki-summary">편집 요약</label><input id="wiki-summary" name="summary" maxlength="300" value="{{ summary }}" placeholder="무엇을 바꿨는지 짧게 남겨 주세요">
 <div class="wiki-editor-actions"><button class="lms-button lms-button-primary" name="action" value="save" type="submit">저장</button><button class="lms-button" name="action" value="preview" type="submit">미리보기</button><a class="lms-button" href="{{ url_for('wiki.document',title=doc.title) }}">취소</a><span class="lms-small">기준 버전 r{{ doc.version }}</span></div>
 </form>
+<dialog id="wiki-link" aria-labelledby="wiki-link-title"><h2 id="wiki-link-title">링크 삽입</h2>
+<form method="dialog"><label>문서명 또는 외부 URL<input name="target" required></label><label>표시 텍스트<input name="caption"></label>
+<footer>{{ button('close','취소') }}<button value="apply">링크 삽입</button></footer></form></dialog>
+<dialog id="wiki-picker" aria-labelledby="wiki-picker-title"><h2 id="wiki-picker-title">표 삽입</h2><div class="picker-grid"></div><output>1 × 1 표 삽입</output><footer>{{ button('close','취소') }}</footer></dialog>
+<dialog id="wiki-table" aria-labelledby="wiki-table-title"><h2 id="wiki-table-title">표 비주얼 편집 · 열 너비 조절</h2>
+<div class="table-tools"><label>표 너비 <select id="table-width"><option value="">자동</option>{% for width in ['100%','85%','70%'] %}<option>{{ width }}</option>{% endfor %}</select></label>{{ button('equal','열 너비 균등 분배') }}{{ button('header','첫 행 헤더 스타일') }}</div>
+<div class="table-scroll"><table id="wiki-grid"></table></div>
+<div class="table-tools">
+{% for cmd,label in [('above','+ 위에 행'),('below','+ 아래에 행'),('left','+ 왼쪽에 열'),('right','+ 오른쪽에 열'),('delRow','현재 행 삭제'),('delCol','현재 열 삭제')] %}{{ button(cmd,label) }}{% endfor %}
+</div><div class="table-tools"><label>셀 정렬 <select id="cell-align"><option value="">기본</option><option value="(">왼쪽</option><option value=":">가운데</option><option value=")">오른쪽</option></select></label>
+<label>셀 배경색 <select id="cell-bg">{% for hex,name in [('','없음'),('#f5f5f5','연회색'),('#fff2f2','연빨강'),('#eef6fc','연파랑'),('#fffbe6','연노랑'),('#eef7f0','연초록')] %}<option value="{{ hex }}">{{ name }}</option>{% endfor %}</select></label>
+{{ button('mergeRight','+ 오른쪽 셀 병합') }}{{ button('mergeDown','+ 아래 셀 병합') }}{{ button('unmerge','병합 해제') }}</div>
+<p id="table-message" role="status"></p><footer>{{ button('close','취소') }}{{ button('apply','문서에 반영') }}</footer></dialog>
 {% if preview is not none %}<section class="wiki-preview"><h2>미리보기</h2><article class="wiki-prose">{{ preview }}</article></section>{% endif %}
 {% endblock %}
