@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="app-layout" content="public-landing">
+  <meta name="color-scheme" content="light">
+  {% include '_favicon.html' %}
+  <title>{% block title %}책 먹는 호반우 · 경북대학교 중앙 독서동아리{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='public_landing.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body class="public-shell">
+<header class="mast">
+  <a class="brand" href="{{ url_for('main_index') }}">
+    <img src="{{ url_for('static', filename='icons/icon-192.png') }}" width="42" height="42" alt="">
+    <span>책 먹는 호반우<small>경북대학교 중앙 독서동아리</small></span>
+  </a>
+  <nav aria-label="주요 메뉴">
+    <a href="{{ url_for('public_archive') }}">역대 아카이브</a>
+    <a class="mast-login" href="{{ url_for('login') }}">로그인</a>
+  </nav>
+</header>
+<main class="{% block main_class %}{% endblock %}">
+  {% block content %}{% endblock %}
+</main>
+<footer>
+  <strong>책 먹는 호반우</strong>
+  <nav aria-label="하단 메뉴">
+    <a href="{{ url_for('public_archive') }}">역대 아카이브</a>
+    <a href="{{ url_for('login') }}">로그인</a>
+  </nav>
+</footer>
+</body>
+</html>

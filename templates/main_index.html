@@ -2,7 +2,7 @@
 {% set lms_page='dashboard' %}{% set lms_title='대시보드' %}{% set lms_aside=true %}
 {% block title %}대시보드 · 책 먹는 호반우{% endblock %}
 {% block content %}
-<header class="lms-dashboard-heading"><h1>대시보드</h1><a class="lms-icon-button" href="{{ url_for('lms_calendar') }}" aria-label="전체 일정">{{ icon('calendar',20) }}</a></header>
+<header class="lms-dashboard-heading"><h1>대시보드</h1><div class="lms-dashboard-actions">{% include '_lms_search_trigger.html' %}<a class="lms-icon-button" href="{{ url_for('lms_calendar') }}" aria-label="전체 일정">{{ icon('calendar',20) }}</a></div></header>
 <section class="lms-dashboard-tasks" aria-labelledby="dashboard-title"><h2 id="dashboard-title">지금 해야 할 일</h2>
 {% if session.user_role %}{% if home_error %}<p role="alert">현재 활동을 불러오지 못했어요. <a href="{{ url_for('main_index') }}">다시 시도</a></p>
 {% elif home and home.tasks %}<ul class="lms-assignment-list">{% for task in home.tasks %}<li class="lms-item" data-event-id="{{ task.id }}"><span class="lms-item-icon">{{ icon('document',20) }}</span><div class="lms-item-body"><a class="lms-item-title" href="{{ url_for('view_shared_topics',token=task.share_token) if task.share_token else url_for('seminars',term_id=home.term.id) }}">{{ task.book_title }} 발제문 작성</a><div class="lms-item-meta">{{ home.term.name }} · 마감 {{ task.deadline_label or '미정' }} (한국시간)</div></div><span class="lms-item-status">{{ task.status_label }}</span></li>{% endfor %}</ul>

@@ -182,9 +182,12 @@ class PublicArchiveAndPreSeminarTests(unittest.TestCase):
         resp = self.client.get("/archive")
         self.assertEqual(resp.status_code, 200)
         html = resp.get_data(as_text=True)
-        self.assertIn('name="app-layout" content="canvas"', html)
-        self.assertEqual(html.count('id="lms-global"'), 1)
-        self.assertEqual(html.count('id="lms-content"'), 1)
+        self.assertIn('name="app-layout" content="public-landing"', html)
+        self.assertNotIn('id="lms-global"', html)
+        self.assertNotIn('id="lms-content"', html)
+        self.assertNotIn('data-lms-quick-search', html)
+        self.assertNotIn('quick_search.js', html)
+        self.assertIn('header class="mast"', html)
         self.assertIn("역대 커리큘럼·발제·토의 아카이브", html)
         self.assertIn("필담", html)
         self.assertIn("미식회", html)
@@ -192,9 +195,15 @@ class PublicArchiveAndPreSeminarTests(unittest.TestCase):
             self.assertNotIn(banned, html)
         # Logged-out users must NOT see member-only pre-seminar route or materials
         self.assertNotIn("/pre-seminar", html)
-        urls = self._extract_quick_search_urls(html)
+
+        # Logged-in members still receive the Canvas LMS shell on /archive
+        self.login("member")
+        member_html = self.client.get("/archive").get_data(as_text=True)
+        self.assertIn('name="app-layout" content="canvas"', member_html)
+        self.assertEqual(member_html.count('id="lms-global"'), 1)
+        urls = self._extract_quick_search_urls(member_html)
         self.assertIn("/archive", urls)
-        self.assertNotIn("/pre-seminar", urls)
+        self.assertIn("/pre-seminar", urls)
 
     def test_public_archive_semester_filter_and_keyword_search(self):
         sem_resp = self.client.get("/archive?semester=2026-1")

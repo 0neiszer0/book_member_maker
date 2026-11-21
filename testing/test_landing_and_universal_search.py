@@ -51,9 +51,14 @@ class LandingAndSearchTests(unittest.TestCase):
     def test_landing_and_preview(self):
         guest = self.client.get("/").get_data(as_text=True)
         dom = BeautifulSoup(guest, "html.parser")
+        first_book_href = dom.select_one(".books a[href^='/archive/']")["href"]
         self.assertEqual(len(dom.select(".books a[href^='/archive/']")), 6)
-        self.assertTrue(dom.select_one("header [data-lms-quick-search]"))
-        self.assertTrue(dom.select_one("#lms-quick-search-items"))
+        self.assertIsNotNone(dom.select_one('meta[name="app-layout"][content="public-landing"]'))
+        self.assertIsNone(dom.select_one("[data-lms-quick-search]"))
+        self.assertIsNone(dom.select_one("#lms-quick-search-items"))
+        self.assertIsNone(dom.select_one(".lms-global"))
+        self.assertIsNone(dom.select_one(".lms-breadcrumb"))
+        self.assertNotIn("quick_search.js", guest)
         self.assertTrue(dom.select_one("header nav a[href='/archive']"))
         self.assertTrue(dom.select_one("header nav a[href='/login']"))
         self.assertIsNone(dom.select_one(".actions a[href='/login']"))
@@ -63,14 +68,37 @@ class LandingAndSearchTests(unittest.TestCase):
             self.assertNotIn(forbidden, guest)
         for title in ("필담", "미식회", "벽돌책"):
             self.assertIn(title, guest)
+
+        for public_path in ("/archive", first_book_href):
+            resp = self.client.get(public_path)
+            self.assertEqual(resp.status_code, 200, public_path)
+            pub_html = resp.get_data(as_text=True)
+            pub_dom = BeautifulSoup(pub_html, "html.parser")
+            self.assertIsNotNone(pub_dom.select_one('meta[name="app-layout"][content="public-landing"]'), public_path)
+            self.assertIsNone(pub_dom.select_one("#lms-global"), public_path)
+            self.assertIsNone(pub_dom.select_one(".lms-breadcrumb"), public_path)
+            self.assertIsNone(pub_dom.select_one("[data-lms-quick-search]"), public_path)
+            self.assertNotIn("quick_search.js", pub_html, public_path)
+            self.assertIsNotNone(pub_dom.select_one("header.mast nav a[href='/archive']"), public_path)
+            self.assertIsNotNone(pub_dom.select_one("header.mast nav a[href='/login']"), public_path)
+
         self.login("admin")
         self.assertEqual(BeautifulSoup(self.client.get("/landing").data, "html.parser").main, dom.main)
-        for path in ("/", "/calendar"):
-            page = BeautifulSoup(self.client.get(path).data, "html.parser")
-            self.assertTrue(page.select_one(".lms-breadcrumb [data-lms-quick-search]"), path)
-            self.assertTrue(page.select_one(".lms-mobile-header [data-lms-quick-search]"), path)
-            self.assertTrue(page.select_one("a[href='/landing']"), path)
-            self.assertNotIn("notion", str(page).lower())
+        archive_logged_in = BeautifulSoup(self.client.get("/archive").data, "html.parser")
+        self.assertIsNotNone(archive_logged_in.select_one('meta[name="app-layout"][content="canvas"]'))
+
+        dash = BeautifulSoup(self.client.get("/").data, "html.parser")
+        self.assertIsNone(dash.select_one(".lms-breadcrumb"))
+        self.assertIsNotNone(dash.select_one(".lms-dashboard-heading [data-lms-quick-search]"))
+        self.assertIsNotNone(dash.select_one(".lms-mobile-header [data-lms-quick-search]"))
+        self.assertIsNotNone(dash.select_one("a[href='/landing']"))
+        self.assertNotIn("notion", str(dash).lower())
+
+        cal = BeautifulSoup(self.client.get("/calendar").data, "html.parser")
+        self.assertIsNotNone(cal.select_one(".lms-breadcrumb [data-lms-quick-search]"))
+        self.assertIsNotNone(cal.select_one(".lms-mobile-header [data-lms-quick-search]"))
+        self.assertIsNotNone(cal.select_one("a[href='/landing']"))
+        self.assertNotIn("notion", str(cal).lower())
         self.assertIn('data-lms-page="dashboard"', self.client.get("/").get_data(as_text=True))
 
     def test_topics_only_listed_for_members(self):

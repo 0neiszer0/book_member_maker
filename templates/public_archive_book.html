@@ -1,4 +1,4 @@
-{% extends 'lms_base.html' %}
+{% extends 'lms_base.html' if session.get('user_role') else '_public_shell.html' %}
 {% set lms_title = book.title %}
 {% set lms_page = 'archive' %}
 {% block title %}{{ book.title }} · 공개 아카이브 · 책 먹는 호반우{% endblock %}

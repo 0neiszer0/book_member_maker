@@ -1,19 +1,19 @@
 * { box-sizing: border-box; }
-body { margin: 0; color: #282322; background: #faf8f2; font: 16px/1.65 system-ui, sans-serif; word-break: keep-all; overflow-wrap: anywhere; }
+body { margin: 0; color: #282322; background: #faf8f2; font: 16px/1.65 system-ui, "Noto Sans KR", sans-serif; word-break: keep-all; overflow-wrap: anywhere; }
 a { color: inherit; text-decoration: none; }
 a:hover { text-decoration: underline; }
 .mast, main, footer { width: min(1120px, 92%); margin: auto; }
-.mast, footer, nav, .actions, .brand { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; }
+.mast, footer, .mast nav, footer nav, .actions, .brand { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; }
 .mast { padding: 1.2rem 0; border-bottom: 2px solid #282322; }
 .brand { gap: .55rem; font-weight: 750; font-size: 1.1rem; line-height: 1.4; }
 .brand small { display: block; font-size: .72rem; font-weight: 500; }
-nav, section header a { font-size: .9rem; }
+.mast nav, footer nav, .landing-main section > header a { font-size: .9rem; }
 .mast nav { margin-left: auto; }
 .mast .mast-login { display: inline-flex; align-items: center; padding: .38rem .85rem; border: 1px solid #b4a69e; border-radius: 3px; background: #fff; font-weight: 600; color: #282322; transition: background-color .15s ease, border-color .15s ease; }
 .mast .mast-login:hover { background: #f2eee6; border-color: #282322; text-decoration: none; }
 .intro { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; align-items: center; padding: clamp(2rem,7vw,6rem) 0; }
-h1, h2, h3, dd { font-family: Georgia, "Nanum Myeongjo", Batang, serif; line-height: 1.25; }
-h1 { font-size: clamp(2.55rem,7.5vw,6rem); margin: .25em 0; letter-spacing: -.065em; }
+.intro h1, .landing-main h2, .landing-main h3, .landing-main dd { font-family: Georgia, "Nanum Myeongjo", Batang, serif; line-height: 1.25; }
+.intro h1 { font-size: clamp(2.55rem,7.5vw,6rem); margin: .25em 0; letter-spacing: -.065em; }
 .kicker, .books small { color: #9e1119; font-size: .83rem; font-weight: 650; }
 .actions { margin-top: 1.5rem; gap: .6rem; }
 .actions a { border: 1px solid #b4a69e; padding: .55rem 1rem; }
@@ -22,18 +22,45 @@ dl { margin: 0; border-top: 3px solid #d20f17; padding: 1rem 0; }
 dl div { display: flex; align-items: baseline; justify-content: space-between; border-bottom: 1px solid #d6cdc2; padding: .45rem 0; }
 dd { margin: 0; color: #b60f17; font-size: 2.6rem; }
 dd small { font: 1rem system-ui; margin-left: .3rem; }
-section header { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; border-top: 1px solid #453f39; }
-h2 { font-size: clamp(1.5rem,4vw,2.3rem); }
+.landing-main section > header { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; border-top: 1px solid #453f39; }
+.landing-main h2 { font-size: clamp(1.5rem,4vw,2.3rem); }
 .books, .programs { display: grid; gap: 1rem; margin-bottom: 3.6rem; }
 .books { grid-template-columns: repeat(3,1fr); }
 .books a { display: block; background: #fff; padding: 1.25rem; border-left: 3px solid #d20f17; }
-h3 { font-size: 1.22rem; margin: .6rem 0; }
+.landing-main h3 { font-size: 1.22rem; margin: .6rem 0; }
 .programs { grid-template-columns: 1fr 1fr; }
 .programs article { border-top: 1px solid #d6cdc2; padding: .8rem 0; }
 footer { border-top: 1px solid #453f39; padding: 1.5rem 0 3rem; justify-content: space-between; }
 .lms-sr { position: absolute; width: 1px; height: 1px; clip-path: inset(50%); overflow: hidden; }
+
+/* External archive showcase pages (/archive, /archive/<slug>) */
+body.public-shell .arc-shell,
+body.public-shell .arc-book-shell { margin: 0 auto; padding: 2rem 0 4rem; }
+body.public-shell .arc-hero,
+body.public-shell .arc-book-header { background: #fff; border-color: #dfd7cc; border-top: 3px solid #b60f17; border-radius: 6px; }
+body.public-shell .arc-hero h1,
+body.public-shell .arc-book-header h1 { font-family: Georgia, "Nanum Myeongjo", Batang, serif; letter-spacing: -0.02em; color: #282322; }
+body.public-shell .arc-tabs { border-bottom-color: #d6cdc2; }
+body.public-shell .arc-tab { border-color: #d6cdc2; border-radius: 6px; color: #282322; }
+body.public-shell .arc-tab:hover { background: #f2ede3; }
+body.public-shell .arc-tab[aria-current="page"] { background: #b60f17; border-color: #b60f17; color: #fff; }
+body.public-shell .arc-search-form input[type="search"] { min-height: 40px; padding: .5rem .85rem; border: 1px solid #cfc6bc; border-radius: 6px; background: #fff; color: #282322; font: 400 15px/1.4 system-ui, "Noto Sans KR", sans-serif; }
+body.public-shell .arc-search-form input[type="search"]:focus { outline: 2px solid #b60f17; outline-offset: 1px; border-color: #b60f17; }
+body.public-shell .lms-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: .5rem .95rem; border: 1px solid #cfc6bc; border-radius: 6px; background: #fff; color: #282322; font: 600 14px/1.4 system-ui, "Noto Sans KR", sans-serif; cursor: pointer; text-decoration: none; transition: background-color .15s ease, border-color .15s ease; }
+body.public-shell .lms-button:hover { background: #f2ede3; border-color: #9e9186; text-decoration: none; }
+body.public-shell .lms-button-primary { background: #b60f17; border-color: #b60f17; color: #fff; }
+body.public-shell .lms-button-primary:hover { background: #960b12; border-color: #960b12; color: #fff; }
+body.public-shell .lms-alert { padding: 1rem 1.25rem; border: 1px solid #d6cdc2; border-radius: 6px; background: #fff; color: #453f39; font-size: .95rem; }
+body.public-shell .arc-card,
+body.public-shell .arc-program-card,
+body.public-shell .arc-prompt-group,
+body.public-shell .arc-session-block { border-color: #dfd7cc; border-radius: 6px; }
+body.public-shell .arc-card:hover { border-color: #b60f17; }
+body.public-shell .arc-section-title { border-bottom-color: #282322; color: #282322; }
+body.public-shell .arc-pager { border-top-color: #d6cdc2; }
+
 @media (max-width: 680px) {
-  .mast, nav { gap: .7rem; }
+  .mast, .mast nav, footer nav { gap: .7rem; }
   .intro, .books, .programs { grid-template-columns: 1fr; }
   .mast nav { width: 100%; margin-left: 0; justify-content: space-between; }
 }

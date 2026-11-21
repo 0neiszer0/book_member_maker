@@ -1,19 +1,7 @@
-<!doctype html>
-<html lang="ko"><head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="app-layout" content="public-landing"><meta name="color-scheme" content="light">
-  {% include '_favicon.html' %}
-  <title>책 먹는 호반우 · 경북대학교 중앙 독서동아리</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='public_landing.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='quick_search.css') }}">
-  <script defer src="{{ url_for('static', filename='quick_search.js') }}"></script>
-</head><body>
-<header class="mast">
-  <a class="brand" href="{{ url_for('main_index') }}"><img src="{{ url_for('static', filename='icons/icon-192.png') }}" width="42" height="42" alt=""><span>책 먹는 호반우<small>경북대학교 중앙 독서동아리</small></span></a>
-  <button class="top-search" type="button" data-lms-quick-search>통합 검색 <kbd>Ctrl K</kbd></button>
-  <nav aria-label="주요 메뉴"><a href="{{ url_for('public_archive') }}">역대 아카이브</a><a class="mast-login" href="{{ url_for('login') }}">로그인</a></nav>
-</header>
-<main>
+{% extends '_public_shell.html' %}
+{% block title %}책 먹는 호반우 · 경북대학교 중앙 독서동아리{% endblock %}
+{% block main_class %}landing-main{% endblock %}
+{% block content %}
   <section class="intro">
     <div><p class="kicker">경북대학교 중앙 독서동아리</p><h1>책 먹는 호반우</h1>
     <p>한 권의 책에서 시작해 서로 다른 생각을 만납니다.<br>우리가 함께 읽은 책과 나눈 질문들을 만나 보세요.</p>
@@ -28,8 +16,4 @@
     {% for program in programs %}<article><h3>{{ program.title }}</h3><p>{{ program.summary }}</p></article>{% endfor %}
     <article><h3>벽돌책 함께 읽기</h3><p>혼자 시작하기 어려웠던 두꺼운 책을 함께 읽습니다.</p></article></div>
   </section>
-</main>
-<footer><strong>책 먹는 호반우</strong><nav aria-label="하단 메뉴"><a href="{{ url_for('public_archive') }}">역대 아카이브</a><a href="{{ url_for('login') }}">로그인</a></nav></footer>
-{% set menu = [dict(title='역대 아카이브', url=url_for('public_archive'), group='메뉴')] %}
-<script id="lms-quick-search-items" type="application/json" data-scope="public">{{ menu|tojson }}</script>
-</body></html>
+{% endblock %}

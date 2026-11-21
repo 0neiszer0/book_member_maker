@@ -158,15 +158,13 @@ class Wave3CtaAndMembersUiTest(unittest.TestCase):
         nav_links = [(a.get_text(strip=True), a.get("href")) for a in header_nav.select("a")]
         self.assertEqual(nav_links, [("역대 아카이브", "/archive"), ("로그인", "/login")])
 
-        self.assertIsNotNone(dom.select_one("header.mast [data-lms-quick-search]"))
+        self.assertIsNone(dom.select_one("header.mast [data-lms-quick-search]"))
+        self.assertIsNone(dom.select_one("#lms-quick-search-items"))
         self.assertIsNotNone(dom.select_one(".actions a[href='/archive']"))
         self.assertIsNone(dom.select_one(".actions a[href='/login']"))
 
         for removed in ("공개 캘린더", "동아리방", "이용안내"):
             self.assertNotIn(removed, html)
-
-        quick_items = json.loads(dom.select_one("#lms-quick-search-items").string)
-        self.assertEqual([item["title"] for item in quick_items], ["역대 아카이브"])
 
     def test_global_cta_hierarchy_css_and_pages(self):
         lms_css = (ROOT / "static" / "lms.css").read_text(encoding="utf-8")
