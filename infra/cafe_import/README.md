@@ -40,3 +40,6 @@
    (중간에 멈춰도 같은 명령으로 이어서 진행, 이미 만든 글은 건너뜀)
 5. 공개 게시판 사진 62장은 운영진 확인 뒤 `--public-images attach`로 다시 export → 같은 state로 `--apply`.
 - 되돌리기: `... --rollback --state /var/tmp/cafe-import/state.json` (만든 글·첨부·Storage 파일 삭제) → 3단계 되돌리기.
+
+
+기본 `--author-mode keep`은 이름과 기수를 유지하며 학번은 제거합니다. 이전 익명화 방식은 `--author-mode cohort`를 사용합니다. 기존 state의 게시물을 그대로 유지하며 제목과 본문을 갱신하려면 원본으로 계획을 다시 만든 뒤 `--refresh-existing --apply`를 사용하세요. 사진을 복원할 때는 계획 생성 시 `--public-images attach`를 지정하고 같은 state를 사용합니다.

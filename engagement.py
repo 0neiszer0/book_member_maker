@@ -14,6 +14,7 @@ from topic_credentials import (
     review_request_fingerprint,
 )
 from storage_media import browser_storage_url
+from board_content import prepare_image
 from PIL import Image, ImageOps, UnidentifiedImageError
 from werkzeug.routing import BuildError
 from engagement_utils import clean_text as _clean_text
@@ -31,13 +32,35 @@ GUEST_WINDOW_MINUTES = 15
 REVISION_PRIVATE_KEYS = {"id", "created_at", "updated_at", "deleted_at", "edit_token_hash"}
 
 
+def cohort_name(name, cohort):
+    name = (name or '').strip() or '회원'
+    cohort = str(cohort or '').strip()
+    if cohort and not cohort.endswith('기'):
+        cohort += '기'
+    return f'{cohort} {name}' if cohort else name
+
+
 def review_author_label(row, member_by_id=None, staff=False, mark_guest=False):
-    """Display name of a link review: the member's name, or the name a guest typed."""
-    member = (member_by_id or {}).get(row.get("member_id")) if row.get("member_id") is not None else None
-    if member and member.get("name"):
-        return member["name"]
-    name = (row.get("author_name") or "").strip() or "회원"
-    return f"{name} (비회원)" if (staff or mark_guest) and row.get("identity_kind") == "guest" else name
+    members = member_by_id or {}
+    member = members.get(row.get('member_id'))
+    if not member and row.get('student_id'):
+        matches = [m for m in members.values() if m.get('student_id') and str(m['student_id']) == str(row['student_id'])]
+        if len(matches) == 1:
+            member = matches[0]
+    name = (member or {}).get('name') or row.get('author_name') or '회원'
+    label = cohort_name(name, (member or {}).get('recruiting_class'))
+    return f'{label} (비회원)' if (staff or mark_guest) and row.get('identity_kind') == 'guest' else label
+
+
+def review_image_url(db, row):
+    if not row.get('image_path'):
+        return None
+    try:
+        result = db.storage.from_('engagement-photos').create_signed_url(row['image_path'], 3600)
+        value = (result.get('signedURL') or result.get('signedUrl') or result.get('signed_url')) if isinstance(result, dict) else getattr(result, 'signed_url', None)
+        return browser_storage_url(value)
+    except (ValueError, AttributeError, KeyError):
+        return None
 
 
 def _student_id(value):
@@ -172,6 +195,8 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
 
     def joined_review(row):
         if row:
+            row["author_label"] = review_author_label(row, {member["id"]: member} if (member := current_member()) else {})
+            row["image_url"] = review_image_url(supabase, row)
             row["review_content"] = "\n\n".join(filter(None, [
                 row.get("memorable_point"), row.get("discussion_point"), row.get("free_text"),
             ]))
@@ -217,6 +242,15 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
         response.headers["Cache-Control"] = "no-store"
         return response
 
+    def upload_review_image():
+        file = request.files.get("photo")
+        if not file or not file.filename:
+            return None, None
+        content, mime, ext = prepare_image(file)
+        path = f"seminar-reviews/{uuid.uuid4().hex}.{ext}"
+        supabase.storage.from_("engagement-photos").upload(path, content, {"content-type": mime, "upsert": "false"})
+        return path, mime
+
     def submit_guest_review(form, seminar):
         """Link submission without login. Returns a response for every outcome."""
         values = {
@@ -245,6 +279,9 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
             if not ok:
                 flash("이 학번으로 이미 낸 후기가 있습니다. 수정하려면 제출할 때 받은 수정 코드를 입력해주세요.", "danger")
                 return render_review(form, seminar, None, None, status=403, need_edit_code=True, **values)
+            image_path, image_type = upload_review_image()
+            if image_path:
+                payload.update(image_path=image_path, image_mime_type=image_type)
             save_revision("seminar_review", existing)
             payload["author_name"] = values["guest_name"]
             supabase.table("seminar_reviews").update(payload).eq("id", existing["id"]).execute()
@@ -252,6 +289,9 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
         if review_attempts_exceeded(form["id"], "submit", GUEST_SUBMIT_LIMIT, False):
             flash("짧은 시간에 제출이 너무 많습니다. 15분 후 다시 시도해주세요.", "danger")
             return render_review(form, seminar, None, None, status=429, **values)
+        image_path, image_type = upload_review_image()
+        if image_path:
+            payload.update(image_path=image_path, image_mime_type=image_type)
         token = generate_topic_edit_token()
         payload.update({
             "form_id": form["id"],
@@ -689,6 +729,9 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
                     raise ValueError("로그인 전에 이 학번으로 쓴 후기가 있습니다. 아래에서 수정 코드로 내 계정에 연결한 뒤 수정해주세요.")
                 existing = member_review(member)
                 payload = review_content_payload()
+                image_path, image_type = upload_review_image()
+                if image_path:
+                    payload.update(image_path=image_path, image_mime_type=image_type)
                 payload.update({
                     "form_id": form["id"],
                     "seminar_session_id": form["seminar_session_id"],

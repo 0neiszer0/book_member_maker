@@ -134,7 +134,8 @@ def clean_body(raw, attachments):
     return re.sub(r'\n{3,}', '\n\n', text).strip()
 
 
-def review_title(title, names):
+def review_title(title, names, author_mode='cohort'):
+    title = redact(title, [])
     match = re.search(r'[\[<『](.+?)[\]>』]', title)
     book = match.group(1).strip() if match else ''
     rest = title[match.end():] if match else title
@@ -144,7 +145,9 @@ def review_title(title, names):
     if '후기 모음' in title:
         return f'{book} 발제자 후기 모음'.strip(), book
     if not book:
-        cleaned = redact(title, names)
+        cleaned = redact(title, names) if author_mode == 'cohort' else title
+        if author_mode == 'keep':
+            return re.sub(r'\s+', ' ', cleaned).strip(), re.sub(r'\s+', ' ', cleaned).strip()
         cleaned = re.sub(r'\S+(학과|학부|전공|과)\b', '', cleaned)
         book = re.sub(r'\s+', ' ', cleaned.replace('○○○', '')).strip()
     return book, book
@@ -200,7 +203,7 @@ def load_history(path):
             for r in rows if r.get('date')]
 
 
-def build_plan(archive, history, public_images):
+def build_plan(archive, history, public_images, author_mode='keep'):
     index = list(csv.DictReader((archive / 'index.csv').open(encoding='utf-8')))
     names = person_names(index)
     plan, skipped = [], Counter()
@@ -221,22 +224,22 @@ def build_plan(archive, history, public_images):
         attachments = [a for a in (meta.get('attachments') or '').split(';') if a.strip()]
         posted = datetime.strptime(meta['posted'], '%Y.%m.%d. %H:%M').replace(tzinfo=KST)
         slug, prefix = BOARD_RULES[menu]
-        public_author = menu in PUBLIC_AUTHOR_BOARDS
+        public_author = author_mode == 'keep' or menu in PUBLIC_AUTHOR_BOARDS
         if menu == '18':
-            title_core, book = review_title(row['title'], names)
+            title_core, book = review_title(row['title'], names, author_mode)
         else:
-            title_core = row['title'].strip() if public_author else redact(row['title'], names).replace('○○○', '').strip()
+            title_core = redact(row['title'], []).strip() if public_author else redact(row['title'], names).replace('○○○', '').strip()
             book = title_core
         title = f'{prefix} {title_core}'.strip()[:200]
         body = clean_body(pdf_text(folder / 'page.pdf'), attachments)
-        body = body if public_author else redact(body, names)
+        body = redact(body, [] if public_author else names)
         images = sorted(p for p in folder.rglob('*') if p.suffix.lower() in IMAGE_EXT)
         files = [a for a in attachments if Path(a).suffix.lower() not in IMAGE_EXT]
         hidden_images = bool(images) and slug != REVIEW_BOARD and public_images == 'hold'
-        byline = f'작성: {public_byline(row["author"])}' if public_author else cohort(row['author'])
+        byline = f'작성: {redact(public_byline(row["author"]), [])}' if public_author else cohort(row['author'])
         parts = [f"카페에서 옮긴 글 · {byline} · {posted:%Y.%m.%d} 작성", '', body or '(본문 없음)']
         if files:
-            parts += ['', '카페 원본 첨부파일 (운영진 보관본):'] + [f'- {f if public_author else redact(f, names)}' for f in files]
+            parts += ['', '카페 원본 첨부파일 (운영진 보관본):'] + [f'- {redact(f, [] if public_author else names)}' for f in files]
         if hidden_images:
             parts += ['', f'카페 원본 사진 {len(images)}장은 운영진 확인 후 올립니다.']
         history_id = None
@@ -271,11 +274,23 @@ def summarize(plan, skipped, history):
     print(f"== 기수 미상 작성자: {sum(i['unknown_cohort'] for i in plan)}개")
 
 
-def apply(plan, state_path):
+def import_client():
     import os
+    if os.environ.get('DATABASE_URL'):
+        try:
+            from db_client import get_supabase_client
+        except ImportError:
+            if not os.environ.get('SUPABASE_URL'):
+                raise RuntimeError('DATABASE_URL requires db_client.get_supabase_client or a configured local SUPABASE_URL')
+        else:
+            return get_supabase_client()
     from supabase import create_client
+    return create_client(os.environ['SUPABASE_URL'], os.environ['SUPABASE_SERVICE_KEY'])
+
+
+def apply(plan, state_path, refresh_existing=False):
     from board_content import prepare_image
-    db = create_client(os.environ['SUPABASE_URL'], os.environ['SUPABASE_SERVICE_KEY'])
+    db = import_client()
     state = json.loads(state_path.read_text()) if state_path.exists() else {'posts': {}, 'objects': []}
     state.setdefault('images_done', [])
     boards = {b['slug']: b['id'] for b in db.table('boards').select('id,slug').execute().data}
@@ -295,6 +310,8 @@ def apply(plan, state_path):
             }).execute().data[0]['id']
             state['posts'][item['source']] = post_id
             save()
+        elif refresh_existing:
+            db.table('posts').update({'title': item['title'], 'content': item['content']}).eq('id', post_id).execute()
         elif item['images'] and item['source'] not in state['images_done']:
             # Second run after officers reviewed the held photos: drop the "later" note.
             db.table('posts').update({'content': item['content']}).eq('id', post_id).execute()
@@ -396,6 +413,8 @@ def main(argv=None):
     parser.add_argument('--export', type=Path, help='plan.json과 변환된 이미지를 쓸 새 폴더')
     parser.add_argument('--from-export', type=Path, help='--export로 만든 폴더에서 읽는다 (VM용)')
     parser.add_argument('--history-json', help='history 목록(JSON: [{id,date,book_title}] 또는 {"history": [...]})')
+    parser.add_argument('--author-mode', choices=('keep', 'cohort'), default='keep')
+    parser.add_argument('--refresh-existing', action='store_true')
     parser.add_argument('--public-images', choices=('hold', 'attach'), default='hold')
     parser.add_argument('--preview', type=Path, help='제목·본문 미리보기 JSONL을 쓸 경로 (운영진 검토용)')
     parser.add_argument('--state', type=Path, default=Path('cafe_import_state.json'))
@@ -412,7 +431,7 @@ def main(argv=None):
         if not args.archive:
             parser.error('--archive 또는 --from-export가 필요합니다')
         history = load_history(args.history_json)
-        plan, skipped = build_plan(args.archive, history, args.public_images)
+        plan, skipped = build_plan(args.archive, history, args.public_images, args.author_mode)
         summarize(plan, skipped, history)
     if args.export:
         export_plan(plan, args.export)
@@ -424,7 +443,7 @@ def main(argv=None):
     if args.check_images:
         check_images(plan)
     if args.apply:
-        apply(plan, args.state)
+        apply(plan, args.state, args.refresh_existing)
     else:
         print('dry-run: 아무것도 쓰지 않았습니다.')
 

@@ -49,3 +49,15 @@ class BoardUploadTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class AuthorDisplayTests(unittest.TestCase):
+    def test_archive_and_member_labels(self):
+        from boards import post_author_label
+        archive = {'author': {'name': '카페 보관'}, 'content': '카페에서 옮긴 글 · 작성: 14기 홍길동 · 2026.09.10 작성'}
+        self.assertEqual(post_author_label(archive), '14기 홍길동')
+        archive['content'] = '카페에서 옮긴 글 · 14기 회원 · 2026.09.10 작성'
+        self.assertEqual(post_author_label(archive), '14기 회원')
+        archive['content'] = '본문'
+        self.assertEqual(post_author_label(archive), '카페 보관')
+        self.assertEqual(post_author_label({'author': {'name': '홍길동', 'recruiting_class': '14'}}), '14기 홍길동')

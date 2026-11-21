@@ -48,6 +48,7 @@
     <label>기억에 남은 내용<textarea class="eg-textarea" name="memorable_point" maxlength="5000" required {% if not is_open %}disabled{% endif %}>{{ existing.memorable_point if existing else '' }}</textarea></label>
     <label>그 밖의 후기 <span class="eg-help">선택</span><textarea class="eg-textarea" name="free_text" maxlength="10000" {% if not is_open %}disabled{% endif %}>{{ existing.free_text if existing else '' }}</textarea></label>
   {% endif %}
+  {% if form_kind == 'seminar_review' %}<label>사진 첨부 (선택)<input class="eg-input" type="file" name="photo" accept="image/jpeg,image/png,image/webp,image/gif" {% if not is_open %}disabled{% endif %}><span class="eg-help">세미나 현장이나 책 사진 등을 함께 올릴 수 있습니다. 새 사진을 선택하지 않으면 기존 사진을 유지합니다.</span></label>{% if existing and existing.image_url %}<img src="{{ existing.image_url }}" alt="현재 첨부 사진" style="max-width:100%;max-height:300px;object-fit:contain">{% endif %}{% endif %}
   {% if form_kind == 'brick_review' %}<label>사진 <span class="eg-help">선택</span><input class="eg-input" type="file" name="photo" accept="image/jpeg,image/png,image/webp" {% if not is_open %}disabled{% endif %}><span class="eg-help">JPG, PNG, WEBP · 최대 5MB</span></label>{% endif %}
   {% if is_open %}<button class="lms-button lms-button-primary" type="submit">{% if existing %}수정 내용 저장{% else %}제출하기{% endif %}</button>{% endif %}
 </form>
