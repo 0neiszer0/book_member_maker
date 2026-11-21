@@ -1,4 +1,5 @@
 """Ribbon editor page and the JSON live-preview endpoint (runs under unittest or pytest)."""
+import pathlib
 import unittest
 from unittest.mock import patch
 
@@ -40,6 +41,22 @@ class EditorToolbarTests(unittest.TestCase):
                         'numbers', 'quote', 'fold', 'rule', 'break', 'toc', 'link', 'note', 'table']:
             self.assertIsNotNone(html.select_one('#wiki-ribbon [data-command=%s]' % command), command)
         self.assertEqual(html.select_one('#wiki-content').text.lstrip('\n'), 'sample')
+
+    def test_direct_resize_hooks_in_template_js_and_css(self):
+        self.login()
+        html = BeautifulSoup(self.client.get('/wiki/edit/대문').data, 'html.parser')
+        tip = html.select_one('#wiki-live header .wiki-live-tip')
+        self.assertIsNotNone(tip)
+        self.assertIn('미리보기 표의 세로선·오른쪽 끝을 드래그해 너비를 바로 조절할 수 있어요.', tip.text)
+        self.assertTrue(tip.has_attr('hidden'))
+        root = pathlib.Path(__file__).resolve().parent.parent / 'static'
+        js = (root / 'wiki_editor.js').read_text(encoding='utf-8')
+        css = (root / 'wiki_editor.css').read_text(encoding='utf-8')
+        for token in ['findAllTables', 'setTableWidth', 'matchTables', 'decorateTables', "matchMedia('(min-width: 960px)')",
+                      'wiki-col-handle', 'wiki-table-edge', 'wiki-table-bar', '표 편집', '균등', '표 너비 ', 'pointerup']:
+            self.assertIn(token, js, token)
+        for token in ['.wiki-col-handle', '.wiki-table-edge', '.wiki-resize-badge', 'col-resize', 'ew-resize', '#d20f17']:
+            self.assertIn(token, css, token)
 
     def test_classic_preview_submit_still_works_without_js(self):
         self.login()

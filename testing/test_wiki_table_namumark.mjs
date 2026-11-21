@@ -38,7 +38,7 @@ test('cursor detection returns exact block and leaves neighboring prose intact',
 });
 
 test('complex structures refuse visual editing and ambiguous edits never serialize', () => {
-    for (const src of ['||{{{#!wiki ||nested||}}}||', '||a||||b||', '||a||b||\n||c||', '||<|99999>bad||',
+    for (const src of ['||{{{#!wiki ||nested||}}}||', '||a||b||\n||c||', '||<|99999>bad||',
                        '||[[link||label]]||']) assert.throws(() => table.parseTable(src));
     const model = table.parseTable('||a||');
     model.grid[0][0].text = 'a||b';
@@ -47,3 +47,54 @@ test('complex structures refuse visual editing and ambiguous edits never seriali
     assert.equal(table.serializeTable(model),'||첫줄[br]둘째||');
 });
 
+test('findAllTables returns every table with exact offsets in document order', () => {
+    const t1 = '||a||b||\n||c||d||', t2 = '||<tablewidth=50%>x||y||   ', t3 = '||z||';
+    const text = '== 하나 ==\n' + t1 + '\n\n본문\n' + t2 + '\n\n{{{\n||코드||\n}}}\n' + t3;
+    const found = table.findAllTables(text);
+    assert.equal(found.length, 3);
+    [t1, t2, t3].forEach((src, i) => {
+        assert.equal(found[i].index, i);
+        assert.equal(found[i].source, src);
+        assert.equal(text.slice(found[i].start, found[i].end), src);
+    });
+    assert.deepEqual(table.findAllTables('prose only'), []);
+});
+
+test('real openNamu tables: trailing spaces, leading spaces before tags, || shorthand colspan', () => {
+    let model = table.parseTable('||<tablewidth=100%> <width=30%> 내용 ||b||   \n|| c || d ||  ');
+    assert.deepEqual(model.widths, [30, 70]);
+    assert.deepEqual(model.tableTags, ['tablewidth=100%']);
+    assert.equal(model.grid[0][0].text, ' 내용 ');
+    model = table.parseTable('||||제목||\n||a||b||');
+    assert.equal(model.grid[0][0], model.grid[0][1]);
+    assert.equal(table.serializeTable(model), '||<-2>제목||\n||a||b||');
+    model = table.parseTable('||||||긴 제목||\n||a||b||c||');
+    assert.equal(model.grid[0].length, 3);
+    for (const src of ['||a||||', '||||<-2>a||b||', '||a||b||\n||c||d||e||']) assert.throws(() => table.parseTable(src), src);
+});
+
+test('setTableWidth inserts, replaces, clamps and round-trips', () => {
+    const model = table.parseTable('||a||b||');
+    assert.equal(table.setTableWidth(model, 75), 75);
+    assert.equal(table.serializeTable(model), '||<tablewidth=75%>a||b||');
+    assert.equal(table.setTableWidth(model, 78.4), 78);
+    assert.deepEqual(model.tableTags, ['tablewidth=78%']);
+    assert.equal(table.setTableWidth(model, 3), 25);
+    assert.equal(table.setTableWidth(model, 900), 100);
+    const again = table.parseTable(table.serializeTable(model));
+    assert.deepEqual(again.tableTags, ['tablewidth=100%']);
+    assert.equal(again.grid[0].length, 2);
+});
+
+test('matchTables binds only on identical shapes and skips included or unsupported tables', () => {
+    const text = '||a||b||\n||c||d||\n\n||{{{#!wiki x}}}||\n\n||e||f||f||';
+    const shapes = [{rows: 2, cols: 2}, {rows: 1, cols: 1}, {rows: 1, cols: 3}];
+    const m = table.matchTables(text, shapes);
+    assert.equal(m[0].index, 0);
+    assert.equal(m[0].block.source, '||a||b||\n||c||d||');
+    assert.equal(m[1], null);          // unsupported nested block
+    assert.equal(m[2].index, 2);
+    assert.equal(table.matchTables(text, [{rows: 3, cols: 2}, shapes[1], shapes[2]])[0], null);
+    // [include] macro rendering an extra <table>: counts differ, nothing is bound.
+    assert.deepEqual(table.matchTables(text, shapes.concat([{rows: 1, cols: 1}])), [null, null, null, null]);
+});

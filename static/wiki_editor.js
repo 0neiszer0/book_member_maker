@@ -61,21 +61,24 @@ function spanOf(grid, r, c) {
 }
 
 function parseTable(source) {
-    const lines = source.split(/\r?\n/);
+    const lines = source.split(/\r?\n/).map(line => line.trimEnd());
     const grid = lines.map(() => []);
     const tableTags = [];
-    // Avoid interpreting separators in escaped text, multiline constructs, or
-    // implicit colspans. Such tables remain editable in their original source.
-    if (lines.length > 200 || /\\\||\|\|\|\||\{\{\{#!|^\|[^|]/m.test(source)) throw Error(unsupported);
+    // Avoid interpreting separators in escaped text or multiline constructs.
+    // Such tables remain editable in their original source.
+    if (lines.length > 200 || /\\\||\{\{\{#!|^\|[^|]/m.test(source)) throw Error(unsupported);
     for (const [r, line] of lines.entries()) {
         if (!line.startsWith('||') || !line.endsWith('||') || line.length < 4) throw Error(unsupported);
-        let c = 0;
+        let c = 0, pending = 0;
         for (let raw of line.slice(2, -2).split('||')) {
+            // An empty piece is NamuMark shorthand: ||||x|| spans two columns.
+            if (raw === '') { pending++; continue; }
             while (grid[r][c]) c++;
             const tags = [];
-            let w = 1, h = 1;
-            while (raw.startsWith('<')) {
-                const match = /^<([^<>]+)>/.exec(raw);
+            let w = 1 + pending, h = 1, explicit = false;
+            pending = 0;
+            while (/^\s*</.test(raw)) {
+                const match = /^\s*<([^<>]+)>/.exec(raw);
                 if (!match) break;
                 const tag = match[1];
                 if (/^table/.test(tag)) {
@@ -85,12 +88,16 @@ function parseTable(source) {
                     tags.push(tag);
                     if (/^[-|]/.test(tag)) {
                         if (!/^[-|][1-9]\d*$/.test(tag)) throw Error(unsupported);
-                        if (tag[0] === '-') w = Number(tag.slice(1));
-                        else h = Number(tag.slice(1));
+                        if (tag[0] === '-') {
+                            if (w > 1) throw Error(unsupported);
+                            w = Number(tag.slice(1));
+                            explicit = true;
+                        } else h = Number(tag.slice(1));
                     }
                 }
                 raw = raw.slice(match[0].length);
             }
+            if (explicit && w < 1) throw Error(unsupported);
             if (c + w > 64 || r + h > lines.length ||
                 (raw.match(/\{\{\{/g) || []).length !== (raw.match(/\}\}\}/g) || []).length ||
                 (raw.match(/\[\[/g) || []).length !== (raw.match(/\]\]/g) || []).length) throw Error(unsupported);
@@ -103,6 +110,7 @@ function parseTable(source) {
             }
             c += w;
         }
+        if (pending) throw Error(unsupported);
     }
     const count = grid[0].length;
     if (grid.some(row => row.length !== count || Array.from(row).includes(undefined))) throw Error(unsupported);
@@ -151,7 +159,49 @@ function serializeTable(model) {
     }).join('\n');
 }
 
-if (typeof module !== 'undefined' && module.exports) module.exports = {parseTable, serializeTable, tableAt, equalWidths, resizeWidths};
+// All table blocks in document order, i.e. the order openNamu renders <table>s.
+function findAllTables(source) {
+    const found = [];
+    let pos = 0, depth = 0, current = null;
+    while (pos <= source.length) {
+        let end = source.indexOf('\n', pos);
+        if (end < 0) end = source.length;
+        const text = source.slice(pos, end);
+        if (depth === 0 && text.startsWith('||')) {
+            if (!current) current = {start: pos};
+            current.end = end;
+        } else {
+            if (current) found.push(current);
+            current = null;
+            depth = Math.max(0, depth + (text.match(/\{\{\{/g) || []).length - (text.match(/\}\}\}/g) || []).length);
+        }
+        pos = end + 1;
+    }
+    if (current) found.push(current);
+    return found.map((t, index) => ({index, start: t.start, end: t.end, source: source.slice(t.start, t.end)}));
+}
+
+function setTableWidth(model, widthPercent) {
+    const width = Math.max(25, Math.min(100, Math.round(Number(widthPercent)) || 100));
+    setTag(model.tableTags, t => t.startsWith('tablewidth='), 'tablewidth=' + width + '%');
+    return width;
+}
+
+// Pair rendered <table> shapes [{rows, cols}] with parsed source tables. Any
+// count mismatch (e.g. [include] macros) or shape mismatch yields null, never a guess.
+function matchTables(source, shapes) {
+    const blocks = findAllTables(source);
+    if (blocks.length !== shapes.length) return shapes.map(() => null);
+    return blocks.map((block, index) => {
+        try {
+            const model = parseTable(block.source);
+            if (model.grid.length !== shapes[index].rows || model.grid[0].length !== shapes[index].cols) return null;
+            return {index, block, model};
+        } catch { return null; }
+    });
+}
+
+if (typeof module !== 'undefined' && module.exports) module.exports = {parseTable, serializeTable, tableAt, equalWidths, resizeWidths, findAllTables, setTableWidth, matchTables};
 if (typeof document === 'undefined') return;
 const $ = selector => document.querySelector(selector);
 const source = $('#wiki-content');
@@ -187,11 +237,219 @@ function schedulePreview(delay = 450) {
             if (version !== previewVersion) return;
             live.querySelector('article').innerHTML = result.html;
             live.querySelector('[role=status]').textContent = '';
+            try { decorateTables(); } catch { /* direct resizing is optional */ }
         } catch (error) {
             if (version === previewVersion) live.querySelector('[role=status]').textContent = error.message;
         }
     }, delay);
 }
+
+// ---- Direct resizing on rendered preview tables ------------------------------
+let shells = [], observers = [];
+const tip = live.querySelector('.wiki-live-tip');
+const shapeOf = table => ({rows: table.rows.length,
+    cols: [...(table.rows[0]?.cells || [])].reduce((n, cell) => n + cell.colSpan, 0)});
+
+function badgeAt(text, x, y) {
+    let badge = $('.wiki-resize-badge');
+    if (!badge) {
+        badge = document.createElement('div');
+        badge.className = 'wiki-resize-badge';
+        document.body.append(badge);
+    }
+    badge.textContent = text;
+    badge.style.left = (x + 14) + 'px';
+    badge.style.top = (y + 14) + 'px';
+}
+const clearBadge = () => $('.wiki-resize-badge')?.remove();
+
+// Re-read the source block at commit time; refuse when the text moved on since rendering.
+function freshBinding(binding) {
+    const found = findAllTables(source.value)[binding.index];
+    if (!found || found.source !== binding.source) {
+        live.querySelector('[role=status]').textContent = '원문이 바뀌었습니다. 미리보기가 갱신된 뒤 다시 조절해 주세요.';
+        schedulePreview(0);
+        return null;
+    }
+    try { return {block: found, model: parseTable(found.source)}; } catch { return null; }
+}
+
+function commitTable(binding, fresh) {
+    const result = serializeTable(fresh.model);
+    replace(fresh.block.start, fresh.block.end, result, 0, 0);
+    binding.source = result;
+    binding.refresh?.(fresh.model);
+}
+
+function measuredWidths(ref, table) {
+    const total = table.getBoundingClientRect().width || 1;
+    const widths = [...ref.cells].map(cell => percent(cell.getBoundingClientRect().width * 100 / total));
+    widths[widths.length - 1] = percent(100 - widths.slice(0, -1).reduce((a, b) => a + b, 0));
+    return widths;
+}
+
+function paintLiveWidths(table, widths) {
+    let group = table.querySelector('colgroup.wiki-live-cols');
+    if (!group) {
+        group = document.createElement('colgroup');
+        group.className = 'wiki-live-cols';
+        widths.forEach(() => group.append(document.createElement('col')));
+        table.prepend(group);
+    }
+    table.style.tableLayout = 'fixed';
+    widths.forEach((w, i) => group.children[i].style.width = w + '%');
+}
+
+function dragHandle(handle, start, move, end) {
+    handle.addEventListener('pointerdown', event => {
+        if (event.button) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const state = start(event);
+        if (!state) return;
+        handle.setPointerCapture(event.pointerId);
+        handle.classList.add('dragging');
+        const onMove = e => move(state, e);
+        const finish = (e, commit) => {
+            handle.removeEventListener('pointermove', onMove);
+            handle.removeEventListener('pointerup', onUp);
+            handle.removeEventListener('pointercancel', onCancel);
+            handle.classList.remove('dragging');
+            clearBadge();
+            end(state, e, commit);
+        };
+        const onUp = e => finish(e, true), onCancel = e => finish(e, false);
+        handle.addEventListener('pointermove', onMove);
+        handle.addEventListener('pointerup', onUp);
+        handle.addEventListener('pointercancel', onCancel);
+    });
+}
+
+function decorateTables() {
+    observers.forEach(o => o.disconnect());
+    observers = [];
+    shells = [];
+    const tables = [...live.querySelector('article').querySelectorAll('table')];
+    const matches = matchTables(source.value, tables.map(shapeOf));
+    let bound = 0;
+    tables.forEach((table, i) => {
+        const match = matches[i];
+        if (!match) return;
+        bound++;
+        const binding = {index: match.index, source: match.block.source};
+        const shell = document.createElement('div');
+        shell.className = 'wiki-table-shell';
+        table.replaceWith(shell);
+        shell.append(table);
+        const columns = shapeOf(table).cols;
+        const ref = [...table.rows].find(tr => tr.cells.length === columns &&
+            [...tr.cells].every(cell => cell.colSpan === 1 && cell.rowSpan === 1));
+
+        const bar = document.createElement('div');
+        bar.className = 'wiki-table-bar';
+        const label = document.createElement('span');
+        const edit = document.createElement('button'), equal = document.createElement('button');
+        edit.type = equal.type = 'button';
+        edit.textContent = '표 편집';
+        equal.textContent = '균등';
+        equal.disabled = !ref;
+        bar.append(label, edit, equal);
+        const widthLabel = model => label.textContent = '너비 ' + (tagValue(model.tableTags, 'tablewidth') || '자동');
+        widthLabel(match.model);
+        binding.refresh = fresh => widthLabel(fresh.model);
+        edit.onclick = () => {
+            const fresh = freshBinding(binding);
+            if (!fresh) return;
+            block = fresh.block;
+            openGrid();
+        };
+        equal.onclick = () => {
+            const fresh = freshBinding(binding);
+            if (!fresh) return;
+            fresh.model.widths = equalWidths(fresh.model.widths.length);
+            fresh.model.widthsChanged = true;
+            paintLiveWidths(table, fresh.model.widths);
+            commitTable(binding, fresh);
+        };
+        shell.append(bar);
+
+        const handles = [];
+        const edge = document.createElement('div');
+        edge.className = 'wiki-table-edge';
+        edge.setAttribute('role', 'separator');
+        edge.setAttribute('aria-label', '표 너비 조절');
+        shell.append(edge);
+        dragHandle(edge, event => {
+            const fresh = freshBinding(binding);
+            if (!fresh) return null;
+            return {fresh, x: event.clientX, width: table.getBoundingClientRect().width,
+                    box: shell.getBoundingClientRect().width || 1, pct: null};
+        }, (state, event) => {
+            const px = state.width + event.clientX - state.x;
+            state.pct = Math.max(25, Math.min(100, Math.round(px * 100 / state.box)));
+            table.style.width = state.pct + '%';
+            badgeAt('표 너비 ' + state.pct + '%', event.clientX, event.clientY);
+            layout();
+        }, (state, event, commit) => {
+            if (commit && state.pct !== null) {
+                setTableWidth(state.fresh.model, state.pct);
+                commitTable(binding, state.fresh);
+            }
+            layout();
+        });
+
+        if (ref) for (let k = 0; k < columns - 1; k++) {
+            const handle = document.createElement('div');
+            handle.className = 'wiki-col-handle';
+            handle.setAttribute('role', 'separator');
+            handle.setAttribute('aria-label', (k + 1) + '열 너비 조절');
+            shell.append(handle);
+            handles.push(handle);
+            dragHandle(handle, event => {
+                const fresh = freshBinding(binding);
+                if (!fresh || fresh.model.widths.length !== columns) return null;
+                return {fresh, x: event.clientX, initial: measuredWidths(ref, table),
+                        width: table.getBoundingClientRect().width || 1, widths: null};
+            }, (state, event) => {
+                state.widths = resizeWidths(state.initial, k, (event.clientX - state.x) * 100 / state.width);
+                paintLiveWidths(table, state.widths);
+                badgeAt(Math.round(state.widths[k]) + '% | ' + Math.round(state.widths[k + 1]) + '%', event.clientX, event.clientY);
+                layout();
+            }, (state, event, commit) => {
+                if (commit && state.widths) {
+                    state.fresh.model.widths = state.widths;
+                    state.fresh.model.widthsChanged = true;
+                    commitTable(binding, state.fresh);
+                }
+                layout();
+            });
+        }
+
+        function layout() {
+            const left = table.offsetLeft, top = table.offsetTop, w = table.offsetWidth, h = table.offsetHeight;
+            edge.style.cssText = 'left:' + (left + w - 6) + 'px;top:' + top + 'px;height:' + h + 'px';
+            bar.style.cssText = 'left:' + (left + w - 6) + 'px;top:' + (top + 4) + 'px';
+            if (ref) {
+                const cells = [...ref.cells];
+                handles.forEach((handle, k) => {
+                    const cell = cells[k];
+                    handle.style.cssText = 'left:' + (left + cell.offsetLeft + cell.offsetWidth - 5) +
+                        'px;top:' + top + 'px;height:' + h + 'px';
+                });
+            }
+        }
+        shell.layout = layout;
+        shells.push(shell);
+        layout();
+        if (window.ResizeObserver) {
+            const observer = new ResizeObserver(layout);
+            observer.observe(table);
+            observers.push(observer);
+        }
+    });
+    if (tip) tip.hidden = !bound;
+}
+window.addEventListener('resize', () => shells.forEach(shell => shell.layout()));
 
 function context() {
     block = tableAt(source.value, source.selectionStart);
@@ -565,4 +823,6 @@ for (const area of [source.form, link, picker, gridDialog]) {
 }
 context();
 ribbon.hidden = false;
+// Wide screens open with the rendered preview so tables can be resized directly.
+if (window.matchMedia && window.matchMedia('(min-width: 960px)').matches) run('split');
 })();

@@ -29,7 +29,7 @@
 </div>
 <div id="wiki-workspace"><textarea id="wiki-content" name="content" rows="23" required spellcheck="false">
 {{ doc.source }}</textarea>
-<section id="wiki-live" hidden aria-label="실시간 미리보기"><header><strong>미리보기</strong>{{ button('refresh','새로 고침') }}</header><p role="status"></p><article class="wiki-prose"></article></section></div>
+<section id="wiki-live" hidden aria-label="실시간 미리보기"><header><strong>미리보기</strong><small class="wiki-live-tip" hidden>미리보기 표의 세로선·오른쪽 끝을 드래그해 너비를 바로 조절할 수 있어요.</small>{{ button('refresh','새로 고침') }}</header><p role="status"></p><article class="wiki-prose"></article></section></div>
 <label for="wiki-summary">편집 요약</label><input id="wiki-summary" name="summary" maxlength="300" value="{{ summary }}" placeholder="무엇을 바꿨는지 짧게 남겨 주세요">
 <div class="wiki-editor-actions"><button class="lms-button lms-button-primary" name="action" value="save" type="submit">저장</button><button class="lms-button" name="action" value="preview" type="submit">미리보기</button><a class="lms-button" href="{{ url_for('wiki.document',title=doc.title) }}">취소</a><span class="lms-small">기준 버전 r{{ doc.version }}</span></div>
 </form>
