@@ -164,6 +164,68 @@ class KnuEmailPinTests(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(self.sent, [])
 
+    def test_applicant_result_form_accepts_same_origin_and_blocks_null_origin(self):
+        token = "11111111-1111-4111-8111-111111111111"
+        path = f"/applicant-result/{token}"
+        base_url = self.module.PUBLIC_BASE_URL
+        self.db.rows["recruitment_campaigns"] = [{
+            "id": "test-campaign", "share_token": token, "title": "지원 결과", "is_active": True, "is_published": True,
+        }]
+        self.db.rows["recruitment_applicants"] = [{
+            "id": 1, "campaign_id": "test-campaign", "name": "테스트 지원자",
+            "name_key": "테스트지원자", "student_id": "2026000000", "result_status": "waitlisted",
+        }]
+
+        page = self.client.get(path, base_url=base_url)
+        self.assertEqual(page.status_code, 200)
+        self.assertEqual(page.headers["Referrer-Policy"], "same-origin")
+        with self.client.session_transaction(base_url=base_url) as session:
+            self.assertEqual(session["applicant_portal_token"], token)
+            data = {"name": "테스트 지원자", "student_id": "2026000000", "csrf_token": session["sensitive_csrf"]}
+
+        accepted = self.client.post(path, base_url=base_url, data=data,
+                                    headers={"Origin": base_url, "Sec-Fetch-Site": "same-origin"})
+        self.assertEqual(accepted.status_code, 200)
+        self.assertIn("테스트 지원자님의 결과", accepted.get_data(as_text=True))
+        rejected = self.client.post(path, base_url=base_url, data=data,
+                                    headers={"Origin": "null", "Sec-Fetch-Site": "same-origin"})
+        self.assertEqual(rejected.status_code, 403)
+        self.assertNotIn("테스트 지원자님의 결과", rejected.get_data(as_text=True))
+
+    def test_forbidden_html_has_korean_guidance_and_navigation(self):
+        response = self.client.post("/auth/email/request", headers={"Accept": "text/html"})
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+        self.assertEqual(response.mimetype, "text/html")
+        page = response.get_data(as_text=True)
+        self.assertIn("요청을 처리할 수 없습니다 (403)", page)
+        self.assertIn("페이지가 오래되었거나 권한이 없는 요청입니다. 새로고침 후 다시 시도하거나 로그인 화면으로 돌아가 주세요.", page)
+        self.assertIn('href="/login"', page)
+        self.assertIn('href="/"', page)
+        self.assertNotIn("You don't have the permission", page)
+
+    def test_forbidden_json_and_existing_api_error(self):
+        response = self.client.post("/api/admin/signup-code", headers={"Accept": "text/html"})
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(response.is_json)
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+
+        response = self.client.post("/auth/email/request", headers={"Accept": "application/json"})
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(response.is_json)
+
+        response = self.admin().post("/api/admin/signup-code",
+                                     headers={"X-App-CSRF": "csrf", "Origin": "null"})
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.get_json(), {"error": "허용되지 않은 요청 출처입니다."})
+
+    def test_origin_auth_forbidden_renders_without_template_context(self):
+        with patch.dict(self.app.config, {"REQUIRE_ORIGIN_AUTH": True}), \
+                patch.object(self.app, "update_template_context", side_effect=RuntimeError):
+            response = self.client.get("/login")
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("요청을 처리할 수 없습니다 (403)", response.get_data(as_text=True))
+
     def test_non_knu_email_and_csrf_rejection(self):
         for path in ("/auth/email/request", "/auth/email/verify", "/auth/email/enroll", "/login/pin",
                      "/account/pin/setup", "/account/pin/reset"):

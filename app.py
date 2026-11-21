@@ -209,7 +209,7 @@ def protect_applicant_result_responses(response):
         response.headers["Pragma"] = "no-cache"
         response.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
         response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Referrer-Policy"] = "same-origin"
         response.headers["Content-Security-Policy"] = "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
     return response
 
@@ -221,6 +221,40 @@ def protect_topic_edit_responses(response):
         response.headers['Cache-Control'] = 'no-store, max-age=0'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Referrer-Policy'] = 'no-referrer'
+    return response
+
+
+@app.errorhandler(403)
+def forbidden_response(_error):
+    if (request.path.startswith("/api/")
+            or request.accept_mimetypes.best_match(("text/html", "application/json")) == "application/json"):
+        response = jsonify(error="요청을 처리할 수 없습니다.")
+    else:
+        # This can run before route handling, so keep the page independent of template context.
+        response = Response("""<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>요청을 처리할 수 없습니다 (403)</title>
+  <style>
+    body { margin: 0; color: #29241e; background: #faf6ec; font: 1rem/1.65 system-ui, sans-serif; }
+    main { max-width: 34rem; margin: 12vh auto 0; padding: 0 1.25rem; }
+    h1 { font-size: 1.5rem; }
+    a { color: #664424; }
+    a + a { margin-inline-start: 1rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>요청을 처리할 수 없습니다 (403)</h1>
+    <p>페이지가 오래되었거나 권한이 없는 요청입니다. 새로고침 후 다시 시도하거나 로그인 화면으로 돌아가 주세요.</p>
+    <nav aria-label="이동"><a href="/login">로그인</a><a href="/">홈</a></nav>
+  </main>
+</body>
+</html>""", mimetype="text/html")
+    response.status_code = 403
+    response.headers["Cache-Control"] = "no-store"
     return response
 
 
