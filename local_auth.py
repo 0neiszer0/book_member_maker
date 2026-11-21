@@ -17,6 +17,8 @@ from flask import abort, flash, g, jsonify, redirect, render_template, request, 
 
 from member_identity import normalize_member_student_id
 from minipc_security import SENSITIVE_AUTH_PAGES, has_term_assignment
+from privacy_cleanup import init_privacy_cleanup_routes
+from recruitment_dues_routes import init_recruitment_dues_routes
 from security_utils import forwarded_client_address, safe_internal_next_url, trusted_client_address
 import email_auth_mailer
 import signup_notify
@@ -175,6 +177,9 @@ def is_officer_role(member):
 
 
 def install_local_auth(app, get_db, login_required, primary_admin_check):
+    init_recruitment_dues_routes(app, get_db, login_required)
+    init_privacy_cleanup_routes(app, get_db, login_required, primary_admin_check)
+
     def db():
         return get_db()
 
@@ -958,6 +963,54 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
     @login_required(role='admin')
     def admin_reject_signup(member_id):
         return decide_signup(member_id, approve=False)
+
+    @app.post('/api/admin/members/<int:member_id>/knu-email')
+    @login_required(role='admin')
+    def admin_set_knu_email(member_id):
+        data = request.get_json(silent=True)
+        value = data.get('knu_email') if isinstance(data, dict) else None
+        if not isinstance(value, str):
+            return jsonify(status='error', message=EMAIL_ERROR), 400
+        value = value.strip()
+        email = value.lower()
+        if value and (not value.isascii() or len(value) > 254 or not KNU_EMAIL_RE.fullmatch(email)):
+            return jsonify(status='error', message=EMAIL_ERROR), 400
+
+        members = db().table('members')
+        rows = members.select('id,role,social_id,knu_email,auth_session_version') \
+            .eq('id', member_id).limit(1).execute().data or []
+        if not rows or str(rows[0].get('social_id') or '').startswith('system:'):
+            return jsonify(status='error', message='회원을 찾을 수 없습니다.'), 404
+        member = rows[0]
+        staff = is_officer_role(member)
+        if staff and member_id != actor_id() and not primary_admin_check():
+            return jsonify(status='error', message='다른 운영진의 학교 메일은 관리자만 변경할 수 있습니다.'), 403
+
+        version = member['auth_session_version']
+        fields = {
+            'knu_email': email or None,
+            'knu_email_verified_at': iso(now_utc()) if email else None,
+            'auth_session_version': version + 1,
+        }
+        if email:
+            fields['auth_provider'] = 'local'
+        if staff or not email or email != member.get('knu_email'):
+            fields.update(pin_hash=None, pin_failed_attempts=0, pin_locked_until=None)
+
+        # The unique index arbitrates competing assignments of the same email.
+        # Guard the role and version so a concurrent promotion or credential change wins.
+        query = members.update(fields).eq('id', member_id).eq('auth_session_version', version)
+        role = member.get('role')
+        query = query.eq('role', role) if role is not None else query.is_('role', 'null')
+        try:
+            updated = query.execute().data
+        except Exception as exc:
+            if getattr(exc, 'code', None) == '23505':
+                return jsonify(status='error', message='다른 회원에게 연결된 학교 메일입니다.'), 409
+            raise
+        if not updated:
+            return jsonify(status='error', message='회원 정보가 바뀌었습니다. 새로고침 후 다시 시도해주세요.'), 409
+        return jsonify(status='success', knu_email=email or None)
 
     @app.post('/api/admin/members/<int:member_id>/login-link')
     @login_required(role='admin')

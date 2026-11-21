@@ -23,6 +23,8 @@ SENSITIVE_POSTS = MEMBER_POSTS | {'seminar_review_form',
     'admin_signup_code', 'admin_approve_signup', 'admin_reject_signup', 'admin_issue_login_link',
     'email_auth_request', 'email_auth_verify', 'email_auth_enroll', 'login_pin',
     'pin_setup', 'pin_reset_confirm',
+    'admin_set_knu_email', 'admin_recruitment_dues_settings', 'admin_recruitment_toggle_dues',
+    'admin_privacy_purge_inactive_members', 'admin_privacy_purge_recruitment_applicants',
 }
 SENSITIVE_AUTH_PAGES = {
     'login', 'login_password', 'signup', 'email_auth_request', 'email_auth_verify',

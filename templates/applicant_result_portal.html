@@ -7,6 +7,13 @@
 <meta name="robots" content="noindex,nofollow,noarchive">
 <meta property="og:title" content="면접 지원 결과 확인">
 <link rel="stylesheet" href="{{ url_for('static', filename='lms_auth.css') }}">
+<style>
+  .lms-result-dues { border: 1px solid #c7cdd1; border-radius: 6px; background: #fff; margin-top: 16px; padding: 16px; }
+  .lms-result-dues h2 { font-size: 18px; margin: 0 0 8px; }
+  .lms-result-dues p + p { margin-top: 8px; }
+  .lms-result-dues button { margin-top: 8px; }
+  .lms-result-paid { display: inline-block; margin-top: 8px; border-radius: 4px; padding: 2px 8px; color: #18542c; background: #e4f5e8; font-weight: 700; }
+</style>
 {% endblock %}
 {% block content %}
     <section class="lms-result-portal">
@@ -24,12 +31,31 @@
       {% else %}
         <p class="lms-result-lead">{{ campaign.intro_text }}</p>
         {% if result %}
+          {% set dues_applicant = accepted_applicant_dues(campaign, result) if result.status == 'accepted' else none %}
           <div class="lms-result-decision {{ result.status }}" aria-live="polite">
             <span class="lms-result-label">{{ result.status_label }}</span>
             <h2>{{ result.name }}님의 결과</h2>
             <p class="lms-result-message">{{ result.common_message }}</p>
             {% if result.personal_message %}<p class="lms-result-message lms-result-personal">{{ result.personal_message }}</p>{% endif %}
+            {% if dues_applicant and dues_applicant.dues_paid_at %}<span class="lms-result-paid">회비 입금 확인 완료</span>{% endif %}
           </div>
+          {% if dues_applicant and (campaign.dues_account_info or campaign.dues_contact_phone) %}
+            <section class="lms-result-dues" aria-labelledby="dues-guide-title">
+              <h2 id="dues-guide-title">회비 입금 안내</h2>
+              {% if campaign.dues_account_info %}
+                <p class="lms-result-message"><strong>입금 계좌</strong> <span id="dues-account">{{ campaign.dues_account_info }}</span></p>
+              {% endif %}
+              {% if campaign.dues_amount %}<p class="lms-result-message"><strong>회비 금액</strong> {{ campaign.dues_amount }}</p>{% endif %}
+              {% if campaign.dues_contact_phone %}
+                <p class="lms-result-message">입금 후 회장 번호({{ campaign.dues_contact_phone }})로 [이름·학번 입금 완료] 문자를 한 번 보내주세요.</p>
+              {% endif %}
+              {% if campaign.dues_guide_note %}<p class="lms-result-message">{{ campaign.dues_guide_note }}</p>{% endif %}
+              {% if campaign.dues_account_info %}
+                <button type="button" class="lms-button" id="dues-copy">계좌 복사</button>
+                <span id="dues-copy-status" role="status"></span>
+              {% endif %}
+            </section>
+          {% endif %}
         {% endif %}
         {% if error_message %}<div class="lms-result-notice error" role="alert">{{ error_message }}</div>{% endif %}
         <form class="lms-result-form" method="post" autocomplete="off">
@@ -42,4 +68,23 @@
       {% endif %}
     </section>
     <p class="lms-result-help">개인정보 보호를 위해 이름과 학번이 모두 일치할 때만 결과가 표시됩니다.<br>이 링크에서는 로그인·회원가입 및 동아리의 다른 메뉴를 이용할 수 없습니다.</p>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('dues-copy')?.addEventListener('click', async () => {
+  const account = document.getElementById('dues-account');
+  const status = document.getElementById('dues-copy-status');
+  try {
+    await navigator.clipboard.writeText(account.textContent.trim());
+    status.textContent = '계좌를 복사했습니다.';
+  } catch {
+    const range = document.createRange();
+    range.selectNodeContents(account);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    status.textContent = '선택된 계좌를 직접 복사해주세요.';
+  }
+});
+</script>
 {% endblock %}

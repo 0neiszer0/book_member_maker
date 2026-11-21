@@ -1,0 +1,102 @@
+{% extends 'lms_admin_base.html' %}
+{% set lms_title = '개인정보 정리' %}
+{% block title %}{{ lms_title }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='lms_admin_aux.css') }}">
+<style>
+  .privacy-cleanup summary { cursor: pointer; }
+  .privacy-cleanup .purge-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 12px; align-items: end; }
+  .privacy-cleanup .campaign-row { border-top: 1px solid #c7cdd1; padding-top: 12px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="lms-aux privacy-cleanup">
+  <header class="flex flex-wrap justify-between gap-3 mb-6">
+    <div><h1>개인정보 정리</h1><p class="muted mt-2">비활성 회원과 종료된 모집 차수의 개인정보를 정리합니다.</p></div>
+    <a class="lms-button" href="{{ url_for('records_members') }}">전체 회원 관리</a>
+  </header>
+
+  {% if summary is none %}
+    <p class="panel text-red-700" role="alert">개인정보 현황을 불러오지 못했습니다. 잠시 후 새로고침해주세요.</p>
+  {% else %}
+    {% if not can_purge %}<p class="muted mb-4">개인정보 파기는 관리자 권한이 필요합니다.</p>{% endif %}
+    <section class="panel" aria-labelledby="inactive-title">
+      <h2 id="inactive-title">비활성 회원 개인정보</h2>
+      <p class="mt-2"><strong>{{ summary.inactive_count }}명</strong>에게 이메일, 학교 메일, 학번, 소셜 ID 또는 로그인 정보가 남아 있습니다.</p>
+      {% if summary.inactive_preview %}
+        <details class="mt-3">
+          <summary>대상 미리보기 ({{ summary.inactive_preview|length }}명)</summary>
+          <ul class="muted text-sm mt-2">
+            {% for member in summary.inactive_preview %}
+              <li>ID #{{ member.id }} · {{ (member.recruiting_class ~ '기') if member.recruiting_class is not none else '기수 미기재' }} · 비활성</li>
+            {% endfor %}
+          </ul>
+        </details>
+      {% endif %}
+      {% if can_purge and summary.inactive_count %}
+        <p class="muted text-sm mt-3">파기 후에도 회원 ID, 기수, 세미나 기록과 발제는 보존됩니다.</p>
+        <form class="purge-form mt-3" method="post" action="{{ url_for('admin_privacy_purge_inactive_members') }}">
+          <div class="purge-controls">
+            <label class="label">‘파기 확인’ 입력<input class="field" name="confirm" maxlength="5" required autocomplete="off"></label>
+            <button type="submit" class="btn danger">비활성 회원 개인정보 파기</button>
+          </div>
+          <p class="text-sm mt-2" role="status"></p>
+        </form>
+      {% endif %}
+    </section>
+
+    <section class="panel space-y-3" aria-labelledby="campaigns-title">
+      <h2 id="campaigns-title">종료된 모집 차수의 지원자</h2>
+      {% for campaign in summary.campaigns %}
+        <article class="campaign-row">
+          <h3>{{ campaign.title }}</h3>
+          <p class="muted text-sm mt-1">불합격 {{ campaign.rejected_count }}명 · 전체 {{ campaign.applicant_count }}명</p>
+          {% if can_purge and campaign.applicant_count %}
+            <form class="purge-form mt-3" method="post" action="{{ url_for('admin_privacy_purge_recruitment_applicants') }}">
+              <input type="hidden" name="campaign_id" value="{{ campaign.id }}">
+              <div class="purge-controls">
+                <label class="label">파기 범위
+                  <select class="field" name="scope">
+                    <option value="rejected"{% if not campaign.rejected_count %} disabled{% endif %}>불합격자 ({{ campaign.rejected_count }}명)</option>
+                    <option value="all"{% if not campaign.rejected_count %} selected{% endif %}>전체 지원자 ({{ campaign.applicant_count }}명)</option>
+                  </select>
+                </label>
+                <label class="label">‘파기 확인’ 입력<input class="field" name="confirm" maxlength="5" required autocomplete="off"></label>
+                <button type="submit" class="btn danger">지원자 개인정보 파기</button>
+              </div>
+              <p class="text-sm mt-2" role="status"></p>
+            </form>
+          {% endif %}
+        </article>
+      {% else %}<p class="muted">종료된 모집 차수가 없습니다.</p>{% endfor %}
+    </section>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll('.purge-form').forEach(form => {
+  const button = form.querySelector('button');
+  const status = form.querySelector('[role="status"]');
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    button.disabled = true;
+    status.textContent = '파기 중…';
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-App-CSRF': document.querySelector('meta[name="lms-csrf"]').content},
+        body: JSON.stringify(Object.fromEntries(new FormData(form))),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.status !== 'success') throw new Error(result.message || '개인정보를 파기하지 못했습니다.');
+      alert(`개인정보 ${result.purged_count}건을 파기했습니다.`);
+      location.reload();
+    } catch (error) {
+      status.textContent = error.message;
+      button.disabled = false;
+    }
+  });
+});
+</script>
+{% endblock %}
