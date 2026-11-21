@@ -1,0 +1,93 @@
+#wiki-ribbon, #wiki-live, #wiki-table, #wiki-picker, #wiki-link {
+    --editor-line: #c7cdd1;
+    --editor-accent: #0374b5;
+    color: #273238;
+}
+#wiki-ribbon[hidden], .wiki-editor [hidden] { display: none; }
+#wiki-ribbon {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    padding: 6px;
+    background: #f5f7f8;
+    border: 1px solid var(--editor-line);
+    border-radius: 6px 6px 0 0;
+}
+.ribbon-tools, .table-tools, #wiki-context, #wiki-live header,
+#wiki-table footer, #wiki-link footer, #wiki-picker footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+.ribbon-tools span { display: inline-flex; align-items: center; border-right: 1px solid #d3dade; padding-right: 5px; }
+.ribbon-tools button, .ribbon-tools select, #wiki-context button, #wiki-live button,
+.table-tools button, .table-tools select, #wiki-table footer button, #wiki-picker footer button, #wiki-link footer button {
+    appearance: auto;
+    min-height: 32px;
+    padding: 3px 7px;
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.35;
+    color: inherit;
+    background: #fff;
+    border: 1px solid #c7cdd1;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.ribbon-tools button { background: transparent; border-color: transparent; }
+.ribbon-tools button:hover, .table-tools button:hover { background: #e6edf1; }
+.ribbon-tools button:disabled { opacity: .38; }
+#wiki-ribbon [aria-pressed=true], #wiki-table [aria-pressed=true], #wiki-table [data-command=apply] {
+    color: white; background: #155779;
+}
+[data-command=bold] { font-weight: 800 !important; }
+[data-command=italic] { font-style: italic !important; }
+[data-command=underline] { text-decoration: underline; }
+[data-command=strike] { text-decoration: line-through; }
+#wiki-context { padding: 6px 4px 0; font-size: 13px; }
+#wiki-workspace { display: grid; min-width: 0; }
+#wiki-content { min-width: 0; box-sizing: border-box; resize: vertical; }
+#wiki-live { min-width: 0; max-height: 65vh; overflow: auto; padding: 12px 16px; border: 1px solid #c7cdd1; }
+#wiki-live header { justify-content: space-between; }
+#wiki-live [role=status]:empty, #table-message:empty { display: none; }
+#wiki-table, #wiki-picker, #wiki-link {
+    box-sizing: border-box;
+    margin: auto;
+    max-height: 88vh;
+    max-width: calc(100vw - 24px);
+    padding: 20px;
+    border: 1px solid #aeb9bf;
+    border-radius: 8px;
+    background: white;
+    box-shadow: 0 16px 64px #18232c40;
+    overflow: auto;
+}
+#wiki-table { width: 860px; }
+#wiki-table::backdrop, #wiki-link::backdrop, #wiki-picker::backdrop { background: #19252e70; }
+#wiki-table h2, #wiki-link h2, #wiki-picker h2 { margin: 0 0 16px; font-size: 20px; }
+#wiki-link label { display: grid; gap: 4px; margin: 12px 0; }
+#wiki-table footer, #wiki-link footer, #wiki-picker footer { justify-content: flex-end; margin-top: 16px; }
+.table-tools { margin: 12px 0; }
+.table-tools label { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+.table-scroll { width: 100%; overflow: auto; }
+#wiki-grid { width: 100%; table-layout: fixed; border-collapse: collapse; }
+#wiki-grid th, #wiki-grid td { padding: 0; border: 1px solid #bcc8ce; }
+#wiki-grid th { position: relative; background: #eff3f5; padding: 7px 3px; font-size: 12px; }
+#wiki-grid th output { color: #32617a; }
+#wiki-grid td.current { outline: 2px solid #0374b5; outline-offset: -2px; }
+#wiki-grid textarea { display: block; width: 100%; min-width: 0; box-sizing: border-box; border: 0; background: transparent; resize: vertical; padding: 5px; }
+#wiki-grid .col-handle { position: absolute; right: -6px; top: 0; bottom: 0; width: 12px; z-index: 1; cursor: col-resize; touch-action: none; background: transparent; border: 0; padding: 0; }
+#wiki-grid .col-handle::after { content: ''; display: block; height: 16px; width: 3px; background: #39728d; margin: auto; border-radius: 3px; }
+.picker-grid { display: grid; grid-template-columns: repeat(6, 26px); gap: 2px; margin-bottom: 10px; }
+.picker-grid button { width: 26px; height: 26px; padding: 0; border: 1px solid #b0bec5; background: #fff; }
+.picker-grid button.picked { border-color: #0374b5; background: #d2eaf7; }
+@media (min-width: 960px) {
+    #wiki-workspace.split { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 767px) {
+    #wiki-ribbon { top: 48px; }
+    .ribbon-tools { flex-wrap: nowrap; overflow-x: auto; }
+    .ribbon-tools > * { flex-shrink: 0; white-space: nowrap; }
+    #wiki-table { padding: 12px; }
+}

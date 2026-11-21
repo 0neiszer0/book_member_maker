@@ -91,6 +91,9 @@ def clean_wiki_html(source):
     return Markup(re.sub(r'\sstyle=""', '', cleaned))
 
 
+MAX_SOURCE_BYTES = 512_000
+MAX_FORM_BYTES = 3 * MAX_SOURCE_BYTES + 16_000
+
 DIFF_CONTEXT = 3
 MAX_INLINE_DIFF_CHARS = 100_000
 MAX_INLINE_LINE_CHARS = 4_000
@@ -175,6 +178,8 @@ def init_wiki_routes(app, get_db):
                                wiki_csrf=session.get('wiki_csrf', ''), **context)
 
     def message(text, status):
+        if request.endpoint == 'wiki.preview':
+            return {'ok': False, 'error': text}, status
         return page('message.html', message=text), status
 
     def hidden():
@@ -206,6 +211,10 @@ def init_wiki_routes(app, get_db):
             return message('가입 승인된 회원 계정으로 로그인해야 위키를 읽을 수 있습니다.', 403)
         session.setdefault('wiki_csrf', secrets.token_urlsafe(32))
         if request.method == 'POST':
+            # A 512,000-byte draft is up to ~1.5 MB once urlencoded (Korean is
+            # 9 bytes per syllable), above Werkzeug's 500 kB per-field default.
+            request.max_form_memory_size = MAX_FORM_BYTES
+            request.max_content_length = MAX_FORM_BYTES + 64_000
             target = (request.view_args or {}).get('title', '')
             if not can_read_title(g.wiki_access, target):
                 return hidden()
@@ -352,6 +361,27 @@ def init_wiki_routes(app, get_db):
             return redirect(url_for('wiki.edit', title=title))
         return page('new.html')
 
+    def render_draft(backend, client, title, content):
+        return clean_wiki_html(backend.render(client, title, renderable(content)))
+
+    @bp.errorhandler(400)
+    @bp.errorhandler(413)
+    def bad_request(exc):
+        if request.endpoint == 'wiki.preview':
+            return message('문서 제목이나 본문 크기를 확인해 주세요.', 400)
+        return exc
+
+    @bp.post('/api/preview/<path:title>')
+    def preview(title):
+        title_value(title)
+        content = request.form.get('content')
+        if content is None or len(content.encode()) > MAX_SOURCE_BYTES:
+            abort(400)
+        backend = engine()
+        with backend.user(g.wiki_access.member_id) as client:
+            rendered = render_draft(backend, client, title, content.replace('\r', ''))
+        return {'ok': True, 'html': str(rendered)}
+
     @bp.route('/edit/<path:title>', methods=['GET', 'POST'])
     def edit(title):
         title_value(title)
@@ -365,7 +395,7 @@ def init_wiki_routes(app, get_db):
             content = request.form.get('content', '').replace('\r', '')
             version = request.form.get('version', '')
             summary = request.form.get('summary', '').strip()
-            if (len(content.encode()) > 512_000 or len(summary) > 300
+            if (len(content.encode()) > MAX_SOURCE_BYTES or len(summary) > 300
                     or not version.isascii() or not version.isdigit()):
                 abort(400)
             # Capture the draft before configuration, login or rendering can fail.
@@ -378,7 +408,7 @@ def init_wiki_routes(app, get_db):
                     return page('edit.html', doc=doc, notice=notice, preview=preview, summary=summary,
                                 officer_doc=is_officer_title(title))
                 if request.form.get('action') == 'preview':
-                    preview = clean_wiki_html(backend.render(client, title, renderable(content)))
+                    preview = render_draft(backend, client, title, content)
                 elif not summary or not content.strip():
                     notice, status = '본문과 편집 요약을 입력해 주세요.', 400
                 else:
