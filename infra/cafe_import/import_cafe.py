@@ -356,12 +356,12 @@ def check_images(plan):
 
 
 def attach_images(db, prepare_image, post_id, images, state, state_path):
+    existing_rows = db.table('post_attachments').select('display_order').eq('post_id', post_id).execute().data or []
+    existing_orders = {row['display_order'] for row in existing_rows if row.get('display_order') is not None}
     for order, image in enumerate(images):
-        try:
-            content, mime, ext = convert_image(image)
-        except ValueError as exc:
-            print(f'  이미지 건너뜀 {Path(image).name}: {exc}')
+        if order in existing_orders:
             continue
+        content, mime, ext = convert_image(image)
         path = f'posts/{post_id}/{uuid.uuid4().hex}.{ext}'
         db.storage.from_('board-uploads').upload(path, content, {'content-type': mime, 'upsert': 'false'})
         state['objects'].append(path)

@@ -75,6 +75,35 @@ if __name__ == '__main__':
 
 
 class CafeImportApplyTests(unittest.TestCase):
+    def test_interrupted_attachment_resumes_per_image(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from testing._fake_supabase import FakeSupabase
+
+        db = FakeSupabase({'post_attachments': []})
+        uploads = []
+
+        class Bucket:
+            def upload(self, path, content, options):
+                if uploads:
+                    raise RuntimeError('interrupted')
+                uploads.append(path)
+
+        db.storage = SimpleNamespace(from_=lambda name: Bucket())
+        state = {'objects': []}
+        with tempfile.TemporaryDirectory() as tmp, patch.object(cafe, 'convert_image', return_value=(b'image', 'image/webp', 'webp')):
+            state_path = Path(tmp) / 'state.json'
+            with self.assertRaisesRegex(RuntimeError, 'interrupted'):
+                cafe.attach_images(db, None, 'post', ['img0', 'img1'], state, state_path)
+            self.assertEqual([row['display_order'] for row in db.rows['post_attachments']], [0])
+            self.assertEqual(json.loads(state_path.read_text())['objects'], uploads)
+            resumed_uploads = []
+            db.storage = SimpleNamespace(from_=lambda name: SimpleNamespace(upload=lambda path, content, options: resumed_uploads.append(path)))
+            cafe.attach_images(db, None, 'post', ['img0', 'img1'], state, state_path)
+            self.assertEqual(len(resumed_uploads), 1)
+            self.assertEqual([row['display_order'] for row in db.rows['post_attachments']], [0, 1])
+            self.assertEqual(len(json.loads(state_path.read_text())['objects']), 2)
+
     def test_apply_is_resumable_attaches_held_images_later_and_rolls_back(self):
         import io
         import os
