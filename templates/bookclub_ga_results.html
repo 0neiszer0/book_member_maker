@@ -23,7 +23,7 @@
                     <p class="groups-text-sm groups-muted groups-mb-3">세부 점수 (성비, 새만남, 발제자, 선호도): {{ result.details|join(', ') }}</p>
                     <div class="group-editor-mount" data-groups='{{ result.groups|tojson }}'></div>
                     <div class="group-editor-actions button-group-view">
-                        <button type="button" class="groups-rounded-lg save-groups-btn lms-button lms-button-primary" data-groups='{{ result.groups|tojson }}'>이 추천안으로 확정</button>
+                        <button type="button" class="groups-rounded-lg save-groups-btn lms-button lms-button-primary lms-button-cta" data-groups='{{ result.groups|tojson }}'>이 추천안으로 확정</button>
                         <button type="button" class="groups-rounded-lg capture-groups-btn lms-button" data-groups='{{ result.groups|tojson }}'>공지 이미지 만들기</button>
                     </div>
                 </article>

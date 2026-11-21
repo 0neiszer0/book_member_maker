@@ -54,10 +54,12 @@ class LandingAndSearchTests(unittest.TestCase):
         self.assertEqual(len(dom.select(".books a[href^='/archive/']")), 6)
         self.assertTrue(dom.select_one("header [data-lms-quick-search]"))
         self.assertTrue(dom.select_one("#lms-quick-search-items"))
-        self.assertTrue(dom.select_one(".actions a[href='/login']"))
+        self.assertTrue(dom.select_one("header nav a[href='/archive']"))
+        self.assertTrue(dom.select_one("header nav a[href='/login']"))
+        self.assertIsNone(dom.select_one(".actions a[href='/login']"))
         self.assertTrue(dom.select_one(".actions a[href='/archive']"))
         for forbidden in ("notion.site", "동아리 소개(외부)", "shared_topics", "/topics/", "발제문 작성",
-                          'id="lms-global"', "202600001", "지금 해야 할 일"):
+                          'id="lms-global"', "202600001", "지금 해야 할 일", "공개 캘린더", "동아리방", "이용안내"):
             self.assertNotIn(forbidden, guest)
         for title in ("필담", "미식회", "벽돌책"):
             self.assertIn(title, guest)

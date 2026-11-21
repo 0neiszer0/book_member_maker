@@ -8,6 +8,9 @@ a:hover { text-decoration: underline; }
 .brand { gap: .55rem; font-weight: 750; font-size: 1.1rem; line-height: 1.4; }
 .brand small { display: block; font-size: .72rem; font-weight: 500; }
 nav, section header a { font-size: .9rem; }
+.mast nav { margin-left: auto; }
+.mast .mast-login { display: inline-flex; align-items: center; padding: .38rem .85rem; border: 1px solid #b4a69e; border-radius: 3px; background: #fff; font-weight: 600; color: #282322; transition: background-color .15s ease, border-color .15s ease; }
+.mast .mast-login:hover { background: #f2eee6; border-color: #282322; text-decoration: none; }
 .intro { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; align-items: center; padding: clamp(2rem,7vw,6rem) 0; }
 h1, h2, h3, dd { font-family: Georgia, "Nanum Myeongjo", Batang, serif; line-height: 1.25; }
 h1 { font-size: clamp(2.55rem,7.5vw,6rem); margin: .25em 0; letter-spacing: -.065em; }
@@ -32,5 +35,5 @@ footer { border-top: 1px solid #453f39; padding: 1.5rem 0 3rem; justify-content:
 @media (max-width: 680px) {
   .mast, nav { gap: .7rem; }
   .intro, .books, .programs { grid-template-columns: 1fr; }
-  .mast nav { width: 100%; }
+  .mast nav { width: 100%; margin-left: 0; justify-content: space-between; }
 }

@@ -1,101 +1,219 @@
 {% extends 'lms_admin_base.html' %}
-{% from '_records_base.html' import records_nav %}
 {% from '_lms_icons.html' import icon %}
 {% set lms_title = '전체 회원 관리' %}
 {% set lms_page = 'records' %}
 {% block title %}전체 회원 관리{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='lms_records.css') }}">
-
 {% endblock %}
 {% block content %}
 <div class="records-page">
 {% set ns=namespace(active=0,dormant=0,inactive=0,incomplete=0) %}{% for m in members %}{% set st=m.member_status or 'active' %}{% if st=='active' %}{% set ns.active=ns.active+1 %}{% elif st=='dormant' %}{% set ns.dormant=ns.dormant+1 %}{% else %}{% set ns.inactive=ns.inactive+1 %}{% endif %}{% if not m.student_id or not m.department or not m.recruiting_class %}{% set ns.incomplete=ns.incomplete+1 %}{% endif %}{% endfor %}
 <div class="records-content">
-{{ records_nav('members') }}
-  <div class="records-flex records-flex-wrap records-items-end records-justify-between records-gap-4 records-mb-6"><div><p class="records-text-sm records-font-bold records-muted">전체 운영</p><h1 class="">전체 회원 관리</h1><p class="records-muted records-mt-2">회원 정보와 로그인 권한을 관리합니다. 학기별 활동·휴식은 학기 회원 명단에서 변경해주세요.</p></div><div class="records-flex records-flex-wrap records-gap-2"><a class="lms-button" href="{{ url_for('admin_term_members') }}">학기 회원 명단</a><a class="lms-button" href="{{ url_for('admin_privacy_cleanup') }}">개인정보 정리</a><button class="lms-button" id="merge-open">중복 회원 합치기</button><button class="lms-button lms-button-primary" id="member-add">회원 추가</button></div></div>
+  <header class="records-header">
+    <div>
+      <p class="records-eyebrow">전체 운영 · 회원·계정</p>
+      <h1>전체 회원 관리</h1>
+      <p>회원 정보와 로그인 권한을 관리합니다. 학기별 활동·휴식은 학기 회원 명단에서 변경해주세요.</p>
+    </div>
+    <div class="records-actions">
+      <a class="lms-button" href="{{ url_for('admin_term_members') }}">학기 회원 명단</a>
+      <a class="lms-button" href="{{ url_for('admin_privacy_cleanup') }}">개인정보 정리</a>
+      <button type="button" class="lms-button" id="merge-open">중복 회원 합치기</button>
+      <button type="button" class="lms-button lms-button-primary" id="member-add">회원 추가</button>
+    </div>
+  </header>
 
   {% set lo = login_overview or {} %}
-  <section class="records-panel records-p-5 records-mb-4" id="login-admin" aria-labelledby="login-admin-title">
-    <h2 id="login-admin-title">가입 코드 · 가입 승인</h2>
-    <p class="records-muted records-text-sm records-mt-1">이메일 또는 아이디로 들어온 가입 신청을 여기에서 승인할 수 있습니다. 기존 아이디 비밀번호를 잊은 회원에게는 ‘로그인 링크’를 발급해주세요.</p>
+  {% set pending_list = lo.pending_signups or [] %}
+  <section class="records-panel members-auth-panel" id="login-admin" aria-labelledby="login-admin-title">
+    <div class="members-auth-head">
+      <div>
+        <h2 id="login-admin-title">가입 코드 · 가입 승인</h2>
+        <p>이메일 또는 아이디로 들어온 가입 신청을 승인합니다. 비밀번호를 잊은 회원에게는 행의 ‘로그인 링크’를 발급해주세요.</p>
+      </div>
+      <span class="members-pill {% if pending_list %}members-pill-crimson{% else %}members-pill-slate{% endif %}">승인 대기 {{ pending_list|length }}명</span>
+    </div>
     {% if lo.error %}<p class="records-accent records-mt-2" role="alert">가입 정보를 불러오지 못했습니다.</p>{% endif %}
-    <div class="records-flex records-flex-wrap records-items-end records-gap-3 records-mt-4">
+
+    <div class="members-auth-grid">
       {% set sc = lo.signup_code %}
-      <div><p class="records-text-xs records-muted records-font-bold">가입 방식</p>
-        {% if sc and sc.open %}<p class="records-text-2xl records-font-extrabold" id="signup-code-value">가입 코드 없이 · 운영진 승인</p>
-        {% elif sc %}<p class="records-text-xs records-muted">가입 코드 필요</p><p class="records-text-2xl records-font-extrabold" id="signup-code-value">{{ sc.code }}</p>
-        {% else %}<p class="records-font-extrabold" id="signup-code-value">일반 가입 신청 닫힘</p>{% endif %}
-        {% if sc and sc.expires_at %}<p class="records-text-xs records-muted">{{ sc.expires_at|datetime('%m.%d %H:%M') }}까지</p>
-        {% elif sc and sc.term_name %}<p class="records-text-xs records-muted">{{ sc.term_name }} 종료일까지</p>{% endif %}</div>
-      <input id="signup-code-input" class="records-field" placeholder="새 코드 (비우면 자동 생성)" maxlength="40" style="max-width:240px">
-      <button class="lms-button lms-button-primary" type="button" id="signup-code-set">{{ '코드 바꾸기' if sc and not sc.open else '가입 코드 켜기' }}</button>
-      {% if not (sc and sc.open) %}<button class="lms-button" type="button" id="signup-code-open">코드 없이 받기</button>{% endif %}
-      {% if sc %}<button class="lms-button" type="button" id="signup-code-revoke">가입 막기</button>{% endif %}
+      <div class="members-auth-card">
+        <div class="members-auth-card-head">
+          <p class="members-auth-card-title">일반 가입 설정</p>
+          {% if sc and sc.open %}
+          <span class="members-pill members-pill-slate">운영진 승인 필요</span>
+          {% elif sc %}
+          <span class="members-pill members-pill-green">가입 코드 활성화</span>
+          {% else %}
+          <span class="members-pill">가입 닫힘</span>
+          {% endif %}
+        </div>
+        <div>
+          {% if sc and sc.open %}
+          <p class="members-code-display is-text" id="signup-code-value">가입 코드 없이 · 운영진 승인</p>
+          {% elif sc %}
+          <p class="members-code-display" id="signup-code-value">{{ sc.code }}</p>
+          {% else %}
+          <p class="members-code-display is-text" id="signup-code-value">일반 가입 신청 닫힘</p>
+          {% endif %}
+          {% if sc and sc.expires_at %}
+          <p class="records-text-xs records-muted records-mt-1">{{ sc.expires_at|datetime('%m.%d %H:%M') }}까지</p>
+          {% elif sc and sc.term_name %}
+          <p class="records-text-xs records-muted records-mt-1">{{ sc.term_name }} 종료일까지</p>
+          {% endif %}
+        </div>
+        <div class="members-auth-row">
+          <input id="signup-code-input" class="records-field" placeholder="새 코드 (비우면 자동 생성)" maxlength="40">
+          <button class="lms-button lms-button-primary" type="button" id="signup-code-set">{{ '코드 바꾸기' if sc and not sc.open else '가입 코드 켜기' }}</button>
+        </div>
+        {% if not (sc and sc.open) or sc %}
+        <div class="members-auth-secondary">
+          {% if not (sc and sc.open) %}<button class="lms-button" type="button" id="signup-code-open">코드 없이 받기</button>{% endif %}
+          {% if sc %}<button class="lms-button records-danger" type="button" id="signup-code-revoke">가입 막기</button>{% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="members-auth-card">
+        <div class="members-auth-card-head">
+          <p class="members-auth-card-title">OT 즉시 자동승인</p>
+          {% if lo.auto_approve_until %}
+          <span class="members-pill members-pill-green">즉시 승인 중</span>
+          {% else %}
+          <span class="members-pill">닫힘</span>
+          {% endif %}
+        </div>
+        {% if lo.auto_approve_until %}
+        <p class="members-ot-meta" id="ot-expiry" data-until="{{ lo.auto_approve_until }}">
+          <time datetime="{{ lo.auto_approve_until }}">{{ lo.auto_approve_until|datetime('%m.%d %H:%M') }}</time>까지 · <strong id="ot-remaining"></strong>
+        </p>
+        {% else %}
+        <p class="members-ot-meta records-muted">OT 자동승인 닫힘 · 오리엔테이션 등 현장 가입 시에만 열어주세요.</p>
+        {% endif %}
+        <div class="members-auth-row">
+          <label class="lms-sr" for="ot-duration">OT 자동승인 시간</label>
+          <select id="ot-duration" class="records-field" aria-label="OT 자동승인 시간">
+            <option value="1">1시간</option>
+            <option value="3">3시간</option>
+            <option value="6">6시간</option>
+          </select>
+          <button class="lms-button lms-button-primary" type="button" id="ot-open">OT 즉시 자동승인 열기</button>
+          <button class="lms-button" type="button" id="ot-close" {% if not lo.auto_approve_until %}hidden{% endif %}>자동승인 닫기</button>
+        </div>
+      </div>
     </div>
-    <div class="records-flex records-flex-wrap records-items-end records-gap-3 records-mt-4">
-      <label class="records-text-sm records-font-bold">OT 자동승인 시간
-        <select id="ot-duration" class="records-field">
-          <option value="1">1시간</option>
-          <option value="3">3시간</option>
-          <option value="6">6시간</option>
-        </select>
-      </label>
-      <button class="lms-button lms-button-primary" type="button" id="ot-open">OT 즉시 자동승인 열기</button>
-      <button class="lms-button" type="button" id="ot-close" {% if not lo.auto_approve_until %}hidden{% endif %}>자동승인 닫기</button>
-      {% if lo.auto_approve_until %}
-      <p class="records-text-sm" id="ot-expiry" data-until="{{ lo.auto_approve_until }}">
-        <time datetime="{{ lo.auto_approve_until }}">{{ lo.auto_approve_until|datetime('%m.%d %H:%M') }}</time>까지 · <span id="ot-remaining"></span>
-      </p>
-      {% else %}<p class="records-text-sm records-muted">OT 자동승인 닫힘</p>{% endif %}
+
+    <div class="members-pending-box {% if pending_list %}has-pending{% endif %}">
+      <div class="members-pending-head">
+        <h3>승인 대기 {{ pending_list|length }}명 {% if pending_list %}<span class="members-pill members-pill-crimson">확인 필요</span>{% endif %}</h3>
+        {% if not pending_list %}<span class="records-text-sm records-muted">대기 중인 가입 신청이 없습니다.</span>{% endif %}
+      </div>
+      {% if pending_list %}
+      <div class="records-overflow-x-auto records-mt-3">
+        <table class="records-w-full records-text-sm">
+          <thead>
+            <tr>
+              <th>신청 내용</th>
+              <th>학교 메일·아이디</th>
+              <th>명부</th>
+              <th>신청</th>
+              <th class="records-text-right">처리</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for c in pending_list %}
+          <tr>
+            <td>
+              <div class="records-font-bold">{{ c.signup_name }}</div>
+              <div class="records-text-xs records-muted">{{ c.signup_student_id }} · {{ c.signup_department }}</div>
+            </td>
+            <td>{{ c.login_id }}</td>
+            <td>{% if c.existing %}기존 명부 회원과 연결 ({{ c.member.name }}{% if c.member.recruiting_class %} · {{ c.member.recruiting_class }}기{% endif %}){% else %}새 회원{% endif %}</td>
+            <td class="records-text-xs records-muted">{{ (c.created_at or '')|datetime('%m.%d %H:%M') }}</td>
+            <td>
+              <div class="members-action-group">
+                <button class="lms-button lms-button-primary members-action-btn signup-decision" type="button" data-id="{{ c.member_id }}" data-action="approve-login" data-name="{{ c.signup_name }}">승인</button>
+                <button class="lms-button members-action-btn signup-decision" type="button" data-id="{{ c.member_id }}" data-action="reject-login" data-name="{{ c.signup_name }}">거절</button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
     </div>
-    <h3 class="records-mt-4 records-font-extrabold">승인 대기 {{ (lo.pending_signups or [])|length }}명</h3>
-    {% if lo.pending_signups %}
-    <div class="records-overflow-x-auto"><table class="records-w-full records-text-sm records-mt-2"><thead class="records-tint records-text-left"><tr><th class="records-p-3">신청 내용</th><th class="records-p-3">학교 메일·아이디</th><th class="records-p-3">명부</th><th class="records-p-3">신청</th><th class="records-p-3 records-text-right">처리</th></tr></thead><tbody>
-    {% for c in lo.pending_signups %}<tr class="records-border-t records-line"><td class="records-p-3"><div class="records-font-extrabold">{{ c.signup_name }}</div><div class="records-text-xs records-muted">{{ c.signup_student_id }} · {{ c.signup_department }}</div></td><td class="records-p-3">{{ c.login_id }}</td><td class="records-p-3">{% if c.existing %}기존 명부 회원과 연결 ({{ c.member.name }}{% if c.member.recruiting_class %} · {{ c.member.recruiting_class }}기{% endif %}){% else %}새 회원{% endif %}</td><td class="records-p-3 records-text-xs">{{ (c.created_at or '')|datetime('%m.%d %H:%M') }}</td><td class="records-p-3"><div class="records-flex records-justify-end records-gap-2"><button class="lms-button lms-button-primary signup-decision" type="button" data-id="{{ c.member_id }}" data-action="approve-login" data-name="{{ c.signup_name }}">승인</button><button class="lms-button signup-decision" type="button" data-id="{{ c.member_id }}" data-action="reject-login" data-name="{{ c.signup_name }}">거절</button></div></td></tr>{% endfor %}
-    </tbody></table></div>
-    {% else %}<p class="records-muted records-text-sm records-mt-1">대기 중인 가입 신청이 없습니다.</p>{% endif %}
   </section>
 
-  <div class="records-panel records-p-4 records-mb-4 records-border-l-4"><p class="records-font-extrabold">상태를 바꾸려면 회원 행의 ‘활성 · 휴면 · 비활성’ 버튼을 누르세요.</p><p class="records-muted records-text-sm records-mt-1">누르는 즉시 저장됩니다. 활성은 조 편성에 포함, 휴면은 기록을 유지한 채 명단에서 제외, 비활성으로 바꾸면 로그인·위키 이용이 차단되며 활동 기록은 유지됩니다.</p></div>
+  {% if duplicate_student_id_count %}
+  <div class="members-alert-banner" role="alert">
+    <p class="records-font-bold records-accent">중복 학번 {{ duplicate_student_id_count }}건을 확인해주세요.</p>
+    <p class="records-muted records-text-sm records-mt-1">같은 학번이어도 서로 다른 사람일 수 있으니 바로 합치지 마세요. 아래 ‘중복 학번만 보기’를 누른 뒤, 표시된 회원의 편집 창에서 원본 명단과 다른 한쪽 학번만 고쳐주세요.</p>
+  </div>
+  {% endif %}
 
-  {% if duplicate_student_id_count %}<div class="records-panel records-p-4 records-mb-4 records-border-l-4" role="alert"><p class="records-font-extrabold records-accent">중복 학번 {{ duplicate_student_id_count }}건을 확인해주세요.</p><p class="records-muted records-text-sm records-mt-1">같은 학번이어도 서로 다른 사람일 수 있으니 바로 합치지 마세요. 아래 ‘중복 학번만 보기’를 누른 뒤, 표시된 회원의 편집 창에서 원본 명단과 다른 한쪽 학번만 고쳐주세요.</p></div>{% endif %}
-
-  <p class="records-text-xs records-font-extrabold records-muted records-mb-2">상태별 회원만 보기</p>
-  <section class="records-grid records-grid-cols-2 records-lg-grid-cols-5 records-gap-3 records-mb-5">
-    <button class="records-panel records-p-4 records-text-left status-filter" data-status="active" aria-pressed="false"><p class="records-text-xs records-muted records-font-bold">활성만 보기</p><p class="records-text-2xl records-font-extrabold records-mt-1" data-count-status="active">{{ ns.active }}</p></button>
-    <button class="records-panel records-p-4 records-text-left status-filter" data-status="dormant" aria-pressed="false"><p class="records-text-xs records-muted records-font-bold">휴면만 보기</p><p class="records-text-2xl records-font-extrabold records-mt-1" data-count-status="dormant">{{ ns.dormant }}</p></button>
-    <button class="records-panel records-p-4 records-text-left status-filter" data-status="inactive" aria-pressed="false"><p class="records-text-xs records-muted records-font-bold">비활성만 보기</p><p class="records-text-2xl records-font-extrabold records-mt-1" data-count-status="inactive">{{ ns.inactive }}</p></button>
-    <button class="records-panel records-p-4 records-text-left" id="incomplete-filter"><p class="records-text-xs records-muted records-font-bold">정보 확인 필요</p><p class="records-text-2xl records-font-extrabold records-mt-1">{{ ns.incomplete }}</p></button>
-    <button class="records-panel records-p-4 records-text-left" id="duplicate-filter" {% if not duplicate_student_id_count %}disabled aria-disabled="true"{% endif %}><p class="records-text-xs records-muted records-font-bold">중복 학번만 보기</p><p class="records-text-2xl records-font-extrabold records-mt-1">{{ duplicate_student_id_count }}</p></button>
+  <section class="members-kpi-strip" aria-label="상태별 회원 필터">
+    <button type="button" class="members-kpi-btn status-filter" data-status="active" aria-pressed="false"><span class="members-kpi-label">활성</span><span class="members-kpi-count" data-count-status="active">{{ ns.active }}</span></button>
+    <button type="button" class="members-kpi-btn status-filter" data-status="dormant" aria-pressed="false"><span class="members-kpi-label">휴면</span><span class="members-kpi-count" data-count-status="dormant">{{ ns.dormant }}</span></button>
+    <button type="button" class="members-kpi-btn status-filter" data-status="inactive" aria-pressed="false"><span class="members-kpi-label">비활성</span><span class="members-kpi-count" data-count-status="inactive">{{ ns.inactive }}</span></button>
+    <button type="button" class="members-kpi-btn" id="incomplete-filter" aria-pressed="false"><span class="members-kpi-label">정보 확인 필요</span><span class="members-kpi-count">{{ ns.incomplete }}</span></button>
+    <button type="button" class="members-kpi-btn" id="duplicate-filter" aria-pressed="false" {% if not duplicate_student_id_count %}disabled aria-disabled="true"{% endif %}><span class="members-kpi-label">중복 학번만 보기</span><span class="members-kpi-count">{{ duplicate_student_id_count }}</span></button>
   </section>
 
   <section id="merge-panel" class="records-panel records-p-5 records-mb-5 records-hidden">
-    <div class="records-flex records-justify-between records-gap-3"><div><h2 class="">중복 회원 합치기</h2><p class="records-muted records-text-sm records-mt-1">삭제할 계정의 활동과 로그인 정보를 남길 계정으로 이전합니다. 이름이 잘못 갈라진 같은 사람일 때만 사용하세요. <strong>학번만 같다는 이유로 합치면 안 됩니다.</strong></p></div><button id="merge-close" aria-label="닫기">×</button></div>
+    <div class="records-flex records-justify-between records-gap-3"><div><h2>중복 회원 합치기</h2><p class="records-muted records-text-sm records-mt-1">삭제할 계정의 활동과 로그인 정보를 남길 계정으로 이전합니다. 이름이 잘못 갈라진 같은 사람일 때만 사용하세요. <strong>학번만 같다는 이유로 합치면 안 됩니다.</strong></p></div><button type="button" id="merge-close" aria-label="닫기">×</button></div>
     <div class="records-grid records-md-grid-cols-2 records-gap-3 records-mt-4"><select id="source-member" class="records-field"><option value="">삭제할 회원 선택</option>{% for m in members %}<option value="{{ m.id }}">{{ m.name }} · {{ m.student_id or '학번 없음' }}</option>{% endfor %}</select><select id="target-member" class="records-field"><option value="">남길 회원 선택</option>{% for m in members %}<option value="{{ m.id }}">{{ m.name }} · {{ m.student_id or '학번 없음' }}</option>{% endfor %}</select></div>
-    <button id="merge-run" class="records-mt-3 lms-button lms-button-primary">선택한 회원 합치기</button>
+    <button type="button" id="merge-run" class="records-mt-3 lms-button lms-button-primary">선택한 회원 합치기</button>
   </section>
 
-  <div class="records-panel records-p-4 records-mb-4 records-grid records-md-grid-cols--1fr_auto records-gap-3"><input id="member-search" class="records-field" placeholder="이름·학번·학과로 검색"><button class="lms-button" id="show-all">전체 상태 보기</button></div>
+  <p class="members-helper-note">회원 행의 <strong>활성 · 휴면 · 비활성</strong> 버튼을 누르면 즉시 저장됩니다. (활성: 조 편성 포함 · 휴면: 명단 제외 · 비활성: 로그인·위키 차단)</p>
 
-  <section class="records-panel records-overflow-hidden">
-    <p class="records-px-4 records-pt-3 records-text-xs records-muted">세미나·발제 횟수는 과거 기록에 저장된 이름 기준입니다. 동명이인은 잘못 귀속하지 않고 ‘—’로 표시합니다.</p>
-    <div class="records-overflow-x-auto"><table class="records-w-full records-text-sm records-min-w--1160px"><thead class="records-tint records-text-left"><tr><th class="records-p-3">회원</th><th class="records-p-3">학번·학과</th><th class="records-p-3 records-text-center">기수</th><th class="records-p-3 records-text-center">세미나</th><th class="records-p-3 records-text-center">발제</th><th class="records-p-3 records-text-center">벽돌책</th><th class="records-p-3 records-text-center">소모임</th><th class="records-p-3">활동 상태 <span class="records-block records-text--11px records-font-normal records-muted">버튼을 누르면 즉시 저장</span></th><th class="records-p-3 records-text-right">관리</th></tr></thead>
-    <tbody id="member-list">{% for m in members %}{% set st=m.member_status or 'active' %}<tr class="member-row records-border-t records-line records-hover {% if m.student_id_duplicate %}records-tint{% endif %}" data-status="{{ st }}" data-incomplete="{{ '1' if not m.student_id or not m.department or not m.recruiting_class else '0' }}" data-duplicate="{{ '1' if m.student_id_duplicate else '0' }}" data-search="{{ ((m.name or '') ~ ' ' ~ (m.student_id or '') ~ ' ' ~ (m.department or ''))|lower }}">
-      <td class="records-p-3"><div class="records-font-extrabold">{{ m.name }}</div><div class="records-text-xs records-muted records-mt-1">{% if m.role=='admin' %}관리자{% elif m.role=='officer' %}운영진{% else %}회원{% endif %} · {% if (lo.linked_email or {}).get(m.id) %}학교 메일 {{ lo.linked_email[m.id] }}{% elif m.login_kind=='local' %}아이디 {{ m.login_id }}{% elif m.login_kind=='kakao' %}카카오 (전환 전){% else %}로그인 없음{% endif %}</div></td>
-      <td class="records-p-3"><div>{{ m.student_id or '학번 미입력' }}{% if m.student_id_duplicate %}<span class="records-ml-2 records-inline-block records-rounded records-tint records-px-2 records-py-0-5 records-text--10px records-font-extrabold records-accent">중복 · ID {{ m.id }}</span>{% endif %}</div><div class="records-text-xs records-muted">{{ m.department or '학과 미입력' }}</div></td><td class="records-p-3 records-text-center">{{ m.recruiting_class or '-' }}</td><td class="records-p-3 records-text-center records-font-extrabold records-accent">{% if m.activity_count_ambiguous %}<span title="동명이인이라 이름 기준 집계가 모호합니다">&mdash;</span>{% else %}{{ m.seminar_count or 0 }}{% endif %}</td><td class="records-p-3 records-text-center">{% if m.activity_count_ambiguous %}<span class="topic-count" title="동명이인이라 이름 기준 집계가 모호합니다">&mdash;</span>{% else %}<span class="topic-count">{{ m.facilitator_count or 0 }}</span>{% endif %}</td><td class="records-p-3 records-text-center records-font-bold records-accent">{{ m.brick_count or 0 }}</td><td class="records-p-3 records-text-center records-font-bold records-ink">{{ m.study_count or 0 }}</td>
-      <td class="records-p-3"><div class="status-control" role="group" aria-label="{{ m.name }} 활동 상태"><button type="button" class="status-choice" data-member-id="{{ m.id }}" data-status="active" aria-pressed="{{ 'true' if st=='active' else 'false' }}">활성</button><button type="button" class="status-choice" data-member-id="{{ m.id }}" data-status="dormant" aria-pressed="{{ 'true' if st=='dormant' else 'false' }}">휴면</button><button type="button" class="status-choice" data-member-id="{{ m.id }}" data-status="inactive" aria-pressed="{{ 'true' if st=='inactive' else 'false' }}">비활성</button></div></td>
-      <td class="records-p-3"><div class="records-flex records-justify-end records-gap-2">{% if m.can_view_activity %}<a class="lms-button" href="{{ url_for('records_member_profile', member_id=m.id) }}">활동</a>{% endif %}<button class="lms-button login-link" type="button" data-id="{{ m.id }}" data-name="{{ m.name }}">로그인 링크</button>{% if can_manage_roles or m.role not in ('admin', 'officer') or m.id == session.user_id %}<button class="lms-button school-email" type="button" data-url="{{ url_for('admin_set_knu_email', member_id=m.id) }}" data-name="{{ m.name }}" data-email="{{ (lo.linked_email or {}).get(m.id, '') }}">학교 메일</button>{% endif %}<button class="edit-member lms-button lms-button-primary" data-id="{{ m.id }}" data-name="{{ m.name }}" data-email="{{ m.email or '' }}" data-department="{{ m.department or '' }}" data-gender="{{ m.gender or '' }}" data-student-id="{{ m.student_id or '' }}" data-recruiting-class="{{ m.recruiting_class or '' }}" data-role="{{ m.role or 'member' }}">편집</button></div></td>
+  <section class="records-panel members-table-card">
+    <div class="members-search-toolbar">
+      <input id="member-search" class="records-field" placeholder="이름·학번·학과로 검색" aria-label="회원 검색">
+      <button type="button" class="lms-button" id="show-all">전체 상태 보기</button>
+    </div>
+    <p class="members-table-note">세미나·발제 횟수는 과거 기록에 저장된 이름 기준입니다. 동명이인은 잘못 귀속하지 않고 ‘—’로 표시합니다.</p>
+    <div class="records-overflow-x-auto"><table class="records-w-full records-text-sm records-min-w--1160px"><thead><tr><th>회원</th><th>학번·학과</th><th class="records-text-center">기수</th><th class="records-text-center">세미나</th><th class="records-text-center">발제</th><th class="records-text-center">벽돌책</th><th class="records-text-center">소모임</th><th>활동 상태</th><th class="records-text-right">관리</th></tr></thead>
+    <tbody id="member-list">{% for m in members %}{% set st=m.member_status or 'active' %}{% set linked = (lo.linked_email or {}).get(m.id) %}<tr class="member-row records-hover {% if m.student_id_duplicate %}records-tint{% endif %}" data-status="{{ st }}" data-incomplete="{{ '1' if not m.student_id or not m.department or not m.recruiting_class else '0' }}" data-duplicate="{{ '1' if m.student_id_duplicate else '0' }}" data-search="{{ ((m.name or '') ~ ' ' ~ (m.student_id or '') ~ ' ' ~ (m.department or ''))|lower }}">
+      <td>
+        <div class="members-identity">
+          <div class="records-font-extrabold">{{ m.name }}</div>
+          <div class="members-badges">
+            {% if m.role=='admin' %}<span class="members-pill members-pill-crimson">관리자</span>
+            {% elif m.role=='officer' %}<span class="members-pill members-pill-slate">운영진</span>
+            {% else %}<span class="members-pill">회원</span>{% endif %}
+            {% if linked %}
+            <span class="members-pill members-pill-green" title="{{ linked }}">학교 메일 연결됨</span>
+            {% elif m.login_kind=='local' %}
+            <span class="members-pill members-pill-slate">아이디 {{ m.login_id }}</span>
+            {% elif m.login_kind=='kakao' %}
+            <span class="members-pill members-pill-warn">카카오 (전환 전)</span>
+            {% else %}
+            <span class="members-pill">로그인 없음</span>
+            {% endif %}
+          </div>
+          {% if linked %}<span class="members-email-sub">{{ linked }}</span>{% endif %}
+        </div>
+      </td>
+      <td><div>{{ m.student_id or '학번 미입력' }}{% if m.student_id_duplicate %}<span class="members-pill members-pill-crimson records-ml-2">중복 · ID {{ m.id }}</span>{% endif %}</div><div class="records-text-xs records-muted">{{ m.department or '학과 미입력' }}</div></td><td class="records-text-center">{{ m.recruiting_class or '-' }}</td><td class="records-text-center records-font-bold">{% if m.activity_count_ambiguous %}<span title="동명이인이라 이름 기준 집계가 모호합니다">&mdash;</span>{% else %}{{ m.seminar_count or 0 }}{% endif %}</td><td class="records-text-center">{% if m.activity_count_ambiguous %}<span class="topic-count" title="동명이인이라 이름 기준 집계가 모호합니다">&mdash;</span>{% else %}<span class="topic-count">{{ m.facilitator_count or 0 }}</span>{% endif %}</td><td class="records-text-center records-font-bold">{{ m.brick_count or 0 }}</td><td class="records-text-center records-font-bold records-ink">{{ m.study_count or 0 }}</td>
+      <td><div class="status-control" role="group" aria-label="{{ m.name }} 활동 상태"><button type="button" class="status-choice" data-member-id="{{ m.id }}" data-status="active" aria-pressed="{{ 'true' if st=='active' else 'false' }}">활성</button><button type="button" class="status-choice" data-member-id="{{ m.id }}" data-status="dormant" aria-pressed="{{ 'true' if st=='dormant' else 'false' }}">휴면</button><button type="button" class="status-choice" data-member-id="{{ m.id }}" data-status="inactive" aria-pressed="{{ 'true' if st=='inactive' else 'false' }}">비활성</button></div></td>
+      <td class="records-text-right"><div class="members-action-group"><button type="button" class="edit-member lms-button lms-button-primary members-action-btn" data-id="{{ m.id }}" data-name="{{ m.name }}" data-email="{{ m.email or '' }}" data-department="{{ m.department or '' }}" data-gender="{{ m.gender or '' }}" data-student-id="{{ m.student_id or '' }}" data-recruiting-class="{{ m.recruiting_class or '' }}" data-role="{{ m.role or 'member' }}">편집</button>{% if m.can_view_activity %}<a class="lms-button members-action-btn" href="{{ url_for('records_member_profile', member_id=m.id) }}">활동</a>{% endif %}{% if can_manage_roles or m.role not in ('admin', 'officer') or m.id == session.user_id %}<button class="lms-button members-action-btn school-email" type="button" data-url="{{ url_for('admin_set_knu_email', member_id=m.id) }}" data-name="{{ m.name }}" data-email="{{ (lo.linked_email or {}).get(m.id, '') }}">학교 메일</button>{% endif %}<button class="lms-button members-action-btn login-link" type="button" data-id="{{ m.id }}" data-name="{{ m.name }}">로그인 링크</button></div></td>
     </tr>{% else %}<tr><td colspan="9" class="records-p-8 records-text-center records-muted">등록된 회원이 없습니다.</td></tr>{% endfor %}</tbody></table></div>
   </section>
 </div>
 
-<dialog id="member-dialog" class="records-w--min-92vw-560px records-rounded-2xl records-border records-line records-p-0 records-white records-ink"><form method="dialog" id="member-form" class="records-p-6"><div class="records-flex records-justify-between records-items-center"><h2 id="dialog-title" class="">회원 추가</h2><button value="cancel" aria-label="닫기">×</button></div><div class="records-grid records-sm-grid-cols-2 records-gap-3 records-mt-5"><label class="records-text-sm records-font-bold">이름 *<input id="m-name" class="records-field records-mt-1" required></label><label class="records-text-sm records-font-bold">학번<input id="m-student-id" class="records-field records-mt-1"></label><label class="records-text-sm records-font-bold records-sm-col-span-2">학과<input id="m-department" class="records-field records-mt-1"></label><label class="records-text-sm records-font-bold records-sm-col-span-2">이메일 <span class="records-muted records-font-normal">(선택)</span><input id="m-email" type="email" class="records-field records-mt-1"></label><label class="records-text-sm records-font-bold">기수<input id="m-class" type="number" class="records-field records-mt-1"></label><label class="records-text-sm records-font-bold">성별<select id="m-gender" class="records-field records-mt-1"><option value="">선택 안 함</option><option value="M">남성</option><option value="W">여성</option></select></label>{% if can_manage_roles %}<label class="records-text-sm records-font-bold records-sm-col-span-2">권한<select id="m-role" class="records-field records-mt-1"><option value="member">회원</option><option value="officer">운영진</option><option value="admin">관리자</option></select><span class="records-block records-muted records-font-normal records-text-xs records-mt-1">저장 후 해당 회원이 다음 화면을 열 때부터 권한이 반영됩니다.</span></label>{% else %}<input id="m-role" type="hidden" value="member">{% endif %}</div><div class="records-flex records-justify-end records-gap-2 records-mt-6"><button value="cancel" class="lms-button">취소</button><button value="default" class="lms-button lms-button-primary" id="member-save">저장</button></div></form></dialog>
+<dialog id="member-dialog" class="records-w--min-92vw-560px records-rounded-2xl records-border records-line records-p-0 records-white records-ink"><form method="dialog" id="member-form" class="records-p-6"><div class="records-flex records-justify-between records-items-center"><h2 id="dialog-title">회원 추가</h2><button value="cancel" aria-label="닫기">×</button></div><div class="records-grid records-sm-grid-cols-2 records-gap-3 records-mt-5"><label class="records-text-sm records-font-bold">이름 *<input id="m-name" class="records-field records-mt-1" required></label><label class="records-text-sm records-font-bold">학번<input id="m-student-id" class="records-field records-mt-1"></label><label class="records-text-sm records-font-bold records-sm-col-span-2">학과<input id="m-department" class="records-field records-mt-1"></label><label class="records-text-sm records-font-bold records-sm-col-span-2">이메일 <span class="records-muted records-font-normal">(선택)</span><input id="m-email" type="email" class="records-field records-mt-1"></label><label class="records-text-sm records-font-bold">기수<input id="m-class" type="number" class="records-field records-mt-1"></label><label class="records-text-sm records-font-bold">성별<select id="m-gender" class="records-field records-mt-1"><option value="">선택 안 함</option><option value="M">남성</option><option value="W">여성</option></select></label>{% if can_manage_roles %}<label class="records-text-sm records-font-bold records-sm-col-span-2">권한<select id="m-role" class="records-field records-mt-1"><option value="member">회원</option><option value="officer">운영진</option><option value="admin">관리자</option></select><span class="records-block records-muted records-font-normal records-text-xs records-mt-1">저장 후 해당 회원이 다음 화면을 열 때부터 권한이 반영됩니다.</span></label>{% else %}<input id="m-role" type="hidden" value="member">{% endif %}</div><div class="records-flex records-justify-end records-gap-2 records-mt-6"><button value="cancel" class="lms-button">취소</button><button value="default" class="lms-button lms-button-primary" id="member-save">저장</button></div></form></dialog>
 
 <script>
 let statusFilter='', incompleteOnly=false, duplicateOnly=false, editingId=null;
 const rows=[...document.querySelectorAll('.member-row')], search=document.getElementById('member-search');
-function updateStatusFilters(){document.querySelectorAll('.status-filter').forEach(button=>button.setAttribute('aria-pressed',String(statusFilter===button.dataset.status&&!incompleteOnly)))}
+function updateStatusFilters(){
+  document.querySelectorAll('.status-filter').forEach(button=>button.setAttribute('aria-pressed',String(statusFilter===button.dataset.status&&!incompleteOnly&&!duplicateOnly)));
+  document.getElementById('incomplete-filter')?.setAttribute('aria-pressed',String(incompleteOnly));
+  document.getElementById('duplicate-filter')?.setAttribute('aria-pressed',String(duplicateOnly));
+}
 function updateStatusCounts(){['active','dormant','inactive'].forEach(status=>{document.querySelector(`[data-count-status="${status}"]`).textContent=rows.filter(row=>row.dataset.status===status).length})}
 function filterRows(){const q=search.value.trim().toLowerCase();rows.forEach(row=>row.hidden=!!((statusFilter&&row.dataset.status!==statusFilter)||(incompleteOnly&&row.dataset.incomplete!=='1')||(duplicateOnly&&row.dataset.duplicate!=='1')||(q&&!row.dataset.search.includes(q))));updateStatusFilters()}
 function showStatusToast(message){document.querySelector('.status-toast')?.remove();const toast=document.createElement('div');toast.className='status-toast';toast.setAttribute('role','status');toast.textContent=message;document.body.appendChild(toast);setTimeout(()=>toast.remove(),2200)}
