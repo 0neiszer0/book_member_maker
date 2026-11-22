@@ -1,4 +1,6 @@
-.knu-email-group{box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:stretch;min-width:0;width:100%;border:1px solid #8f969c;border-radius:5px;background:#fff}
-.knu-email-group:focus-within{border-color:#0374b5;outline:2px solid #0374b5;outline-offset:1px}
-.lms-page .knu-email-group input:not([type=checkbox]):not([type=radio]):not([type=hidden]){box-sizing:border-box;width:100%;min-width:0;border:0;border-radius:4px 0 0 4px;outline:none}
-.knu-email-suffix{display:flex;align-items:center;padding-inline:clamp(6px,2.5vw,12px);border-left:1px solid #c7cdd1;border-radius:0 4px 4px 0;background:#f2f4f5;color:#374854;font-size:14px;font-weight:700;white-space:nowrap}
+.knu-email-group{box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:stretch;min-width:0;width:100%;border:1px solid #cbd5e1;border-radius:8px;background:#fff;overflow:hidden}
+.knu-email-group:focus-within{border-color:#2563eb;box-shadow:0 0 0 3px #2563eb33}
+.knu-email-group input,.lms-page .knu-email-group input:not([type=checkbox]):not([type=radio]):not([type=hidden]){box-sizing:border-box;width:100%;min-width:0;border:0;border-radius:0;outline:none;box-shadow:none;background:transparent}
+.knu-email-suffix{display:flex;align-items:center;padding-inline:12px;border-left:1px solid #e2e8f0;background:#f1f5f9;color:#475569;font-size:14px;font-weight:600;white-space:nowrap}
+
+.knu-email-group[hidden]{display:none}

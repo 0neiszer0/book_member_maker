@@ -120,7 +120,7 @@ def build_handover_wiki_draft(form, responses):
         return "\n".join(lines)
 
     field_labels = (
-        ("core_tasks", "핵심 업무 3가지 (시기 포함)"),
+        ("core_tasks", "맡은 업무 서술. (최대한 자세히)"),
         ("hardships_and_tips", "처음 맡았을 때 헤맸던 점 · 미리 알았으면 좋았을 점"),
         ("assets_and_links", "차기 임원에게 넘길 파일·링크·디자인 원본·양식 위치"),
         ("common_issues", "자주 생기는 트러블과 해결 요령"),
@@ -280,7 +280,7 @@ def init_officer_handover_routes(app, get_db, login_required):
                 form,
                 token_str,
                 status_code=400,
-                error_message="한 학기 동안 맡은 핵심 업무 3가지를 입력해주세요.",
+                error_message="맡은 업무 서술을 입력해주세요.",
                 form_values=request.form,
             )
 

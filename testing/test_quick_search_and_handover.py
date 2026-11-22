@@ -277,6 +277,7 @@ class QuickSearchAndHandoverTests(unittest.TestCase):
         token, html = self._public_csrf(path)
         self.assertIn('name="knu_email" type="text" inputmode="email"', html)
         self.assertIn('class="knu-email-group"', html)
+        self.assertIn('맡은 업무 서술. (최대한 자세히)', html)
         self.assertIn("위키 초안에는 포함되지 않아요", html)
         response = self.client.post(path, data={
             "csrf_token": token, "role_name": "총무", "author_name": "김철수",
@@ -307,7 +308,7 @@ class QuickSearchAndHandoverTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 400)
                 html = response.get_data(as_text=True)
                 self.assertIn("경북대 학교 메일(@knu.ac.kr) 형식으로 입력해주세요.", html)
-                self.assertIn(f'value="{email}"', html)
+                self.assertIn(f'value="{email.replace("@knu.ac.kr", "")}"', html)
                 self.assertIn("기존 작성 내용", html)
         self.assertEqual(self.fake.rows["officer_handover_responses"], [])
 

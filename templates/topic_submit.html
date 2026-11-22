@@ -1,4 +1,5 @@
 {% extends 'lms_base.html' %}
+{% from '_knu_email_input.html' import knu_email_input %}
 {% set lms_page = 'topics' %}
 {% set lms_title = '발제문 제출' %}
 {% set lms_course = classroom_term if classroom_term else none %}
@@ -27,7 +28,7 @@
                 {{ icon('book',18) }} 처음이신가요? 작성 방법 보기
             </summary>
             <div class="topic-muted topic-stack">
-                <p><strong>1단계.</strong> 명부에 등록된 회원도 로그인 없이 이 링크로 제출할 수 있습니다. 이름·소속·학번을 입력하세요. 로그인 중이면 계정 정보를 사용합니다. 처음 제출할 때는 수정 코드가 필요 없고, 로그인 없이 작성한 기존 글을 수정할 때만 발급받은 코드를 입력합니다.</p>
+                <p><strong>1단계.</strong> 명부에 등록된 회원도 로그인 없이 이 링크로 제출할 수 있습니다. 이름·소속·학번을 입력하세요. 로그인 중이면 계정 정보를 사용합니다. 로그인 없이 제출한 글은 학교 메일(@knu.ac.kr) 6자리 인증번호로 수정할 수 있습니다.</p>
                 <p><strong>2단계.</strong> 인증되면 <strong>발제문 작성 폼</strong>이 나타납니다. 토론하고 싶은 주제·해당 페이지·참조 사항을 입력하세요. 발제문 1개는 필수이며, 원하면 1개를 더 추가할 수 있습니다.</p>
                 <p><strong>3단계.</strong> <strong>제출</strong> 버튼을 누르면 끝! 같은 정보로 다시 들어오면 작성한 내용을 수정할 수 있습니다.</p>
                 <div class="topic-example">
@@ -36,7 +37,7 @@
                     <p>• 페이지: p.123~125</p>
                     <p>• 인용: "그 순간 그는 모든 것을 내려놓기로 했다. 더 이상 잃을 것이 없었기 때문이다." — 책에서 발제와 관련된 원문을 그대로 적어주세요.</p>
                 </div>
-                <p class="topic-muted">※ 로그인 없이 제출한 글의 수정 코드는 최초 제출 후 한 번 표시되며 운영진도 코드를 다시 알려드릴 수 없습니다. 현재 브라우저에 자동 보관되지만 다른 기기에서 수정하려면 코드를 따로 복사해 두세요. 나중에 로그인하더라도 이 글은 수정 코드로 확인합니다.</p>
+                <p class="topic-muted">※ 로그인 없이 제출할 때 학교 메일을 입력하면 6자리 인증번호로 글을 수정할 수 있습니다.</p>
             </div>
         </details>
 
@@ -111,9 +112,8 @@
                 </div>
                 <div id="credentialField"{% if user_name %} class="hidden"{% endif %}>
                     <label for="knuEmail">학교 메일 주소 (@knu.ac.kr) · 선택</label>
-                    <input id="knuEmail" class="topic-input" type="email" autocomplete="email" placeholder="예: honggildong@knu.ac.kr (선택)">
+                    {{ knu_email_input(name='knu_email', id='knuEmail') }}
                     <p class="topic-muted">학교 메일을 입력해두면 나중에 6자리 인증번호로 간편하게 수정할 수 있어요.</p>
-                    <details id="legacyCodeDetails"><summary>기존 수정 코드로 불러오기</summary><input type="text" id="pinCode" class="topic-input" maxlength="80" autocomplete="off" aria-label="기존 수정 코드"></details>
                     <button type="button" id="emailStart" class="topic-secondary-btn">이미 제출한 글을 이메일로 수정하기</button>
                     <div id="emailStep" class="hidden"><button type="button" id="emailRequest" class="topic-secondary-btn">인증번호 받기</button><input id="emailCode" class="topic-input" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6자리 인증번호"><button type="button" id="emailVerify" class="topic-secondary-btn topic-primary-btn">인증하고 불러오기</button></div>
                 </div>
@@ -169,15 +169,6 @@
             </form>
 
             <div id="emailDone" class="hidden topic-panel" role="status">제출이 완료되었습니다. 나중에 수정할 때는 학교 메일 6자리 인증번호로 간편하게 불러올 수 있어요.</div>
-            <div id="credentialCard" class="hidden topic-panel" role="status">
-                <h2 class="topic-strong">수정 코드를 보관해주세요</h2>
-                <p class="topic-muted">이 코드는 다시 표시할 수 없습니다. 현재 브라우저에는 자동 저장했습니다.</p>
-                <div class="topic-row">
-                    <code id="issuedCredential" class="topic-input"></code>
-                    <button type="button" id="copyCredentialBtn" class="topic-strong">복사</button>
-                </div>
-                <p id="copyCredentialMsg" class="hidden">복사했습니다.</p>
-            </div>
         </div>
 
 </div>
@@ -332,17 +323,12 @@
             const author = document.getElementById('authorName').value.trim();
             const dept = document.getElementById('department').value.trim();
             const sid = (document.getElementById('studentId') || {}).value?.trim() || '';
-            const credentialInput = document.getElementById('pinCode');
-            let credential = credentialInput?.value?.trim() || '';
+            let credential = readStoredCredential(sid);
 
             if (IS_LOGGED_IN && (!author || !dept || !sid)) document.getElementById('verifyCard').classList.remove('hidden');
             if (!author || !dept) { showVerifyError('이름과 소속을 입력해주세요.'); return; }
             if (!sid) { showVerifyError('학번을 입력해주세요. (예: 2022XXXXXX)'); return; }
             if (!/^[0-9]{8,10}$/.test(sid)) { showVerifyError('학번은 숫자 8~10자리여야 합니다. (예: 2022123456)'); return; }
-            if (!credential) {
-                credential = readStoredCredential(sid);
-                if (credentialInput && credential) credentialInput.value = credential;
-            }
 
             // 시도: 기존 발제문 로드
             const isMember = IS_LOGGED_IN;
@@ -413,6 +399,7 @@
 
         document.getElementById('addTopicBtn').addEventListener('click', () => { addTopicField(); changed(); });
         document.getElementById('verifyBtn').addEventListener('click', tryVerify);
+        document.getElementById('knuEmail').addEventListener('input', e => { e.target.value = e.target.value.replace(/@knu\.ac\.kr$/i, ''); });
         document.getElementById('emailStart').addEventListener('click', () => document.getElementById('emailStep').classList.remove('hidden'));
         document.getElementById('emailRequest').addEventListener('click', async () => {
             try {
@@ -483,23 +470,10 @@
                 const cleared = draftStore.remove(document.getElementById('eventId').value, verified.sid);
                 saveStatus.textContent = cleared ? '제출 완료 · 운영진에게 정상적으로 전달됐어요.' : '제출 완료 · 브라우저 임시저장을 삭제하지 못했어요. 공용 기기라면 브라우저 데이터를 삭제해주세요.';
                 if (isDirty()) { draftPaused = false; persistDraft(); }
-                if (result.edit_token) {
-                    verified.credential = result.edit_token;
-                    storeCredential(verified.sid, result.edit_token);
-                    if (document.getElementById('knuEmail').value.trim()) {
-                        document.getElementById('emailDone').classList.remove('hidden');
-                    } else {
-                    document.getElementById('issuedCredential').textContent = result.edit_token;
-                    const card = document.getElementById('credentialCard');
-                    card.classList.remove('hidden');
-                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
-                } else {
-                    if (verified.credential) {
-                        storeCredential(verified.sid, verified.credential);
-                    }
-                    alert(result.message || '제출되었습니다.');
-                }
+                if (result.edit_token) { verified.credential = result.edit_token; storeCredential(verified.sid, result.edit_token); }
+                const done = document.getElementById('emailDone');
+                done.textContent = document.getElementById('knuEmail').value.trim() ? '제출이 완료되었습니다. 나중에 학교 메일 6자리 인증번호로 수정할 수 있어요.' : '제출이 완료되었습니다.';
+                done.classList.remove('hidden');
             } catch (err) {
                 persistDraft();
                 saveStatus.textContent = '제출에 실패했어요. 입력한 내용은 화면에 유지됩니다. 연결을 확인하고 다시 제출해주세요.';
@@ -512,20 +486,11 @@
         });
 
         // Enter 키로 인증
-        ['authorName', 'department', 'studentId', 'pinCode'].forEach(id => {
+        ['authorName', 'department', 'studentId'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); tryVerify(); }});
         });
 
-        document.getElementById('copyCredentialBtn').addEventListener('click', async () => {
-            const token = document.getElementById('issuedCredential').textContent;
-            try {
-                await navigator.clipboard.writeText(token);
-                document.getElementById('copyCredentialMsg').classList.remove('hidden');
-            } catch (error) {
-                window.prompt('수정 코드를 복사하세요.', token);
-            }
-        });
     </script>
 
 {% endblock %}

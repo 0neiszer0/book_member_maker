@@ -37,7 +37,7 @@
 
   <div class="eg-identity">
     <strong>로그인 없이 바로 작성할 수 있어요.</strong>
-    <span class="eg-help">실명이나 익명 모두 가능하며, 직책과 핵심 업무만 필수입니다.</span>
+    <span class="eg-help">실명이나 익명 모두 가능하며, 직책과 맡은 업무 서술만 필수입니다.</span>
   </div>
 
   {% if not is_open %}
@@ -74,8 +74,8 @@
   </div>
 
   <label>
-    <span>1. 한 학기 동안 맡은 핵심 업무 3가지 (시기 포함) <strong style="color:#d20f17">*</strong></span>
-    <textarea class="eg-textarea" name="core_tasks" rows="5" maxlength="3000" required placeholder="예:&#10;1) 3월 초: OT 장소 대관 및 신입 부원 안내&#10;2) 매주 목요일: 세미나 출석 체크 및 공지 업로드&#10;3) 6월 중순: 종강총회 결산 정리" {% if not is_open %}disabled{% endif %}>{{ form_values.get('core_tasks', '') }}</textarea>
+    <span>1. 맡은 업무 서술. (최대한 자세히) <strong style="color:#d20f17">*</strong></span>
+    <textarea class="eg-textarea" name="core_tasks" rows="5" maxlength="3000" required placeholder="맡은 업무와 진행 시기, 유용한 팁을 최대한 자세히 적어주세요." {% if not is_open %}disabled{% endif %}>{{ form_values.get('core_tasks', '') }}</textarea>
   </label>
 
   <label>
