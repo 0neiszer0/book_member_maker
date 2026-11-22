@@ -2,6 +2,7 @@
 {% set lms_page = 'applicant-results' %}
 {% set lms_isolated_auth = true %}
 {% set lms_title = campaign.title if campaign else '지원 결과 확인' %}
+{% from '_knu_email_input.html' import knu_email_input %}
 {% block title %}{{ lms_title }}{% endblock %}
 {% block head %}
 <meta name="robots" content="noindex,nofollow,noarchive">
@@ -34,16 +35,31 @@
             {% if campaign.application_intro %}<p class="lms-result-lead">{{ campaign.application_intro }}</p>{% endif %}
             {% if campaign.application_deadline %}<p>접수 마감: {{ campaign.application_deadline }}</p>{% endif %}
             <form class="application-form" method="post"><input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}"><input type="hidden" name="action" value="apply"><label class="honeypot">Website<input name="website" tabindex="-1" autocomplete="off"></label>
-              <label>이름 <small>*</small><input class="lms-result-input" name="name" maxlength="80" required value="{{ request.form.get('name', '') if request.form.get('action') == 'apply' else '' }}"></label>
-              <label>학번 <small>*</small><input class="lms-result-input" name="student_id" pattern="[0-9]{4,20}" inputmode="numeric" required value="{{ request.form.get('student_id', '') if request.form.get('action') == 'apply' else '' }}"></label>
-              <label>학과/학부 <small>*</small><input class="lms-result-input" name="department" maxlength="100" required value="{{ request.form.get('department', '') }}"></label>
-              <label>연락처(휴대폰) <small>*</small><input class="lms-result-input" name="phone" type="tel" pattern="[0-9-]{8,25}" required value="{{ request.form.get('phone', '') }}"></label>
-              <label>학교 메일 아이디 (@knu.ac.kr, 선택)<input class="lms-result-input" name="knu_email" value="{{ request.form.get('knu_email', '') }}"></label>
+              <div class="portal-inline-error" id="apply-inline-error" role="alert" hidden></div>
+              <div class="portal-fixed-fields">
+              <label>이름 <small>*</small><input class="lms-result-input" name="name" maxlength="80" required autocomplete="name" placeholder="홍길동 (실명 입력)" value="{{ request.form.get('name', '') if request.form.get('action') == 'apply' else '' }}"><span class="portal-help">결과 조회 시 사용되므로 실명을 정확히 입력해주세요.</span></label>
+              <label>학번 <small>*</small><input class="lms-result-input" name="student_id" pattern="[0-9]{4,20}" inputmode="numeric" maxlength="20" required autocomplete="off" placeholder="예: 2026123456" value="{{ request.form.get('student_id', '') if request.form.get('action') == 'apply' else '' }}"><span class="portal-help">숫자만 입력 (예: 2026123456 · 결과 조회 시 본인 확인에 사용)</span></label>
+              <label>학과/학부 <small>*</small><input class="lms-result-input" name="department" maxlength="100" required placeholder="예: 국어국문학과" value="{{ request.form.get('department', '') }}"><span class="portal-help">소속 학과 또는 학부명을 적어주세요.</span></label>
+              <label>연락처 (휴대폰) <small>*</small><input class="lms-result-input" id="applicant-phone" name="phone" type="tel" inputmode="numeric" pattern="[0-9\-]{8,25}" maxlength="13" required autocomplete="tel" placeholder="010-1234-5678" value="{{ request.form.get('phone', '') }}"><span class="portal-help">면접 일정 및 합격 안내 문자가 발송되는 번호입니다.</span></label>
+              <label>학교 메일 (선택){{ knu_email_input(name='knu_email', value=request.form.get('knu_email', ''), describedby='knu-email-help') }}<span class="portal-help" id="knu-email-help">@ 앞부분만 입력하세요. 예: hobanu → hobanu@knu.ac.kr</span></label>
+              </div>
               {% if campaign.interview_slot_options %}<fieldset><legend>면접 가능 시간</legend>{% for slot in campaign.interview_slot_options %}<label class="slot"><input type="checkbox" name="interview_availability" value="{{ slot }}" {% if slot in request.form.getlist('interview_availability') %}checked{% endif %}> {{ slot }}</label>{% endfor %}</fieldset>{% endif %}
               <label>면접 가능 시간 메모<textarea class="lms-result-input" name="interview_availability_note" maxlength="500">{{ request.form.get('interview_availability_note', '') }}</textarea></label>
-              {% for question in campaign.application_questions %}<label>{{ question.label }} {% if question.required %}<small>*</small>{% endif %}<textarea class="lms-result-input" name="answer_{{ question.id }}" maxlength="3000" placeholder="{{ question.placeholder }}" {% if question.required %}required{% endif %}>{{ request.form.get('answer_' ~ question.id, '') }}</textarea></label>{% endfor %}
+              {% for question in campaign.application_questions %}{% set qmin = question.min_length or 0 %}{% set qmax = question.max_length or 3000 %}<label class="portal-question">
+                <span class="portal-question-head"><span class="portal-question-label">{{ question.label }}</span> {% if question.required %}<span class="portal-badge is-required">필수</span>{% else %}<span class="portal-badge">선택</span>{% endif %}{% if qmin > 0 %}<span class="portal-badge is-limit">최소 {{ qmin }}자 이상 · 최대 {{ '{:,}'.format(qmax) }}자</span>{% else %}<span class="portal-badge is-limit">최대 {{ '{:,}'.format(qmax) }}자</span>{% endif %}</span>
+                <textarea class="lms-result-input" name="answer_{{ question.id }}" maxlength="{{ qmax }}" {% if qmin > 0 and question.required %}minlength="{{ qmin }}"{% endif %} data-min-length="{{ qmin }}" data-max-length="{{ qmax }}" data-label="{{ question.label }}" placeholder="{{ question.placeholder }}" {% if question.required %}required{% endif %}>{{ request.form.get('answer_' ~ question.id, '') }}</textarea>
+                <span class="portal-char-counter" data-counter aria-live="polite">현재 0자 / {% if qmin > 0 %}최소 {{ qmin }}자{% else %}최대 {{ '{:,}'.format(qmax) }}자{% endif %}</span>
+              </label>{% endfor %}
               <button class="lms-button lms-button-primary" type="submit">지원서 제출</button>
             </form>
+            <dialog id="apply-confirm-dialog" class="portal-confirm-dialog" aria-labelledby="apply-confirm-title">
+              <h2 id="apply-confirm-title">최종 지원 전 확인해주세요</h2>
+              <div class="portal-confirm-phone"><span class="portal-confirm-phone-label">입력하신 전화번호:</span> <strong id="apply-confirm-phone">010-XXXX-XXXX</strong></div>
+              <p>이 번호로 면접 일정 안내 문자가 발송됩니다. 전화번호가 정확하신가요?</p>
+              <p class="portal-confirm-summary" id="apply-confirm-summary"></p>
+              <p class="portal-confirm-question"><strong>이대로 최종 지원을 완료하시겠습니까?</strong></p>
+              <div class="portal-confirm-actions"><button type="button" class="lms-button" id="apply-confirm-edit">다시 수정하기</button><button type="button" class="lms-button lms-button-primary" id="apply-confirm-ok">네, 최종 지원 완료하기</button></div>
+            </dialog>
           </div>
         {% elif portal_state == 'pending' %}<p class="lms-result-lead">{{ campaign.intro_text }}</p><div class="lms-result-notice">{{ campaign.pending_message }}</div>
         {% else %}<p class="lms-result-lead">{{ campaign.intro_text }}</p>{% endif %}
@@ -94,6 +110,61 @@
 const applyTab = document.getElementById('apply-tab'), lookupTab = document.getElementById('lookup-tab');
 function showTab(apply) { document.getElementById('application-panel').hidden = !apply; document.getElementById('lookup-panel').hidden = apply; applyTab.setAttribute('aria-selected', String(apply)); lookupTab.setAttribute('aria-selected', String(!apply)); }
 applyTab?.addEventListener('click', () => showTab(true)); lookupTab?.addEventListener('click', () => showTab(false));
+(function () {
+  const form = document.querySelector('.application-form');
+  if (!form) return;
+  const phone = document.getElementById('applicant-phone');
+  const errorBox = document.getElementById('apply-inline-error');
+  const dialog = document.getElementById('apply-confirm-dialog');
+  const fmt = n => Number(n).toLocaleString('ko-KR');
+  function formatPhone(v) {
+    const d = v.replace(/\D/g, '').slice(0, 11);
+    if (d.length < 4) return d;
+    if (d.length < 8) return d.slice(0, 3) + '-' + d.slice(3);
+    return d.slice(0, 3) + '-' + d.slice(3, 7) + '-' + d.slice(7);
+  }
+  phone?.addEventListener('input', () => { phone.value = formatPhone(phone.value); });
+  const email = form.querySelector('[data-knu-email-input]');
+  email?.addEventListener('input', () => { email.value = email.value.trim().replace(/@knu\.ac\.kr.*$/i, '').replace(/@.*$/, ''); });
+  function updateCounter(area) {
+    const min = +area.dataset.minLength || 0, max = +area.dataset.maxLength || 3000, n = area.value.trim().length;
+    const out = area.parentElement.querySelector('[data-counter]');
+    out.classList.remove('is-ok', 'is-warn');
+    if (min > 0) {
+      if (n >= min) { out.textContent = '\u2713 ' + fmt(n) + '자 (최소 글자수 충족)'; out.classList.add('is-ok'); }
+      else { out.textContent = '현재 ' + fmt(n) + '자 / 최소 ' + fmt(min) + '자'; if (n > 0) out.classList.add('is-warn'); }
+    } else { out.textContent = '현재 ' + fmt(n) + '자 / 최대 ' + fmt(max) + '자'; }
+  }
+  form.querySelectorAll('textarea[data-min-length]').forEach(area => { updateCounter(area); area.addEventListener('input', () => { area.setCustomValidity(''); updateCounter(area); }); });
+  function fail(message, field) { errorBox.textContent = message; errorBox.hidden = false; errorBox.scrollIntoView({ block: 'center' }); field?.focus(); }
+  function val(name) { return (form.elements[name]?.value || '').trim(); }
+  let confirmed = false;
+  form.addEventListener('submit', event => {
+    if (confirmed) return;
+    event.preventDefault();
+    errorBox.hidden = true;
+    for (const name of ['name', 'student_id', 'department']) {
+      if (!val(name)) return fail('이름, 학번, 학과/학부를 모두 입력해주세요.', form.elements[name]);
+    }
+    if (!/^[0-9]{4,20}$/.test(val('student_id'))) return fail('학번은 숫자만 입력해주세요.', form.elements.student_id);
+    phone.value = formatPhone(phone.value);
+    if (!/^010-[0-9]{4}-[0-9]{4}$/.test(phone.value)) return fail('휴대폰 번호를 010-1234-5678 형식으로 입력해주세요.', phone);
+    for (const area of form.querySelectorAll('textarea[data-min-length]')) {
+      const min = +area.dataset.minLength || 0, n = area.value.trim().length;
+      if (area.required && n === 0) return fail('\'' + area.dataset.label + '\' 항목을 입력해주세요.', area);
+      if (n > 0 && min > 0 && n < min) return fail('\'' + area.dataset.label + '\' 항목은 최소 ' + fmt(min) + '자 이상 작성해주세요. (현재 ' + fmt(n) + '자)', area);
+    }
+    document.getElementById('apply-confirm-phone').textContent = phone.value;
+    document.getElementById('apply-confirm-summary').textContent = [val('name'), val('student_id'), val('department')].join(' · ');
+    const submitNow = () => { confirmed = true; form.submit(); };
+    if (dialog && typeof dialog.showModal === 'function') { dialog.showModal(); }
+    else if (window.confirm('입력하신 전화번호: ' + phone.value + '\n이 번호로 면접 일정 안내 문자가 발송됩니다. 전화번호가 정확하신가요?\n\n이대로 최종 지원을 완료하시겠습니까?')) { submitNow(); }
+    else { phone.focus(); }
+    form._submitNow = submitNow;
+  });
+  document.getElementById('apply-confirm-ok')?.addEventListener('click', () => { dialog.close(); form._submitNow && form._submitNow(); });
+  document.getElementById('apply-confirm-edit')?.addEventListener('click', () => { dialog.close(); phone.focus(); });
+})();
 document.getElementById('dues-copy')?.addEventListener('click', async () => {
   const account = document.getElementById('dues-account');
   const status = document.getElementById('dues-copy-status');

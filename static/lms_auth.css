@@ -65,3 +65,27 @@ body:has(.lms-result-portal) { background: #f8fafc; }
 .auth-secondary-cta{display:grid;gap:8px;padding:14px;border:1px solid #c7cdd1;border-radius:3px;background:#fafafa}
 .auth-secondary-cta .auth-help{margin:0;font-weight:700;color:#2b3338}
 .auth-pin-links>.auth-help{margin:0;font-size:14px;line-height:21px}
+
+/* Wave 6A: guided applicant form, live counters and final confirmation */
+.lms-result-portal .portal-fixed-fields{border:1px solid #e2e8f0;border-radius:14px;background:#f8fafc;padding:4px 16px 8px;margin:16px 0}
+.lms-result-portal .portal-help{display:block;margin-top:4px;font-size:12px;line-height:18px;color:#56616a}
+.lms-result-portal .application-form .lms-result-input{border:1px solid #cbd5e1;border-radius:10px;padding:10px 12px}
+.lms-result-portal .application-form .knu-email-group{border-radius:10px;margin-top:6px}
+.lms-result-portal .portal-question{padding:14px;border:1px solid #e2e8f0;border-radius:14px;background:#fff}
+.lms-result-portal .portal-question-head{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;font-weight:700}
+.lms-result-portal .portal-badge{display:inline-block;border:1px solid #cbd5e1;border-radius:999px;padding:1px 9px;font-size:11px;line-height:18px;font-weight:700;color:#475569;background:#f1f5f9}
+.lms-result-portal .portal-badge.is-required{color:#a6192e;border-color:#f0b4bd;background:#fdf0f2}
+.lms-result-portal .portal-badge.is-limit{color:#1d4ed8;border-color:#bfdbfe;background:#eff6ff}
+.lms-result-portal .portal-char-counter{display:block;margin-top:6px;text-align:right;font-size:12px;line-height:18px;color:#56616a}
+.lms-result-portal .portal-char-counter.is-ok{color:#18542c;font-weight:700}
+.lms-result-portal .portal-char-counter.is-warn{color:#b45309;font-weight:700}
+.lms-result-portal .portal-inline-error{margin:12px 0;padding:12px 14px;border:1px solid #a82623;border-radius:10px;background:#fef2f2;color:#a82623;font-size:14px;font-weight:700}
+.portal-confirm-dialog{max-width:440px;width:calc(100% - 32px);border:0;border-radius:18px;padding:24px;box-shadow:0 24px 60px rgba(15,23,42,.35)}
+.portal-confirm-dialog::backdrop{background:rgba(15,23,42,.55)}
+.portal-confirm-dialog h2{font-size:20px;font-weight:800;margin:0 0 12px}
+.portal-confirm-dialog p{font-size:14px;line-height:21px;margin:8px 0}
+.portal-confirm-phone{margin:12px 0;padding:14px 16px;border:2px solid #a6192e;border-radius:14px;background:#fdf0f2;color:#a6192e}
+.portal-confirm-phone-label{display:block;font-size:13px;font-weight:700}
+.portal-confirm-phone strong{display:block;font-size:26px;line-height:34px;letter-spacing:.02em}
+.portal-confirm-summary{color:#56616a}
+.portal-confirm-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:16px}
