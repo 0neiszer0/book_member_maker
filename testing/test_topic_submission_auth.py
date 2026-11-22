@@ -110,7 +110,7 @@ class TopicSubmissionAuthorizationTests(unittest.TestCase):
         })
 
         self.assertEqual(response.status_code, 403)
-        self.assertIn("수정 정보", response.get_json()["error"])
+        self.assertIn("수정 권한", response.get_json()["error"])
 
     def test_guest_record_requires_valid_strong_edit_token(self):
         token = "guest-edit-token-with-enough-entropy"
@@ -192,7 +192,7 @@ class TopicSubmissionAuthorizationTests(unittest.TestCase):
         })
 
         self.assertEqual(response.status_code, 403)
-        self.assertIn("수정 정보", response.get_json()["error"])
+        self.assertIn("수정 권한", response.get_json()["error"])
 
     def test_public_page_ignores_stale_name_only_session(self):
         client = self.app_module.app.test_client()
@@ -204,7 +204,8 @@ class TopicSubmissionAuthorizationTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("const IS_LOGGED_IN = false", html)
-        self.assertIn('id="pinCode"', html)
+        self.assertNotIn('id="pinCode"', html)
+        self.assertIn('class="knu-email-group"', html)
         self.assertEqual(response.headers["Cache-Control"], "no-store, max-age=0")
         self.assertEqual(response.headers["Referrer-Policy"], "no-referrer")
 
@@ -278,7 +279,7 @@ class TopicSubmissionAuthorizationTests(unittest.TestCase):
         })
 
         self.assertEqual(response.status_code, 403)
-        self.assertIn("수정 정보", response.get_json()["error"])
+        self.assertIn("수정 권한", response.get_json()["error"])
 
     def test_authenticated_submit_cannot_replace_author_identity(self):
         self.fake.rows["topic_submissions"] = []
@@ -428,7 +429,8 @@ class TopicSubmissionAuthorizationTests(unittest.TestCase):
             flask_session["user_id"] = 7
         html = client.get("/shared_topics?token=public-token").get_data(as_text=True)
         self.assertIn('id="credentialField" class="hidden"', html)
-        self.assertIn('type="text" id="pinCode"', html)
+        self.assertNotIn('id="pinCode"', html)
+        self.assertNotIn('id="credentialCard"', html)
         self.assertIn("data.code === 'edit_credential_required'", html)
 
     def test_legacy_pin_is_upgraded_after_successful_edit(self):

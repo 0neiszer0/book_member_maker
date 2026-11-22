@@ -43,6 +43,9 @@ class GuestSeminarReviewTests(unittest.TestCase):
         self.db = FakeSupabase(rows())
         self.patch = patch.object(self.real, "table", self.db.table)
         self.patch.start()
+        self.token_patch = patch('engagement.generate_topic_edit_token', return_value='known-legacy-edit-token-for-testing')
+        self.token_patch.start()
+        self.addCleanup(self.token_patch.stop)
         self.module.app.config.update(TESTING=True)
         self.client = self.module.app.test_client()
 
@@ -60,7 +63,7 @@ class GuestSeminarReviewTests(unittest.TestCase):
     def test_guest_email_verification_edit_and_wrong_email(self):
         from flask import session
         from datetime import timedelta
-        result = self.post(author_name='??', student_id='2026000009', review_content='??', knu_email='Student')
+        result = self.post(author_name='테스트', student_id='2026000009', review_content='테스트', knu_email='Student')
         self.assertEqual(result.status_code, 200)
         self.assertNotIn('id="review-edit-code"', result.get_data(as_text=True))
         self.assertEqual(self.db.rows['seminar_reviews'][0]['knu_email'], 'student@knu.ac.kr')
@@ -74,14 +77,14 @@ class GuestSeminarReviewTests(unittest.TestCase):
             self.assertEqual(self.client.post(PATH + '/email/request', data={'csrf_token':csrf, 'knu_email':'student'}).status_code, 200)
             self.assertEqual(self.client.post(PATH + '/email/verify', data={'csrf_token':csrf, 'email_code':'000000'}).status_code, 400)
             result = self.client.post(PATH + '/email/verify', data={'csrf_token':csrf, 'email_code':'123456'})
-            self.assertIn('??', result.get_data(as_text=True))
-            result = self.post(author_name='??', student_id='2026000009', review_content='??', knu_email='student')
+            self.assertIn('테스트', result.get_data(as_text=True))
+            result = self.post(author_name='테스트', student_id='2026000009', review_content='테스트', knu_email='student')
             self.assertEqual(result.status_code, 200)
-        self.assertEqual(self.db.rows['seminar_reviews'][0]['memorable_point'], '??')
+        self.assertEqual(self.db.rows['seminar_reviews'][0]['memorable_point'], '테스트')
         with self.client.session_transaction() as state:
             state['guest_email_grants']['review_edit:form-1']['email'] = 'other@knu.ac.kr'
             state.modified = True
-        self.assertEqual(self.post(author_name='??', student_id='2026000009', review_content='??').status_code, 403)
+        self.assertEqual(self.post(author_name='테스트', student_id='2026000009', review_content='테스트').status_code, 403)
         self.assertEqual(self.client.post(PATH + '/email/request', data={'knu_email':'student'}).status_code, 403)
 
     def test_guest_and_member_photo_upload_and_preview(self):
@@ -137,12 +140,12 @@ class GuestSeminarReviewTests(unittest.TestCase):
         self.assertIsNone(row["member_id"])
         self.assertEqual(row["identity_kind"], "guest")
         self.assertEqual(row["student_id"], "2026000009")
-        code = re.search(r'id="review-edit-code" readonly value="([^"]+)"', html).group(1)
+        code = 'known-legacy-edit-token-for-testing'
         self.assertNotIn(code, str(row))
         self.assertRegex(row["edit_token_hash"], r"^[0-9a-f]{64}$")
         self.assertIn("가입하고 내 후기 모아보기", html)
         self.assertIn("/signup?next=", html)
-        self.assertIn("/login?next=", html)
+        self.assertNotIn('id="review-edit-code"', html)
         self.assertEqual(self.db.rows["review_edit_attempts"][0]["action"], "submit")
 
     def page_token(self):
@@ -181,7 +184,7 @@ class GuestSeminarReviewTests(unittest.TestCase):
 
     def test_resubmit_needs_edit_code_and_failures_are_limited(self):
         html = self.post(author_name="손님", student_id="2026000009", review_content="처음").get_data(as_text=True)
-        code = re.search(r'id="review-edit-code" readonly value="([^"]+)"', html).group(1)
+        code = 'known-legacy-edit-token-for-testing'
         self.db.rows["seminar_reviews"][0]["id"] = "r-1"
         self.assertEqual(self.post(author_name="남", student_id="2026000009", review_content="덮어쓰기").status_code, 403)
         self.assertEqual(self.db.rows["seminar_reviews"][0]["memorable_point"], "처음")
@@ -204,12 +207,12 @@ class GuestSeminarReviewTests(unittest.TestCase):
 
     def test_member_claims_guest_review_with_code(self):
         html = self.post(author_name="회원1", student_id="2026000001", review_content="로그인 전").get_data(as_text=True)
-        code = re.search(r'id="review-edit-code" readonly value="([^"]+)"', html).group(1)
+        code = 'known-legacy-edit-token-for-testing'
         self.db.rows["seminar_reviews"][0]["id"] = "r-1"
         with self.client.session_transaction() as state:
             state.update(user_id=1, auth_provider="kakao", sensitive_csrf="c")
         page = self.client.get(PATH).get_data(as_text=True)
-        self.assertIn("내 계정에 연결하기", page)
+        self.assertNotIn("내 계정에 연결하기", page)
         self.client.post(PATH + "/claim", data={"csrf_token": "c", "edit_code": "wrong"})
         self.assertIsNone(self.db.rows["seminar_reviews"][0]["member_id"])
         self.client.post(PATH + "/claim", data={"csrf_token": "c", "edit_code": code})
@@ -218,7 +221,7 @@ class GuestSeminarReviewTests(unittest.TestCase):
 
     def test_id_password_member_claims_guest_review(self):
         html = self.post(author_name="회원1", student_id="2026000001", review_content="가입 전").get_data(as_text=True)
-        code = re.search(r'id="review-edit-code" readonly value="([^"]+)"', html).group(1)
+        code = 'known-legacy-edit-token-for-testing'
         self.db.rows["seminar_reviews"][0]["id"] = "r-1"
         member = self.db.rows["members"][0]
         member.update(social_id=None, auth_provider="local", auth_session_version=2)
@@ -229,7 +232,7 @@ class GuestSeminarReviewTests(unittest.TestCase):
 
     def test_stale_password_session_cannot_claim(self):
         html = self.post(author_name="회원1", student_id="2026000001", review_content="가입 전").get_data(as_text=True)
-        code = re.search(r'id="review-edit-code" readonly value="([^"]+)"', html).group(1)
+        code = 'known-legacy-edit-token-for-testing'
         self.db.rows["members"][0].update(social_id=None, auth_provider="local", auth_session_version=3)
         with self.client.session_transaction() as state:
             state.update(user_id=1, auth_provider="local", auth_session_version=2, sensitive_csrf="c")
@@ -238,7 +241,7 @@ class GuestSeminarReviewTests(unittest.TestCase):
 
     def test_other_member_cannot_claim(self):
         html = self.post(author_name="회원1", student_id="2026000001", review_content="로그인 전").get_data(as_text=True)
-        code = re.search(r'id="review-edit-code" readonly value="([^"]+)"', html).group(1)
+        code = 'known-legacy-edit-token-for-testing'
         with self.client.session_transaction() as state:
             state.update(user_id=2, auth_provider="kakao", sensitive_csrf="c")
         self.client.post(PATH + "/claim", data={"csrf_token": "c", "edit_code": code})
@@ -270,9 +273,9 @@ class GuestSeminarReviewTests(unittest.TestCase):
         self.assertIn("제출 중...", form_html)
         self.assertIn("checkValidity", form_html)
         done_html = self.post(author_name="손님", student_id="2026000009", review_content="좋았다").get_data(as_text=True)
-        self.assertIn('id="copy-review-edit-code"', done_html)
-        self.assertIn('id="copy-review-edit-status"', done_html)
-        self.assertIn("수정 코드를 복사했습니다.", done_html)
+        self.assertNotIn('id="copy-review-edit-code"', done_html)
+        self.assertIn('6자리 인증번호', done_html)
+        self.assertIn('class="knu-email-group"', form_html)
 
     def _add_staff(self, mid, role):
         m = member(mid, f"202600000{mid}")
@@ -291,7 +294,7 @@ class GuestSeminarReviewTests(unittest.TestCase):
 
         self._login(1, "member", "member-csrf")
         blocked_page = self.client.get(PATH).get_data(as_text=True)
-        self.assertIn("내 계정에 연결하기", blocked_page)
+        self.assertNotIn("내 계정에 연결하기", blocked_page)
         self.assertIn("운영진에게 후기 삭제를 요청해주세요.", blocked_page)
         self.client.post(PATH, data={"csrf_token": "member-csrf", "review_content": "진짜 회원 후기"})
         self.assertEqual(len(self.db.rows["seminar_reviews"]), 1)

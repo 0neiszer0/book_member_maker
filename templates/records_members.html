@@ -263,7 +263,7 @@ if (otExpiry) {
 document.querySelectorAll('.signup-decision').forEach(b=>b.onclick=async()=>{const approve=b.dataset.action==='approve-login';if(!confirm(`${b.dataset.name}님의 가입 신청을 ${approve?'승인':'거절'}할까요?`))return;if(await postJson(`/api/admin/members/${b.dataset.id}/${b.dataset.action}`))location.reload()});
 document.querySelectorAll('.school-email').forEach(button => {
   button.onclick = async () => {
-    const email = prompt(button.dataset.name + '님의 학교 메일을 입력해주세요. @knu.ac.kr 없이 아이디만 입력해도 돼요. 연결을 해제하려면 비워두세요.', button.dataset.email);
+    const email = prompt(button.dataset.name + '님의 학교 메일을 입력해주세요. @knu.ac.kr 없이 아이디만 입력해도 돼요. 연결을 해제하려면 비워두세요.', button.dataset.email.replace(/@knu\.ac\.kr$/i, ''));
     if (email === null) return;
     button.disabled = true;
     try {

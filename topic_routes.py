@@ -479,7 +479,7 @@ def init_topic_routes(app, get_supabase, login_required, get_datetime, public_ba
         _record_topic_edit_attempt(event_id, credential_ok)
         if not credential_ok:
             return jsonify({
-                "error": "수정 정보를 확인할 수 없습니다. 로그인 없이 제출한 글은 발급받은 수정 코드를 입력해주세요. 계정으로 제출한 글은 해당 계정으로 로그인해주세요.",
+                "error": "수정 권한을 확인할 수 없습니다. 로그인하거나 제출 시 입력한 학교 메일(@knu.ac.kr)로 6자리 인증 후 수정해주세요.",
                 "code": "edit_credential_required",
             }), 403
         return None

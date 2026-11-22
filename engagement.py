@@ -336,7 +336,7 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
             ok = email_ok or review_edit_token_matches(existing.get("edit_token_hash"), code, app.secret_key)
             record_review_attempt(form["id"], "edit", ok)
             if not ok:
-                flash("이 학번으로 이미 낸 후기가 있습니다. 수정하려면 제출할 때 받은 수정 코드를 입력해주세요.", "danger")
+                flash("이 학번으로 이미 낸 후기가 있습니다. 로그인하거나 제출 시 입력한 학교 메일로 6자리 인증 후 수정해주세요.", "danger")
                 return render_review(form, seminar, None, None, status=403, need_edit_code=True, **values)
             image_path, image_type = upload_review_image()
             if image_path:
@@ -789,7 +789,7 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
                 if not member:
                     return submit_guest_review(form, seminar)
                 if unclaimed:
-                    raise ValueError("로그인 전에 이 학번으로 쓴 후기가 있습니다. 아래에서 수정 코드로 내 계정에 연결한 뒤 수정해주세요.")
+                    raise ValueError("로그인 전에 이 학번으로 쓴 후기가 있습니다. 제출 시 입력한 학교 메일로 6자리 인증 후 수정해주세요.")
                 existing = member_review(member)
                 payload = review_content_payload()
                 image_path, image_type = upload_review_image()
