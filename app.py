@@ -4858,13 +4858,13 @@ def seminar_session_capacity(session_id):
 @app.route('/api/admin/seminar_sessions/<session_id>/absences', methods=['POST'])
 @login_required(role="admin")
 def seminar_session_add_absence(session_id):
-    return jsonify({'status': 'error', 'message': '???? ?? ?? ?? ??? ??????.'}), 410
+    return jsonify({'status': 'error', 'message': '예정 결석 사전 등록 기능은 종료되었습니다.'}), 410
 
 
 @app.route('/api/admin/seminar_sessions/<session_id>/absences/<int:member_id>', methods=['DELETE'])
 @login_required(role="admin")
 def seminar_session_cancel_absence(session_id, member_id):
-    return jsonify({'status': 'error', 'message': '?? ???? ??? ??? ?? ?????.'}), 410
+    return jsonify({'status': 'error', 'message': '예정 결석 사전 취소 기능은 종료되었습니다.'}), 410
 
 
 @app.route('/api/admin/seminar_sessions/<session_id>/no_shows', methods=['POST'])

@@ -110,12 +110,12 @@
                     <p class="topic-muted">입학년도 + 학번 (예: 2022123456)</p>
                 </div>
                 <div id="credentialField"{% if user_name %} class="hidden"{% endif %}>
-                    <label for="knuEmail">?? ?? ??? (@knu.ac.kr)</label>
-                    <input id="knuEmail" class="topic-input" autocomplete="email">
-                    <p class="topic-muted">??? ???? ??? ??? ? ?? ?? ??? ????.</p>
-                    <details id="legacyCodeDetails"><summary>?? ?? ??? ????</summary><input type="text" id="pinCode" class="topic-input" maxlength="80" autocomplete="off"></details>
-                    <button type="button" id="emailStart">?? ??? ?? ??? ????</button>
-                    <div id="emailStep" class="hidden"><button type="button" id="emailRequest">???? ??</button><input id="emailCode" class="topic-input" inputmode="numeric" maxlength="6" placeholder="6?? ????"><button type="button" id="emailVerify">???? ????</button></div>
+                    <label for="knuEmail">학교 메일 주소 (@knu.ac.kr) · 선택</label>
+                    <input id="knuEmail" class="topic-input" type="email" autocomplete="email" placeholder="예: honggildong@knu.ac.kr (선택)">
+                    <p class="topic-muted">학교 메일을 입력해두면 나중에 6자리 인증번호로 간편하게 수정할 수 있어요.</p>
+                    <details id="legacyCodeDetails"><summary>기존 수정 코드로 불러오기</summary><input type="text" id="pinCode" class="topic-input" maxlength="80" autocomplete="off" aria-label="기존 수정 코드"></details>
+                    <button type="button" id="emailStart" class="topic-secondary-btn">이미 제출한 글을 이메일로 수정하기</button>
+                    <div id="emailStep" class="hidden"><button type="button" id="emailRequest" class="topic-secondary-btn">인증번호 받기</button><input id="emailCode" class="topic-input" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6자리 인증번호"><button type="button" id="emailVerify" class="topic-secondary-btn topic-primary-btn">인증하고 불러오기</button></div>
                 </div>
             </div>
 
@@ -168,7 +168,7 @@
                 </button>
             </form>
 
-            <div id="emailDone" class="hidden topic-panel" role="status">???? ???????. ??? ??? ?? ?? ?? 6?? ????? ?? ??? ? ???.</div>
+            <div id="emailDone" class="hidden topic-panel" role="status">제출이 완료되었습니다. 나중에 수정할 때는 학교 메일 6자리 인증번호로 간편하게 불러올 수 있어요.</div>
             <div id="credentialCard" class="hidden topic-panel" role="status">
                 <h2 class="topic-strong">수정 코드를 보관해주세요</h2>
                 <p class="topic-muted">이 코드는 다시 표시할 수 없습니다. 현재 브라우저에는 자동 저장했습니다.</p>
@@ -300,9 +300,10 @@
             updateAddBtn();
         }
 
-        function showVerifyError(msg) {
+        function showVerifyError(msg, isInfo) {
             const el = document.getElementById('verifyMsg');
             el.textContent = msg; el.classList.remove('hidden');
+            el.classList.toggle('topic-error', !isInfo); el.classList.toggle('topic-info', !!isInfo);
         }
 
         function credentialStorageKey(sid) {
@@ -416,14 +417,14 @@
         document.getElementById('emailRequest').addEventListener('click', async () => {
             try {
                 const res = await fetch('/api/topics/edit-email/request', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({event_id:document.getElementById('eventId').value, email:document.getElementById('knuEmail').value})});
-                const data = await res.json(); if (!res.ok) throw new Error(data.error); showVerifyError('????? ??? ?????.');
+                const data = await res.json(); if (!res.ok) throw new Error(data.error); showVerifyError('인증번호를 메일로 보냈습니다. 받은 6자리 숫자를 입력해주세요.', true);
             } catch (e) { showVerifyError(e.message); }
         });
         document.getElementById('emailVerify').addEventListener('click', async () => {
             try {
                 const res = await fetch('/api/topics/edit-email/verify', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({event_id:document.getElementById('eventId').value, code:document.getElementById('emailCode').value})});
                 const data = await res.json(); if (!res.ok) throw new Error(data.error);
-                if (!data.found) { showVerifyError('? ??? ??? ???? ????.'); return; }
+                if (!data.found) { showVerifyError('이 메일로 제출한 발제문을 찾을 수 없어요.'); return; }
                 const row = data.submission;
                 document.getElementById('authorName').value = row.author_name || '';
                 document.getElementById('department').value = row.department || '';

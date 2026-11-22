@@ -19,7 +19,7 @@
 {% set login_url = review_signup_url(request.path) %}
 <section class="eg-panel eg-form" aria-live="polite">
   <div class="eg-flash eg-flash-success">후기를 {{ '수정했습니다' if guest_updated else '제출했습니다' }}. 고맙습니다!</div>
-  {% if email_done %}<p class="eg-help">??? ??? ?? ?? ?? 6?? ????? ??? ? ???.</p>{% endif %}
+  {% if email_done %}<p class="eg-help">나중에 후기를 수정할 때는 학교 메일 6자리 인증번호로 간편하게 불러올 수 있어요.</p>{% endif %}
   {% if edit_token %}<label for="review-edit-code">수정 코드</label>
   <div class="eg-actions"><input class="eg-input" id="review-edit-code" readonly value="{{ edit_token }}" onfocus="this.select()" style="flex:1"><button type="button" id="copy-review-edit-code" class="lms-button">코드 복사</button><span id="copy-review-edit-status" class="eg-help" aria-live="polite"></span></div>
   <p class="eg-help">이 코드는 지금 한 번만 보입니다. 후기를 고치거나 내 계정에 연결할 때 필요하니 복사해 두세요. 운영진도 다시 알려 드릴 수 없습니다.</p>{% endif %}
@@ -34,6 +34,7 @@
   {% elif form_kind == 'seminar_review' %}<div class="eg-identity"><strong>로그인 없이 바로 쓸 수 있어요.</strong><span class="eg-help">이미 가입했다면 <a href="{{ review_login_url(request.path) }}">로그인 후 작성</a>하면 내 활동에 바로 모입니다.</span></div>
     <label>이름<input class="eg-input" name="author_name" maxlength="40" autocomplete="name" required value="{{ guest_name or request.form.get('author_name', '') }}" {% if not is_open %}disabled{% endif %}></label>
     <label>학번<input class="eg-input" name="student_id" inputmode="numeric" pattern="[0-9 -]{4,14}" maxlength="14" required value="{{ guest_student_id or request.form.get('student_id', '') }}" {% if not is_open %}disabled{% endif %}><span class="eg-help">같은 세미나에 후기를 두 번 내지 않도록 확인하는 데만 씁니다.</span></label>
+    <label>학교 메일 <span class="eg-help">선택 · 나중에 6자리 인증번호로 후기를 수정할 때 씁니다</span><input class="eg-input" type="email" name="knu_email" autocomplete="email" placeholder="예: honggildong@knu.ac.kr" value="{{ guest_email or request.form.get('knu_email', '') }}" {% if not is_open %}disabled{% endif %}></label>
     <label>수정 코드 <span class="eg-help">이미 낸 후기를 고칠 때만</span><input class="eg-input" name="edit_code" autocomplete="off" {% if need_edit_code %}required autofocus{% endif %} {% if not is_open %}disabled{% endif %}></label>
     <div aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden"><label>웹사이트<input name="website" tabindex="-1" autocomplete="off"></label></div>
   {% else %}<p><a href="{{ url_for('login', next=request.path) }}">로그인 후 작성</a></p>{% endif %}
@@ -53,6 +54,22 @@
   {% if form_kind == 'brick_review' %}<label>사진 <span class="eg-help">선택</span><input class="eg-input" type="file" name="photo" accept="image/jpeg,image/png,image/webp" {% if not is_open %}disabled{% endif %}><span class="eg-help">JPG, PNG, WEBP · 최대 5MB</span></label>{% endif %}
   {% if is_open %}<button class="lms-button lms-button-primary" type="submit">{% if existing %}수정 내용 저장{% else %}제출하기{% endif %}</button>{% endif %}
 </form>
+{% if form_kind == 'seminar_review' and not member and is_open %}
+<details class="eg-panel eg-form" id="review-email-lookup"{% if email_step %} open{% endif %}>
+  <summary>이메일로 기존 후기 불러오기</summary>
+  <form method="post" action="{{ url_for('seminar_review_email', token=form_row.share_token, action='request') }}">
+    <input type="hidden" name="csrf_token" value="{{ review_csrf_token() }}">
+    <label>학교 메일 (@knu.ac.kr)<input class="eg-input" type="email" name="knu_email" autocomplete="email" required value="{{ guest_email or '' }}"></label>
+    <button class="lms-button" type="submit">인증번호 받기</button>
+  </form>
+  {% if email_step %}<form method="post" action="{{ url_for('seminar_review_email', token=form_row.share_token, action='verify') }}">
+    <input type="hidden" name="csrf_token" value="{{ review_csrf_token() }}">
+    <input type="hidden" name="knu_email" value="{{ guest_email or '' }}">
+    <label>6자리 인증번호<input class="eg-input" name="email_code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required></label>
+    <button class="lms-button lms-button-primary" type="submit">인증하고 불러오기</button>
+  </form>{% endif %}
+</details>
+{% endif %}
 {% if form_kind == 'seminar_review' and unclaimed %}
 <form class="eg-panel eg-form" method="post" action="{{ url_for('seminar_review_claim', token=form_row.share_token) }}">
   <input type="hidden" name="csrf_token" value="{{ review_csrf_token() if form_kind == 'seminar_review' else sensitive_csrf_token() }}">

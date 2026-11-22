@@ -73,7 +73,7 @@ class TopicSubmissionAuthorizationTests(unittest.TestCase):
         from datetime import timedelta
         self.fake.rows['topic_submissions'] = []
         client = self.app_module.app.test_client()
-        data = {'event_id': 'event-1', 'author_name': '??', 'department': '????', 'student_id': '2026000009', 'topics': [{'topic': '??'}], 'knu_email': 'Student'}
+        data = {'event_id': 'event-1', 'author_name': '김테스트', 'department': '국어국문학과', 'student_id': '2026000009', 'topics': [{'topic': '토론 주제'}], 'knu_email': 'Student'}
         result = client.post('/api/topics/submit', json=data)
         self.assertEqual(result.status_code, 200)
         self.assertTrue(result.json['edit_token'])
@@ -86,12 +86,14 @@ class TopicSubmissionAuthorizationTests(unittest.TestCase):
             return True
         with patch('topic_routes.request_guest_email_code', return_value='student@knu.ac.kr'), patch('topic_routes.verify_guest_email_code', side_effect=grant):
             self.assertEqual(client.post('/api/topics/edit-email/request', json={'event_id':'event-1', 'email':'student'}).status_code, 200)
-            self.assertEqual(client.post('/api/topics/edit-email/verify', json={'event_id':'event-1', 'code':'000000'}).status_code, 400)
+            bad = client.post('/api/topics/edit-email/verify', json={'event_id':'event-1', 'code':'000000'})
+            self.assertEqual(bad.status_code, 400)
+            self.assertEqual(bad.json['error'], '인증번호가 올바르지 않거나 만료되었습니다.')
             verified = client.post('/api/topics/edit-email/verify', json={'event_id':'event-1', 'code':'123456'})
             self.assertTrue(verified.json['found'])
-            data['topics'] = [{'topic':'??'}]
+            data['topics'] = [{'topic':'토론 주제'}]
             self.assertEqual(client.post('/api/topics/submit', json=data).status_code, 200)
-        self.assertEqual(self.fake.rows['topic_submissions'][0]['topics'], [{'topic':'??'}])
+        self.assertEqual(self.fake.rows['topic_submissions'][0]['topics'], [{'topic':'토론 주제'}])
         with client.session_transaction() as state:
             state['guest_email_grants']['topic_edit:event-1']['email'] = 'other@knu.ac.kr'
             state.modified = True

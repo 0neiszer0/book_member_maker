@@ -435,22 +435,22 @@ def init_topic_routes(app, get_supabase, login_required, get_datetime, public_ba
         data = request.get_json(silent=True) or {}
         event_id = str(data.get('event_id') or '')
         if not event_id or not (db().table('topic_events').select('id').eq('id', event_id).limit(1).execute().data or []):
-            return jsonify(ok=False, error='???? ?? ??????.'), 400
+            return jsonify(ok=False, error='유효하지 않은 발제문 행사입니다.'), 400
         try:
-            email = request_guest_email_code(app, db(), data.get('email'), 'topic_edit', '??? ??', event_id)
+            email = request_guest_email_code(app, db(), data.get('email'), 'topic_edit', '발제문 수정', event_id)
             return jsonify(ok=True, email=email)
         except ValueError as exc:
-            return jsonify(ok=False, error=str(exc)), 429 if '????' in str(exc) else 400
+            return jsonify(ok=False, error=str(exc)), 429 if ('잦습니다' in str(exc) or '잠시' in str(exc)) else 400
         except Exception:
             app.logger.exception('Topic email delivery failed')
-            return jsonify(ok=False, error='?? ??? ??? ?????.'), 503
+            return jsonify(ok=False, error='인증 메일을 보내지 못했습니다. 잠시 후 다시 시도해주세요.'), 503
 
     @app.post('/api/topics/edit-email/verify')
     def topic_email_verify():
         data = request.get_json(silent=True) or {}
         event_id = str(data.get('event_id') or '')
         if not verify_guest_email_code(app, db(), 'topic_edit', event_id, data.get('code')):
-            return jsonify(ok=False, error='????? ??????.'), 400
+            return jsonify(ok=False, error='인증번호가 올바르지 않거나 만료되었습니다.'), 400
         email = get_verified_guest_email('topic_edit', event_id)
         rows = db().table('topic_submissions').select('*').eq('event_id', event_id).execute().data or []
         row = next ( (r for r in rows if _email_owns_topic(r, email)), None)
@@ -540,7 +540,7 @@ def init_topic_routes(app, get_supabase, login_required, get_datetime, public_ba
         raw_email = data.get('knu_email') or ''
         knu_email = normalize_knu_email(raw_email)
         if raw_email and not is_valid_knu_email(raw_email, knu_email):
-            return jsonify(error='?? ?? ??? ??????.'), 400
+            return jsonify(error='경북대 학교 메일(@knu.ac.kr) 형식을 확인해주세요.'), 400
 
         # 회원 권한은 입력한 이름/학번이 아니라 서버 세션의 member id로만 확인한다.
         member = _authenticated_topic_member(event_id)

@@ -285,22 +285,22 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
         email = request.form.get('knu_email', '')
         if action == 'request':
             try:
-                email = request_guest_email_code(app, supabase, email, 'review_edit', '??? ?? ??', str(form['id']))
-                flash('????? ??? ?????.', 'success')
+                email = request_guest_email_code(app, supabase, email, 'review_edit', '세미나 후기 수정', str(form['id']))
+                flash('인증번호를 메일로 보냈습니다.', 'success')
             except ValueError as exc:
                 flash(str(exc), 'danger')
             except Exception:
                 app.logger.exception('Review email delivery failed')
-                flash('?? ??? ??? ?????.', 'danger')
+                flash('인증 메일을 보내지 못했습니다. 잠시 후 다시 시도해주세요.', 'danger')
             return render_review(form, seminar, None, None, email_step=True, guest_email=email)
         if not verify_guest_email_code(app, supabase, 'review_edit', str(form['id']), request.form.get('email_code')):
-            flash('????? ??????.', 'danger')
+            flash('인증번호가 올바르지 않거나 만료되었습니다.', 'danger')
             return render_review(form, seminar, None, None, status=400, email_step=True, guest_email=email)
         email = get_verified_guest_email('review_edit', str(form['id']))
         rows = supabase.table('seminar_reviews').select('*').eq('form_id', form['id']).is_('deleted_at', 'null').execute().data or []
         row = next((r for r in rows if email_owns_review(r, email)), None)
         if not row:
-            flash('? ??? ??? ??? ????.', 'warning')
+            flash('이 메일로 작성한 후기를 찾을 수 없습니다.', 'warning')
         return render_review(form, seminar, None, row, guest_email=email, guest_name=(row or {}).get('author_name'), guest_student_id=(row or {}).get('student_id'))
 
     def submit_guest_review(form, seminar):
@@ -319,7 +319,7 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
         raw_email = request.form.get('knu_email') or ''
         email = normalize_knu_email(raw_email)
         if raw_email and not is_valid_knu_email(raw_email, email):
-            flash('?? ?? ??? ??????.', 'danger')
+            flash('경북대 학교 메일(@knu.ac.kr) 형식을 확인해주세요.', 'danger')
             return render_review(form, seminar, None, None, status=400, **values)
         payload = review_content_payload()
         existing = review_by_student(form["id"], values["guest_student_id"])
