@@ -270,5 +270,56 @@ class PublicArchiveAndPreSeminarTests(unittest.TestCase):
         self.assertEqual(missing.status_code, 404)
 
 
+class MarkdownPublisherTests(PublicArchiveAndPreSeminarTests):
+    def test_parser_and_slug(self):
+        from public_archive_routes import parse_pre_seminar_markdown, _slugify_material
+        parsed = parse_pre_seminar_markdown("Intro **bold** *em* `code` [safe](https://example.com) [bad](javascript:alert) <script>\n\n## Heading\n- item\n1. second\n> quote\n| a | b |\n|---|---|\n| x | y |\n### Sub\nhttp://example.org")
+        self.assertEqual([s["heading"] for s in parsed["sections"]], ["개요", "Heading", "Sub"])
+        runs = parsed["sections"][0]["items"][0]["runs"]
+        self.assertTrue(any(r.get("strong") for r in runs))
+        self.assertTrue(any(r.get("em") for r in runs))
+        self.assertTrue(any(r.get("code") for r in runs))
+        self.assertEqual(len(parsed["references"]), 2)
+        self.assertFalse(any("javascript:" in r.get("href", "") for r in runs))
+        items = parsed["sections"][1]["items"]
+        self.assertEqual([i["type"] for i in items], ["li", "li", "quote", "table"])
+        self.assertEqual(len(items[-1]["rows"]), 2)
+        self.assertEqual(_slugify_material("한글 제목"), "한글-제목")
+        with self.assertRaises(ValueError):
+            _slugify_material("title", "../bad")
+
+    def test_admin_lifecycle_and_member_visibility(self):
+        self.assertEqual(self.client.get('/admin/pre-seminar').status_code, 302)
+        self.login('member')
+        self.assertEqual(self.client.get('/admin/pre-seminar').status_code, 302)
+        self.login('officer')
+        self.assertEqual(self.client.get('/admin/pre-seminar').status_code, 200)
+        self.assertEqual(self.client.post('/admin/pre-seminar/save', data={'title':'x','markdown_body':'x'}).status_code, 403)
+        data={'csrf_token':'test-csrf','title':'새 도서','author':'작가','semester':'2027-1','semester_label':'2027년 1학기','markdown_body':'## 본문\n<script>alert(1)</script> **강조**','is_published':'on'}
+        self.assertEqual(self.client.post('/admin/pre-seminar/save', data=data).status_code, 303)
+        row=self.fake.rows['pre_seminar_materials'][0]
+        self.assertEqual(self.client.post('/admin/pre-seminar/save', data=data).status_code, 303)
+        self.assertEqual(self.fake.rows['pre_seminar_materials'][1]['slug'], row['slug']+'-2')
+        detail=self.client.get('/pre-seminar/'+row['slug']).get_data(as_text=True)
+        self.assertIn('새 도서',detail)
+        self.assertIn('&lt;script&gt;',detail)
+        self.assertIn('<strong>강조</strong>',detail)
+        self.assertNotIn('발제문·토의 기록 보기',detail)
+        self.assertIn('2027년 1학기',detail)
+        self.assertIn('전체 (17권)',detail)
+        headers={'X-App-CSRF':'test-csrf'}
+        preview=self.client.post('/api/admin/pre-seminar/preview',json={'markdown_body':'## 제목'},headers=headers)
+        self.assertEqual(preview.json['sections'][0]['heading'],'제목')
+        self.assertEqual(self.client.post('/api/admin/pre-seminar/'+row['id']+'/toggle',headers=headers).status_code,200)
+        self.assertEqual(self.client.get('/pre-seminar/'+row['slug']).status_code,404)
+        self.assertEqual(self.client.get('/admin/pre-seminar?edit='+row['id']).status_code,200)
+        data.update(material_id=row['id'],title='고친 제목')
+        self.assertEqual(self.client.post('/admin/pre-seminar/save',data=data).status_code,303)
+        self.assertEqual(self.fake.rows['pre_seminar_materials'][0]['title'],'고친 제목')
+        self.assertEqual(self.client.post('/api/admin/pre-seminar/'+row['id']+'/delete',headers=headers).status_code,200)
+        self.login('admin')
+        self.assertEqual(self.client.get('/admin/pre-seminar').status_code,200)
+
+
 if __name__ == "__main__":
     unittest.main()

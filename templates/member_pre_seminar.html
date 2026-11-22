@@ -53,6 +53,7 @@
       <h1>세미나 전 읽기 자료</h1>
       <p class="pre-lead">{{ description or '세미나 전에 함께 살펴보면 좋은 작가 배경, 학술 논문, 서평과 참고 링크를 모았습니다.' }}</p>
     </div>
+    {% if is_staff %}<a class="lms-button" href="{{ url_for('admin_pre_seminar') }}">사전 자료 등록·관리</a>{% endif %}
     <a class="lms-button" href="{{ url_for('public_archive') }}">공개 아카이브로 이동</a>
   </section>
 
@@ -90,12 +91,12 @@
           <h2>{{ active_book.title }}</h2>
           {% if active_book.edition_note %}<p class="pre-edition">{{ active_book.edition_note }}</p>{% endif %}
         </div>
-        <a class="lms-button" href="{{ url_for('public_archive_book', slug=active_book.slug) }}">발제문·토의 기록 보기</a>
+        {% if has_archive_book %}<a class="lms-button" href="{{ url_for('public_archive_book', slug=active_book.slug) }}">발제문·토의 기록 보기</a>{% endif %}
       </header>
 
       {% macro render_runs(runs) -%}
         {%- for run in runs -%}
-          {%- if run.href -%}<a class="pre-ext-link" href="{{ run.href }}" target="_blank" rel="noopener noreferrer">{{ run.text }}</a>{%- else -%}{{ run.text }}{%- endif -%}
+          {%- if run.href -%}<a class="pre-ext-link" href="{{ run.href }}" target="_blank" rel="noopener noreferrer">{{ run.text }}</a>{%- elif run.strong -%}<strong>{{ run.text }}</strong>{%- elif run.em -%}<em>{{ run.text }}</em>{%- elif run.code -%}<code>{{ run.text }}</code>{%- else -%}{{ run.text }}{%- endif -%}
         {%- endfor -%}
       {%- endmacro %}
 

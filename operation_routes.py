@@ -198,5 +198,5 @@ def init_operation_routes(app, get_db, login_required):
     init_officer_handover_routes(app, get_db, login_required)
 
     from public_archive_routes import init_public_archive_routes
-    init_public_archive_routes(app, login_required)
+    init_public_archive_routes(app, login_required, get_db=get_db)
 

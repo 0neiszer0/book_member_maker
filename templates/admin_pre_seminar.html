@@ -1,0 +1,41 @@
+{% extends 'lms_admin_base.html' %}
+{% block content %}
+<style>
+.material-editor{max-width:1050px;margin:auto;padding:20px}.material-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}.material-editor label{display:block;font-weight:600}.material-editor input:not([type=checkbox]),.material-editor textarea{display:block;width:100%;box-sizing:border-box;padding:8px;margin-top:4px}.material-editor textarea{font-family:monospace;min-height:300px}.material-card,.material-preview{border:1px solid #d8dcdf;padding:16px;margin:14px 0;border-radius:4px}.material-actions{display:flex;gap:8px;flex-wrap:wrap}.material-preview table{border-collapse:collapse}.material-preview td{border:1px solid #ccc;padding:6px}
+</style>
+<div class="material-editor">
+<h1>사전 자료 등록·관리</h1>
+<p><a href="{{ url_for('member_pre_seminar') }}">사전 자료실로 돌아가기</a></p>
+{% if request.args.get('saved') %}<p role="status">저장했습니다.</p>{% endif %}
+<h2>Markdown {{ '수정' if edit else '등록' }}</h2>
+<form action="{{ url_for('admin_pre_seminar_save') }}" method="post">
+<input type="hidden" name="csrf_token" value="{{ session.get('sensitive_csrf', '') }}">
+<input type="hidden" name="material_id" value="{{ edit.id if edit else '' }}">
+<label>마크다운 파일 불러오기 <input id="md-file" type="file" accept=".md,.markdown,.txt"></label>
+<div class="material-grid">
+<label>도서 제목 <input name="title" id="title" required value="{{ edit.title if edit else '' }}"></label>
+<label>저자 <input name="author" value="{{ edit.author if edit else '' }}"></label>
+<label>학기 표시명 <input name="semester_label" placeholder="2026년 2학기" value="{{ edit.semester_label if edit else '' }}"></label>
+<label>학기 코드 <input name="semester" placeholder="2026-2" value="{{ edit.semester if edit else '' }}"></label>
+<label>세미나 날짜 <input type="date" name="seminar_date" value="{{ edit.date if edit else '' }}"></label>
+<label>판본/참고 메모 <input name="edition_note" value="{{ edit.edition_note if edit else '' }}"></label>
+</div>
+<label><input type="checkbox" name="is_published" {% if not edit or edit.is_published %}checked{% endif %}> 공개</label>
+<label>마크다운 본문 <textarea id="markdown-body" name="markdown_body" maxlength="300000" required>{{ edit.markdown_body if edit else '' }}</textarea></label>
+<div class="material-actions"><button type="button" id="preview-button">미리보기</button><button type="submit">저장</button>{% if edit %}<a href="{{ url_for('admin_pre_seminar') }}">새 자료 등록</a>{% endif %}</div>
+</form>
+<div id="preview" class="material-preview" hidden aria-live="polite"></div>
+<h2>등록된 DB 사전 자료 목록</h2>
+{% for book in books %}<article class="material-card"><h3>{{ book.title }}</h3><p>{{ book.author }} · {{ book.semester_label }} · {{ book.date }} · <strong>{{ '공개' if book.is_published else '비공개(초안)' }}</strong></p><div class="material-actions"><a href="{{ url_for('member_pre_seminar_book', slug=book.slug) }}">자료 보기</a><a href="{{ url_for('admin_pre_seminar', edit=book.id) }}">수정</a><button type="button" data-id="{{ book.id }}" data-action="toggle">공개 전환</button><button type="button" data-id="{{ book.id }}" data-action="delete">삭제</button></div></article>{% else %}<p>등록된 자료가 없습니다.</p>{% endfor %}
+<p>기존 15개 아카이브 자료는 사전 자료실에 자동으로 유지됩니다.</p>
+</div>
+<script>
+const csrf = {{ session.get('sensitive_csrf', '')|tojson }};
+const body = document.getElementById('markdown-body');
+document.getElementById('md-file').addEventListener('change', e => { const file=e.target.files[0]; if(!file)return; const reader=new FileReader(); reader.onload=()=>{body.value=reader.result; const title=document.getElementById('title'); if(!title.value.trim()){const match=body.value.match(/^#\s+(.+)$/m); title.value=match ? match[1].trim() : file.name.replace(/\.[^.]+$/, '');}}; reader.readAsText(file, 'UTF-8'); });
+function element(tag, text){const el=document.createElement(tag); if(text !== undefined)el.textContent=text; return el;}
+function appendRuns(parent,runs){for(const run of runs){let el;if(run.href){el=element('a',run.text);el.href=run.href;el.target='_blank';el.rel='noopener noreferrer';}else if(run.strong)el=element('strong',run.text);else if(run.em)el=element('em',run.text);else if(run.code)el=element('code',run.text);else el=document.createTextNode(run.text);parent.append(el);}}
+document.getElementById('preview-button').addEventListener('click',async()=>{const panel=document.getElementById('preview');panel.hidden=false;panel.replaceChildren();try{const response=await fetch({{ url_for('admin_pre_seminar_preview')|tojson }},{method:'POST',headers:{'Content-Type':'application/json','X-App-CSRF':csrf},body:JSON.stringify({markdown_body:body.value})});if(!response.ok)throw Error();const data=await response.json();for(const sec of data.sections){panel.append(element('h3',sec.heading));for(const item of sec.items){let el;if(item.type==='table'){el=element('table');for(const row of item.rows){const tr=element('tr');for(const cell of row)tr.append(element('td',cell));el.append(tr);}}else if(item.type==='li'){el=element('ul');const li=element('li');appendRuns(li,item.runs);el.append(li);}else{el=element(item.type==='quote'?'blockquote':'p');appendRuns(el,item.runs);}panel.append(el);}}if(data.references.length){panel.append(element('h3','참고 링크 바로가기'));const ul=element('ul');for(const ref of data.references){const li=element('li');appendRuns(li,[{text:ref.title,href:ref.url}]);ul.append(li);}panel.append(ul);}}catch(e){panel.textContent='미리보기를 불러오지 못했습니다.';}});
+document.querySelectorAll('[data-action]').forEach(button=>button.addEventListener('click',async()=>{if(button.dataset.action==='delete'&&!confirm('이 자료를 삭제하시겠습니까?'))return;const response=await fetch('/api/admin/pre-seminar/'+encodeURIComponent(button.dataset.id)+'/'+button.dataset.action,{method:'POST',headers:{'X-App-CSRF':csrf}});if(response.ok)location.reload();else alert('요청을 처리하지 못했습니다.');}));
+</script>
+{% endblock %}
