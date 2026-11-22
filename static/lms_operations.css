@@ -411,3 +411,13 @@
 .lms-operations .moderator-error{border:1px solid #dca4a0;color:#a82623;background:#fce9e8;padding:12px;margin:16px 0}
 @media(max-width:991px){.lms-operations .overview-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.lms-operations .overview-tool-groups{grid-template-columns:minmax(0,1fr)}.lms-operations .schedule-new-term form{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:767px){.lms-operations .overview-workflow,.lms-operations .schedule-grid,.lms-operations .schedule-new-term form{grid-template-columns:minmax(0,1fr)}.lms-operations .schedule-tool{padding:14px}.lms-operations .schedule-tool>summary span{display:block;margin:8px 0 0}.lms-operations .schedule-actions button{flex:1 1 100%}.lms-operations .operations-tasks li{align-items:flex-start;flex-direction:column}.lms-operations .cal-cell{min-height:78px;padding:3px}.lms-operations .badge{font-size:10px;padding:1px 3px}.lms-operations .day-num{font-size:11px}.lms-operations .moderator-panel{padding:16px}}
+
+/* Wave 6C: past / attendance-confirmed seminars stay calm and out of the way */
+.lms-operations .op-completed-weeks{margin-top:28px;border:1px solid var(--ui-border-strong,#cbd5e1);border-radius:16px;background:var(--ui-bg,#f8fafc);padding:4px 16px}
+.lms-operations .op-completed-weeks>summary{cursor:pointer;padding:12px 0;font-weight:700;color:var(--ui-ink-muted,#475569);list-style:none}
+.lms-operations .op-completed-weeks>summary::-webkit-details-marker{display:none}
+.lms-operations .op-completed-weeks>summary::before{content:"▸";display:inline-block;margin-right:8px;transition:transform .15s}
+.lms-operations .op-completed-weeks[open]>summary::before{transform:rotate(90deg)}
+.lms-operations .op-completed-list{padding:4px 0 16px}
+.lms-operations .op-week-completed{opacity:.92}
+.lms-operations .op-pill-done{border-radius:999px;padding:4px 12px;white-space:nowrap;font-size:12px;font-weight:700;background:#ecfdf5;border-color:#a7f3d0;color:#047857}
