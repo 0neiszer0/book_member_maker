@@ -59,7 +59,9 @@ class TopicCredentialIntegrationContracts(unittest.TestCase):
         self.assertIn("localStorage.setItem", template)
         self.assertIn("function readStoredCredential", template)
         self.assertIn("function storeCredential", template)
-        self.assertIn('id="issuedCredential"', template)
+        self.assertIn("storeCredential(verified.sid, result.edit_token)", template)
+        self.assertNotIn('id="issuedCredential"', template)
+        self.assertNotIn('id="legacyCodeDetails"', template)
         self.assertNotIn('pattern="[0-9]{4}"', template)
         self.assertNotIn("edit_token=", template)
 
