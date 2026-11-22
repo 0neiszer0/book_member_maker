@@ -1,4 +1,6 @@
 import os
+import hmac
+import time
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -7,7 +9,8 @@ from io import BytesIO
 from flask import (
     abort, flash, g, jsonify, make_response, redirect, render_template, request, session, url_for,
 )
-from minipc_security import authenticated_member
+from guest_email_verify import normalize_knu_email, is_valid_knu_email, request_guest_email_code, verify_guest_email_code, get_verified_guest_email
+from minipc_security import authenticated_member, _signed_csrf_mac, SIGNED_CSRF_MAX_AGE
 from security_utils import forwarded_client_address
 from topic_credentials import (
     generate_topic_edit_token, review_edit_token_digest, review_edit_token_matches,
@@ -251,6 +254,55 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
         supabase.storage.from_("engagement-photos").upload(path, content, {"content-type": mime, "upsert": "false"})
         return path, mime
 
+    def email_owns_review(row, email):
+        if not email:
+            return False
+        if row.get('knu_email') == email:
+            return True
+        sid = row.get('student_id')
+        if not sid:
+            return False
+        members = supabase.table('members').select('*').eq('student_id', sid).eq('knu_email', email).execute().data or []
+        return any(m.get('account_status') == 'active' and m.get('member_status') not in ('inactive', 'blocked') and m.get('is_active') is not False for m in members)
+
+    @app.post('/review/seminar/<uuid:token>/email/<action>')
+    def seminar_review_email(token, action):
+        csrf = request.form.get('csrf_token', '')
+        try:
+            version, issued, mac = csrf.split('.')
+            valid_csrf = version == 's1' and 0 <= time.time() - int(issued) <= SIGNED_CSRF_MAX_AGE and hmac.compare_digest(mac, _signed_csrf_mac(app.secret_key, str(session.get('user_id') or 'guest'), issued))
+        except (ValueError, TypeError):
+            valid_csrf = False
+        if not valid_csrf and not (session.get('sensitive_csrf') and hmac.compare_digest(csrf, session['sensitive_csrf'])):
+            abort(403)
+        if action not in ('request', 'verify'):
+            abort(404)
+        forms = supabase.table('seminar_review_forms').select('*').eq('share_token', str(token)).limit(1).execute().data or []
+        if not forms:
+            abort(404)
+        form = forms[0]
+        seminar = supabase.table('seminar_sessions').select('*').eq('id', form['seminar_session_id']).single().execute().data
+        email = request.form.get('knu_email', '')
+        if action == 'request':
+            try:
+                email = request_guest_email_code(app, supabase, email, 'review_edit', '??? ?? ??', str(form['id']))
+                flash('????? ??? ?????.', 'success')
+            except ValueError as exc:
+                flash(str(exc), 'danger')
+            except Exception:
+                app.logger.exception('Review email delivery failed')
+                flash('?? ??? ??? ?????.', 'danger')
+            return render_review(form, seminar, None, None, email_step=True, guest_email=email)
+        if not verify_guest_email_code(app, supabase, 'review_edit', str(form['id']), request.form.get('email_code')):
+            flash('????? ??????.', 'danger')
+            return render_review(form, seminar, None, None, status=400, email_step=True, guest_email=email)
+        email = get_verified_guest_email('review_edit', str(form['id']))
+        rows = supabase.table('seminar_reviews').select('*').eq('form_id', form['id']).is_('deleted_at', 'null').execute().data or []
+        row = next((r for r in rows if email_owns_review(r, email)), None)
+        if not row:
+            flash('? ??? ??? ??? ????.', 'warning')
+        return render_review(form, seminar, None, row, guest_email=email, guest_name=(row or {}).get('author_name'), guest_student_id=(row or {}).get('student_id'))
+
     def submit_guest_review(form, seminar):
         """Link submission without login. Returns a response for every outcome."""
         values = {
@@ -264,17 +316,24 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
         if not values["guest_name"] or not values["guest_student_id"]:
             flash("이름과 학번(숫자)을 입력해주세요.", "danger")
             return render_review(form, seminar, None, None, status=400, **values)
+        raw_email = request.form.get('knu_email') or ''
+        email = normalize_knu_email(raw_email)
+        if raw_email and not is_valid_knu_email(raw_email, email):
+            flash('?? ?? ??? ??????.', 'danger')
+            return render_review(form, seminar, None, None, status=400, **values)
         payload = review_content_payload()
         existing = review_by_student(form["id"], values["guest_student_id"])
         if existing:
-            if existing.get("identity_kind") != "guest":
+            verified_email = get_verified_guest_email("review_edit", str(form["id"]))
+            email_ok = email_owns_review(existing, verified_email)
+            if existing.get("identity_kind") != "guest" and not email_ok:
                 flash("이 학번으로 계정에서 쓴 후기가 있습니다. 로그인한 뒤 수정해주세요.", "danger")
                 return render_review(form, seminar, None, None, status=409, **values)
             if review_attempts_exceeded(form["id"], "edit", GUEST_FAILURE_LIMIT, True):
                 flash("수정 확인이 잠시 제한되었습니다. 15분 후 다시 시도해주세요.", "danger")
                 return render_review(form, seminar, None, None, status=429, **values)
             code = (request.form.get("edit_code") or "").strip()
-            ok = review_edit_token_matches(existing.get("edit_token_hash"), code, app.secret_key)
+            ok = email_ok or review_edit_token_matches(existing.get("edit_token_hash"), code, app.secret_key)
             record_review_attempt(form["id"], "edit", ok)
             if not ok:
                 flash("이 학번으로 이미 낸 후기가 있습니다. 수정하려면 제출할 때 받은 수정 코드를 입력해주세요.", "danger")
@@ -284,6 +343,8 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
                 payload.update(image_path=image_path, image_mime_type=image_type)
             save_revision("seminar_review", existing)
             payload["author_name"] = values["guest_name"]
+            if email and (not existing.get("knu_email") or existing.get("knu_email") == email):
+                payload["knu_email"] = email
             supabase.table("seminar_reviews").update(payload).eq("id", existing["id"]).execute()
             return render_review(form, seminar, None, None, guest_done=True, guest_updated=True, **values)
         if review_attempts_exceeded(form["id"], "submit", GUEST_SUBMIT_LIMIT, False):
@@ -302,9 +363,11 @@ def init_engagement_routes(app, supabase, login_required, voting_window_for=None
             "student_id": values["guest_student_id"],
             "edit_token_hash": review_edit_token_digest(token, app.secret_key),
         })
+        if email:
+            payload["knu_email"] = email
         supabase.table("seminar_reviews").insert(payload).execute()
         record_review_attempt(form["id"], "submit", True)
-        return render_review(form, seminar, None, None, guest_done=True, edit_token=token, **values)
+        return render_review(form, seminar, None, None, guest_done=True, edit_token=None if email else token, email_done=bool(email), **values)
 
     @app.context_processor
     def engagement_navigation_context():

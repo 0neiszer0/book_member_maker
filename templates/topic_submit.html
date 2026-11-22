@@ -83,7 +83,7 @@
         </section>
 
         <!-- 1단계: 본인 확인 -->
-        <div id="verifyCard" class="topic-panel">
+        <div id="verifyCard" class="topic-panel{% if user_name %} hidden{% endif %}">
             <h2 class="topic-strong"><span class="step-num">1</span>본인 확인</h2>
             <p class="topic-muted">동명이인 구분 및 수정 권한을 위해 필요합니다.</p>
 
@@ -110,12 +110,12 @@
                     <p class="topic-muted">입학년도 + 학번 (예: 2022123456)</p>
                 </div>
                 <div id="credentialField"{% if user_name %} class="hidden"{% endif %}>
-                    <label for="pinCode" class="topic-muted">
-                        수정 코드 <span>(기존 글을 수정할 때만)</span>
-                    </label>
-                    <input type="text" id="pinCode" class="topic-input"
-                        maxlength="80" placeholder="처음 제출이라면 비워두세요" autocomplete="off">
-                    <p class="topic-muted">제출할 때 받은 수정 코드를 입력해주세요. 수정 후 새 코드가 발급되면 다시 보관해주세요.</p>
+                    <label for="knuEmail">?? ?? ??? (@knu.ac.kr)</label>
+                    <input id="knuEmail" class="topic-input" autocomplete="email">
+                    <p class="topic-muted">??? ???? ??? ??? ? ?? ?? ??? ????.</p>
+                    <details id="legacyCodeDetails"><summary>?? ?? ??? ????</summary><input type="text" id="pinCode" class="topic-input" maxlength="80" autocomplete="off"></details>
+                    <button type="button" id="emailStart">?? ??? ?? ??? ????</button>
+                    <div id="emailStep" class="hidden"><button type="button" id="emailRequest">???? ??</button><input id="emailCode" class="topic-input" inputmode="numeric" maxlength="6" placeholder="6?? ????"><button type="button" id="emailVerify">???? ????</button></div>
                 </div>
             </div>
 
@@ -168,6 +168,7 @@
                 </button>
             </form>
 
+            <div id="emailDone" class="hidden topic-panel" role="status">???? ???????. ??? ??? ?? ?? ?? 6?? ????? ?? ??? ? ???.</div>
             <div id="credentialCard" class="hidden topic-panel" role="status">
                 <h2 class="topic-strong">수정 코드를 보관해주세요</h2>
                 <p class="topic-muted">이 코드는 다시 표시할 수 없습니다. 현재 브라우저에는 자동 저장했습니다.</p>
@@ -333,6 +334,7 @@
             const credentialInput = document.getElementById('pinCode');
             let credential = credentialInput?.value?.trim() || '';
 
+            if (IS_LOGGED_IN && (!author || !dept || !sid)) document.getElementById('verifyCard').classList.remove('hidden');
             if (!author || !dept) { showVerifyError('이름과 소속을 입력해주세요.'); return; }
             if (!sid) { showVerifyError('학번을 입력해주세요. (예: 2022XXXXXX)'); return; }
             if (!/^[0-9]{8,10}$/.test(sid)) { showVerifyError('학번은 숫자 8~10자리여야 합니다. (예: 2022123456)'); return; }
@@ -364,7 +366,7 @@
                     topicLimit = 2;
                 } else if (res.status === 403) {
                     if (data.code === 'edit_credential_required') {
-                        document.getElementById('credentialField').classList.remove('hidden');
+                        document.getElementById('emailStep').classList.remove('hidden');
                     }
                     showVerifyError(data.error || '수정 정보를 확인할 수 없습니다.');
                     return;
@@ -410,6 +412,25 @@
 
         document.getElementById('addTopicBtn').addEventListener('click', () => { addTopicField(); changed(); });
         document.getElementById('verifyBtn').addEventListener('click', tryVerify);
+        document.getElementById('emailStart').addEventListener('click', () => document.getElementById('emailStep').classList.remove('hidden'));
+        document.getElementById('emailRequest').addEventListener('click', async () => {
+            try {
+                const res = await fetch('/api/topics/edit-email/request', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({event_id:document.getElementById('eventId').value, email:document.getElementById('knuEmail').value})});
+                const data = await res.json(); if (!res.ok) throw new Error(data.error); showVerifyError('????? ??? ?????.');
+            } catch (e) { showVerifyError(e.message); }
+        });
+        document.getElementById('emailVerify').addEventListener('click', async () => {
+            try {
+                const res = await fetch('/api/topics/edit-email/verify', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({event_id:document.getElementById('eventId').value, code:document.getElementById('emailCode').value})});
+                const data = await res.json(); if (!res.ok) throw new Error(data.error);
+                if (!data.found) { showVerifyError('? ??? ??? ???? ????.'); return; }
+                const row = data.submission;
+                document.getElementById('authorName').value = row.author_name || '';
+                document.getElementById('department').value = row.department || '';
+                document.getElementById('studentId').value = row.student_id || '';
+                await tryVerify();
+            } catch (e) { showVerifyError(e.message); }
+        });
 
         document.getElementById('resetBtn').addEventListener('click', () => {
             if (submitting) return;
@@ -423,7 +444,7 @@
         });
 
         // 회원 자동 인증
-        if (IS_LOGGED_IN && document.getElementById('department').value) {
+        if (IS_LOGGED_IN) {
             tryVerify();
         }
 
@@ -449,7 +470,7 @@
                         session_id: {{ event.submission_session_id|default(none)|tojson }},
                         author_name: verified.author, department: verified.dept,
                         student_id: verified.sid, edit_credential: verified.credential,
-                        topics,
+                        knu_email: document.getElementById('knuEmail').value.trim(), topics,
                     }),
                 });
                 const result = await res.json();
@@ -464,10 +485,14 @@
                 if (result.edit_token) {
                     verified.credential = result.edit_token;
                     storeCredential(verified.sid, result.edit_token);
+                    if (document.getElementById('knuEmail').value.trim()) {
+                        document.getElementById('emailDone').classList.remove('hidden');
+                    } else {
                     document.getElementById('issuedCredential').textContent = result.edit_token;
                     const card = document.getElementById('credentialCard');
                     card.classList.remove('hidden');
                     card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
                 } else {
                     if (verified.credential) {
                         storeCredential(verified.sid, verified.credential);

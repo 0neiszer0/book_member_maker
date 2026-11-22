@@ -22,6 +22,7 @@ from flask import (
     Response, abort, flash, g, jsonify, redirect, render_template, request,
     session, url_for,
 )
+from guest_email_verify import normalize_knu_email, is_valid_knu_email, request_guest_email_code, verify_guest_email_code, get_verified_guest_email
 from home_overview import decorate_topic_submission_states
 from security_utils import forwarded_client_address
 from term_membership import scope_members
@@ -418,12 +419,52 @@ def init_topic_routes(app, get_supabase, login_required, get_datetime, public_ba
             return legacy_pin_matches(existing_record.get('pin_code'), credential)
         return False
 
+    def _email_owns_topic(row, email):
+        if not email:
+            return False
+        if row.get('knu_email') == email:
+            return True
+        sid = row.get('student_id')
+        if not sid:
+            return False
+        members = db().table('members').select('*').eq('student_id', sid).eq('knu_email', email).execute().data or []
+        return any(m.get('account_status') == 'active' and m.get('member_status') not in ('inactive', 'blocked') and m.get('is_active') is not False for m in members)
+
+    @app.post('/api/topics/edit-email/request')
+    def topic_email_request():
+        data = request.get_json(silent=True) or {}
+        event_id = str(data.get('event_id') or '')
+        if not event_id or not (db().table('topic_events').select('id').eq('id', event_id).limit(1).execute().data or []):
+            return jsonify(ok=False, error='???? ?? ??????.'), 400
+        try:
+            email = request_guest_email_code(app, db(), data.get('email'), 'topic_edit', '??? ??', event_id)
+            return jsonify(ok=True, email=email)
+        except ValueError as exc:
+            return jsonify(ok=False, error=str(exc)), 429 if '????' in str(exc) else 400
+        except Exception:
+            app.logger.exception('Topic email delivery failed')
+            return jsonify(ok=False, error='?? ??? ??? ?????.'), 503
+
+    @app.post('/api/topics/edit-email/verify')
+    def topic_email_verify():
+        data = request.get_json(silent=True) or {}
+        event_id = str(data.get('event_id') or '')
+        if not verify_guest_email_code(app, db(), 'topic_edit', event_id, data.get('code')):
+            return jsonify(ok=False, error='????? ??????.'), 400
+        email = get_verified_guest_email('topic_edit', event_id)
+        rows = db().table('topic_submissions').select('*').eq('event_id', event_id).execute().data or []
+        row = next ( (r for r in rows if _email_owns_topic(r, email)), None)
+        submission = {k: row.get(k) for k in ('author_name', 'department', 'student_id', 'topics', 'topic_limit')} if row else None
+        return jsonify(ok=True, email=email, found=bool(row), submission=submission)
+
     def _topic_edit_denial(existing_record, member, credential, event_id):
         """Account-owned posts use the session; link submissions keep their edit code.
 
         Roster registration is not a login requirement for public submission links.
         Logging in later must not bypass a link submission's edit code either.
         """
+        if _email_owns_topic(existing_record, get_verified_guest_email('topic_edit', str(event_id))):
+            return None
         owner_id = existing_record.get('member_id')
         if member and owner_id is not None:
             if str(owner_id) == str(member.get('id')):
@@ -496,6 +537,10 @@ def init_topic_routes(app, get_supabase, login_required, get_datetime, public_ba
         edit_credential = str(data.get('edit_credential') or data.get('pin_code') or '').strip()
         student_id = (data.get('student_id') or '').strip()
         topics = data.get('topics')  # JSON Array
+        raw_email = data.get('knu_email') or ''
+        knu_email = normalize_knu_email(raw_email)
+        if raw_email and not is_valid_knu_email(raw_email, knu_email):
+            return jsonify(error='?? ?? ??? ??????.'), 400
 
         # 회원 권한은 입력한 이름/학번이 아니라 서버 세션의 member id로만 확인한다.
         member = _authenticated_topic_member(event_id)
@@ -545,6 +590,8 @@ def init_topic_routes(app, get_supabase, login_required, get_datetime, public_ba
 
                 # 업데이트 실행
                 update_payload = {'topics': topics, 'updated_at': 'now()', 'department': department}
+                if knu_email and not is_logged_in_member and (not existing_record.get('knu_email') or existing_record.get('knu_email') == knu_email):
+                    update_payload['knu_email'] = knu_email
                 if admission_year:
                     update_payload['admission_year'] = admission_year
                 if sid:
@@ -589,6 +636,8 @@ def init_topic_routes(app, get_supabase, login_required, get_datetime, public_ba
                     'student_id': sid or None,
                     'topics': topics
                 }
+                if knu_email and not is_logged_in_member:
+                    insert_payload['knu_email'] = knu_email
                 if is_logged_in_member:
                     insert_payload.update({
                         'member_id': member.get('id'),
