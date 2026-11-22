@@ -8,24 +8,25 @@
 {% block content %}
 <div class="lms-operations">
 <div class="lms-operations-body">
-        <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
-            <h1 class="text-2xl sm:text-3xl font-bold ops-accent">{{ icon('notice',18) }} 스페셜 이벤트</h1>
-            <a href="{{ url_for('admin_dashboard') }}" class="text-sm text-gray-400 hover:ops-accent">← 관리자 대시보드</a>
-        </div>
-        <p class="text-xs text-gray-500 mb-4">MT·워크숍·강연·번개 등의 일정과 참석 기록을 관리합니다.</p>
-
-
+        <header class="ui-page-header">
+            <div class="ui-page-header-copy">
+                <p class="ui-page-eyebrow">전체 운영 · 동아리 활동</p>
+                <h1>특별 행사</h1>
+                <p class="ui-page-subtitle">OT·MT·총회·워크숍·강연 등의 일정과 참석 기록을 관리합니다.</p>
+            </div>
+        </header>
+        {% include '_admin_activities_tabs.html' %}
 
         <!-- 새 이벤트 -->
         <div class="ops-panel rounded-lg p-5 mb-6">
-            <h2 class="text-lg font-bold ops-accent mb-3">+ 새 스페셜 이벤트</h2>
+            <h2 class="text-lg font-bold ops-accent mb-3">+ 새 특별 행사</h2>
             <form id="newEventForm" class="grid grid-cols-1 md:grid-cols-6 gap-3">
                 <div class="md:col-span-2">
-                    <label class="block text-xs text-gray-400 mb-1">이벤트 이름 *</label>
+                    <label class="block text-xs muted mb-1">이벤트 이름 *</label>
                     <input name="name" required class="ops-field w-full rounded px-3 py-2 text-sm" placeholder="예: 2025 봄 MT">
                 </div>
                 <div>
-                    <label class="block text-xs text-gray-400 mb-1">분류</label>
+                    <label class="block text-xs muted mb-1">분류</label>
                     <select name="category" class="ops-field w-full rounded px-3 py-2 text-sm">
                         <option value="event">이벤트</option>
                         <option value="mt">MT</option>
@@ -34,15 +35,15 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs text-gray-400 mb-1">시작일 *</label>
+                    <label class="block text-xs muted mb-1">시작일 *</label>
                     <input name="event_date" type="date" required class="ops-field w-full rounded px-3 py-2 text-sm">
                 </div>
                 <div>
-                    <label class="block text-xs text-gray-400 mb-1">종료일</label>
+                    <label class="block text-xs muted mb-1">종료일</label>
                     <input name="end_date" type="date" class="ops-field w-full rounded px-3 py-2 text-sm">
                 </div>
                 <div>
-                    <label class="block text-xs text-gray-400 mb-1">학기 연결</label>
+                    <label class="block text-xs muted mb-1">학기 연결</label>
                     <select name="term_id" class="ops-field w-full rounded px-3 py-2 text-sm">
                         <option value="">없음</option>
                         {% for t in terms %}
@@ -51,15 +52,15 @@
                     </select>
                 </div>
                 <div class="md:col-span-3">
-                    <label class="block text-xs text-gray-400 mb-1">장소</label>
+                    <label class="block text-xs muted mb-1">장소</label>
                     <input name="location" class="ops-field w-full rounded px-3 py-2 text-sm" placeholder="예: 학생회관 3층">
                 </div>
                 <div class="md:col-span-3">
-                    <label class="block text-xs text-gray-400 mb-1">간단 설명</label>
+                    <label class="block text-xs muted mb-1">간단 설명</label>
                     <input name="description" class="ops-field w-full rounded px-3 py-2 text-sm" placeholder="(선택)">
                 </div>
                 <div class="md:col-span-6 text-right">
-                    <button type="submit" class="ops-primary text-black font-bold py-2 px-5 rounded text-sm hover:opacity-80">생성</button>
+                    <button type="submit" class="ui-btn ui-btn-primary">생성</button>
                 </div>
             </form>
         </div>
@@ -70,7 +71,7 @@
             {% if events %}
             <div class="overflow-x-auto">
                 <table class="min-w-full text-sm">
-                    <thead class="text-xs text-gray-400 border-b ops-border">
+                    <thead class="text-xs muted border-b ops-border">
                         <tr>
                             <th class="px-3 py-2 text-left">이름</th>
                             <th class="px-3 py-2 text-center">분류</th>
@@ -85,21 +86,23 @@
                         {% for ev in events %}
                         <tr data-event-id="{{ ev.id }}">
                             <td class="px-3 py-3">
-                                <a href="{{ url_for('admin_special_event_detail', event_id=ev.id) }}" class="font-bold hover:ops-accent">{{ ev.name }}</a>
-                                {% if ev.description %}<div class="text-xs text-gray-500 truncate max-w-xs">{{ ev.description }}</div>{% endif %}
+                                <a href="{{ url_for('admin_special_event_detail', event_id=ev.id) }}" class="font-bold hover:underline">{{ ev.name }}</a>
+                                {% if ev.description %}<div class="text-xs muted truncate max-w-xs">{{ ev.description }}</div>{% endif %}
                             </td>
                             <td class="px-3 py-3 text-center">
                                 <span class="pill pill-{{ ev.category }}">{{ ev.category }}</span>
                             </td>
                             <td class="px-3 py-3">{{ ev.event_date }}{% if ev.end_date and ev.end_date != ev.event_date %} ~ {{ ev.end_date }}{% endif %}</td>
-                            <td class="px-3 py-3 text-gray-400">{{ ev.location or '-' }}</td>
+                            <td class="px-3 py-3 muted">{{ ev.location or '-' }}</td>
                             <td class="px-3 py-3 text-center font-bold ops-accent">{{ ev.attendee_count or 0 }}</td>
                             <td class="px-3 py-3 text-center">
                                 <input type="checkbox" class="toggle-active" {% if ev.is_active %}checked{% endif %}>
                             </td>
                             <td class="px-3 py-3 text-right">
-                                <a href="{{ url_for('admin_special_event_detail', event_id=ev.id) }}" class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">관리</a>
-                                <button type="button" class="delete-btn text-xs bg-red-700 hover:bg-red-600 px-2 py-1 rounded">삭제</button>
+                                <div class="inline-flex gap-1">
+                                    <a href="{{ url_for('admin_special_event_detail', event_id=ev.id) }}" class="ui-btn ui-btn-sm">관리</a>
+                                    <button type="button" class="delete-btn ui-btn ui-btn-sm ops-danger">삭제</button>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -107,7 +110,7 @@
                 </table>
             </div>
             {% else %}
-            <p class="text-center text-gray-500 py-8">아직 생성된 스페셜 이벤트가 없습니다.</p>
+            <p class="text-center muted py-8">아직 생성된 특별 행사가 없습니다.</p>
             {% endif %}
         </div>
     </div>

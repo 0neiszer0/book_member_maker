@@ -8,56 +8,58 @@
 {% block content %}
 <div class="lms-operations">
 <div class="lms-operations-body">
-        <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
-            <h1 class="text-2xl sm:text-3xl font-bold ops-accent">{{ icon('dashboard',18) }} 출석 매트릭스</h1>
-            <a href="{{ url_for('admin_dashboard') }}" class="text-sm text-gray-400 hover:ops-accent">← 관리자 대시보드</a>
-        </div>
+        <header class="ui-page-header">
+            <div class="ui-page-header-copy">
+                <p class="ui-page-eyebrow">{% if term_id %}학기 운영 · 학기 출석{% else %}전체 운영 · 학기 출석{% endif %}</p>
+                <h1>출석 매트릭스</h1>
+                <p class="ui-page-subtitle">확정된 세미나 기록을 날짜별로 한 칸씩 표시합니다. 같은 주의 월·목 회차도 각각 확인할 수 있습니다.</p>
+            </div>
+        </header>
+        <nav class="ui-tabs" aria-label="학기 출석 탭">
+            <a class="ui-tab" href="{{ url_for('admin_term_attendance', term_id=term_id) if term_id else url_for('admin_term_attendance') }}">학기 참석 현황</a>
+            <a class="ui-tab is-active" href="{{ url_for('admin_attendance_matrix', term_id=term_id) if term_id else url_for('admin_attendance_matrix') }}" aria-current="page">전체 출석 매트릭스</a>
+        </nav>
 
         <!-- 필터 -->
         <form method="get" class="ops-panel rounded-lg p-4 mb-4">
             <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
                 <div class="md:col-span-2">
-                    <label class="block text-xs text-gray-400 mb-1">학기 선택 (자동으로 기간 채움)</label>
+                    <label class="block text-xs muted mb-1">학기 선택 (자동으로 기간 채움)</label>
                     <div class="flex gap-2">
                         <select name="term_id" class="ops-field flex-1 rounded px-3 py-2 text-sm">
                             <option value="">직접 기간 지정</option>
                             {% for t in terms %}
-                            <option value="{{ t.id }}" {% if t.id == term_id %}selected{% endif %}>{{ t.name }} ({{ t.start_date }}~{{ t.end_date }})</option>
+                            <option value="{{ t.id }}" {% if (t.id|string) == (term_id|string) %}selected{% endif %}>{{ t.name }} ({{ t.start_date }}~{{ t.end_date }})</option>
                             {% endfor %}
                         </select>
-                        <button type="button" id="addTermBtn"
-                            class="bg-gray-700 hover:bg-gray-600 text-white font-bold px-3 py-2 rounded text-sm whitespace-nowrap">+ 학기 추가</button>
+                        <button type="button" id="addTermBtn" class="ui-btn ui-btn-sm whitespace-nowrap">+ 학기 추가</button>
                     </div>
                 </div>
                 <div>
-                    <label class="block text-xs text-gray-400 mb-1">시작일</label>
+                    <label class="block text-xs muted mb-1">시작일</label>
                     <input type="date" name="start_date" value="{{ start_date }}"
                         class="ops-field w-full rounded px-3 py-2 text-sm">
                 </div>
                 <div>
-                    <label class="block text-xs text-gray-400 mb-1">종료일</label>
+                    <label class="block text-xs muted mb-1">종료일</label>
                     <input type="date" name="end_date" value="{{ end_date }}"
                         class="ops-field w-full rounded px-3 py-2 text-sm">
                 </div>
                 <div class="flex gap-2">
-                    <button type="submit"
-                        class="ops-primary text-black font-bold py-2 px-3 rounded text-sm hover:opacity-80 flex-1">조회</button>
+                    <button type="submit" class="ui-btn ui-btn-primary flex-1">조회</button>
                     <a href="{{ url_for('admin_attendance_matrix_export', term_id=term_id, start_date=start_date, end_date=end_date) }}"
-                        class="bg-blue-600 text-white font-bold py-2 px-3 rounded text-sm hover:bg-blue-700 text-center">{{ icon('document',18) }} 엑셀</a>
+                        class="ui-btn">{{ icon('document',18) }} 엑셀</a>
                 </div>
             </div>
-            <p class="text-xs text-gray-500 mt-2">
-                확정된 세미나 기록을 날짜별로 한 칸씩 표시합니다. 같은 주의 월·목 회차도 각각 확인할 수 있습니다.
-            </p>
         </form>
 
         <!-- 표시 옵션 -->
         <div class="flex flex-wrap items-center gap-4 mb-3 text-sm">
-            <label class="flex items-center gap-2 cursor-pointer text-gray-300">
+            <label class="flex items-center gap-2 cursor-pointer muted">
                 <input type="checkbox" id="hideInactive" class="h-4 w-4 rounded">
                 비활성 멤버 숨기기
             </label>
-            <label class="flex items-center gap-2 text-gray-300">
+            <label class="flex items-center gap-2 muted">
                 정렬:
                 <select id="sortMode" class="ops-field rounded px-2 py-1 text-sm">
                     <option value="name">이름순</option>
@@ -77,7 +79,7 @@
                         {% for w in weeks %}
                         <th title="{{ w.title }}">
                             <div>{{ w.label }}</div>
-                            <div class="text-[9px] text-gray-500 max-w-[80px] truncate">{{ w.title }}</div>
+                            <div class="text-[9px] muted max-w-[80px] truncate">{{ w.title }}</div>
                         </th>
                         {% endfor %}
                         <th class="ops-accent">합계</th>
@@ -90,9 +92,9 @@
                     <tr data-name="{{ m.name }}" data-count="{{ cnt }}" data-inactive="{{ '1' if not m.is_active else '0' }}">
                         <td class="row-header">
                             <div class="font-bold">{{ m.name }}</div>
-                            {% if not m.is_active %}<span class="text-[9px] text-gray-500">(비활성)</span>{% endif %}
+                            {% if not m.is_active %}<span class="text-[9px] muted">(비활성)</span>{% endif %}
                         </td>
-                        <td class="text-gray-400">{{ m.student_id or '-' }}</td>
+                        <td class="muted">{{ m.student_id or '-' }}</td>
                         {% for w in weeks %}
                         {% set attended = matrix.get(m.id, {}).get(w.key) %}
                         <td class="{% if attended %}cell-O{% else %}cell-X{% endif %}">
@@ -106,11 +108,11 @@
                 </tbody>
             </table>
             {% else %}
-            <p class="text-center py-8 text-gray-500">선택한 기간에 세미나 기록이 없습니다.</p>
+            <p class="text-center py-8 muted">선택한 기간에 세미나 기록이 없습니다.</p>
             {% endif %}
         </div>
 
-        <p class="text-xs text-gray-500 mt-3">
+        <p class="text-xs muted mt-3">
             전체 회원 {{ members|length }}명 · 세미나 {{ weeks|length }}회 표시
         </p>
     </div>
@@ -120,26 +122,25 @@
         <div class="ops-panel rounded-xl p-6 w-full max-w-sm shadow-2xl">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-bold ops-accent">학기 추가</h3>
-                <button type="button" id="closeTermModal" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+                <button type="button" id="closeTermModal" class="ui-btn ui-btn-ghost ui-btn-sm">&times;</button>
             </div>
             <div class="space-y-3">
                 <div>
-                    <label class="block text-xs text-gray-400 mb-1">학기명 <span class="text-red-400">*</span></label>
+                    <label class="block text-xs muted mb-1">학기명 <span class="ops-accent">*</span></label>
                     <input id="tName" type="text" class="ops-field w-full rounded px-3 py-2 text-sm" placeholder="예: 2026-2학기">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs text-gray-400 mb-1">첫 세미나 날짜 <span class="text-red-400">*</span></label>
+                        <label class="block text-xs muted mb-1">첫 세미나 날짜 <span class="ops-accent">*</span></label>
                         <input id="tStart" type="date" class="ops-field w-full rounded px-3 py-2 text-sm">
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-400 mb-1">마지막 세미나 날짜 <span class="text-red-400">*</span></label>
+                        <label class="block text-xs muted mb-1">마지막 세미나 날짜 <span class="ops-accent">*</span></label>
                         <input id="tEnd" type="date" class="ops-field w-full rounded px-3 py-2 text-sm">
                     </div>
                 </div>
-                <p class="text-xs text-gray-500">기간 내 월/목 세미나 회차가 자동 생성되고, 세미나 투표에서도 바로 사용할 수 있습니다.</p>
-                <button type="button" id="saveTermBtn"
-                    class="w-full ops-primary text-black font-bold py-2 rounded hover:opacity-80">추가하기</button>
+                <p class="text-xs muted">기간 내 월/목 세미나 회차가 자동 생성되고, 세미나 투표에서도 바로 사용할 수 있습니다.</p>
+                <button type="button" id="saveTermBtn" class="ui-btn ui-btn-primary w-full">추가하기</button>
             </div>
         </div>
     </div>

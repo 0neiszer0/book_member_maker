@@ -1,13 +1,12 @@
 {% set endpoint = request.endpoint or '' %}
-{# 전체 운영 메뉴: 동아리 전체에 해당하는 일만 둡니다. 학기마다 하는 일(세미나·발제문·출석·조 편성·학기 설정)은 각 학기 강의실의 '학기 운영' 메뉴에 있습니다. #}
-{% set active_target = 'records_members' if endpoint in ['records_members','records_member_profile']
+{% set active_target = 'admin_dashboard' if endpoint in ['admin_dashboard','operation_workbench','admin_bug_reports','help_admin']
+  else ('admin_term_members' if endpoint in ['admin_term_members','operation_officers','operation_rules','admin_seminars','admin_seminar_term','admin_seminar_roster','seminar_session_moderator','topic_document_setup','view_admin_topics','admin_term_attendance','bookclub_index','bookclub_ga_results','start_group_generation','manual_entry']
+  else ('records_members' if endpoint in ['records_members','records_member_profile'] or endpoint.startswith('admin_recruitment_result')
+  else ('admin_special_events' if endpoint.startswith('admin_special_event') or endpoint.startswith('admin_engagement') or endpoint.startswith('admin_seminar_room')
   else ('records_hub' if endpoint.startswith('records_') or endpoint == 'admin_attendance_matrix'
-  else ('admin_term_members' if endpoint in ['admin_term_members','admin_seminars','admin_seminar_term','admin_seminar_roster','seminar_session_moderator','topic_document_setup','view_admin_topics','admin_term_attendance','bookclub_index','bookclub_ga_results','start_group_generation','manual_entry']
-  else ('admin_special_events' if endpoint.startswith('admin_special_event')
-  else ('admin_recruitment_results' if endpoint.startswith('admin_recruitment_result')
-  else ('operation_settings' if endpoint in ['operation_settings','boards.admin_index']
+  else ('operation_settings' if endpoint in ['operation_settings','boards.admin_index','admin_handover_surveys'] or endpoint.startswith('admin_privacy_')
   else endpoint))))) %}
 <nav class="lms-classroom-nav" aria-label="전체 운영 메뉴"><p class="lms-term-name">전체 운영</p>
-{% for target,label in [('admin_dashboard','개요'),('operation_workbench','맡은 업무'),('admin_term_members','학기 관리'),('records_members','회원·계정'),('admin_recruitment_results','면접 지원자'),('admin_special_events','활동·행사'),('admin_seminar_rooms','세미나실 예약'),('admin_engagement','벽돌책·도서 추천'),('records_hub','기록·통계'),('admin_bug_reports','버그 제보'),('help_admin','운영진 안내')] %}
+{% for target,label in [('admin_dashboard','운영 홈'),('admin_term_members','학기 관리'),('records_members','회원 관리'),('admin_special_events','동아리 활동'),('records_hub','기록·통계')] %}
 <a href="{{ url_for(target) }}" {% if active_target == target %}aria-current="page"{% endif %}>{{ label }}</a>
-{% endfor %}{% if session.user_role == 'admin' %}<a href="{{ url_for('operation_settings') }}" {% if active_target == 'operation_settings' %}aria-current="page"{% endif %}>전체 설정</a>{% endif %}</nav>
+{% endfor %}{% if session.user_role == 'admin' %}<a href="{{ url_for('operation_settings') }}" {% if active_target == 'operation_settings' %}aria-current="page"{% endif %}>설정</a>{% endif %}</nav>

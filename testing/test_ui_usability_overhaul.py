@@ -42,7 +42,8 @@ class UiUsabilityOverhaulTest(unittest.TestCase):
         ):
             self.assertIn(label, overview)
         self.assertEqual(overview.count('class="workflow-card"'), 5)
-        self.assertIn("업무별 도구", overview)
+        self.assertIn("주간 운영 5단계 가이드 보기", overview)
+        self.assertIn("_admin_home_tabs.html", overview)
 
     def test_seminars_use_dense_semantic_modules_and_shared_canvas_shell(self):
         seminars = self.read("templates/seminars.html")

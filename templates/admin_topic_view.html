@@ -8,33 +8,31 @@
 {% block content %}
 <div class="lms-operations">
 <div class="lms-operations-body">
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-            <div>
-                <h1 class="text-3xl font-bold ops-accent">{{ event.book_title }}</h1>
-                <p class="submission-summary mt-2">모임 날짜: {{ event.meeting_date }} | 총 <strong class="submission-total">{{
-                        submissions|length }}</strong>명 제출</p>
+        <header class="ui-page-header">
+            <div class="ui-page-header-copy">
+                <p class="ui-page-eyebrow">학기 운영 · 세미나 운영</p>
+                <h1>{{ event.book_title }}</h1>
+                <p class="ui-page-subtitle submission-summary">모임 날짜: {{ event.meeting_date }} · 총 <strong class="submission-total">{{ submissions|length }}</strong>명 제출</p>
             </div>
-            <div class="flex flex-wrap gap-2">
-                <a href="{{ url_for('admin_seminars', term_id=lms_admin_term_id) }}"
-                    class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded shadow border border-gray-500">
+            <div class="ui-page-actions">
+                <a href="{{ url_for('admin_seminars', term_id=lms_admin_term_id) }}" class="ui-btn ui-btn-sm">
                     ◀ 세미나 운영
                 </a>
-                <a href="/admin/topics/{{ event.id }}/download_word"
-                    class="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded shadow border border-green-400">
+                <a href="/admin/topics/{{ event.id }}/download_word" class="ui-btn ui-btn-primary ui-btn-sm">
                     {{ icon('document',18) }} Word 다운로드
                 </a>
             </div>
-        </div>
+        </header>
 
         <section class="ops-panel p-4 rounded-lg mb-6" aria-label="회차별 사회자와 다운로드">
             {% if event.submission_deadline %}<p class="mb-3">공유 발제문 제출·수정 마감: <strong>{{ event.submission_deadline }} 23:59 (한국시간)</strong> · {{ ('추가 제출 중 (' ~ event.late_until_date ~ ' 23:59까지)') if event.late_open and event.is_active else ('접수 중' if event.is_active else '마감') }}{% if event.late_until_date and not event.late_open and event.is_active %} · 추가 제출 {{ event.late_until_date }} 23:59까지 예정{% endif %}</p>{% endif %}
             <div class="flex flex-wrap gap-3">
             {% for item in seminar_sessions %}
-                <div class="border ops-border rounded-lg p-3 flex-1 min-w-0">
+                <div class="ops-surface border ops-border rounded-lg p-3 flex-1 min-w-0">
                     <p class="font-bold">{{ item.meeting_date }} · 사회자 {{ item.moderator_name or '미입력' }}</p>
                     <div class="flex flex-wrap gap-2 mt-3">
-                        <a class="py-2 px-3 rounded bg-gray-700" href="{{ url_for('topic_document_setup', event_id=event.id, session_id=item.id, download=0) }}">사회자 변경</a>
-                        <a class="py-2 px-3 rounded ops-primary text-white" href="{{ url_for('download_topics_word', event_id=event.id, session_id=item.id) }}">이 날짜 Word</a>
+                        <a class="ui-btn ui-btn-sm" href="{{ url_for('topic_document_setup', event_id=event.id, session_id=item.id, download=0) }}">사회자 변경</a>
+                        <a class="ui-btn ui-btn-primary ui-btn-sm" href="{{ url_for('download_topics_word', event_id=event.id, session_id=item.id) }}">이 날짜 Word</a>
                     </div>
                 </div>
             {% else %}
@@ -45,15 +43,15 @@
 
         <div class="grid gap-6">
             {% for sub in submissions %}
-            <div class="ops-panel p-6 rounded-lg shadow-lg" data-sub-id="{{ sub.id }}">
+            <div class="ops-panel p-6 rounded-lg" data-sub-id="{{ sub.id }}">
                 <div class="border-b ops-border pb-3 mb-4 flex justify-between items-center flex-wrap gap-2">
                     <h2 class="text-xl font-bold ops-accent">
                         {{ icon('account',18) }} {% if sub.admission_year %}<span class="ops-accent font-mono mr-1">{{ sub.admission_year }}</span>{% endif %}<span class="sub-author">{{ sub.author_name }}</span>{% if sub.late_submission %} <span class="chip text-xs">추가 제출</span>{% endif %}
-                        <span class="text-sm text-gray-400 font-normal">(<span class="sub-dept">{{ sub.department }}</span>)</span>
+                        <span class="text-sm muted font-normal">(<span class="sub-dept">{{ sub.department }}</span>)</span>
                     </h2>
                     <div class="flex items-center gap-2">
-                        <span class="text-xs text-gray-500">{{ sub.created_at | datetime('%Y-%m-%d %H:%M') }}</span>
-                        <label class="text-xs text-gray-400 flex items-center gap-1" title="이 제출자가 작성할 수 있는 발제문 개수 (기본 2개)">
+                        <span class="text-xs muted">{{ sub.created_at | datetime('%Y-%m-%d %H:%M') }}</span>
+                        <label class="text-xs muted flex items-center gap-1" title="이 제출자가 작성할 수 있는 발제문 개수 (기본 2개)">
                             한도
                             <select class="limit-select ops-field rounded text-xs py-1 px-1">
                                 {% for n in range(1, 11) %}
@@ -61,8 +59,8 @@
                                 {% endfor %}
                             </select>
                         </label>
-                        <button type="button" class="btn-mini bg-blue-600 hover:bg-blue-500 text-white edit-btn">{{ icon('document',18) }} 편집</button>
-                        <button type="button" class="btn-mini bg-red-700 hover:bg-red-600 text-white delete-btn">{{ icon('document',18) }} 삭제</button>
+                        <button type="button" class="ui-btn ui-btn-sm edit-btn">{{ icon('document',18) }} 편집</button>
+                        <button type="button" class="ui-btn ui-btn-sm ops-danger delete-btn">{{ icon('document',18) }} 삭제</button>
                     </div>
                 </div>
 
@@ -72,11 +70,11 @@
                     <div class="ops-surface p-4 rounded border-l-4 ops-border">
                         <p class="text-xs ops-accent font-bold mb-2">발제 {{ t.number }}</p>
                         <p class="font-bold ops-ink whitespace-pre-wrap">{{ t.topic }}</p>
-                        <div class="mt-3 text-sm flex gap-4 bg-gray-800 p-2 rounded">
-                            {% if t.page %}<span class="text-gray-400">{{ icon('room',18) }} 페이지: <span class="text-gray-200 font-bold">{{
+                        <div class="mt-3 text-sm flex flex-wrap gap-4 ops-panel p-2 rounded">
+                            {% if t.page %}<span class="muted">{{ icon('room',18) }} 페이지: <span class="ops-ink font-bold">{{
                                     t.page }}</span></span>{% endif %}
-                            {% if t.reference %}<span class="text-gray-400">{{ icon('book',18) }} 인용: <span
-                                    class="text-gray-200 font-bold whitespace-pre-wrap">{{ t.reference }}</span></span>{% endif %}
+                            {% if t.reference %}<span class="muted">{{ icon('book',18) }} 인용: <span
+                                    class="ops-ink font-bold whitespace-pre-wrap">{{ t.reference }}</span></span>{% endif %}
                         </div>
                     </div>
                     {% endfor %}
@@ -86,20 +84,20 @@
                 <div class="edit-mode hidden space-y-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
-                            <label class="text-xs text-gray-400 block mb-1">작성자 이름</label>
+                            <label class="text-xs muted block mb-1">작성자 이름</label>
                             <input type="text" class="edit-author ops-field w-full rounded py-2 px-3 text-sm" value="{{ sub.author_name }}">
                         </div>
                         <div>
-                            <label class="text-xs text-gray-400 block mb-1">소속</label>
+                            <label class="text-xs muted block mb-1">소속</label>
                             <input type="text" class="edit-dept ops-field w-full rounded py-2 px-3 text-sm" value="{{ sub.department }}">
                         </div>
                     </div>
                     <div class="edit-topics space-y-3"></div>
                     <div class="flex justify-between gap-2 flex-wrap">
-                        <button type="button" class="btn-mini bg-gray-700 hover:bg-gray-600 text-white add-topic-btn">+ 발제 추가</button>
+                        <button type="button" class="ui-btn ui-btn-sm add-topic-btn">+ 발제 추가</button>
                         <div class="flex gap-2">
-                            <button type="button" class="btn-mini bg-gray-600 hover:bg-gray-500 text-white cancel-edit-btn">취소</button>
-                            <button type="button" class="btn-mini bg-green-600 hover:bg-green-500 text-white save-edit-btn">{{ icon('document',18) }} 저장</button>
+                            <button type="button" class="ui-btn ui-btn-sm cancel-edit-btn">취소</button>
+                            <button type="button" class="ui-btn ui-btn-primary ui-btn-sm save-edit-btn">{{ icon('document',18) }} 저장</button>
                         </div>
                     </div>
                 </div>
@@ -108,7 +106,7 @@
                 <script type="application/json" class="sub-data">{{ sub.topics | tojson }}</script>
             </div>
             {% else %}
-            <div class="ops-panel p-12 text-center rounded-lg text-gray-500">
+            <div class="ops-panel p-12 text-center rounded-lg muted">
                 아직 제출된 발제문이 없습니다.
             </div>
             {% endfor %}
@@ -126,8 +124,8 @@
             return `
                 <div class="ops-surface p-3 rounded border-l-4 ops-border topic-row">
                     <div class="flex justify-between items-start mb-2 gap-2">
-                        <label class="text-xs text-gray-400">발제 내용 *</label>
-                        <button type="button" class="text-red-400 hover:text-red-300 font-bold text-sm remove-topic-btn">× 제거</button>
+                        <label class="text-xs muted">발제 내용 *</label>
+                        <button type="button" class="ui-btn ui-btn-sm ops-danger remove-topic-btn">× 제거</button>
                     </div>
                     <textarea class="t-topic ops-field w-full rounded py-2 px-3 text-sm h-20 resize-none" required>${(t.topic || '').replace(/</g, '&lt;')}</textarea>
                     <div class="grid grid-cols-1 md:grid-cols-[100px_1fr] gap-2 mt-2">

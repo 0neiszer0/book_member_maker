@@ -11,10 +11,17 @@
 {% endblock %}
 {% block content %}
 <div class="lms-aux privacy-cleanup">
-  <header class="flex flex-wrap justify-between gap-3 mb-6">
-    <div><h1>개인정보 정리</h1><p class="muted mt-2">비활성 회원과 종료된 모집 차수의 개인정보를 정리합니다.</p></div>
-    <a class="lms-button" href="{{ url_for('records_members') }}">전체 회원 관리</a>
+  <header class="ui-page-header">
+    <div class="ui-page-header-copy">
+      <p class="ui-page-eyebrow">전체 운영 · 설정</p>
+      <h1>개인정보 정리</h1>
+      <p class="ui-page-subtitle">비활성 회원과 종료된 모집 차수의 개인정보를 정리합니다.</p>
+    </div>
+    <div class="ui-page-actions">
+      <a class="ui-btn ui-btn-secondary" href="{{ url_for('records_members') }}">전체 회원 관리</a>
+    </div>
   </header>
+  {% if session.user_role == 'admin' %}{% include '_global_settings_tabs.html' %}{% endif %}
 
   {% if summary is none %}
     <p class="panel text-red-700" role="alert">개인정보 현황을 불러오지 못했습니다. 잠시 후 새로고침해주세요.</p>

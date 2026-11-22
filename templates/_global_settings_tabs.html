@@ -3,4 +3,6 @@
 <nav class="lms-settings-tabs" aria-label="전체 설정">
 <a href="{{ url_for('operation_settings') }}" {% if ep == 'operation_settings' %}aria-current="page"{% endif %}>직책·기본 업무</a>
 <a href="{{ url_for('boards.admin_index') }}" {% if ep == 'boards.admin_index' %}aria-current="page"{% endif %}>게시판</a>
+<a href="{{ url_for('admin_handover_surveys') }}" {% if ep == 'admin_handover_surveys' %}aria-current="page"{% endif %}>임원 인수인계 설문</a>
+<a href="{{ url_for('admin_privacy_cleanup') }}" {% if ep.startswith('admin_privacy_') %}aria-current="page"{% endif %}>개인정보 정리</a>
 </nav>

@@ -3,14 +3,19 @@
 {% block title %}버그·개선 제보 · 책 먹는 호반우{% endblock %}
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_admin_aux.css') }}">{% endblock %}
 {% block content %}<div class="lms-aux">
-    <div class="bug-head">
-      <div><h1>버그·개선 제보</h1><p>회원이 앱 안에서 보낸 불편 사항을 확인하고 처리 상태를 남깁니다.</p></div>
+    <header class="ui-page-header">
+      <div class="ui-page-header-copy">
+        <p class="ui-page-eyebrow">전체 운영</p>
+        <h1>버그·개선 제보</h1>
+        <p class="ui-page-subtitle">회원이 앱 안에서 보낸 불편 사항을 확인하고 처리 상태를 남깁니다.</p>
+      </div>
       <div class="bug-summary">
         <span class="bug-count">새 제보 {{ counts.new }}건</span>
         <span class="bug-count">확인 중 {{ counts.reviewing }}건</span>
         <span class="bug-count">해결 {{ counts.resolved }}건</span>
       </div>
-    </div>
+    </header>
+    {% include '_admin_home_tabs.html' %}
     {% if reports %}
     <div class="bug-list">
       {% for report in reports %}

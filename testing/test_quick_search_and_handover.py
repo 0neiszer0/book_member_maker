@@ -148,6 +148,26 @@ class QuickSearchAndHandoverTests(unittest.TestCase):
                 ):
                     self.assertIn(expected_url, urls)
 
+    def test_quick_search_covers_40_plus_items_with_keywords_and_preserves_groups(self):
+        self.login("admin")
+        html = self.client.get("/admin/dashboard").get_data(as_text=True)
+        items = self._extract_quick_search_items(html)
+        self.assertGreaterEqual(len(items), 40)
+        groups = {item.get("group") for item in items}
+        self.assertEqual(groups, {"회원", "운영진"})
+        joined = " ".join(
+            f"{item['title']} {item.get('keywords', '')} {item.get('description', '')}"
+            for item in items
+        )
+        for keyword in (
+            "공지사항", "발제문", "출석", "면접", "세미나실", "버그", "개인정보",
+            "인수인계", "전체 설정", "비밀번호", "알림", "아카이브", "매트릭스", "벽돌책",
+        ):
+            self.assertIn(keyword, joined)
+        js_source = (ROOT / "static" / "quick_search.js").read_text(encoding="utf-8")
+        self.assertIn("group: item.group || '메뉴'", js_source)
+        self.assertNotIn("group: '메뉴',\n", js_source)
+
     # --- 2. Public Handover Form Tests ---
     def test_public_handover_renders_exact_9_roles_without_login(self):
         path = f"/handover/{FORM_TOKEN}"
