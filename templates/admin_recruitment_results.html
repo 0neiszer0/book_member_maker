@@ -1,6 +1,6 @@
 {% extends 'lms_admin_base.html' %}
-{% set lms_title='면접 지원자 결과' %}
-{% block title %}면접 지원자 결과 · 책 먹는 호반우{% endblock %}
+{% set lms_title='신입 모집·지원자 관리' %}
+{% block title %}신입 모집·지원자 관리 · 책 먹는 호반우{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='lms_admin_aux.css') }}">
 <style>
@@ -15,7 +15,7 @@
   <header class="ui-page-header">
     <div class="ui-page-header-copy">
       <p class="ui-page-eyebrow">전체 운영 · 회원 관리</p>
-      <h1>면접 지원자 결과</h1>
+      <h1>신입 모집·지원자 관리</h1>
       <p class="ui-page-subtitle">차수별 명단과 결과 안내문을 관리하고, 지원자 단톡방에 전용 링크를 공유합니다.</p>
     </div>
   </header>
@@ -28,9 +28,9 @@
         <div class="flex justify-between gap-3">
           <div>
             <h3 class="font-extrabold text-lg"><a class="underline" href="{{ url_for('admin_recruitment_result_detail', campaign_id=campaign.id) }}">{{ campaign.title }}</a></h3>
-            <p class="muted text-sm mt-1">지원자 {{ campaign.applicant_count }}명 · 합격 {{ campaign.status_counts.get('accepted', 0) }}명</p>
+            <p class="muted text-sm mt-1">지원자 {{ campaign.applicant_count }}명 (직접 지원 {{ campaign.direct_count }}명) · 합격 {{ campaign.status_counts.get('accepted', 0) }}명</p>
           </div>
-          <div><span class="pill">{{ '발표 중' if campaign.is_published else '발표 전' }}</span><br><span class="pill mt-2">{{ '링크 열림' if campaign.is_active else '링크 닫힘' }}</span></div>
+          <div><span class="pill">{{ '종료' if not campaign.is_active else '결과 발표 중' if campaign.is_published else '지원서 접수 중' if campaign.is_accepting_applications else '심사·면접 중' }}</span><br><span class="pill mt-2">{{ '링크 열림' if campaign.is_active else '링크 닫힘' }}</span></div>
         </div>
         <details>
           <summary>합격자 회비 입금 안내 설정</summary>

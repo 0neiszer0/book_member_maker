@@ -8,6 +8,7 @@
 <meta property="og:title" content="면접 지원 결과 확인">
 <link rel="stylesheet" href="{{ url_for('static', filename='lms_auth.css') }}">
 <style>
+  .portal-tabs {display:flex; gap:8px; margin:20px 0} .portal-tabs button {flex:1; padding:12px; border:1px solid #e2e8f0; border-radius:999px; background:white; cursor:pointer} .portal-tabs button[aria-selected="true"] {background:#a6192e; color:white} .application-form label {display:block; margin:16px 0} .application-form textarea {min-height:100px} .application-form input, .application-form textarea {width:100%; box-sizing:border-box} .application-form input[type=checkbox] {width:auto} .application-form .slot {margin:8px 0} .honeypot {position:absolute; left:-10000px} .application-form small {color:#a6192e}
   .lms-result-dues { border: 1px solid #c7cdd1; border-radius: 6px; background: #fff; margin-top: 16px; padding: 16px; }
   .lms-result-dues h2 { font-size: 18px; margin: 0 0 8px; }
   .lms-result-dues p + p { margin-top: 8px; }
@@ -24,13 +25,31 @@
         <div class="lms-result-notice"><strong>사용할 수 없는 링크입니다.</strong><br>운영진이 공유한 최신 링크를 확인해주세요.</div>
       {% elif portal_state == 'closed' %}
         <div class="lms-result-notice"><strong>결과 조회가 종료되었습니다.</strong>{% if campaign.contact_text %}<div class="lms-result-contact">{{ campaign.contact_text }}</div>{% endif %}</div>
-      {% elif portal_state == 'pending' %}
-        <p class="lms-result-lead">{{ campaign.intro_text }}</p>
-        <div class="lms-result-notice">{{ campaign.pending_message }}</div>
-        {% if campaign.contact_text %}<div class="lms-result-contact">{{ campaign.contact_text }}</div>{% endif %}
       {% else %}
-        <p class="lms-result-lead">{{ campaign.intro_text }}</p>
-        {% if result %}
+        {% if portal_state == 'applying' %}
+          <div class="portal-tabs" role="tablist"><button type="button" id="apply-tab" aria-selected="{{ 'true' if active_tab != 'lookup' else 'false' }}">지원서 작성</button><button type="button" id="lookup-tab" aria-selected="{{ 'true' if active_tab == 'lookup' else 'false' }}">내 지원 확인</button></div>
+          {% if confirmation %}<div class="lms-result-notice" role="status"><strong>지원서 제출 완료</strong><p>{{ confirmation.name }} · {{ confirmation.student_id }}</p><p>접수 시각: {{ confirmation.submitted_at }}</p><p>향후 안내는 이 링크에서 확인해주세요.</p></div>{% endif %}
+          {% if error_message %}<div class="lms-result-notice error" role="alert">{{ error_message }}</div>{% endif %}
+          <div id="application-panel" {% if active_tab == 'lookup' %}hidden{% endif %}>
+            {% if campaign.application_intro %}<p class="lms-result-lead">{{ campaign.application_intro }}</p>{% endif %}
+            {% if campaign.application_deadline %}<p>접수 마감: {{ campaign.application_deadline }}</p>{% endif %}
+            <form class="application-form" method="post"><input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}"><input type="hidden" name="action" value="apply"><label class="honeypot">Website<input name="website" tabindex="-1" autocomplete="off"></label>
+              <label>이름 <small>*</small><input class="lms-result-input" name="name" maxlength="80" required value="{{ request.form.get('name', '') if request.form.get('action') == 'apply' else '' }}"></label>
+              <label>학번 <small>*</small><input class="lms-result-input" name="student_id" pattern="[0-9]{4,20}" inputmode="numeric" required value="{{ request.form.get('student_id', '') if request.form.get('action') == 'apply' else '' }}"></label>
+              <label>학과/학부 <small>*</small><input class="lms-result-input" name="department" maxlength="100" required value="{{ request.form.get('department', '') }}"></label>
+              <label>연락처(휴대폰) <small>*</small><input class="lms-result-input" name="phone" type="tel" pattern="[0-9-]{8,25}" required value="{{ request.form.get('phone', '') }}"></label>
+              <label>학교 메일 아이디 (@knu.ac.kr, 선택)<input class="lms-result-input" name="knu_email" value="{{ request.form.get('knu_email', '') }}"></label>
+              {% if campaign.interview_slot_options %}<fieldset><legend>면접 가능 시간</legend>{% for slot in campaign.interview_slot_options %}<label class="slot"><input type="checkbox" name="interview_availability" value="{{ slot }}" {% if slot in request.form.getlist('interview_availability') %}checked{% endif %}> {{ slot }}</label>{% endfor %}</fieldset>{% endif %}
+              <label>면접 가능 시간 메모<textarea class="lms-result-input" name="interview_availability_note" maxlength="500">{{ request.form.get('interview_availability_note', '') }}</textarea></label>
+              {% for question in campaign.application_questions %}<label>{{ question.label }} {% if question.required %}<small>*</small>{% endif %}<textarea class="lms-result-input" name="answer_{{ question.id }}" maxlength="3000" placeholder="{{ question.placeholder }}" {% if question.required %}required{% endif %}>{{ request.form.get('answer_' ~ question.id, '') }}</textarea></label>{% endfor %}
+              <button class="lms-button lms-button-primary" type="submit">지원서 제출</button>
+            </form>
+          </div>
+        {% elif portal_state == 'pending' %}<p class="lms-result-lead">{{ campaign.intro_text }}</p><div class="lms-result-notice">{{ campaign.pending_message }}</div>
+        {% else %}<p class="lms-result-lead">{{ campaign.intro_text }}</p>{% endif %}
+        <div id="lookup-panel" {% if portal_state == 'applying' and active_tab != 'lookup' %}hidden{% endif %}>
+        {% if result and portal_state != 'lookup' %}<div class="lms-result-notice"><strong>지원서가 정상 접수되었습니다 · 심사 중</strong>{% if result.submitted_at %}<p>접수 시각: {{ result.submitted_at }}</p>{% endif %}{% if result.interview_slot %}<p>배정된 면접 일정: {{ result.interview_slot }}</p>{% endif %}{% if result.personal_message %}<p>{{ result.personal_message }}</p>{% endif %}</div>{% endif %}
+        {% if result and portal_state == 'lookup' %}
           {% set dues_applicant = accepted_applicant_dues(campaign, result) if result.status == 'accepted' else none %}
           <div class="lms-result-decision {{ result.status }}" aria-live="polite">
             <span class="lms-result-label">{{ result.status_label }}</span>
@@ -57,13 +76,14 @@
             </section>
           {% endif %}
         {% endif %}
-        {% if error_message %}<div class="lms-result-notice error" role="alert">{{ error_message }}</div>{% endif %}
+        {% if error_message and portal_state != 'applying' %}<div class="lms-result-notice error" role="alert">{{ error_message }}</div>{% endif %}
         <form class="lms-result-form" method="post" autocomplete="off">
-          <input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}">
+          <input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}"><input type="hidden" name="action" value="lookup">
           <label class="lms-result-field">이름<input class="lms-result-input" type="text" name="name" maxlength="80" required autocomplete="off" placeholder="지원서에 작성한 이름"></label>
           <label class="lms-result-field">학번<input class="lms-result-input" type="text" name="student_id" inputmode="numeric" pattern="[0-9]{4,20}" maxlength="20" required autocomplete="off" placeholder="숫자만 입력"></label>
           <button class="lms-button lms-button-primary" type="submit">내 결과 확인하기</button>
         </form>
+        </div>
         {% if campaign.contact_text %}<div class="lms-result-contact">{{ campaign.contact_text }}</div>{% endif %}
       {% endif %}
     </section>
@@ -71,6 +91,9 @@
 {% endblock %}
 {% block scripts %}
 <script>
+const applyTab = document.getElementById('apply-tab'), lookupTab = document.getElementById('lookup-tab');
+function showTab(apply) { document.getElementById('application-panel').hidden = !apply; document.getElementById('lookup-panel').hidden = apply; applyTab.setAttribute('aria-selected', String(apply)); lookupTab.setAttribute('aria-selected', String(!apply)); }
+applyTab?.addEventListener('click', () => showTab(true)); lookupTab?.addEventListener('click', () => showTab(false));
 document.getElementById('dues-copy')?.addEventListener('click', async () => {
   const account = document.getElementById('dues-account');
   const status = document.getElementById('dues-copy-status');

@@ -142,3 +142,108 @@ def parse_applicant_file(filename, content, max_rows=500, max_bytes=2 * 1024 * 1
     except Exception:
         return [], ["Excel 파일 형식을 확인해주세요."]
     return parse_applicant_rows("\n".join(lines), max_rows=max_rows)
+
+
+DEFAULT_APPLICATION_QUESTIONS = [
+    {"id": "motivation", "label": "동아리 지원 동기 및 기대하는 점", "placeholder": "책을 읽고 함께 나누고 싶은 이유를 자유롭게 적어주세요.", "required": True},
+    {"id": "favorite_book", "label": "인상 깊게 읽었거나 함께 나누고 싶은 책", "placeholder": "책 제목과 간단한 이유를 적어주세요.", "required": True},
+    {"id": "intro", "label": "정기 세미나 외에 해보고 싶은 활동이나 자기소개", "placeholder": "평소 독서 스타일이나 관심 분야를 자유롭게 적어주세요.", "required": False},
+]
+
+
+def normalize_application_questions(raw):
+    import json
+    import hashlib
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw) if raw.lstrip().startswith('[') and not raw.lstrip().startswith('[선택]') else raw.splitlines()
+        except ValueError:
+            raw = raw.splitlines()
+    if not isinstance(raw, list) or len(raw) > 15:
+        raise ValueError("질문은 최대 15개까지 입력할 수 있습니다.")
+    result, ids = [], set()
+    for item in raw:
+        if isinstance(item, str):
+            label = item.strip()
+            if not label:
+                continue
+            required = not label.startswith('[선택]')
+            if not required:
+                label = label[4:].strip()
+            item = {"id": "q_" + hashlib.sha256(label.encode('utf-8')).hexdigest()[:16], "label": label, "placeholder": "", "required": required}
+        if not isinstance(item, dict):
+            raise ValueError("질문 형식을 확인해주세요.")
+        ident, label = item.get('id'), item.get('label')
+        placeholder, required = item.get('placeholder', ''), item.get('required')
+        if not isinstance(ident, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,80}', ident) or ident in ids or not isinstance(label, str) or not 1 <= len(label.strip()) <= 200 or not isinstance(placeholder, str) or len(placeholder) > 200 or not isinstance(required, bool):
+            raise ValueError("질문 ID, 내용 또는 필수 여부를 확인해주세요.")
+        ids.add(ident)
+        result.append({"id": ident, "label": label.strip(), "placeholder": placeholder, "required": required})
+    return result
+
+
+def normalize_interview_slot_options(raw):
+    if isinstance(raw, str):
+        raw = raw.splitlines()
+    if not isinstance(raw, list) or len(raw) > 40 or any(not isinstance(x, str) or len(x.strip()) > 100 for x in raw):
+        raise ValueError("면접 시간은 최대 40개, 각각 100자 이하로 입력해주세요.")
+    return list(dict.fromkeys(x.strip() for x in raw if x.strip()))
+
+
+def validate_application_submission(campaign, form):
+    name = (form.get('name') or '').strip()
+    sid = normalize_student_id(form.get('student_id'))
+    department = (form.get('department') or '').strip()
+    phone = (form.get('phone') or '').strip()
+    email = (form.get('knu_email') or '').strip().lower()
+    note = (form.get('interview_availability_note') or '').strip()
+    if form.get('website'):
+        raise ValueError('제출을 처리하지 못했습니다.')
+    if not 1 <= len(name) <= 80 or not normalize_applicant_name(name) or not re.fullmatch(r'[0-9]{4,20}', sid):
+        raise ValueError('이름과 학번을 확인해주세요.')
+    if not 1 <= len(department) <= 100 or not re.fullmatch(r'[0-9-]{8,25}', phone):
+        raise ValueError('학과와 연락처를 확인해주세요.')
+    if email and '@' not in email:
+        email += '@knu.ac.kr'
+    if email and (len(email) > 254 or not re.fullmatch(r'[a-z0-9._%+-]+@knu\.ac\.kr', email)):
+        raise ValueError('학교 메일을 확인해주세요.')
+    options = normalize_interview_slot_options(campaign.get('interview_slot_options') or [])
+    selected = form.getlist('interview_availability') if hasattr(form, 'getlist') else form.get('interview_availability', [])
+    if not isinstance(selected, list) or any(x not in options for x in selected) or len(note) > 500:
+        raise ValueError('면접 가능 시간을 확인해주세요.')
+    answers = {}
+    for q in normalize_application_questions(campaign.get('application_questions', DEFAULT_APPLICATION_QUESTIONS)):
+        answer = (form.get('answer_' + q['id']) or '').strip()
+        if len(answer) > 3000 or (q['required'] and not answer):
+            raise ValueError('지원서의 필수 답변과 글자 수를 확인해주세요.')
+        answers[q['id']] = {'label': q['label'], 'answer': answer}
+    return {'name': name, 'name_key': normalize_applicant_name(name), 'student_id': sid, 'department': department, 'phone': phone, 'knu_email': email or None, 'interview_availability': list(dict.fromkeys(selected)), 'interview_availability_note': note or None, 'answers': answers}
+
+
+def build_applicants_workbook(campaign, applicants):
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    from openpyxl.utils import get_column_letter
+    questions = normalize_application_questions(campaign.get('application_questions', DEFAULT_APPLICATION_QUESTIONS))
+    wb = Workbook()
+    ws = wb.active
+    ws.title = '지원자'
+    ws.append(['이름', '학번', '학과', '연락처', '학교메일', '지원일시', '면접가능시간', '배정면접일정', '결과', '회비입금', '운영진메모'] + [q['label'] for q in questions])
+    for applicant in applicants:
+        answers = applicant.get('answers') or {}
+        values = [applicant.get('name'), applicant.get('student_id'), applicant.get('department'), applicant.get('phone'), applicant.get('knu_email'), applicant.get('submitted_at'), ', '.join(applicant.get('interview_availability') or []) + (' / ' + applicant['interview_availability_note'] if applicant.get('interview_availability_note') else ''), applicant.get('interview_slot'), RESULT_STATUS_LABELS.get(applicant.get('result_status'), '발표 전'), '확인' if applicant.get('dues_paid_at') else '', applicant.get('reviewer_note')]
+        values += [(answers.get(q['id']) or {}).get('answer', '') if isinstance(answers.get(q['id']), dict) else answers.get(q['id'], '') for q in questions]
+        # Force text cells to prevent applicant-supplied formula execution.
+        ws.append([str(v or '') for v in values])
+        for cell in ws[ws.max_row]:
+            cell.data_type = 's'
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+    ws.freeze_panes = 'A2'
+    ws.auto_filter.ref = ws.dimensions
+    for i in range(1, ws.max_column + 1):
+        ws.column_dimensions[get_column_letter(i)].width = 22
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output
