@@ -446,34 +446,65 @@ class KnuEmailPinTests(unittest.TestCase):
         self.assertEqual(self.pin(client=fresh).status_code, 302)
         self.assert_session(3, fresh)
 
-    def test_staff_cannot_use_pin_and_staff_promotion_ends_pin_session(self):
+    def test_staff_and_term_officer_pin_setup_login_and_reset(self):
+        for mid, user in ((1, "admin"), (4, "officer"), (3, "termofficer")):
+            with self.subTest(user=user):
+                email = user + "@knu.ac.kr"
+                self.linked(mid, email=email)
+                if mid == 3:
+                    self.db.rows["term_officers"].append(dict(term_id="t-1", member_id=mid))
+                client = self.app.test_client()
+                self.assertEqual(self.send(email, client=client).status_code, 200)
+                self.assertEqual(self.verify(client=client).location, "/account/pin/setup")
+                self.assertEqual(self.form("/account/pin/setup", client, pin="123456", pin_confirm="123456").status_code, 302)
+                old = self.app.test_client()
+                self.assertEqual(self.pin(identifier=email, client=old).status_code, 302)
+                self.assert_session(mid, old)
+                with old.session_transaction() as session:
+                    self.assertEqual(session["login_method"], "pin")
+                self.assertEqual(old.get("/mypage").status_code, 200)
+                self.now += timedelta(seconds=61)
+                reset = self.app.test_client()
+                self.assertEqual(self.send(email, purpose="pin_reset", client=reset).status_code, 200)
+                self.assertEqual(self.verify(client=reset).location, "/account/pin/reset")
+                self.assertEqual(self.form("/account/pin/reset", reset, pin="246810", pin_confirm="246810").status_code, 302)
+                self.assertEqual(old.get("/mypage").status_code, 302)
+                self.assertEqual(self.pin(identifier=email, client=self.app.test_client()).status_code, 401)
+                self.assertEqual(self.pin(pin="246810", identifier=email, client=self.app.test_client()).status_code, 302)
+
+    def test_staff_pin_security_and_concurrent_revocation(self):
+        original_verify = local_auth.verify_password
         for mid, user in ((1, "admin"), (4, "officer")):
-            email = user + "@knu.ac.kr"
-            self.linked(mid, "123456", email)
-            response = self.pin(identifier=email)
-            self.assertEqual(response.status_code, 403)
-            self.assertIn(local_auth.PIN_STAFF, response.get_data(as_text=True))
-            self.assertEqual(self.send(email).status_code, 200)
-            self.assertEqual(self.verify().status_code, 302)
-            self.assert_session(mid)
-        self.linked(pin="123456")
-        old = self.app.test_client()
-        self.assertEqual(self.pin(client=old).status_code, 302)
-        self.member(3)["role"] = "officer"
-        self.assertEqual(old.get("/admin/members").status_code, 302)
-        self.member(3)["role"] = "member"
-        self.assertEqual(self.pin(client=old).status_code, 302)
-        self.db.rows["term_officers"].append(dict(term_id="t-1", member_id=3))
-        self.assertEqual(old.get("/mypage").status_code, 303)
-        self.assertEqual(self.pin(client=old).status_code, 403)
+            with self.subTest(user=user):
+                email = user + "@knu.ac.kr"
+                self.linked(mid, "123456", email)
+                member = self.member(mid)
+                for field, value in (("is_active", False), ("account_status", "disabled"),
+                                     ("member_status", "inactive"), ("knu_email_verified_at", None)):
+                    previous = member[field]
+                    member[field] = value
+                    self.assertEqual(self.pin(identifier=email, client=self.app.test_client()).status_code, 401)
+                    member[field] = previous
+                for attempt in range(5):
+                    self.assertEqual(self.pin(pin="654321", identifier=email, client=self.app.test_client()).status_code,
+                                     429 if attempt == 4 else 401)
+                self.assertEqual(self.pin(identifier=email, client=self.app.test_client()).status_code, 429)
+                self.assertEqual(local_auth.parse_time(member["pin_locked_until"]) - self.now, timedelta(minutes=15))
+                member.update(pin_failed_attempts=0, pin_locked_until=None)
+                def revoke_during_verify(pin_hash, pin):
+                    result = original_verify(pin_hash, pin)
+                    member["auth_session_version"] += 1
+                    return result
+                with patch.object(local_auth, "verify_password", side_effect=revoke_during_verify):
+                    self.assertEqual(self.pin(identifier=email, client=self.app.test_client()).status_code, 401)
 
     def test_provisioned_staff_email_gets_verified_only_after_otp(self):
         staff = self.member(4)
         staff["knu_email"] = "officer@knu.ac.kr"
-        self.assertEqual(self.pin(identifier=staff["knu_email"]).status_code, 403)
+        self.assertEqual(self.pin(identifier=staff["knu_email"]).status_code, 401)
         self.assertIsNone(staff.get("knu_email_verified_at"))
         self.assertEqual(self.send(staff["knu_email"]).status_code, 200)
-        self.assertEqual(self.verify().location, "/admin/dashboard")
+        self.assertEqual(self.verify().location, "/account/pin/setup")
         self.assert_session(4)
         self.assertEqual(staff["knu_email_verified_at"], local_auth.iso(self.now))
 

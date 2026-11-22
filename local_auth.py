@@ -16,7 +16,7 @@ from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatc
 from flask import abort, flash, g, jsonify, redirect, render_template, request, session, url_for
 
 from member_identity import normalize_member_student_id
-from minipc_security import SENSITIVE_AUTH_PAGES, active_member, has_term_assignment
+from minipc_security import SENSITIVE_AUTH_PAGES, active_member
 from privacy_cleanup import init_privacy_cleanup_routes
 from recruitment_dues_routes import init_recruitment_dues_routes
 from security_utils import forwarded_client_address, safe_internal_next_url, trusted_client_address
@@ -44,7 +44,6 @@ SIX_DIGITS = re.compile(r'^[0-9]{6}$')
 EMAIL_PURPOSES = {'login': '로그인', 'signup': '회원가입', 'pin_reset': 'PIN 재설정'}
 EMAIL_ERROR = '경북대 학교 메일(@knu.ac.kr)만 사용할 수 있습니다.'
 SIGNUP_CLOSED = '현재 신규 가입 기간이 아닙니다. 운영진에게 문의해주세요.'
-PIN_STAFF = '운영진은 학교 메일 6자리 인증코드 또는 12자 이상 비밀번호로 로그인해주세요.'
 PIN_LOCKED = 'PIN을 5번 틀려 15분간 로그인할 수 없습니다. 학교 메일로 PIN을 재설정할 수 있습니다.'
 PIN_PROOF_EXPIRED = '학교 메일 인증 시간이 지났습니다. 인증코드를 다시 받아주세요.'
 PIN_LOCK_DURATION = timedelta(minutes=15)
@@ -463,9 +462,6 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
                 return email_page(email, purpose, error='가입 승인 대기 중입니다. 운영진이 승인하면 로그인할 수 있어요.', status=403)
             if not email_account_active(member):
                 return email_page(email, purpose, error='사용할 수 없는 계정입니다. 운영진에게 문의해주세요.', status=403)
-            regular = member.get('role') == 'member' and not has_term_assignment(db(), member['id'])
-            if purpose == 'pin_reset' and not regular:
-                return email_page(email, purpose, error=PIN_STAFF, status=403)
             if not verified_email_account(member):
                 changed = db().table('members').update({
                     'knu_email_verified_at': member.get('knu_email_verified_at') or iso(now), 'auth_provider': 'local',
@@ -480,7 +476,7 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
                 session['email_grant'] = grant
                 return redirect(url_for('pin_reset_confirm'), code=303)
             start_local_session(member, True)
-            if regular and not member.get('pin_hash'):
+            if not member.get('pin_hash'):
                 grant['kind'] = 'setup'
                 session['email_grant'] = grant
                 return redirect(url_for('pin_setup'), code=303)
@@ -537,7 +533,7 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
             member = email_auth_member('knu_email', grant['email'])
             if verified_email_account(member):
                 start_local_session(member, True)
-                if not member.get('pin_hash') and not has_term_assignment(db(), member['id']):
+                if not member.get('pin_hash'):
                     grant.update(kind='setup', member_id=member['id'], version=member['auth_session_version'] or 0)
                     session['email_grant'] = grant
                     return redirect(url_for('pin_setup'), code=303)
@@ -577,13 +573,9 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
             member = email_auth_member('knu_email', email)
 
         generic_error = '학교 메일·학번 또는 PIN이 맞지 않습니다.'
-        if can_login(member) and (is_officer_role(member) or has_term_assignment(db(), member['id'])):
-            return show(PIN_STAFF, 403)
         if not verified_email_account(member):
             verify_password(None, pin)
             return show(generic_error, 401)
-        if member.get('role') != 'member':
-            return show(PIN_STAFF, 403)
         now = now_utc()
         locked_until = parse_time(member.get('pin_locked_until'))
         if locked_until and locked_until > now:
@@ -598,19 +590,19 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
             lock = iso(now + PIN_LOCK_DURATION) if failed >= 5 else None
             query = db().table('members').update({'pin_failed_attempts': failed, 'pin_locked_until': lock}) \
                 .eq('id', member['id']).eq('pin_hash', member['pin_hash']).eq('pin_failed_attempts', attempts) \
-                .eq('auth_session_version', member['auth_session_version']).eq('role', 'member')
+                .eq('auth_session_version', member['auth_session_version']).eq('role', member['role'])
             query = query.eq('pin_locked_until', member['pin_locked_until']) if locked_until else query.is_('pin_locked_until', 'null')
             changed = query.execute().data or []
             if changed:
                 if not verified:
                     return show(PIN_LOCKED, 429) if lock else show(generic_error, 401)
-                if not verified_email_account(changed[0]) or has_term_assignment(db(), member['id']):
+                if not verified_email_account(changed[0]):
                     return show(generic_error, 401)
                 start_local_session(changed[0], True, method='pin')
                 return after_login_redirect(changed[0], safe_internal_next_url(request.form.get('next')))
             latest = email_auth_member('knu_email', member['knu_email'])
             if not latest or latest['id'] != member['id'] or latest['pin_hash'] != member['pin_hash'] \
-                    or latest['auth_session_version'] != member['auth_session_version'] or latest.get('role') != 'member':
+                    or latest['auth_session_version'] != member['auth_session_version'] or latest.get('role') != member.get('role'):
                 return show(generic_error, 401)
             attempts = latest['pin_failed_attempts']
             locked_until = parse_time(latest.get('pin_locked_until'))
@@ -626,8 +618,6 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
         if not verified_email_account(member) or member['id'] != grant['member_id'] \
                 or member['auth_session_version'] != grant['version'] or (kind == 'setup' and member.get('pin_hash')):
             return email_page(error=PIN_PROOF_EXPIRED, status=400)
-        if member.get('role') != 'member' or has_term_assignment(db(), member['id']):
-            return email_page(error=PIN_STAFF, status=403)
         error = None
         if request.method == 'POST':
             pin = request.form.get('pin') or ''
@@ -639,7 +629,7 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
                 update = {'pin_hash': hash_password(pin), 'pin_failed_attempts': 0, 'pin_locked_until': None,
                           'auth_session_version': grant['version'] + 1}
                 query = db().table('members').update(update).eq('id', member['id']).eq('knu_email', grant['email']) \
-                    .eq('auth_session_version', grant['version']).eq('role', 'member').eq('is_active', True) \
+                    .eq('auth_session_version', grant['version']).eq('role', member['role']).eq('is_active', True) \
                     .eq('account_status', 'active').eq('auth_provider', 'local')
                 member_status = member.get('member_status')
                 query = query.eq('member_status', member_status) if member_status else query.is_('member_status', 'null')
@@ -790,9 +780,6 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
     @app.route('/account/convert', methods=['GET', 'POST'])
     @login_required(role='ANY')
     def account_convert():
-        if session.get('login_method') == 'pin':
-            flash('아이디를 만들려면 학교 메일 인증코드로 다시 로그인해주세요.', 'warning')
-            return redirect(url_for('my_page'))
         member = member_row(session['user_id'])
         if not member or credential_for(member['id']):
             flash('이미 아이디로 로그인하는 계정입니다.', 'info')
