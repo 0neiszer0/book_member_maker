@@ -3864,7 +3864,13 @@ def _load_weekly_seminar_view(term_id=None):
 def admin_seminars():
     try:
         terms, term, weeks = _load_weekly_seminar_view(request.args.get('term_id'))
-        weeks = [row for row in weeks if not row['is_past']] + list(reversed([row for row in weeks if row['is_past']]))
+        def _week_all_confirmed(row):
+            by_day = row.get('sessions_by_day') or {}
+            live = [item for item in (by_day.get('thu'), by_day.get('mon')) if item and (item.get('day_type') != 'mon' or item.get('is_active'))]
+            return bool(live) and all(item.get('attendance_confirmed') for item in live)
+        active_weeks = [row for row in weeks if not row['is_past'] and not _week_all_confirmed(row)]
+        completed_weeks = list(reversed([row for row in weeks if row['is_past'] or _week_all_confirmed(row)]))
+        weeks = active_weeks + completed_weeks
         share_url = f"{PUBLIC_BASE_URL}/seminar_vote?token={term['share_token']}" if term else ''
         schedule_rows = [{
             'id': row['id'], 'book_title': row.get('book_title') or '',
@@ -3876,6 +3882,7 @@ def admin_seminars():
         } for row in weeks]
         schedule_csrf = session.setdefault('topic_moderator_csrf', secrets.token_urlsafe(32))
         return render_template('admin_seminars.html', terms=terms, term=term, weeks=weeks,
+                               active_weeks=active_weeks, completed_weeks=completed_weeks,
                                share_url=share_url,
                                schedule_rows=schedule_rows, schedule_csrf=schedule_csrf)
     except Exception as e:

@@ -17,15 +17,16 @@ class AdminSeminarTemplateTests(unittest.TestCase):
     def test_both_cards_use_attendance_lists(self):
         self.assertIn('for m in thu.attendees', self.source)
         self.assertIn('for m in mon.attendees', self.source)
-        self.assertEqual(self.source.count('카카오톡 참석 명단 반영·출석 확정'), 2)
+        self.assertIn('카카오톡 참여자 반영', self.source)
+        self.assertNotIn('카카오톡 참석 명단 반영·출석 확정', self.source)
         self.assertNotIn('absence-picker', self.source)
 
     def test_no_show_picker_is_available_on_each_session(self):
-        self.assertIn('macro no_show_panel(seminar_session)', self.source)
+        self.assertIn('macro no_show_panel(seminar_session, completed=false)', self.source)
         self.assertIn('미연락 불참', self.source)
         self.assertIn('/no_shows', self.source)
-        self.assertIn('{{ no_show_panel(thu) }}', self.source)
-        self.assertIn('{{ no_show_panel(mon) }}', self.source)
+        self.assertIn('{{ no_show_panel(thu, completed) }}', self.source)
+        self.assertIn('{{ no_show_panel(mon, completed) }}', self.source)
 
     def test_review_management_is_rendered_inside_each_session(self):
         self.assertIn('macro review_panel(seminar_session)', self.source)
@@ -200,3 +201,43 @@ class Wave32OperationsUiRenderTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+    def _dom(self):
+        from bs4 import BeautifulSoup
+        resp = self.client.get('/admin/seminars?term_id=term-1')
+        self.assertEqual(resp.status_code, 200)
+        return BeautifulSoup(resp.data, 'html.parser')
+
+    def test_confirmed_weeks_move_to_calm_completed_section(self):
+        dom = self._dom()
+        # w-normal: only session is attendance-confirmed -> bottom, collapsed, zero red buttons
+        done = dom.select_one('details.op-completed-weeks')
+        self.assertIsNotNone(done)
+        self.assertFalse(done.has_attr('open'))
+        self.assertIn('지난 세미나 · 출석 확정 완료 (1개 주차)', done.select_one('summary').get_text())
+        self.assertIsNotNone(done.select_one('#week-w-normal'))
+        self.assertEqual(len(done.select('.op-btn-primary, .lms-button-primary, .lms-button-cta')), 0)
+        self.assertIn('출석 확정 완료', done.get_text())
+        self.assertNotIn('카카오톡 참여자', done.get_text())
+        # upcoming unconfirmed week stays on top, before the completed block
+        extra = dom.select_one('#week-w-extra')
+        self.assertIsNone(extra.find_parent('details', class_='op-completed-weeks'))
+        self.assertTrue(extra.find_next('details', class_='op-completed-weeks'))
+        self.assertIsNone(done.find_next(id='week-w-extra'))
+
+    def test_lead_week_cta_follows_kakao_roster_state(self):
+        dom = self._dom()
+        lead = dom.select_one('#week-w-extra')
+        thu_card = lead.select('.op-session-card')[1]
+        primary = thu_card.select('.lms-button-primary')
+        self.assertEqual([a.get_text(strip=True) for a in primary], ['카카오톡 참여자 반영'])
+        self.assertIn('조 편성', [a.get_text(strip=True) for a in thu_card.select('.op-btn-secondary')])
+        self.assertIn('카톡 참여 1명', thu_card.get_text())
+        # once the roster has been reflected, grouping becomes the primary CTA
+        for row in self.fake.rows['seminar_sessions']:
+            if row['id'] == 's-thu-2':
+                row['roster_updated_at'] = '2099-11-20T00:00:00Z'
+        dom = self._dom()
+        thu_card = dom.select('#week-w-extra .op-session-card')[1]
+        self.assertEqual([a.get_text(strip=True) for a in thu_card.select('.lms-button-primary')], ['조 편성'])
+        self.assertIn('카카오톡 참여자 수정', [a.get_text(strip=True) for a in thu_card.select('.op-btn-secondary')])
