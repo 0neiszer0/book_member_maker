@@ -98,7 +98,7 @@ class QuickSearchAndHandoverTests(unittest.TestCase):
 
     # --- 1. Quick Search Tests ---
     def test_quick_search_guest_only_sees_public_items(self):
-        resp = self.client.get("/club-room")
+        resp = self.client.get("/login")
         self.assertEqual(resp.status_code, 200)
         html = resp.get_data(as_text=True)
         self.assertIn("quick_search.js", html)

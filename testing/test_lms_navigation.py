@@ -170,9 +170,13 @@ class LmsNavigationTests(unittest.TestCase):
         self.assertEqual(html.count('data-attendance-key='), 3)
         self.assertNotIn('다른 회원 비공개', html)
 
-    def test_guest_login_and_room_keep_lms_shell(self):
+    def test_guest_login_uses_lms_shell_and_room_uses_public_shell(self):
         self.assert_lms_response('/login')
-        self.assert_lms_response('/club-room')
+        response = self.client.get('/club-room')
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('class="public-shell"', html)
+        self.assertNotIn('id="lms-global"', html)
         self.assertIn('/login', self.client.get('/my/term_attendance').location)
 
     def test_classroom_notice_list_detail_and_search_keep_term_context(self):
