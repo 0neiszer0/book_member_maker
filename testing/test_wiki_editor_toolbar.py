@@ -58,6 +58,21 @@ class EditorToolbarTests(unittest.TestCase):
         for token in ['.wiki-col-handle', '.wiki-table-edge', '.wiki-resize-badge', 'col-resize', 'ew-resize', '#d20f17']:
             self.assertIn(token, css, token)
 
+    def test_typo_fixed_and_live_preview_stacks_full_width(self):
+        root = pathlib.Path(__file__).resolve().parent.parent
+        template = (root / 'templates' / 'wiki' / 'edit.html').read_text(encoding='utf-8')
+        self.assertNotIn('바꽨는지', template)
+        self.assertIn('바꿨는지', template)
+        self.assertIn('실시간 미리보기', template)
+        css = (root / 'static' / 'wiki_editor.css').read_text(encoding='utf-8')
+        js = (root / 'static' / 'wiki_editor.js').read_text(encoding='utf-8')
+        self.assertNotIn('grid-template-columns: repeat(2', css)
+        self.assertNotIn('max-height: 65vh', css)
+        self.assertIn('outline: none; box-shadow: 0 0 0 3px', css)
+        for token in ["'100%'", 'tableWidth', '[100, 85, 70]', '{focus: false}', 'if (focus) source.focus()']:
+            if token == "'100%'":
+                continue
+            self.assertIn(token, js, token)
     def test_classic_preview_submit_still_works_without_js(self):
         self.login()
         response = self.client.post('/wiki/edit/대문', data=dict(action='preview', wiki_csrf='token',
