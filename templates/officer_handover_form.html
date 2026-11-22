@@ -5,6 +5,16 @@
 {{ super() }}
 <meta name="robots" content="noindex,nofollow">
 <script defer src="{{ url_for('static', filename='auth_code_boxes.js') }}"></script>
+<style>
+  .eg-role-gap-group{margin-top:4px}
+  .eg-role-gap-item{border-top:1px solid #c7cdd1;padding:14px 0}
+  .eg-role-gap-item:first-child{border-top:0}
+  .eg-role-gap-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .eg-role-gap-title{font-weight:700}
+  .eg-role-gap-item .eg-help{margin-top:4px}
+  .eg-not-my-job{min-height:30px;padding:3px 10px;font-size:12px;line-height:18px;white-space:nowrap;flex-shrink:0}
+  .eg-role-gap-note{border:1px solid #c7cdd1;border-left:4px solid #0374b5;background:#f5f8fb;padding:12px 16px;font-size:14px;line-height:21px;margin-bottom:12px}
+</style>
 {% endblock %}
 {% block content %}
 <section class="eg-header">
@@ -49,7 +59,7 @@
 
   <label>
     <span>임원 직책 <strong style="color:#d20f17">*</strong></span>
-    <select class="eg-select" name="role_name" required {% if not is_open %}disabled{% endif %}>
+    <select id="handover-role-select" class="eg-select" name="role_name" required {% if not is_open %}disabled{% endif %}>
       <option value="">직책을 선택하세요</option>
       {% for role in roles %}
       <option value="{{ role }}" {% if form_values.get('role_name') == role %}selected{% endif %}>{{ role }}</option>
@@ -78,6 +88,31 @@
     <textarea class="eg-textarea" name="core_tasks" rows="5" maxlength="3000" required placeholder="맡은 업무와 진행 시기, 유용한 팁을 최대한 자세히 적어주세요." {% if not is_open %}disabled{% endif %}>{{ form_values.get('core_tasks', '') }}</textarea>
   </label>
 
+  {% set selected_role = form_values.get('role_name') or '' %}
+  <section id="handover-role-gaps" class="eg-section" {% if not selected_role %}hidden{% endif %}>
+    <h2>1-2. 위키 보강 요청 질문 (선택 · 직책 맞춤)</h2>
+    <div class="eg-role-gap-note" role="note">
+      현재 운영진 위키에 상세 내용이 부족한 항목들입니다. 알고 계신 부분만 편하게 적어 주시고, 본인 담당 업무가 아니라면 '내 업무 아님' 버튼을 누르거나 '내 업무 아님'이라고 적어 주세요.
+    </div>
+    {% for role, prompts in role_gap_prompts.items() %}
+    <div class="eg-role-gap-group" data-role="{{ role }}" {% if role != selected_role %}hidden{% endif %}>
+      {% for prompt in prompts %}
+      <div class="eg-role-gap-item">
+        <div class="eg-role-gap-head">
+          <div class="eg-role-gap-title">{{ prompt.title }}</div>
+          <button type="button" class="lms-button eg-not-my-job" data-target="gap_{{ prompt.key }}">내 업무 아님</button>
+        </div>
+        <div class="eg-help">{{ prompt.hint }}</div>
+        <label>
+          <span class="eg-help">알고 계신 내용</span>
+          <textarea class="eg-textarea" name="gap_{{ prompt.key }}" rows="3" maxlength="1500" placeholder="알고 계신 내용을 자세히 적어 주세요. 본인 담당 업무가 아니라면 '내 업무 아님'이라고 적어 주세요." {% if not is_open %}disabled{% endif %} {% if role != selected_role %}disabled{% endif %}>{{ form_values.get('gap_' ~ prompt.key, '') }}</textarea>
+        </label>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </section>
+
   <label>
     <span>2. 처음 맡았을 때 가장 헤맸거나 미리 알았으면 좋았을 점 <span class="eg-help">선택</span></span>
     <textarea class="eg-textarea" name="hardships_and_tips" rows="4" maxlength="3000" placeholder="초반에 놓치기 쉬웠던 일정, 타 부서와의 협업 포인트 등" {% if not is_open %}disabled{% endif %}>{{ form_values.get('hardships_and_tips', '') }}</textarea>
@@ -103,4 +138,51 @@
   {% endif %}
 </form>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(function() {
+  var section = document.getElementById('handover-role-gaps');
+  var select = document.getElementById('handover-role-select');
+  if (!section || !select) return;
+
+  function groups() {
+    return Array.prototype.slice.call(section.querySelectorAll('.eg-role-gap-group'));
+  }
+
+  function sync() {
+    var role = select.value || '';
+    var matched = null;
+    groups().forEach(function(group) {
+      var active = group.getAttribute('data-role') === role;
+      group.hidden = !active;
+      group.querySelectorAll('textarea').forEach(function(el) {
+        el.disabled = !active;
+      });
+      if (active) matched = group;
+    });
+    section.hidden = !matched;
+  }
+
+  select.addEventListener('change', sync);
+  sync();
+
+  section.querySelectorAll('.eg-not-my-job').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var group = btn.closest('.eg-role-gap-group');
+      if (!group) return;
+      var target = group.querySelector('textarea[name="' + btn.getAttribute('data-target') + '"]');
+      if (!target) return;
+      if (target.value === '내 업무 아님') {
+        target.value = '';
+      } else {
+        target.value = '내 업무 아님';
+      }
+      target.focus();
+    });
+  });
+})();
+</script>
 {% endblock %}

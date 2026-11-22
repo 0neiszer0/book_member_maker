@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from officer_handover import OFFICER_HANDOVER_ROLES, build_handover_wiki_draft
+from officer_handover import OFFICER_HANDOVER_ROLES, OFFICER_ROLE_GAP_PROMPTS, build_handover_wiki_draft
 from testing._fake_supabase import FakeSupabase
 from testing.test_home_overview import fixture
 
@@ -271,6 +271,68 @@ class QuickSearchAndHandoverTests(unittest.TestCase):
         self.assertEqual(stored[0]["author_name"], "김철수")
         self.assertEqual(stored[0]["form_id"], "form-open")
         self.assertIsNone(stored[0]["knu_email"])
+
+    def test_role_gap_prompts_cover_every_role_and_highlight_newspaper(self):
+        self.assertEqual(set(OFFICER_ROLE_GAP_PROMPTS.keys()), set(OFFICER_HANDOVER_ROLES))
+        for role in OFFICER_HANDOVER_ROLES:
+            prompts = OFFICER_ROLE_GAP_PROMPTS.get(role)
+            self.assertTrue(prompts, f"{role} 누락된 위키 보강 질문")
+            for prompt in prompts:
+                self.assertIn("key", prompt)
+                self.assertIn("title", prompt)
+                self.assertIn("hint", prompt)
+        for role in ("학술지원부장", "학술지원부원"):
+            keys = [prompt["key"] for prompt in OFFICER_ROLE_GAP_PROMPTS[role]]
+            titles = [prompt["title"] for prompt in OFFICER_ROLE_GAP_PROMPTS[role]]
+            self.assertIn("newspaper", keys)
+            self.assertTrue(any("신문 투고" in title for title in titles), f"{role} 신문 투고 질문 누락")
+
+    def test_public_handover_renders_role_gap_section(self):
+        path = f"/handover/{FORM_TOKEN}"
+        html = self.client.get(path).get_data(as_text=True)
+        self.assertIn("1-2. 위키 보강 요청 질문 (선택 · 직책 맞춤)", html)
+        self.assertIn("본인 담당 업무가 아니라면", html)
+        self.assertIn("내 업무 아님", html)
+        self.assertIn("eg-not-my-job", html)
+        self.assertIn("경북대 신문 투고 세부 절차", html)
+        self.assertIn("모임통장 개설", html)
+        self.assertIn("MT 기획·예산·식재료/주류 정량 기준", html)
+        self.assertIn("디자인 원본 아카이브", html)
+
+    def test_public_handover_stores_role_gap_notes_and_exports_them(self):
+        path = f"/handover/{FORM_TOKEN}"
+        token, _ = self._public_csrf(path)
+        resp = self.client.post(path, data={
+            "csrf_token": token,
+            "role_name": "학술지원부장",
+            "core_tasks": "세미나 도서 선정 및 운영",
+            "gap_newspaper": "경대신문 투고 담당...",
+            "gap_pre_seminar": "내 업무 아님",
+            "gap_curriculum_archive": "",
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("인수인계 설문을 제출했습니다.", resp.get_data(as_text=True))
+
+        stored = self.fake.rows["officer_handover_responses"]
+        self.assertEqual(len(stored), 1)
+        notes = stored[0]["role_gap_notes"]
+        self.assertIsNotNone(notes)
+        self.assertIn("[경북대 신문 투고 세부 절차]", notes)
+        self.assertIn("경대신문 투고 담당...", notes)
+        self.assertIn("[세미나 사전 자료(MD) 제작·배포 흐름]", notes)
+        self.assertIn("내 업무 아님", notes)
+        self.assertNotIn("[커리큘럼 선정", notes)
+
+        draft = build_handover_wiki_draft(self.fake.rows["officer_handover_forms"][0], stored)
+        self.assertIn("위키 보강 항목 답변 (직책별 상세 확인)", draft)
+        self.assertIn("경대신문 투고 담당...", draft)
+
+        self.login("admin")
+        admin_page = self.client.get("/admin/handover")
+        self.assertEqual(admin_page.status_code, 200)
+        html = admin_page.get_data(as_text=True)
+        self.assertIn("위키 보강 항목 답변 (직책별 상세 확인)", html)
+        self.assertIn("경대신문 투고 담당...", html)
 
     def test_public_handover_saves_normalized_school_email_without_exporting_it(self):
         path = f"/handover/{FORM_TOKEN}"

@@ -27,6 +27,116 @@ OFFICER_HANDOVER_ROLES = (
     "학술지원부원",
 )
 
+_ACADEMIC_SUPPORT_GAP_PROMPTS = [
+    {
+        "key": "newspaper",
+        "title": "경북대 신문 투고 세부 절차",
+        "hint": "어느 매체(경대신문 등)·담당 경로로 투고하는지, 마감 주기·원고 분량/형식, 채택 후 게재·아카이빙 흐름을 자세히 적어 주세요.",
+    },
+    {
+        "key": "pre_seminar",
+        "title": "세미나 사전 자료(MD) 제작·배포 흐름",
+        "hint": "자료 작성 시작 시점, 참고 논문·서평 찾는 요령, 배포 타이밍과 주의할 점은 무엇인가요?",
+    },
+    {
+        "key": "curriculum_archive",
+        "title": "커리큘럼 선정 및 세미나 기록 아카이빙",
+        "hint": "추천 도서 수합 → 부장회의 확정 과정과 세미나 기록 정리·사이트 이전에서 꼭 챙길 점은?",
+    },
+]
+
+_PRESIDENT_GAP_PROMPTS = [
+    {
+        "key": "federation_meetings",
+        "title": "전동대회·학술분과 회의 일정 및 대리인 신청 절차",
+        "hint": "정확한 개최 시기, 대리인 신청서 양식 위치 및 제출 경로, 회의 중 꼭 챙길 사항은?",
+    },
+    {
+        "key": "reregistration_grants",
+        "title": "정식동아리 재등록 서류 & 총동연 지원금 신청",
+        "hint": "재등록 제출 시기·필수 서류와 2027년 이후 총동연 지원금 신청 시 준비할 점은?",
+    },
+    {
+        "key": "dept_office",
+        "title": "철학과 사무실 연락 포맷 & 강의실 신청(8일 전)",
+        "hint": "지도교수님 날인 및 철학과 사무실(인문대 413호) 제출 포맷·연락 타이밍 노하우는?",
+    },
+]
+
+_VICE_PRESIDENT_GAP_PROMPTS = [
+    {
+        "key": "presenter_swap",
+        "title": "발제자 불참 시 주차 교체 & 총무 환급 연계",
+        "hint": "발제자가 불가피하게 빠질 때 교체 기준과, 세미나 후 발제자 참석 여부를 총무에게 넘기는 구체적인 방식은?",
+    },
+    {
+        "key": "absence_afterparty",
+        "title": "당일 불참 처리 기준 & 뒤풀이 인솔 배정",
+        "hint": "당일 불참 페널티 적용 기준, 전체 공유 전 뒤풀이 수요 조사 및 인솔 임원(최소 2명) 배정 요령은?",
+    },
+]
+
+_TREASURER_GAP_PROMPTS = [
+    {
+        "key": "bank_cashflow",
+        "title": "모임통장 개설·이관 & 현금흐름(이월금 100만 원) 관리",
+        "hint": "학기 초 토스/카카오뱅크 모임통장 개설·초대 절차와 MT 숙소비 등 큰 지출 시 주의할 점은?",
+    },
+    {
+        "key": "refund_receipts",
+        "title": "학기 말 5,000원 환급 정산 & 영수증/SharePoint 관리",
+        "hint": "환급 대상(3회+발제 주차) 대조 방법, KNU SharePoint 폴더 규칙, 영수증 분실·활동 사진 증빙 처리 팁은?",
+    },
+    {
+        "key": "roster_leave",
+        "title": "휴학생·교환학생 복귀 확인 & 강제 탈퇴 명부",
+        "hint": "모집 전 휴학생 재등록 의사 확인 시점과 강제 탈퇴자 재가입 방지 기록 방식은?",
+    },
+]
+
+_PLANNING_GAP_PROMPTS = [
+    {
+        "key": "mt_guide",
+        "title": "MT 기획·예산·식재료/주류 정량 기준",
+        "hint": "펜션 예약 시기, New 조 편성 노하우, 인당 식재료·주류 정량 기준과 사후 정산 흐름은?",
+    },
+    {
+        "key": "events_ops",
+        "title": "책크메이트·OT 게임·오픈세미나 실행 노하우",
+        "hint": "준비 타임라인, 상품 배정 기준, 당일 현장 스태프/진행요원 역할 분담 팁은?",
+    },
+    {
+        "key": "cross_functional",
+        "title": "기획부 2.0(3인 1팀) & 타 부서 협업(기능횡단)",
+        "hint": "프로젝트 배분, 학기 로드맵 조율, 설문조사 등 타 부서 지원 업무에서 챙길 점은?",
+    },
+]
+
+_PROMOTION_GAP_PROMPTS = [
+    {
+        "key": "design_originals",
+        "title": "디자인 원본 아카이브(미리캔버스/Canva/OT PPTX) 위치",
+        "hint": "카드뉴스·포스터·OT PPT 편집 원본 링크와 사용 폰트가 현재 어디에 정리되어 있나요? (비밀번호 제외)",
+    },
+    {
+        "key": "posting_routine",
+        "title": "모집·주간 홍보 게시 타이밍 및 사진/릴스 루틴",
+        "hint": "에브리타임·인스타 모집 공고 최적 시점과 세미나 당일 스토리·후기 카드뉴스·릴스 제작 흐름은?",
+    },
+]
+
+OFFICER_ROLE_GAP_PROMPTS: dict[str, list[dict[str, str]]] = {
+    "회장": _PRESIDENT_GAP_PROMPTS,
+    "부회장": _VICE_PRESIDENT_GAP_PROMPTS,
+    "총무": _TREASURER_GAP_PROMPTS,
+    "기획부장": _PLANNING_GAP_PROMPTS,
+    "홍보부장": _PROMOTION_GAP_PROMPTS,
+    "학술지원부장": _ACADEMIC_SUPPORT_GAP_PROMPTS,
+    "기획부원": _PLANNING_GAP_PROMPTS,
+    "홍보부원": _PROMOTION_GAP_PROMPTS,
+    "학술지원부원": _ACADEMIC_SUPPORT_GAP_PROMPTS,
+}
+
 SIGNED_CSRF_MAX_AGE = 12 * 3600
 RATE_WINDOW_SECONDS = 600
 RATE_MAX_SUBMISSIONS = 20
@@ -104,6 +214,22 @@ def _group_responses_by_role(responses):
     return grouped
 
 
+def _format_role_gap_notes(role_name, form_data):
+    """Collect and format the submitted gap_<key> answers for a role.
+
+    Returns a structured block like ``[제목]\\n...\\n\\n[제목]\\n...`` or ``None``
+    when every field for the role is blank.
+    """
+    prompts = OFFICER_ROLE_GAP_PROMPTS.get(role_name or "", [])
+    blocks = []
+    for prompt in prompts:
+        cleaned = clean_text(form_data.get(f"gap_{prompt['key']}"), 1500)
+        if not cleaned:
+            continue
+        blocks.append(f"[{prompt['title']}]\n{cleaned}")
+    return "\n\n".join(blocks) or None
+
+
 def build_handover_wiki_draft(form, responses):
     """Build an openNamu/Markdown-friendly wiki draft grouped by officer role."""
     title = form.get("title") or "임원진 인수인계"
@@ -121,6 +247,7 @@ def build_handover_wiki_draft(form, responses):
 
     field_labels = (
         ("core_tasks", "맡은 업무 서술. (최대한 자세히)"),
+        ("role_gap_notes", "위키 보강 항목 답변 (직책별 상세 확인)"),
         ("hardships_and_tips", "처음 맡았을 때 헤맸던 점 · 미리 알았으면 좋았을 점"),
         ("assets_and_links", "차기 임원에게 넘길 파일·링크·디자인 원본·양식 위치"),
         ("common_issues", "자주 생기는 트러블과 해결 요령"),
@@ -189,6 +316,7 @@ def init_officer_handover_routes(app, get_db, login_required):
             "form": form,
             "share_token": str(token),
             "roles": OFFICER_HANDOVER_ROLES,
+            "role_gap_prompts": OFFICER_ROLE_GAP_PROMPTS,
             "is_open": form.get("status") == "open",
             "csrf_token": _issue_handover_csrf(secret, str(token)),
             "submitted": False,
@@ -257,6 +385,7 @@ def init_officer_handover_routes(app, get_db, login_required):
 
         role_name = (request.form.get("role_name") or "").strip()
         core_tasks = clean_text(request.form.get("core_tasks"), 3000)
+        role_gap_notes = _format_role_gap_notes(role_name, request.form)
         raw_email = request.form.get("knu_email", "")
         knu_email = normalize_knu_email_input(raw_email)
         if knu_email and not valid_knu_email_input(raw_email, knu_email):
@@ -292,6 +421,7 @@ def init_officer_handover_routes(app, get_db, login_required):
             "term_cohort": clean_text(request.form.get("term_cohort"), 40) or None,
             "knu_email": knu_email or None,
             "core_tasks": core_tasks,
+            "role_gap_notes": role_gap_notes,
             "hardships_and_tips": clean_text(request.form.get("hardships_and_tips"), 3000) or None,
             "assets_and_links": clean_text(request.form.get("assets_and_links"), 2000) or None,
             "common_issues": clean_text(request.form.get("common_issues"), 2000) or None,
