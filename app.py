@@ -1139,7 +1139,13 @@ def applicant_result_portal(token):
     campaigns = supabase.table("recruitment_campaigns").select("*").eq("share_token", token_text).limit(1).execute().data or []
     campaign = campaigns[0] if campaigns else None
     if not campaign:
-        return render_template("applicant_result_portal.html", campaign=None, portal_state="unavailable", result=None, error_message=None), 404
+        status = 404
+        if request.method in {"GET", "HEAD"} and request.path.startswith(("/apply/", "/recruitment-results/")):
+            status = 200
+        return render_template(
+            "applicant_result_portal.html", campaign=None, portal_state="unavailable",
+            result=None, error_message=None,
+        ), status
     if not campaign.get('is_active'):
         portal_state = 'closed'
     elif campaign.get('is_published'):

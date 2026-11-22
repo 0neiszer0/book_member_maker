@@ -72,6 +72,17 @@ class ApplicationTests(unittest.TestCase):
         row['result_status'] = 'rejected'
         self.assertNotIn('Bank 123', self.client.post(self.url, data={'name':'홍길동', 'student_id':'20261234'}).get_data(as_text=True))
 
+    def test_invalid_links_render_the_isolated_portal(self):
+        token = "00000000-0000-0000-0000-000000000000"
+        for route, status in (("apply", 200), ("recruitment-results", 200), ("applicant-result", 404)):
+            with self.subTest(route=route):
+                response = self.client.get(f"/{route}/{token}")
+                body = response.get_data(as_text=True)
+                self.assertEqual(response.status_code, status)
+                self.assertIn("사용할 수 없는 링크입니다", body)
+                self.assertNotIn("lms-global", body)
+                self.assertIn("no-store", response.headers["Cache-Control"])
+
     def test_rate_limit_and_closed_stage(self):
         from datetime import datetime, timezone
         ip_hash = None
