@@ -1,3 +1,5 @@
+BEGIN;
+
 CREATE TABLE IF NOT EXISTS public.pre_seminar_materials (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     slug text NOT NULL UNIQUE,
@@ -16,3 +18,9 @@ CREATE TABLE IF NOT EXISTS public.pre_seminar_materials (
 
 CREATE INDEX IF NOT EXISTS pre_seminar_materials_published_idx
     ON public.pre_seminar_materials (is_published, seminar_date DESC, created_at DESC);
+
+ALTER TABLE public.pre_seminar_materials ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.pre_seminar_materials FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.pre_seminar_materials TO service_role;
+
+COMMIT;
