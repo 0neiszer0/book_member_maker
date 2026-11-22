@@ -282,15 +282,36 @@ class KnuEmailPinTests(unittest.TestCase):
         self.assertNotIn('name="email" type="email"', html)
         self.assertLess(html.index('action="/auth/email/verify"'), html.index("인증코드 다시 받기"))
         self.assertLess(html.index("인증코드 다시 받기"), html.index('id="pin-login"'))
+        self.assertLess(html.index('id="school-email"'), html.index('id="pin-login"'))
         self.assertIn('<details id="pin-login" class="auth-details">', html)
         self.assertIn('auth_code_boxes.js', html)
         self.assert_digit_widget(html, 'login-code', 'code', masked=False)
         self.assert_digit_widget(html, 'login-pin', 'pin')
+        self.assertRegex(html, r'data-auth-code data-digit-mask="false" data-auto-submit="true">\s*<label id="login-code-label"')
         reset = self.client.get("/login?mode=pin_reset").get_data(as_text=True)
         self.assertIn('class="auth-title">PIN 재설정</h1>', reset)
         self.assertIn('name="purpose" value="pin_reset"', reset)
+        self.assertLess(reset.index('<section id="school-email"'), reset.index('<details id="pin-login"'))
         failed_pin = self.pin().get_data(as_text=True)
-        self.assertIn('<details id="pin-login" class="auth-details" open>', failed_pin)
+        self.assertIn('<section id="pin-login"', failed_pin)
+        self.assertLess(failed_pin.index('<section id="pin-login"'), failed_pin.index('<details id="school-email"'))
+
+    def test_default_login_is_pin_first_with_auto_submit(self):
+        html = self.client.get("/login").get_data(as_text=True)
+        self.assertLess(html.index('<section id="pin-login"'), html.index('<details id="school-email"'))
+        self.assertIn('<details id="school-email" class="auth-details">', html)
+        self.assertRegex(html, r'data-auth-code data-digit-mask="true" data-auto-submit="true">\s*<label id="login-pin-label"')
+        self.assertNotIn('id="login-code"', html)
+        self.assertIn('href="/signup', html)
+        self.assertIn("mode=pin_reset", html)
+        self.assert_digit_widget(html, 'login-pin', 'pin')
+
+    def test_signup_pin_does_not_auto_submit(self):
+        self.send()
+        self.verify()
+        html = self.client.get("/auth/email/enroll").get_data(as_text=True)
+        self.assert_digit_widget(html, 'signup-pin', 'pin', required=False)
+        self.assertNotIn('data-auto-submit', html)
 
     def test_school_email_requests_and_pin_login_accept_bare_school_ids(self):
         response = self.client.get("/login")

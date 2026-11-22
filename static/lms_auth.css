@@ -61,3 +61,7 @@
 .lms-result-portal { background: #fff; border: 1px solid #e2e8f0; border-radius: 18px; padding: clamp(20px, 5vw, 40px); }
 body:has(.lms-result-portal) { background: #f8fafc; }
 .lms-result-portal .lms-button-primary { background: #a6192e; border-color: #a6192e; }
+.auth-pin-links{display:grid;gap:12px;margin-top:20px}
+.auth-secondary-cta{display:grid;gap:8px;padding:14px;border:1px solid #c7cdd1;border-radius:3px;background:#fafafa}
+.auth-secondary-cta .auth-help{margin:0;font-weight:700;color:#2b3338}
+.auth-pin-links>.auth-help{margin:0;font-size:14px;line-height:21px}
