@@ -1,12 +1,13 @@
-{% extends 'lms_base.html' %}
+{% extends 'lms_base.html' if session.user_role else '_public_shell.html' %}
 {% set lms_title='동아리방' %}{% set lms_page='room' %}
 {% block title %}동아리방 · 책 먹는 호반우{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_room.css') }}">{% endblock %}
-{% block content %}<div class="cr-shell" id="club-room" data-today="{{ room_today }}" data-csrf="{{ room_csrf }}" data-staff="{{ 'true' if room_staff else 'false' }}">
+{% block head %}<meta name="robots" content="noindex, nofollow"><link rel="stylesheet" href="{{ url_for('static', filename='lms_room.css') }}">{% endblock %}
+{% block content %}<div class="cr-shell{{ ' cr-standalone' if not session.user_role }}" id="club-room" data-today="{{ room_today }}" data-csrf="{{ room_csrf }}" data-staff="{{ 'true' if room_staff else 'false' }}" data-email="{{ room_user_email or '' }}" data-member="{{ 'false' if room_is_guest else 'true' }}">
   <header class="cr-hero">
-    <div><h1>동아리방 사용하기</h1>
-      <p>오전 9시부터 밤 12시까지, 원하는 시간을 골라주세요.<br>로그인 없이 신청하고 여러 팀이 함께 사용할 수 있어요.</p></div>
-    <div class="cr-hero-actions"><button class="cr-primary" id="cr-new" disabled>사용 신청하기</button><a href="#cr-my">내 예약 수정·취소</a></div>
+    <div><p class="cr-eyebrow">책 먹는 호반우 동아리방</p><h1>동아리방 사용하기</h1>
+      <p>오전 9시부터 밤 12시까지, 원하는 시간을 골라주세요.<br>로그인 없이 신청하고 여러 팀이 함께 사용할 수 있어요.</p>
+      <p class="cr-now" id="cr-now-status" role="status" data-tone="loading">지금 상태를 확인하고 있어요</p></div>
+    <div class="cr-hero-actions"><button class="cr-primary" id="cr-new" disabled>사용 신청하기</button><button type="button" class="cr-share" id="cr-share-link">링크 복사</button><a href="#cr-my">내 예약 수정·취소</a><span class="cr-share-note" id="cr-share-note" role="status"></span></div>
   </header>
   <section class="cr-availability" aria-labelledby="cr-free-title"><div><p class="cr-eyebrow" id="cr-summary-date">선택한 날짜</p><h2 id="cr-free-title">예약 가능한 시간</h2></div><div id="cr-free" role="status">시간표를 확인하고 있어요.</div></section>
   <p class="cr-footnote">위 시간은 빈 구간 안내예요. 구간을 누른 뒤 원하는 시작·종료 시간을 1시간 단위로 선택하면, 여러 시간도 한 번에 신청할 수 있어요.</p>
@@ -24,8 +25,16 @@
     <details id="cr-staff-panel"><summary>선택한 주의 예약·참여자 관리</summary><div id="cr-staff-list"></div></details>
   </section>
   {% endif %}
-  <section class="cr-my" id="cr-my"><div><h2>내 예약 수정·취소</h2><p>신청할 때 받은 개인 관리 코드로 불러오세요.<br>회원 로그인 없이 관리 코드로 수정·취소할 수 있어요.</p></div>
-    <div><form id="cr-lookup"><label for="cr-code">개인 관리 코드</label><div class="cr-lookup-row"><input id="cr-code" autocomplete="off" spellcheck="false" placeholder="예약 완료 후 받은 코드를 붙여넣으세요" required><button class="cr-secondary">불러오기</button></div></form><p id="cr-lookup-error" class="cr-error" role="alert" hidden></p><div id="cr-saved"></div><p class="cr-footnote">공용 기기에서는 사용 후 저장된 코드를 지워주세요. 코드를 잃어버렸다면 운영진에게 문의해주세요.</p><button class="cr-text-button" id="cr-forget">이 브라우저의 관리 코드 지우기</button></div>
+  <section class="cr-my" id="cr-my"><div><h2>내 예약 확인·수정·취소</h2><p>신청할 때 적은 학교 메일로 6자리 인증번호를 받으면<br>누구나 간단히 내 예약을 바꿀 수 있어요.</p></div>
+    <div>
+      <p class="cr-mail-state" id="cr-mail-state" role="status" hidden></p>
+      <form id="cr-mail-request" class="cr-mail-form"><label for="cr-mail-id">학교 메일 아이디 <span>@knu.ac.kr</span></label><div class="cr-lookup-row"><input id="cr-mail-id" autocomplete="username" inputmode="email" spellcheck="false" placeholder="아이디 (예: hoban)" required><button class="cr-primary">인증번호 받기</button></div></form>
+      <form id="cr-mail-verify" class="cr-mail-form" hidden><label for="cr-otp">메일로 받은 6자리 인증번호</label><div class="cr-lookup-row"><input id="cr-otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="000000" required><button class="cr-primary">확인</button></div></form>
+      <p id="cr-mail-error" class="cr-error" role="alert" hidden></p>
+      <div id="cr-my-list" class="cr-my-list"></div>
+      <details class="cr-legacy" id="cr-legacy"><summary>예전 관리 코드로 불러오기</summary>
+        <form id="cr-lookup"><label for="cr-code">개인 관리 코드</label><div class="cr-lookup-row"><input id="cr-code" autocomplete="off" spellcheck="false" placeholder="예약 완료 후 받은 코드를 붙여넣으세요" required><button class="cr-secondary">불러오기</button></div></form><p id="cr-lookup-error" class="cr-error" role="alert" hidden></p><div id="cr-saved"></div><p class="cr-footnote">공용 기기에서는 사용 후 저장된 코드를 지워주세요. 학교 메일 없이 예약했다면 운영진에게 문의해주세요.</p><button class="cr-text-button" id="cr-forget">이 브라우저의 관리 코드 지우기</button></details>
+    </div>
   </section>
   <details class="cr-help"><summary>처음 이용한다면</summary><p>① 사용 신청하기 → 날짜·시작·종료 시간 선택 → ② 대표자·참여자 입력 → ③ 신청 완료 확인. 다른 팀과 겹치면 한 번 확인 후 신청할 수 있어요. 대표자 이름과 사용 시간은 누구나 볼 수 있고, 참여자 명단·사용 목적은 신청자와 운영진만 확인할 수 있습니다.</p><p>동아리방 사용은 학기 출석 횟수에 포함되지 않습니다.</p></details>
 </div>
@@ -34,6 +43,7 @@
   <form id="cr-form"><fieldset id="cr-fields"><input type="hidden" id="cr-kind" value="regular">
     <div class="cr-time-fields"><label class="cr-use-date">사용 날짜<input type="date" id="cr-start-date" required></label><label>시작 시간<select id="cr-start-hour">{% for hour in range(9,24) %}<option value="{{ '%02d'|format(hour) }}">{{ '%02d'|format(hour) }}:00</option>{% endfor %}</select></label><label>종료 시간<select id="cr-end-hour">{% for hour in range(10,25) %}<option value="{{ '%02d'|format(hour) }}">{{ '%02d'|format(hour) }}:00</option>{% endfor %}</select></label></div>
     <p class="cr-duration" id="cr-duration"></p>
+    <label for="cr-email" id="cr-email-label">학교 메일 아이디 (@knu.ac.kr) <span>선택 · 수정·취소 인증에 써요</span></label><input id="cr-email" type="text" inputmode="email" autocomplete="username" spellcheck="false" maxlength="254" placeholder="아이디 (예: hoban)">
     <label for="cr-representative">대표자 이름 <span>시간표에 공개돼요</span></label><input id="cr-representative" maxlength="80" autocomplete="name" required>
     <label for="cr-participants">참여자 이름 <span>신청자와 운영진만 확인해요</span></label><textarea id="cr-participants" rows="3" maxlength="17000" placeholder="대표자를 포함해 적어주세요. 예: 김하늘, 이봄, 박여름&#10;여러 줄을 그대로 붙여넣어도 돼요." required></textarea>
     <label for="cr-purpose">사용 목적 <span>선택 · 비공개</span></label><input id="cr-purpose" maxlength="1000" placeholder="예: 책 읽기, 소모임">
@@ -41,9 +51,9 @@
   </fieldset>
   <p id="cr-form-error" class="cr-error" role="alert" hidden></p>
   <section id="cr-receipt" class="cr-receipt" hidden><h3 id="cr-receipt-title">예약 완료</h3><p id="cr-receipt-detail"></p></section>
-  <details id="cr-code-details" class="cr-code-details"><summary>개인 관리 코드 · 수정·취소할 때 필요해요</summary><input id="cr-issued-code" readonly aria-label="발급된 개인 관리 코드"><button type="button" class="cr-secondary" id="cr-copy">코드 복사</button><p id="cr-storage-note" class="cr-footnote">이 브라우저에 저장됩니다. 다른 기기에서는 코드를 입력해주세요. 타인에게 공유하지 마세요.</p></details>
+  <details id="cr-code-details" class="cr-code-details" hidden><summary>예전 방식 관리 코드 · 학교 메일을 적지 않았다면 보관해주세요</summary><input id="cr-issued-code" readonly aria-label="발급된 개인 관리 코드"><button type="button" class="cr-secondary" id="cr-copy">코드 복사</button><p id="cr-storage-note" class="cr-footnote">이 브라우저에 저장됩니다. 다른 기기에서는 코드를 입력해주세요. 타인에게 공유하지 마세요.</p></details>
   <div class="cr-form-actions"><button type="button" class="cr-danger" id="cr-cancel" hidden>예약 취소</button><button type="submit" class="cr-primary" id="cr-save">사용 신청 완료</button></div></form>
 </dialog>
-
+{% if not session.user_role %}<script defer src="{{ url_for('static', filename='club_room.js') }}"></script>{% endif %}
 {% endblock %}
-{% block scripts %}<script defer src="{{ url_for('static', filename='club_room.js') }}"></script>{% endblock %}
+{% block scripts %}{% if session.user_role %}<script defer src="{{ url_for('static', filename='club_room.js') }}"></script>{% endif %}{% endblock %}

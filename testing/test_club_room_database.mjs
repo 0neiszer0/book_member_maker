@@ -12,12 +12,15 @@ await db.exec(`create role anon; create role authenticated; create role service_
   grant usage on schema public to service_role; grant select on public.members to service_role;`);
 const migration = await readFile(new URL('../supabase/migrations/20261005122140_club_room_bookings.sql', import.meta.url), 'utf8');
 await db.exec(migration);
+const emailMigration = await readFile(new URL('../supabase/migrations/20261122020000_club_room_email_auth.sql', import.meta.url), 'utf8');
+await db.exec(emailMigration);
+await db.exec(emailMigration); // idempotent
 const digest = 'a'.repeat(64);
 function args(overrides = {}) {
   return {action:'create', id:randomUUID(), payload:{kind:'regular', starts_at:'2099-10-05T12:00:00+09:00', ends_at:'2099-10-05T14:00:00+09:00', representative:'대표 테스트', participants:['대표 테스트','비공개 참여자'], purpose:'비공개 목적'}, digest, actor:null, fingerprint:randomUUID(), ack:false, version:null, ...overrides};
 }
 async function mutate(a) {
-  const result = await db.query('select public.club_room_mutate($1,$2,$3,$4,$5,$6,$7,$8) as result', [a.action,a.id,a.payload,a.digest,a.actor,a.fingerprint,a.ack,a.version]);
+  const result = await db.query('select public.club_room_mutate($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) as result', [a.action,a.id,a.payload,a.digest,a.actor,a.fingerprint,a.ack,a.version,a.knuEmail ?? null,a.verified ?? null]);
   return result.rows[0].result;
 }
 await db.exec('set role service_role');
@@ -62,6 +65,21 @@ assert.equal((await mutate({...far,action:'cancel',version:1})).status, 'forbidd
 const audit = (await db.query('select * from club_room_booking_audit')).rows;
 assert.ok(audit.length >= 7);
 assert.equal(JSON.stringify(audit).includes(digest), false, 'audit excludes credential digests');
+// School-email authorization: alternative to the legacy code, never to staff rules.
+const mailed = args({ack:true, knuEmail:'Owner@knu.ac.kr'});
+const mailedSaved = await mutate(mailed);
+assert.equal(mailedSaved.status, 'success');
+assert.equal(JSON.stringify(mailedSaved).includes('knu.ac.kr'), false, 'returned booking hides email');
+assert.equal((await db.query('select knu_email from club_room_bookings where id=$1', [mailed.id])).rows[0].knu_email, 'owner@knu.ac.kr');
+const viaMail = {...mailed, digest:'', verified:'OWNER@knu.ac.kr', version:1};
+assert.equal((await mutate({...viaMail, action:'update', payload:{...mailed.payload, purpose:'메일 인증 수정'}})).status, 'success');
+assert.equal((await mutate({...viaMail, action:'update', verified:'other@knu.ac.kr', version:2})).status, 'forbidden', 'other email rejected');
+assert.equal((await mutate({...viaMail, action:'cancel', digest:'', verified:null, version:2})).status, 'forbidden', 'no credential rejected');
+assert.equal((await mutate({...mailed, action:'update', version:2, payload:{...mailed.payload, purpose:'코드 수정'}})).status, 'success', 'legacy code still works');
+assert.equal((await mutate({...viaMail, action:'cancel', version:1})).status, 'stale', 'versions still enforced');
+assert.equal((await mutate({...viaMail, action:'cancel', version:3})).status, 'success');
+assert.equal(JSON.stringify((await db.query('select * from club_room_booking_audit')).rows).includes('knu.ac.kr'), false, 'audit excludes email');
+await assert.rejects(db.query("update club_room_bookings set knu_email='x@gmail.com' where id=$1", [mailed.id]), /check constraint|permission/);
 await db.exec('reset role; set role anon');
 await assert.rejects(db.query('select * from public.club_room_bookings'), /permission denied/);
 await assert.rejects(mutate(args()), /permission denied/);

@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const {kst, shiftDate, weekStart, slotState, freeRanges, calendarTarget, targetMatches} = require('../static/club_room.js');
+const {kst, shiftDate, weekStart, slotState, freeRanges, calendarTarget, targetMatches, nowStatus, shareUrl} = require('../static/club_room.js');
 const future = calendarTarget('?date=2027-01-03&booking=public-id', '2026-10-27');
 assert.equal(future.date, '2027-01-03');
 assert.equal(weekStart(future.date), '2026-12-28');
@@ -27,4 +27,11 @@ assert.deepEqual(freeRanges(rows, '2026-10-05', now), [[10,12], [14,18]]);
 assert.deepEqual(freeRanges([], '2026-10-04', now), []);
 assert.deepEqual(freeRanges([], '2026-10-06', now), [[9,24]]);
 assert.deepEqual(freeRanges(rows, '2026-10-06', now), [[9,24]]);
+const at = text => Date.parse(text);
+assert.deepEqual(nowStatus(rows, at('2026-10-05T10:20:00+09:00')), {tone:'free', text:'지금 바로 사용 가능해요 (다음 예약 12:00)'});
+assert.deepEqual(nowStatus(rows, at('2026-10-05T12:30:00+09:00')), {tone:'busy', text:'지금 예약이 있어요 · 14:00부터 비어 있어요'});
+assert.equal(nowStatus(rows, at('2026-10-05T19:00:00+09:00')).text, '지금 예약이 있어요 · 오늘은 자정까지 이어져요');
+assert.equal(nowStatus(rows, at('2026-10-05T07:00:00+09:00')).text, '현재 이용 시간이 아니에요 (09:00~24:00)');
+assert.equal(nowStatus([], at('2026-10-05T15:00:00+09:00')).tone, 'free');
+assert.equal(shareUrl('https://knu-read.xyz/'), 'https://knu-read.xyz/club-room');
 console.log('Room calendar: KST, week/year boundaries, shared/blocked slots, midnight and free ranges passed.');
