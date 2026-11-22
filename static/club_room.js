@@ -36,8 +36,21 @@
     }
     return ranges;
   }
+  function nowStatus(bookings, now) {
+    const stamp = kst(now), day = stamp.slice(0, 10), hour = Number(stamp.slice(11, 13));
+    if (hour < 9) return {tone: 'closed', text: '현재 이용 시간이 아니에요 (09:00~24:00)'};
+    const busy = h => slotState(bookings, day, h, now).rows.length > 0;
+    if (!busy(hour)) {
+      const next = bookings.map(b => Date.parse(b.starts_at)).filter(t => t > now && kst(t).slice(0, 10) === day).sort((a, b) => a - b)[0];
+      return {tone: 'free', text: '지금 바로 사용 가능해요 ' + (next ? '(다음 예약 ' + kst(next).slice(11) + ')' : '(오늘 남은 시간 예약 없음)')};
+    }
+    let end = hour;
+    while (end < 24 && busy(end)) end++;
+    return {tone: 'busy', text: end >= 24 ? '지금 예약이 있어요 · 오늘은 자정까지 이어져요' : '지금 예약이 있어요 · ' + pad(end) + ':00부터 비어 있어요'};
+  }
+  const shareUrl = origin => origin.replace(/\/+$/, '') + '/club-room';
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {kst, shiftDate, weekStart, slotState, freeRanges, calendarTarget, targetMatches}; return;
+    module.exports = {kst, shiftDate, weekStart, slotState, freeRanges, calendarTarget, targetMatches, nowStatus, shareUrl}; return;
   }
   const root = document.getElementById('club-room');
   const homeStatus = document.getElementById('cr-home-status');
@@ -105,6 +118,7 @@
     $('cr-summary-date').textContent = dateText(selected);
     $('cr-days').replaceChildren(); $('cr-grid').replaceChildren(); $('cr-free').replaceChildren();
     const start = weekStart(selected);
+    renderNow();
     for (let i = 0; i < 7; i++) {
       const day = shiftDate(start, i), isSelected = day === selected;
       const tab = node('button', undefined, isSelected ? 'is-selected' : '');
@@ -137,7 +151,7 @@
         const button = node('button'); button.type = 'button';
         button.append(node('strong',pad(startHour) + ':00–' + pad(endHour) + ':00'),node('span','이 시간에 예약하기 →'));
         button.setAttribute('aria-label',pad(startHour)+':00부터 '+pad(endHour)+':00 사이 예약하기');
-        button.addEventListener('click', () => openNew(selected, startHour)); $('cr-free').append(button);
+        button.addEventListener('click', () => openNew(selected, startHour, 'regular', endHour)); $('cr-free').append(button);
       });
       if (!ranges.length) $('cr-free').textContent = '예약 없는 시간이 없어요. 일반 예약과는 함께 사용할 수 있어요.';
     }
@@ -145,12 +159,25 @@
     if (staff) $('cr-meeting').disabled = $('cr-new').disabled;
     if (focusedLabel) [...root.querySelectorAll('button[aria-label]')].find(button => button.getAttribute('aria-label') === focusedLabel)?.focus({preventScroll:true});
   }
+  let todayRows = null;
+  function renderNow() {
+    const el = $('cr-now-status'), today = kst(now).slice(0, 10);
+    const rows = weekStart(selected) === weekStart(today) && ready ? bookings : todayRows;
+    if (!rows) return;
+    const status = nowStatus(rows, now);
+    el.textContent = status.text; el.dataset.tone = status.tone;
+  }
+  async function refreshToday() {
+    const thisWeek = weekStart(kst(Date.now()).slice(0, 10));
+    if (weekStart(selected) === thisWeek) { todayRows = null; return; }
+    try { const data = await api('/api/club-room/schedule?date=' + thisWeek); todayRows = data.bookings; now = Date.parse(data.now); renderNow(); } catch (_) {}
+  }
   async function refresh() {
     const seq = ++requestNumber, start = weekStart(selected);
     try {
       const data = await api('/api/club-room/schedule?date=' + start);
       if (seq !== requestNumber) return;
-      bookings = data.bookings; now = Date.parse(data.now); ready = true; message('cr-error', '');
+      bookings = data.bookings; now = Date.parse(data.now); ready = true; message('cr-error', ''); refreshToday();
       $('cr-updated').textContent = '방금 확인 · 화면이 열려 있으면 30초마다 갱신'; render();
       if (staff) refreshStaff();
     } catch (error) {
@@ -189,6 +216,8 @@
   function showForm(booking) {
     dirty = false; form.reset(); $('cr-fields').hidden = false; $('cr-fields').disabled = false; $('cr-save').hidden = false;
     $('cr-copy').textContent = '코드 복사';
+    $('cr-email').value = root.dataset.email ? root.dataset.email.replace(/@knu\.ac\.kr$/, '') : '';
+    $('cr-email').hidden = $('cr-email-label').hidden = !!current.version;
     $('cr-receipt').hidden = true; message('cr-form-error', ''); $('cr-kind').value = booking.kind;
     $('cr-representative').value = booking.representative || ''; $('cr-participants').value = (booking.participants || []).join(', '); $('cr-purpose').value = booking.purpose || '';
     const from = kst(booking.starts_at), to = kst(booking.ends_at);
@@ -202,18 +231,18 @@
     $('cr-dialog-title').textContent = current.version ? '예약 확인·수정' : booking.kind === 'meeting' ? '임원진 회의 등록' : '동아리방 사용 신청';
     $('cr-save').textContent = current.version ? '변경 내용 저장' : booking.kind === 'meeting' ? '회의 등록 완료' : '사용 신청 완료';
     $('cr-cancel').hidden = !current.version || !!booking.cancelled_at;
-    $('cr-meeting-note').hidden = booking.kind !== 'meeting'; $('cr-code-details').hidden = !current.code; $('cr-code-details').open = false;
+    $('cr-meeting-note').hidden = booking.kind !== 'meeting'; $('cr-code-details').hidden = !current.code || !!current.hasEmail; $('cr-code-details').open = false;
     $('cr-issued-code').value = current.code ? current.id + '.' + current.code : '';
     if (!supported) { $('cr-save').hidden = true; $('cr-fields').disabled = true; message('cr-form-error', '기존 예약은 그대로 유지돼요: ' + timeText(booking) + '. 야간 예약 변경은 운영진에게 문의해주세요. 취소는 가능합니다.'); }
     if (booking.cancelled_at) { $('cr-save').hidden = true; $('cr-fields').disabled = true; message('cr-form-error', '취소된 예약이에요. 다시 사용하려면 새로 신청해주세요.'); }
     if (!dialog.open) dialog.showModal();
   }
-  function openNew(day, hour, kind = 'regular') {
+  function openNew(day, hour, kind = 'regular', endHour = hour + 1) {
     if (!ready || busy) return;
     const start = Date.parse(day + 'T' + pad(Math.max(9, hour)) + ':00:00+09:00');
     const code = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-    current = {id:crypto.randomUUID(), code, version:null};
-    showForm({kind, starts_at:new Date(start).toISOString(), ends_at:new Date(start + hourMs).toISOString(), participants:[]});
+    current = {id:crypto.randomUUID(), code, version:null, hasEmail:false};
+    showForm({kind, starts_at:new Date(start).toISOString(), ends_at:new Date(start + Math.max(1, endHour - Math.max(9, hour)) * hourMs).toISOString(), participants:[]});
   }
   async function loadBooking(id, code) {
     if (busy) return;
@@ -226,7 +255,8 @@
   async function save(action) {
     if (!current || busy) return;
     const body = {action, edit_code:current.code, version:current.version, ...times(), kind:$('cr-kind').value, representative:$('cr-representative').value, participants:$('cr-participants').value, purpose:$('cr-purpose').value};
-    if (action === 'create') { current.start = body.starts_at; remember(current); }
+    if (action === 'create') body.knu_email = $('cr-email').value.trim();
+    if (action === 'create') { current.start = body.starts_at; current.hasEmail = !!body.knu_email; remember(current); }
     setBusy(true); message('cr-form-error', '');
     try {
       const url = '/api/club-room/bookings/' + current.id;
@@ -242,8 +272,10 @@
       if (current.code) { current.start = kst(data.booking.starts_at); remember(current); }
       $('cr-fields').hidden = true; $('cr-save').hidden = true; $('cr-cancel').hidden = true; $('cr-receipt').hidden = false;
       $('cr-receipt-title').textContent = data.booking.cancelled_at ? '예약이 취소됐어요' : '예약이 완료됐어요';
-      $('cr-receipt-detail').textContent = timeText(data.booking) + '\n대표자 ' + data.booking.representative + (body.kind === 'meeting' ? '\n기존 예약은 유지됩니다. 필요한 경우 직접 조율해주세요.' : ' · 참여 ' + data.booking.participants.length + '명');
-      $('cr-dialog-title').textContent = '처리 완료'; $('cr-code-details').open = !!current.code;
+      const mailed = action === 'create' && (data.has_email || !!body.knu_email);
+      $('cr-receipt-detail').textContent = (mailed ? '예약이 완료되었어요! 수정·취소가 필요하면 학교 메일 인증으로 언제든 변경할 수 있어요.\n' : '') + timeText(data.booking) + '\n대표자 ' + data.booking.representative + (body.kind === 'meeting' ? '\n기존 예약은 유지됩니다. 필요한 경우 직접 조율해주세요.' : ' · 참여 ' + data.booking.participants.length + '명');
+      $('cr-dialog-title').textContent = '처리 완료'; $('cr-code-details').hidden = !current.code || mailed; $('cr-code-details').open = !!current.code && !mailed;
+      loadMine();
       refresh();
     } catch (error) { message('cr-form-error', error.message); }
     finally { setBusy(false); }
@@ -269,5 +301,48 @@
   $('cr-refresh').addEventListener('click', () => refresh());
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
   setInterval(() => { if (!document.hidden) refresh(); }, 30000);
-  renderSaved(); render(); refresh(true);
+  const mine = {email: root.dataset.email || ''};
+  function mineMessage(text) { message('cr-mail-error', text); }
+  function renderMine(email, rows) {
+    mine.email = email || '';
+    const state = $('cr-mail-state');
+    state.hidden = !mine.email;
+    state.textContent = mine.email ? (root.dataset.member === 'true' ? '로그인한 학교 메일 ' : '인증된 학교 메일 ') + mine.email + '의 예약이에요.' : '';
+    $('cr-mail-request').hidden = !!mine.email; if (mine.email) $('cr-mail-verify').hidden = true;
+    $('cr-my-list').replaceChildren();
+    if (!mine.email) return;
+    (rows || []).forEach(row => {
+      const item = node('div', undefined, 'cr-staff-row'), info = node('div');
+      info.append(node('strong', timeText(row)), node('p', '참여 ' + (row.participants || []).length + '명' + (row.purpose ? ' · ' + row.purpose : '')));
+      const button = node('button', '확인·수정·취소'); button.type = 'button';
+      button.addEventListener('click', () => loadBooking(row.id, ''));
+      item.append(info, button); $('cr-my-list').append(item);
+    });
+    if (!rows || !rows.length) $('cr-my-list').append(node('p', '이 메일로 신청한 예정 예약이 없어요.', 'cr-empty'));
+  }
+  async function loadMine() {
+    try { const data = await api('/api/club-room/my-bookings'); renderMine(data.email, data.bookings); } catch (_) { /* optional */ }
+  }
+  $('cr-mail-request').addEventListener('submit', async event => {
+    event.preventDefault(); mineMessage('');
+    try {
+      const data = await api('/api/club-room/email/request', {email:$('cr-mail-id').value});
+      $('cr-mail-verify').hidden = false; $('cr-otp').focus();
+      $('cr-mail-state').hidden = false; $('cr-mail-state').textContent = data.email + '로 6자리 인증번호를 보냈어요. 메일함을 확인해주세요.';
+    } catch (error) { mineMessage(error.message); }
+  });
+  $('cr-mail-verify').addEventListener('submit', async event => {
+    event.preventDefault(); mineMessage('');
+    try {
+      const data = await api('/api/club-room/email/verify', {code:$('cr-otp').value.trim()});
+      root.dataset.email = data.email; $('cr-otp').value = ''; renderMine(data.email, data.bookings);
+    } catch (error) { mineMessage(error.message); }
+  });
+  $('cr-share-link').addEventListener('click', async () => {
+    const url = shareUrl(window.location.origin), note = $('cr-share-note');
+    try { await navigator.clipboard.writeText(url); note.textContent = '링크를 복사했어요'; }
+    catch (_) { window.prompt('아래 링크를 복사해주세요', url); note.textContent = ''; }
+    setTimeout(() => { note.textContent = ''; }, 3000);
+  });
+  renderSaved(); render(); refresh(true); if (mine.email) loadMine();
 })();

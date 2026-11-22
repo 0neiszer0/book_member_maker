@@ -8,6 +8,8 @@ from uuid import UUID
 
 from flask import abort, g, jsonify, render_template, request, session
 from security_utils import trusted_client_address
+from guest_email_verify import (get_verified_guest_email, is_valid_knu_email, normalize_knu_email,
+                                request_guest_email_code, verify_guest_email_code)
 
 KST = timezone(timedelta(hours=9))
 PRIVATE_FIELDS = 'id,kind,starts_at,ends_at,representative,participants,purpose,version,cancelled_at'
@@ -66,6 +68,30 @@ def init_club_room_routes(app, get_db, login_required):
             return session['user_id']
         return None
 
+    def member_email():
+        """Verified school email of the signed-in, active member, if any."""
+        if not session.get('user_id'):
+            return None
+        rows = get_db().table('members').select('knu_email,knu_email_verified_at,is_active,account_status')             .eq('id', session['user_id']).limit(1).execute().data or []
+        member = rows[0] if rows else {}
+        email = normalize_knu_email(member.get('knu_email'))
+        if (email and member.get('knu_email_verified_at') and member.get('is_active') is not False
+                and member.get('account_status') == 'active' and is_valid_knu_email(email, email)):
+            return email
+        return None
+
+    def active_email():
+        try:
+            return member_email() or get_verified_guest_email('room_edit', 'global')
+        except Exception:
+            app.logger.exception('Room email lookup failed')
+            return get_verified_guest_email('room_edit', 'global')
+
+    def my_bookings(email):
+        floor = (datetime.now(KST) - timedelta(days=14)).isoformat()
+        rows = get_db().table('club_room_bookings').select(PRIVATE_FIELDS)             .eq('knu_email', email).is_('cancelled_at', 'null').gte('ends_at', floor)             .order('starts_at').limit(100).execute().data or []
+        return [{k: r.get(k) for k in PRIVATE_FIELDS.split(',')} for r in rows if r.get('kind') != 'meeting']
+
     def body_with_csrf():
         if request.content_length and request.content_length > 24000:
             abort(413)
@@ -109,8 +135,49 @@ def init_club_room_routes(app, get_db, login_required):
         except Exception:
             app.logger.exception('Room staff visibility check failed')
             staff = False
+        try:
+            email = active_email() or ''
+        except Exception:
+            email = ''
         return render_template('club_room.html', room_staff=staff, room_csrf=session['room_csrf'],
-                               room_today=datetime.now(KST).date().isoformat())
+                               room_today=datetime.now(KST).date().isoformat(),
+                               room_is_guest=not bool(session.get('user_id')), room_user_email=email,
+                               room_email_verified=bool(email))
+
+    @app.post('/api/club-room/email/request')
+    def club_room_email_request():
+        body = body_with_csrf()
+        try:
+            email = request_guest_email_code(app, get_db(), body.get('email', ''), 'room_edit', '동아리방 예약 관리', 'global')
+            return jsonify(ok=True, email=email)
+        except ValueError as error:
+            return jsonify(error=str(error)), 400
+        except Exception:
+            app.logger.exception('Room email code request failed')
+            return jsonify(error='인증 메일을 보내지 못했어요. 잠시 후 다시 시도해주세요.'), 503
+
+    @app.post('/api/club-room/email/verify')
+    def club_room_email_verify():
+        body = body_with_csrf()
+        try:
+            if not verify_guest_email_code(app, get_db(), 'room_edit', 'global', body.get('code', '')):
+                return jsonify(error='인증번호가 맞지 않거나 만료됐어요. 다시 확인해주세요.'), 400
+            email = get_verified_guest_email('room_edit', 'global')
+            return jsonify(ok=True, email=email, bookings=my_bookings(email))
+        except Exception:
+            app.logger.exception('Room email verification failed')
+            return jsonify(error='인증을 확인하지 못했어요. 잠시 후 다시 시도해주세요.'), 503
+
+    @app.get('/api/club-room/my-bookings')
+    def club_room_my_bookings():
+        try:
+            email = active_email()
+            if not email:
+                return jsonify(email='', bookings=[])
+            return jsonify(email=email, bookings=my_bookings(email))
+        except Exception:
+            app.logger.exception('Room my bookings failed')
+            return jsonify(error='내 예약을 불러오지 못했어요.'), 503
 
     @app.get('/api/club-room/schedule')
     def club_room_schedule():
@@ -148,14 +215,27 @@ def init_club_room_routes(app, get_db, login_required):
             if not isinstance(code, str) or (code and not re.fullmatch(r'[A-Za-z0-9_-]{43}', code)):
                 raise ValueError('개인 관리 코드를 확인해주세요.')
             actor = staff_id()
-            if not code and (action == 'create' or not actor):
+            verified = None if actor else active_email()
+            if not code and (action == 'create' or not (actor or verified)):
                 raise ValueError('개인 관리 코드를 확인해주세요.')
+            knu_email = ''
+            if action == 'create':
+                raw_email = body.get('knu_email', '')
+                if not isinstance(raw_email, str):
+                    raw_email = ''
+                if raw_email.strip():
+                    knu_email = normalize_knu_email(raw_email)
+                    if not is_valid_knu_email(raw_email, knu_email):
+                        return jsonify(error='학교 메일 아이디를 확인해주세요. 예: 아이디@knu.ac.kr'), 400
+                else:
+                    knu_email = (verified or '') if not actor else (member_email() or '')
             digest = edit_digest(code, app.secret_key) if code else ''
             if action == 'read':
-                rows = get_db().table('club_room_bookings').select(PRIVATE_FIELDS + ',edit_digest') \
+                rows = get_db().table('club_room_bookings').select(PRIVATE_FIELDS + ',edit_digest,knu_email') \
                     .eq('id', booking_id).limit(1).execute().data or []
                 row = rows[0] if rows else None
-                if not row or (row['kind'] == 'meeting' and not actor) or (not actor and not hmac.compare_digest(row['edit_digest'], digest)):
+                email_ok = bool(verified and row and (row.get('knu_email') or '').lower() == verified.lower())
+                if not row or (row['kind'] == 'meeting' and not actor) or (not actor and not email_ok and not (code and hmac.compare_digest(row['edit_digest'], digest))):
                     return jsonify(error='예약 또는 개인 관리 코드를 확인해주세요.'), 403
                 return jsonify(status='success', booking={k: row.get(k) for k in PRIVATE_FIELDS.split(',')})
             payload = booking_payload(body) if action in ('create', 'update') else {}
@@ -174,11 +254,13 @@ def init_club_room_routes(app, get_db, login_required):
             fingerprint = hmac.new(str(app.secret_key).encode(), ('room-rate:' + address).encode(), hashlib.sha256).hexdigest()
             result = get_db().rpc('club_room_mutate', dict(p_action=action, p_id=booking_id,
                 p_payload=payload, p_digest=digest, p_actor=actor, p_fingerprint=fingerprint,
-                p_ack=body.get('acknowledge_overlap') is True, p_version=version)).execute().data
+                p_ack=body.get('acknowledge_overlap') is True, p_version=version,
+                p_knu_email=knu_email or None, p_verified_email=verified)).execute().data
             status = (result or {}).get('status')
             if status == 'success':
                 row = result['booking']
-                return jsonify(status=status, booking={k: row.get(k) for k in PRIVATE_FIELDS.split(',')})
+                extra = dict(edit_code=code, has_email=bool(knu_email)) if action == 'create' else {}
+                return jsonify(status=status, booking={k: row.get(k) for k in PRIVATE_FIELDS.split(',')}, **extra)
             if status == 'overlap':
                 return jsonify(status=status, conflicts=[public_booking({**r, 'id': ''}) for r in result['conflicts']],
                                error='겹치는 예약이 있어요. 함께 사용해도 괜찮은지 확인해주세요.'), 409

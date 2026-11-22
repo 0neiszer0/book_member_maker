@@ -3,6 +3,7 @@ import hmac
 import importlib
 import os
 import unittest
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 from uuid import uuid4
@@ -184,6 +185,124 @@ class RoomTests(unittest.TestCase):
         self.db.rows['club_room_bookings'][0]['starts_at']='2099-10-05T02:00:00+09:00'
         self.assertEqual(self.post(dict(action='read',edit_code=self.code)).status_code,200)
         self.assertEqual(self.post(dict(action='cancel',edit_code=self.code,version=1)).status_code,200)
+
+
+class RoomEmailTests(RoomTests):
+    """Friendly school-email management, on top of the unchanged legacy-code behaviour."""
+    def setUp(self):
+        super().setUp()
+        self.row['knu_email'] = 'owner@knu.ac.kr'
+        self.db.rows['club_room_bookings'][0]['knu_email'] = 'owner@knu.ac.kr'
+        self.db.rows['members'].append(dict(id=3, role='member', is_active=True, account_status='active',
+            member_status='active', knu_email='Owner@knu.ac.kr', knu_email_verified_at='2026-01-01T00:00:00Z'))
+        self.sent = []
+        self.module.app.extensions['email_auth_sender'] = lambda *args: self.sent.append(args)
+        self.addCleanup(self.module.app.extensions.pop, 'email_auth_sender', None)
+        base_rpc = self.db.rpc
+        def rpc(name, args):
+            if name == 'reserve_email_auth_code':
+                self.db.rows.setdefault('email_auth_codes', []).append({
+                    'id': args['p_id'], 'email': args['p_email'], 'purpose': args['p_purpose'],
+                    'code_hash': args['p_code_hash'], 'attempts': 0, 'consumed_at': None,
+                    'expires_at': (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()})
+                return SimpleNamespace(execute=lambda: SimpleNamespace(data=True))
+            return base_rpc(name, args)
+        self.db.rpc = rpc
+
+    def api(self, path, body, csrf=True):
+        return self.client.post(path, json=body, headers={'X-Room-CSRF': self.csrf} if csrf else {})
+
+    def verify_as(self, local):
+        with patch('guest_email_verify.secrets.randbelow', return_value=123456):
+            self.assertEqual(self.api('/api/club-room/email/request', {'email': local}).status_code, 200)
+        return self.api('/api/club-room/email/verify', {'code': '123456'})
+
+    def test_guest_gets_standalone_shell_and_member_gets_lms(self):
+        guest = self.client.get('/club-room').get_data(as_text=True)
+        self.assertIn('public-shell', guest)
+        self.assertNotIn('lms-page', guest)
+        self.assertIn('id="cr-share-link"', guest)
+        self.assertIn('id="cr-now-status"', guest)
+        self.assertIn('id="cr-email"', guest)
+        self.assertIn('예전 관리 코드로 불러오기', guest)
+        self.assertEqual(guest.count('club_room.js'), 1)
+        self.login(2, 'member')
+        member = self.client.get('/club-room').get_data(as_text=True)
+        self.assertIn('lms-page', member)
+        self.assertNotIn('public-shell', member)
+        self.assertEqual(member.count('club_room.js'), 1)
+
+    def test_create_stores_normalized_email_and_still_returns_code(self):
+        response = self.post({**self.body, 'knu_email': ' Owner '})
+        self.assertEqual(response.status_code, 200)
+        sent = self.rpc_calls[-1][1]
+        self.assertEqual(sent['p_knu_email'], 'owner@knu.ac.kr')
+        self.assertEqual(response.json['edit_code'], self.code)
+        self.assertTrue(response.json['has_email'])
+        self.assertNotIn('knu_email', response.json['booking'])
+        self.assertFalse(self.post(self.body).json['has_email'])
+        self.assertEqual(self.post({**self.body, 'knu_email': 'x@gmail.com'}).status_code, 400)
+        self.assertEqual(self.post({**self.body, 'knu_email': '한글'}).status_code, 400)
+
+    def test_logged_in_member_email_is_autofilled_and_listed(self):
+        self.login(3, 'member')
+        page = self.client.get('/club-room').get_data(as_text=True)
+        self.assertIn('data-email="owner@knu.ac.kr"', page)
+        self.assertIn('data-member="true"', page)
+        self.post()
+        self.assertEqual(self.rpc_calls[-1][1]['p_knu_email'], 'owner@knu.ac.kr')
+        mine = self.client.get('/api/club-room/my-bookings').json
+        self.assertEqual(mine['email'], 'owner@knu.ac.kr')
+        self.assertEqual([b['id'] for b in mine['bookings']], [self.identifier])
+        self.assertNotIn('edit_digest', mine['bookings'][0])
+        self.assertNotIn('knu_email', mine['bookings'][0])
+
+    def test_email_otp_request_verify_and_my_bookings(self):
+        self.assertEqual(self.client.get('/api/club-room/my-bookings').json, {'email': '', 'bookings': []})
+        self.assertEqual(self.api('/api/club-room/email/request', {'email': 'owner'}, csrf=False).status_code, 403)
+        self.assertEqual(self.api('/api/club-room/email/request', {'email': 'a@gmail.com'}).status_code, 400)
+        self.assertEqual(self.api('/api/club-room/email/verify', {'code': '123456'}).status_code, 400)
+        result = self.verify_as('owner')
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.json['email'], 'owner@knu.ac.kr')
+        self.assertEqual([b['id'] for b in result.json['bookings']], [self.identifier])
+        self.assertEqual(self.sent[0][0], 'owner@knu.ac.kr')
+        self.assertEqual(self.sent[0][2], '동아리방 예약 관리')
+        self.assertEqual(self.client.get('/api/club-room/my-bookings').json['email'], 'owner@knu.ac.kr')
+        self.assertIn('data-email="owner@knu.ac.kr"', self.client.get('/club-room').get_data(as_text=True))
+
+    def test_wrong_code_does_not_verify(self):
+        with patch('guest_email_verify.secrets.randbelow', return_value=123456):
+            self.api('/api/club-room/email/request', {'email': 'owner'})
+        self.assertEqual(self.api('/api/club-room/email/verify', {'code': '000000'}).status_code, 400)
+        self.assertEqual(self.client.get('/api/club-room/my-bookings').json['email'], '')
+
+    def test_verified_email_authorizes_read_update_cancel_without_code(self):
+        self.assertEqual(self.post({'action': 'read'}).status_code, 400)
+        self.verify_as('owner')
+        read = self.post({'action': 'read'})
+        self.assertEqual(read.status_code, 200)
+        self.assertNotIn('edit_digest', read.json['booking'])
+        update = {**self.body, 'action': 'update', 'edit_code': '', 'version': 1}
+        self.assertEqual(self.post(update).status_code, 200)
+        sent = self.rpc_calls[-1][1]
+        self.assertEqual((sent['p_digest'], sent['p_verified_email']), ('', 'owner@knu.ac.kr'))
+        self.assertEqual(self.post({'action': 'cancel', 'version': 1}).status_code, 200)
+        self.assertEqual(self.rpc_calls[-1][1]['p_action'], 'cancel')
+
+    def test_different_verified_email_is_rejected(self):
+        self.verify_as('someone')
+        self.assertEqual(self.post({'action': 'read'}).status_code, 403)
+        self.assertEqual(self.client.get('/api/club-room/my-bookings').json['bookings'], [])
+        self.rpc_result = {'status': 'forbidden'}
+        self.assertEqual(self.post({'action': 'cancel', 'version': 1}).status_code, 403)
+        self.assertEqual(self.rpc_calls[-1][1]['p_verified_email'], 'someone@knu.ac.kr')
+
+    def test_legacy_code_flow_unchanged_when_email_present(self):
+        self.assertEqual(self.post(dict(action='read', edit_code=self.code)).status_code, 200)
+        self.assertEqual(self.post(dict(action='read', edit_code='b' * 43)).status_code, 403)
+        self.assertEqual(self.post(dict(action='cancel', edit_code=self.code, version=1)).status_code, 200)
+        self.assertIsNone(self.rpc_calls[-1][1]['p_verified_email'])
 
 
 if __name__ == '__main__':
