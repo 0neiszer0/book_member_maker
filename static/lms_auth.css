@@ -56,3 +56,8 @@
 .lms-result-personal,.lms-result-contact{border-top:1px solid #c7cdd1;margin-top:16px;padding-top:16px}
 .lms-result-help{font-size:12px;line-height:18px;color:#56616a;margin-top:24px}
 @media(max-width:560px){.auth-card,.auth-section{padding:16px}.auth-grid{grid-template-columns:1fr}}
+
+/* Isolated recruitment portal */
+.lms-result-portal { background: #fff; border: 1px solid #e2e8f0; border-radius: 18px; padding: clamp(20px, 5vw, 40px); }
+body:has(.lms-result-portal) { background: #f8fafc; }
+.lms-result-portal .lms-button-primary { background: #a6192e; border-color: #a6192e; }

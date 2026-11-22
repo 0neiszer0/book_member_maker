@@ -47,6 +47,8 @@ from recruitment_results import (
     normalize_student_id,
     parse_applicant_file,
     parse_applicant_rows,
+    DEFAULT_APPLICATION_QUESTIONS, normalize_application_questions, normalize_interview_slot_options,
+    validate_application_submission, build_applicants_workbook,
 )
 from topic_autopen import open_due_topic_events
 from home_overview import date_label, member_seminar_summary, operations_summary, decorate_topic_submission_states
@@ -1125,84 +1127,85 @@ def _applicant_request_hash():
 
 
 @app.route('/applicant-result/<uuid:token>', methods=['GET', 'POST'])
+@app.route('/recruitment-results/<uuid:token>', methods=['GET', 'POST'])
+@app.route('/apply/<uuid:token>', methods=['GET', 'POST'])
 def applicant_result_portal(token):
-    """Isolated, no-login result lookup by exact name and student ID."""
+    """Isolated application and exact-match lookup portal."""
     token_text = str(token)
     is_staff_preview = session.get("user_role") in ("admin", "officer")
     if not is_staff_preview and session.get("applicant_portal_token") != token_text:
         session.clear()
         session["applicant_portal_token"] = token_text
-
-    campaigns = supabase.table("recruitment_campaigns").select("*") \
-        .eq("share_token", token_text).limit(1).execute().data or []
+    campaigns = supabase.table("recruitment_campaigns").select("*").eq("share_token", token_text).limit(1).execute().data or []
     campaign = campaigns[0] if campaigns else None
     if not campaign:
-        return render_template(
-            "applicant_result_portal.html",
-            campaign=None,
-            portal_state="unavailable",
-            result=None,
-            error_message=None,
-        ), 404
-
-    if not campaign.get("is_active"):
-        portal_state = "closed"
-    elif not campaign.get("is_published"):
-        portal_state = "pending"
+        return render_template("applicant_result_portal.html", campaign=None, portal_state="unavailable", result=None, error_message=None), 404
+    if not campaign.get('is_active'):
+        portal_state = 'closed'
+    elif campaign.get('is_published'):
+        portal_state = 'lookup'
+    elif campaign.get('is_accepting_applications'):
+        portal_state = 'applying'
     else:
-        portal_state = "lookup"
-
-    result = None
-    error_message = None
+        portal_state = 'pending'
+    campaign['application_questions'] = campaign.get('application_questions', DEFAULT_APPLICATION_QUESTIONS)
+    result, error_message, confirmation = None, None, None
     response_status = 200
-    if request.method == 'POST' and portal_state == "lookup":
-        name = (request.form.get("name") or "").strip()
-        student_id = normalize_student_id(request.form.get("student_id"))
-        name_key = normalize_applicant_name(name)
-        if not name_key or not re.fullmatch(r"[0-9]{4,20}", student_id):
-            error_message = "이름과 학번을 정확히 입력해주세요."
+    action = request.form.get('action', 'lookup')
+    if request.method == 'POST' and action == 'apply':
+        expected = session.get('sensitive_csrf', '')
+        supplied = request.form.get('csrf_token', '')
+        if not expected or not supplied or not secrets.compare_digest(expected, supplied):
+            abort(403)
+    if request.method == 'POST' and portal_state in ('applying', 'pending', 'lookup'):
+        if action == 'apply' and portal_state != 'applying':
+            error_message = '지원서 접수가 마감되었습니다.'
         else:
             ip_hash = _applicant_request_hash()
             rate_start = (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat()
-            attempts = supabase.table("recruitment_lookup_attempts").select("id", count="exact") \
-                .eq("campaign_id", campaign["id"]).eq("ip_hash", ip_hash) \
-                .gte("created_at", rate_start).execute()
+            attempts = supabase.table('recruitment_lookup_attempts').select('id', count='exact').eq('campaign_id', campaign['id']).eq('ip_hash', ip_hash).gte('created_at', rate_start).execute()
             if (attempts.count or 0) >= 10:
-                error_message = "조회가 잠시 제한되었습니다. 15분 후 다시 시도해주세요."
-                response_status = 429
+                error_message, response_status = '조회가 잠시 제한되었습니다. 15분 후 다시 시도해주세요.', 429
             else:
-                matches = supabase.table("recruitment_applicants").select(
-                    "id, name, result_status, personal_message"
-                ).eq("campaign_id", campaign["id"]).eq("student_id", student_id) \
-                    .eq("name_key", name_key).limit(1).execute().data or []
-                matched = matches[0] if matches else None
+                success = False
                 try:
-                    supabase.table("recruitment_lookup_attempts").insert({
-                        "campaign_id": campaign["id"],
-                        "ip_hash": ip_hash,
-                        "succeeded": bool(matched),
-                    }).execute()
-                except Exception as exc:
-                    app.logger.warning("recruitment lookup audit failed: %s", exc)
-                if not matched:
-                    error_message = "입력한 정보와 일치하는 결과를 찾지 못했습니다. 이름과 학번을 다시 확인해주세요."
-                else:
-                    status = matched.get("result_status") or "pending"
-                    result = {
-                        "name": matched.get("name") or name,
-                        "status": status,
-                        "status_label": RESULT_STATUS_LABELS.get(status, "발표 전"),
-                        "common_message": campaign.get(f"{status}_message") or campaign.get("pending_message") or "",
-                        "personal_message": matched.get("personal_message") or "",
-                    }
-
-    return render_template(
-        "applicant_result_portal.html",
-        campaign=campaign,
-        portal_state=portal_state,
-        result=result,
-        error_message=error_message,
-    ), response_status
+                    if action == 'apply' and portal_state == 'applying':
+                        data = validate_application_submission(campaign, request.form)
+                        existing = supabase.table('recruitment_applicants').select('id').eq('campaign_id', campaign['id']).eq('student_id', data['student_id']).limit(1).execute().data or []
+                        if existing:
+                            error_message = '이미 해당 학번으로 제출된 지원서가 있습니다. 수정이 필요하면 운영진에게 문의해 주세요.'
+                        else:
+                            data.update(campaign_id=campaign['id'], result_status='pending', submitted_at=datetime.now(timezone.utc).isoformat())
+                            try:
+                                supabase.table('recruitment_applicants').insert(data).execute()
+                                confirmation = {k: data[k] for k in ('name', 'student_id', 'submitted_at')}
+                                success = True
+                            except Exception as exc:
+                                app.logger.warning('recruitment application insert failed: %s', exc)
+                                error_message = '지원서를 제출하지 못했습니다. 이미 제출한 학번인지 확인하거나 운영진에게 문의해 주세요.'
+                    else:
+                        name = (request.form.get('name') or '').strip()
+                        student_id = normalize_student_id(request.form.get('student_id'))
+                        name_key = normalize_applicant_name(name)
+                        if not name_key or len(name) > 80 or not re.fullmatch(r'[0-9]{4,20}', student_id):
+                            error_message = '이름과 학번을 정확히 입력해주세요.'
+                        else:
+                            matches = supabase.table('recruitment_applicants').select('id, name, result_status, personal_message, submitted_at, interview_slot').eq('campaign_id', campaign['id']).eq("student_id", student_id).eq("name_key", name_key).limit(1).execute().data or []
+                            matched = matches[0] if matches else None
+                            if not matched:
+                                error_message = '입력한 정보와 일치하는 결과를 찾지 못했습니다. 이름과 학번을 다시 확인해주세요.'
+                            else:
+                                status = matched.get('result_status') or 'pending'
+                                result = {'name': matched.get('name') or name, 'status': status, 'status_label': RESULT_STATUS_LABELS.get(status, '발표 전'), 'common_message': campaign.get(f'{status}_message') or campaign.get('pending_message') or '', 'personal_message': matched.get('personal_message') or '', 'submitted_at': matched.get('submitted_at'), 'interview_slot': matched.get('interview_slot')}
+                                success = True
+                except ValueError as exc:
+                    error_message = str(exc)
+                finally:
+                    try:
+                        supabase.table('recruitment_lookup_attempts').insert({'campaign_id': campaign['id'], 'ip_hash': ip_hash, 'succeeded': success}).execute()
+                    except Exception as exc:
+                        app.logger.warning('recruitment lookup audit failed: %s', exc)
+    return render_template('applicant_result_portal.html', campaign=campaign, portal_state=portal_state, result=result, confirmation=confirmation, error_message=error_message, active_tab='lookup' if action == 'lookup' and request.method == 'POST' else 'apply'), response_status
 
 
 @app.route('/admin/recruitment-results')
@@ -1210,15 +1213,16 @@ def applicant_result_portal(token):
 def admin_recruitment_results():
     campaigns = supabase.table("recruitment_campaigns").select("*") \
         .order("created_at", desc=True).execute().data or []
-    applicant_rows = supabase.table("recruitment_applicants").select("campaign_id, result_status").execute().data or []
+    applicant_rows = supabase.table("recruitment_applicants").select("campaign_id, result_status, submitted_at").execute().data or []
     campaign_counts = defaultdict(lambda: defaultdict(int))
     for row in applicant_rows:
         campaign_counts[row.get("campaign_id")][row.get("result_status") or "pending"] += 1
     for campaign in campaigns:
+        campaign["direct_count"] = sum(1 for row in applicant_rows if row.get("campaign_id") == campaign["id"] and row.get("submitted_at"))
         counts = campaign_counts[campaign["id"]]
         campaign["applicant_count"] = sum(counts.values())
         campaign["status_counts"] = dict(counts)
-        campaign["share_url"] = f"{PUBLIC_BASE_URL}{url_for('applicant_result_portal', token=campaign['share_token'])}"
+        campaign["share_url"] = f"{PUBLIC_BASE_URL}/apply/{campaign['share_token']}"
     return render_template("admin_recruitment_results.html", campaigns=campaigns)
 
 
@@ -1254,7 +1258,7 @@ def admin_recruitment_result_detail(campaign_id):
     counts = {status: 0 for status in VALID_RESULT_STATUSES}
     for applicant in applicants:
         counts[applicant.get("result_status") or "pending"] += 1
-    campaign["share_url"] = f"{PUBLIC_BASE_URL}{url_for('applicant_result_portal', token=campaign['share_token'])}"
+    campaign["share_url"] = f"{PUBLIC_BASE_URL}/apply/{campaign['share_token']}"
     return render_template(
         "admin_recruitment_result_detail.html",
         campaign=campaign,
@@ -1262,6 +1266,16 @@ def admin_recruitment_result_detail(campaign_id):
         status_counts=counts,
         status_labels=RESULT_STATUS_LABELS,
     )
+
+
+@app.route('/admin/recruitment-results/<uuid:campaign_id>/export')
+@login_required(role="admin")
+def admin_recruitment_result_export(campaign_id):
+    campaign = _recruitment_campaign(campaign_id)
+    if not campaign:
+        abort(404)
+    applicants = supabase.table('recruitment_applicants').select('*').eq('campaign_id', str(campaign_id)).order('name').execute().data or []
+    return send_file(build_applicants_workbook(campaign, applicants), as_attachment=True, download_name='recruitment-applicants.xlsx', mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
 @app.route('/admin/recruitment-results/<uuid:campaign_id>/settings', methods=['POST'])
@@ -1273,7 +1287,25 @@ def admin_recruitment_result_settings(campaign_id):
     if not title:
         flash("모집 차수 이름은 비워둘 수 없습니다.", "danger")
         return redirect(url_for("admin_recruitment_result_detail", campaign_id=campaign_id))
+    try:
+        questions = normalize_application_questions(request.form.get('application_questions', ''))
+        previous = _recruitment_campaign(campaign_id).get('application_questions') or DEFAULT_APPLICATION_QUESTIONS
+        by_label = {q['label']: q for q in previous}
+        for q in questions:
+            if q['label'] in by_label:
+                q['id'] = by_label[q['label']]['id']
+                q['placeholder'] = by_label[q['label']].get('placeholder', '')
+        slots = normalize_interview_slot_options(request.form.get('interview_slot_options', ''))
+        if len(request.form.get('application_intro', '')) > 3000 or len(request.form.get('application_deadline', '')) > 120:
+            raise ValueError('모집 안내문의 글자 수를 확인해주세요.')
+    except ValueError as exc:
+        flash(str(exc), 'danger')
+        return redirect(url_for('admin_recruitment_result_detail', campaign_id=campaign_id))
     update = {
+        "application_questions": questions, "interview_slot_options": slots,
+        "application_intro": request.form.get('application_intro', '').strip() or None,
+        "application_deadline": request.form.get('application_deadline', '').strip() or None,
+        "is_accepting_applications": request.form.get('is_accepting_applications') == 'on',
         "title": title,
         "intro_text": (request.form.get("intro_text") or "").strip(),
         "pending_message": (request.form.get("pending_message") or "").strip(),
@@ -1407,6 +1439,8 @@ def admin_recruitment_result_update_applicant(campaign_id, applicant_id):
                 "student_id": student_id,
                 "result_status": result_status,
                 "personal_message": personal_message,
+                "interview_slot": (request.form.get("interview_slot") or "").strip() or None,
+                "reviewer_note": (request.form.get("reviewer_note") or "").strip() or None,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }).eq("id", str(applicant_id)).eq("campaign_id", str(campaign_id)).execute()
             flash(f"{name} 지원자의 결과를 저장했습니다.", "success")
