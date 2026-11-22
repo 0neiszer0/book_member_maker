@@ -9,61 +9,53 @@
 <div class="lms-operations">
 <div class="lms-operations-body">
 
-        <div class="flex items-center justify-between flex-wrap gap-2">
-            <div>
-                <h1 class="text-2xl font-bold ops-accent">{{ icon('calendar',18) }} 세미나실 예약 현황</h1>
-                <p class="text-xs text-gray-400 mt-1">
-                    경북대 총동연 게시판(dongari.knu.ac.kr) 캐시 기반 · 다른 동아리/세미나실 예약을 한눈에 확인
-                </p>
+        <header class="ui-page-header">
+            <div class="ui-page-header-copy">
+                <p class="ui-page-eyebrow">전체 운영 · 동아리 활동</p>
+                <h1>세미나실 예약 현황</h1>
+                <p class="ui-page-subtitle">경북대 총동연 게시판(dongari.knu.ac.kr) 캐시 기반 · 다른 동아리/세미나실 예약을 한눈에 확인합니다.</p>
             </div>
-            <a href="{{ url_for('admin_dashboard') }}" class="text-sm text-gray-400 hover:text-white">← 대시보드</a>
-        </div>
-
-
+        </header>
+        {% include '_admin_activities_tabs.html' %}
 
         <!-- 컨트롤 바 -->
         <div class="ops-panel rounded-lg p-4 flex flex-wrap items-center justify-between gap-3">
-            <div class="flex items-center gap-2">
-                <a href="?month={{ prev_month }}"
-                    class="px-3 py-1.5 rounded text-sm bg-gray-700 hover:bg-gray-600">← {{ prev_month }}</a>
-                <span class="text-lg font-bold">
+            <div class="flex items-center gap-2 flex-wrap">
+                <a href="?month={{ prev_month }}" class="ui-btn ui-btn-sm">← {{ prev_month }}</a>
+                <span class="text-lg font-bold ops-ink">
                     {{ year }}년 {{ '%02d' % month }}월
                 </span>
-                <a href="?month={{ next_month }}"
-                    class="px-3 py-1.5 rounded text-sm bg-gray-700 hover:bg-gray-600">{{ next_month }} →</a>
-                <a href="{{ url_for('admin_seminar_rooms') }}"
-                    class="ml-2 px-3 py-1.5 rounded text-sm bg-gray-800 hover:bg-gray-700 text-gray-300">오늘로</a>
+                <a href="?month={{ next_month }}" class="ui-btn ui-btn-sm">{{ next_month }} →</a>
+                <a href="{{ url_for('admin_seminar_rooms') }}" class="ui-btn ui-btn-sm ui-btn-ghost">오늘로</a>
             </div>
-            <div class="flex items-center gap-3 text-xs text-gray-400">
+            <div class="flex flex-wrap items-center gap-3 text-xs muted">
                 <div>
-                    캐시 글 수: <span class="text-gray-200 font-bold">{{ total_cached }}</span>
+                    캐시 글 수: <span class="ops-ink font-bold">{{ total_cached }}</span>
                 </div>
-                <div>
-                    이 달:
-                    <span class="text-green-400">승인 {{ month_counts.approved }}</span> ·
-                    <span class="text-yellow-400">대기 {{ month_counts.pending }}</span> ·
-                    <span class="text-red-400">반려 {{ month_counts.rejected }}</span>
+                <div class="flex items-center gap-1 flex-wrap">
+                    <span>이 달:</span>
+                    <span class="ui-pill is-success">승인 {{ month_counts.approved }}</span>
+                    <span class="ui-pill is-warn">대기 {{ month_counts.pending }}</span>
+                    <span class="ui-pill is-accent">반려 {{ month_counts.rejected }}</span>
                 </div>
                 <div>
                     마지막 갱신:
-                    <span id="last-check" class="text-gray-200">
+                    <span id="last-check" class="ops-ink font-semibold">
                         {% if last_check %}{{ last_check }}{% else %}—{% endif %}
                     </span>
                 </div>
-                <button id="refreshBtn"
-                    class="ops-primary text-black font-bold px-3 py-1.5 rounded text-sm hover:opacity-80"
-                        >
+                <button id="refreshBtn" class="ui-btn ui-btn-primary ui-btn-sm">
                     {{ icon('calendar',18) }} 지금 새로고침
                 </button>
             </div>
         </div>
 
         <!-- 범례 -->
-        <div class="ops-panel rounded-lg p-3 flex flex-wrap items-center gap-3 text-xs text-gray-300">
+        <div class="ops-panel rounded-lg p-3 flex flex-wrap items-center gap-3 text-xs muted">
             <span class="legend-chip ops-approved">● 승인</span>
-                    <span class="legend-chip ops-pending">● 대기</span>
-                    <span class="legend-chip ops-rejected">● 반려</span>
-            <span class="text-gray-500">| 월/목 = 우리 동아리 세미나 요일 (파란색 강조)</span>
+            <span class="legend-chip ops-pending">● 대기</span>
+            <span class="legend-chip ops-rejected">● 반려</span>
+            <span>| 월/목 = 우리 동아리 세미나 요일 (파란색 강조)</span>
         </div>
 
         <!-- 달력 -->
@@ -88,7 +80,7 @@
                     <div class="day-num">
                         <span>{{ cell.date.day }}</span>
                         {% if cell.posts %}
-                        <span class="text-[0.6rem] text-gray-500">{{ cell.posts|length }}건</span>
+                        <span class="text-[0.6rem] muted">{{ cell.posts|length }}건</span>
                         {% endif %}
                     </div>
                     {% for p in cell.posts %}
@@ -111,7 +103,7 @@
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
-                        <tr class="border-b ops-border text-left text-gray-400">
+                        <tr class="border-b ops-border text-left muted">
                             <th class="p-2">날짜</th>
                             <th class="p-2">요일</th>
                             <th class="p-2">세미나실</th>
@@ -134,7 +126,7 @@
 
                         {% if rows %}
                           {% for row in rows %}
-                          <tr class="border-b border-gray-800/60 hover:bg-gray-800/40">
+                          <tr class="ops-table-row">
                               <td class="p-2 font-mono">{{ row.date.isoformat() }}</td>
                               <td class="p-2">{{ ['월','화','수','목','금','토','일'][row.date.weekday()] }}</td>
                               <td class="p-2 font-bold">{{ row.p.room or '?' }}</td>
@@ -151,13 +143,13 @@
                               <td class="p-2">
                                   {% if row.p.post_url %}
                                   <a href="{{ row.p.post_url }}" target="_blank" rel="noopener"
-                                     class="text-blue-400 hover:underline text-xs">열기 ↗</a>
+                                     class="ops-link text-xs">열기 ↗</a>
                                   {% endif %}
                               </td>
                           </tr>
                           {% endfor %}
                         {% else %}
-                          <tr><td colspan="6" class="p-6 text-center text-gray-500">이 달에 등록된 예약이 없습니다. 우측 상단의 새로고침을 눌러보세요.</td></tr>
+                          <tr><td colspan="6" class="p-6 text-center muted">이 달에 등록된 예약이 없습니다. 우측 상단의 새로고침을 눌러보세요.</td></tr>
                         {% endif %}
                     </tbody>
                 </table>
@@ -169,66 +161,65 @@
             <h2 class="text-lg font-bold mb-1">
                 {{ icon('document',18) }} 예약 신청 글 도우미
             </h2>
-            <p class="text-xs text-gray-400 mb-4">
+            <p class="text-xs muted mb-4">
                 아래 설정을 채우면 게시판에 그대로 붙여넣을 <strong>제목/내용</strong>이 자동 생성됩니다.
                 "{{ icon('document',18) }} 저장"을 누르면 다음 방문에도 값이 유지됩니다.
             </p>
 
             <!--  기본 설정 (DB 저장) -->
-            <div class="border border-gray-700 rounded-lg p-3 mb-4 bg-gray-900/40">
+            <div class="border ops-border ops-surface rounded-lg p-3 mb-4">
                 <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-                    <h3 class="text-sm font-bold text-gray-200">{{ icon('settings',18) }} 기본 설정</h3>
+                    <h3 class="text-sm font-bold ops-ink">{{ icon('settings',18) }} 기본 설정</h3>
                     <div class="flex items-center gap-2">
-                        <span id="saveStatus" class="text-[0.7rem] text-gray-500"></span>
-                        <button type="button" id="saveSettingsBtn"
-                            class="text-xs bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-1.5 rounded">
+                        <span id="saveStatus" class="text-[0.7rem] muted"></span>
+                        <button type="button" id="saveSettingsBtn" class="ui-btn ui-btn-primary ui-btn-sm">
                             {{ icon('document',18) }} 저장
                         </button>
                     </div>
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
                     <div>
-                        <div class="text-[0.7rem] text-gray-400 mb-1">동아리명</div>
+                        <div class="text-[0.7rem] muted mb-1">동아리명</div>
                         <input id="clubName" type="text" value="{{ settings.club_name }}"
-                            class="settings-field w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
+                            class="settings-field ops-field w-full rounded px-2 py-1 text-sm">
                     </div>
                     <div>
-                        <div class="text-[0.7rem] text-gray-400 mb-1">대표자 번호</div>
+                        <div class="text-[0.7rem] muted mb-1">대표자 번호</div>
                         <input id="phone" type="text" value="{{ settings.club_phone }}"
-                            class="settings-field w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
+                            class="settings-field ops-field w-full rounded px-2 py-1 text-sm">
                     </div>
                     <div>
-                        <div class="text-[0.7rem] text-gray-400 mb-1">시간</div>
+                        <div class="text-[0.7rem] muted mb-1">시간</div>
                         <input id="timeSlot" type="text" value="{{ settings.time_slot }}"
-                            class="settings-field w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
+                            class="settings-field ops-field w-full rounded px-2 py-1 text-sm">
                     </div>
                     <div>
-                        <div class="text-[0.7rem] text-gray-400 mb-1">목적</div>
+                        <div class="text-[0.7rem] muted mb-1">목적</div>
                         <input id="purpose" type="text" value="{{ settings.purpose }}"
-                            class="settings-field w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
+                            class="settings-field ops-field w-full rounded px-2 py-1 text-sm">
                     </div>
                     <div>
-                        <div class="text-[0.7rem] text-gray-400 mb-1">첫 세미나 날짜</div>
+                        <div class="text-[0.7rem] muted mb-1">첫 세미나 날짜</div>
                         <input id="semesterStart" type="date" value="{{ settings.semester_start or '' }}"
-                            class="settings-field w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
+                            class="settings-field ops-field w-full rounded px-2 py-1 text-sm">
                     </div>
                     <div>
-                        <div class="text-[0.7rem] text-gray-400 mb-1">마지막 세미나 날짜</div>
+                        <div class="text-[0.7rem] muted mb-1">마지막 세미나 날짜</div>
                         <input id="semesterEnd" type="date" value="{{ settings.semester_end or '' }}"
-                            class="settings-field w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
+                            class="settings-field ops-field w-full rounded px-2 py-1 text-sm">
                     </div>
                     <div>
-                        <div class="text-[0.7rem] text-gray-400 mb-1">최소 N일 후부터</div>
+                        <div class="text-[0.7rem] muted mb-1">최소 N일 후부터</div>
                         <input id="daysAheadMin" type="number" min="0" max="60" value="{{ settings.days_ahead_min }}"
-                            class="settings-field w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
+                            class="settings-field ops-field w-full rounded px-2 py-1 text-sm">
                     </div>
                     <div>
-                        <div class="text-[0.7rem] text-gray-400 mb-1">최대 N일 후까지</div>
+                        <div class="text-[0.7rem] muted mb-1">최대 N일 후까지</div>
                         <input id="daysAheadMax" type="number" min="1" max="180" value="{{ settings.days_ahead_max }}"
-                            class="settings-field w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm">
+                            class="settings-field ops-field w-full rounded px-2 py-1 text-sm">
                     </div>
                 </div>
-                <p class="text-[0.7rem] text-gray-500 mt-2 leading-relaxed">
+                <p class="text-[0.7rem] muted mt-2 leading-relaxed">
                     {{ icon('help',18) }} 첫·마지막 세미나 날짜와 N일 범위는 <strong>예약 가능 날짜</strong> 계산에 사용됩니다.
                     저장 후 페이지가 새로고침되어 후보 날짜가 다시 계산됩니다.
                 </p>
@@ -237,9 +228,9 @@
             {% if available_dates %}
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
-                    <div class="text-xs text-gray-400 mb-2">
+                    <div class="text-xs muted mb-2">
                         예약 가능한 날짜
-                        <span class="text-gray-500">
+                        <span>
                             (월/목 ·
                             {% if settings.semester_start %}{{ settings.semester_start }} ~ {% endif %}
                             {% if settings.semester_end %}{{ settings.semester_end }}까지{% endif %}
@@ -248,7 +239,7 @@
                     </div>
                     <div class="flex flex-wrap gap-2" id="date-options">
                         {% for d in available_dates %}
-                        <label class="flex items-center gap-1 bg-gray-800 px-2 py-1 rounded cursor-pointer hover:bg-gray-700 text-sm">
+                        <label class="flex items-center gap-1 border ops-border ops-surface px-2 py-1 rounded cursor-pointer text-sm">
                             <input type="checkbox" class="date-cb" value="{{ d.isoformat() }}" checked>
                             <span>{{ d.month }}/{{ d.day }} ({{ ['월','화','수','목','금','토','일'][d.weekday()] }})</span>
                         </label>
@@ -256,7 +247,7 @@
                     </div>
                 </div>
                 <div>
-                    <div class="text-xs text-gray-400 mb-2">세미나실</div>
+                    <div class="text-xs muted mb-2">세미나실</div>
                     <div class="flex gap-3 text-sm">
                         <label class="flex items-center gap-1 cursor-pointer">
                             <input type="radio" name="room" value="민주" checked> 민주
@@ -274,42 +265,41 @@
             <div class="space-y-3">
                 <div>
                     <div class="flex items-center justify-between mb-1">
-                        <span class="text-xs text-gray-400">{{ icon('document',18) }} 제목</span>
+                        <span class="text-xs muted">{{ icon('document',18) }} 제목</span>
                         <button type="button" onclick="copyText('genTitle', this)"
-                            class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">복사</button>
+                            class="ui-btn ui-btn-sm">복사</button>
                     </div>
                     <input id="genTitle" readonly
-                        class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-2 text-sm font-mono">
+                        class="ops-field w-full rounded px-2 py-2 text-sm font-mono">
                 </div>
                 <div>
                     <div class="flex items-center justify-between mb-1">
-                        <span class="text-xs text-gray-400">{{ icon('document',18) }} 내용</span>
+                        <span class="text-xs muted">{{ icon('document',18) }} 내용</span>
                         <button type="button" onclick="copyText('genContent', this)"
-                            class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">복사</button>
+                            class="ui-btn ui-btn-sm">복사</button>
                     </div>
                     <textarea id="genContent" rows="4"
-                        class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-2 text-sm font-mono"></textarea>
+                        class="ops-field w-full rounded px-2 py-2 text-sm font-mono"></textarea>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
                     <a href="{{ write_url }}" target="_blank" rel="noopener"
-                        class="font-bold px-3 py-2 rounded text-sm hover:opacity-80"
-                    >
+                        class="ui-btn ui-btn-primary ui-btn-sm">
                         {{ icon('document',18) }} 총동연 글쓰기 페이지 열기 ↗
                     </a>
-                    <span class="text-xs text-gray-500">로그인 후 제목/내용 붙여넣기</span>
+                    <span class="text-xs muted">로그인 후 제목/내용 붙여넣기</span>
                 </div>
             </div>
 
             {% else %}
-            <div class="text-sm text-gray-500 py-4 text-center">
+            <div class="text-sm muted py-4 text-center">
                 예약 가능한 월/목 날짜가 없습니다. 우상단 새로고침을 눌러 최신 캐시를 받아오세요.
             </div>
             {% endif %}
         </div>
 
         <!-- 안내 -->
-        <div class="ops-panel rounded-lg p-4 text-xs text-gray-400 leading-relaxed">
-            <strong class="text-gray-200">{{ icon('help',18) }} 어떻게 동작하나요?</strong>
+        <div class="ops-panel rounded-lg p-4 text-xs muted leading-relaxed">
+            <strong class="ops-ink">{{ icon('help',18) }} 어떻게 동작하나요?</strong>
             <ul class="list-disc list-inside mt-1 space-y-0.5">
                 <li>외부 게시판은 <code>requests + BeautifulSoup</code> 으로 <strong>로그인 없이</strong> 읽기만 합니다.</li>
                 <li>승인/반려된 글은 <em>종착 상태</em>로 보고 다시 가져오지 않습니다. 신규 글 + 대기(pending) 글만 재확인.</li>
@@ -395,7 +385,7 @@
             el.addEventListener('input', () => {
                 dirty = true;
                 if (saveStatus) saveStatus.textContent = '변경됨 · 저장 필요';
-                if (saveStatus) saveStatus.className = 'text-[0.7rem] text-yellow-400';
+                if (saveStatus) saveStatus.className = 'ui-pill is-warn';
             });
         });
         saveBtn?.addEventListener('click', async () => {
@@ -422,7 +412,7 @@
                 if (data.status === 'success') {
                     if (saveStatus) {
                         saveStatus.textContent = '✓ 저장됨 · 새로고침 중';
-                        saveStatus.className = 'text-[0.7rem] text-green-400';
+                        saveStatus.className = 'ui-pill is-success';
                     }
                     // 예약 가능 날짜 재계산을 위해 reload
                     setTimeout(() => location.reload(), 400);

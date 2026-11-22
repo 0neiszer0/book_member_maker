@@ -197,6 +197,33 @@ class CurrentUiContractsTest(unittest.TestCase):
         self.assertIn("delete-link-review", list_html)
         self.assertIn("session.user_role in ['admin', 'officer']", list_html)
 
+    def test_wave4bc_ui_tokens_and_consolidated_navigation_contracts(self):
+        base = self.read("templates/lms_base.html")
+        nav = self.read("templates/_lms_navigation.html")
+        tokens = self.read("static/lms_ui_tokens.css")
+        self.assertIn("filename='lms_ui_tokens.css'", base)
+        self.assertIn('class="lms-bell-btn"', base)
+        self.assertIn('class="lms-mobile-bell"', base)
+        for token in ("--ui-accent:", "--ui-surface:", "--ui-ink:", ".ui-tabs", ".ui-page-header"):
+            self.assertIn(token, tokens)
+        self.assertNotIn('data-lms-panel="lms-notifications"', nav)
+        self.assertNotIn("<span>운영진 위키</span>", nav)
+        self.assertNotIn("<span>이용안내</span>", nav)
+        for dark_free_template in (
+            "templates/admin_dashboard.html",
+            "templates/admin_special_events.html",
+            "templates/admin_special_event_detail.html",
+            "templates/admin_seminar_rooms.html",
+            "templates/admin_attendance_matrix.html",
+            "templates/admin_seminar_term.html",
+            "templates/_lms_operations_session_card.html",
+            "templates/admin_topic_view.html",
+            "templates/admin_boards.html",
+        ):
+            src = self.read(dark_free_template)
+            for forbidden in ("bg-gray-", "text-gray-", "border-gray-", "bg-blue-"):
+                self.assertNotIn(forbidden, src, f"{forbidden} remains in {dark_free_template}")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -109,9 +109,12 @@ class SeminarRoomNavigationTests(unittest.TestCase):
         self.assertIn("endpoint == 'admin_seminar_rooms'", sidebar)
 
     def test_admin_overview_has_reservation_shortcut(self):
-        overview = (ROOT / 'templates' / 'admin_overview.html').read_text(encoding='utf-8')
-        self.assertIn("url_for('admin_seminar_rooms')", overview)
-        self.assertIn('세미나실 예약 현황', overview)
+        tabs = (ROOT / 'templates' / '_admin_activities_tabs.html').read_text(encoding='utf-8')
+        base = (ROOT / 'templates' / 'lms_base.html').read_text(encoding='utf-8')
+        self.assertIn("url_for('admin_seminar_rooms')", tabs)
+        self.assertIn('세미나실 예약', tabs)
+        self.assertIn("url_for('admin_seminar_rooms')", base)
+        self.assertIn('세미나실 예약 현황', base)
 
     def test_admin_view_reparses_old_cached_titles(self):
         app_source = (ROOT / 'app.py').read_text(encoding='utf-8')

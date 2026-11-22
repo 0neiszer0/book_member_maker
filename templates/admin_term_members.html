@@ -1,14 +1,30 @@
-{% extends 'lms_base.html' if term_scope else 'lms_admin_base.html' %}
-{% set lms_title='학기 설정' if term_scope else '학기 관리' %}
-{% set lms_page='term_settings' if term_scope else 'term_members' %}{% set lms_course=term if term_scope else none %}
-{% block title %}{{ '학기 설정' if term_scope else '학기 관리' }} · 책 먹는 호반우{% endblock %}
+{% extends 'lms_admin_base.html' %}
+{% set lms_title='학기 관리' %}
+{% set lms_page='term_settings' if term_scope else 'term_members' %}
+{% block title %}{{ (term.name ~ ' 학기 관리') if term_scope else '학기 관리' }} · 책 먹는 호반우{% endblock %}
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_attendance.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='lms_term_membership.css') }}">{% endblock %}
 {% block content %}<div class="attendance-shell" id="term-members" data-csrf="{{ csrf_token }}">
-  {% if term_scope %}<h1>{{ term.name }} 학기 설정</h1>{% include '_term_settings_tabs.html' %}<p>이 학기에 활동할 사람만 따로 관리합니다. 휴식·종료로 바꿔도 이전 학기 명단과 출석 기록, 로그인 권한은 유지됩니다. 위키 편집은 현재 학기의 활동 회원만 가능합니다.</p>
+  {% if term_scope %}
+  <header class="ui-page-header">
+    <div class="ui-page-header-copy">
+      <p class="ui-page-eyebrow">전체 운영 · 학기 관리</p>
+      <h1>{{ term.name }} 학기 관리</h1>
+      <p class="ui-page-subtitle">이 학기에 활동할 명단과 임원 배치를 관리합니다. 휴식·종료로 바꿔도 이전 학기 기록과 로그인 권한은 유지됩니다.</p>
+    </div>
+    <div class="ui-page-actions"><a class="ui-btn ui-btn-secondary" href="{{ url_for('admin_term_members') }}">전체 학기 목록</a></div>
+  </header>
+  {% include '_term_settings_tabs.html' %}
   <form method="get" id="term-picker"><label for="term-id">관리할 학기</label><select name="term_id" id="term-id">{% for item in terms %}<option value="{{ item.id }}" {% if term and item.id == term.id %}selected{% endif %}>{{ item.name }} · {{ item.start_date }} ~ {{ item.end_date }}</option>{% endfor %}</select></form>
-  {% else %}<h1>학기 관리</h1><p>학기를 고르면 그 학기 강의실로 들어갑니다. 세미나·발제문·출석·회원 명단·임원은 모두 각 학기 강의실 왼쪽의 ‘학기 운영’ 메뉴에서 관리합니다.</p>
+  {% else %}
+  <header class="ui-page-header">
+    <div class="ui-page-header-copy">
+      <p class="ui-page-eyebrow">전체 운영</p>
+      <h1>학기 관리</h1>
+      <p class="ui-page-subtitle">학기를 생성하고 학기별 활동·휴식 명단과 임원 배치를 관리합니다. 회차·도서·출석 확인은 각 학기의 ‘세미나 운영’으로 이동합니다.</p>
+    </div>
+  </header>
   <table class="lms-term-list"><thead><tr><th scope="col">학기</th><th scope="col">기간</th><th scope="col">바로가기</th></tr></thead><tbody>
-  {% for item in terms %}<tr><td><strong>{{ item.name }}</strong>{% if item.is_active %} <span class="lms-small">진행 중</span>{% endif %}</td><td class="lms-small">{{ item.start_date }} ~ {{ item.end_date }}</td><td><a href="{{ url_for('admin_seminars', term_id=item.id) }}">세미나 운영</a><a href="{{ url_for('admin_term_members', term_id=item.id) }}">학기 설정</a><a href="{{ url_for('seminars', term_id=item.id) }}">강의실</a></td></tr>
+  {% for item in terms %}<tr><td><strong>{{ item.name }}</strong>{% if item.is_active %} <span class="lms-small">진행 중</span>{% endif %}</td><td class="lms-small">{{ item.start_date }} ~ {{ item.end_date }}</td><td><a href="{{ url_for('admin_term_members', term_id=item.id) }}">명단·임원 관리</a><a href="{{ url_for('admin_seminars', term_id=item.id) }}">세미나 운영</a><a href="{{ url_for('seminars', term_id=item.id) }}">강의실</a></td></tr>
   {% else %}<tr><td colspan="3">아직 학기가 없습니다. 아래에서 새 학기를 만들어주세요.</td></tr>{% endfor %}
   </tbody></table>{% endif %}
   {% if not term_scope and session.user_role in ["admin","officer"] %}

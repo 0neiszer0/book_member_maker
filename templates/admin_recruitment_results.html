@@ -12,7 +12,14 @@
 </style>
 {% endblock %}
 {% block content %}<div class="lms-aux">
-  <div class="mb-7"><p class="text-sm font-bold muted">전체 운영</p><h1 class="text-3xl font-extrabold tracking-tight">면접 지원자 결과</h1><p class="muted mt-2">차수별 명단과 결과 안내문을 관리하고, 지원자 단톡방에 전용 링크를 공유합니다.</p></div>
+  <header class="ui-page-header">
+    <div class="ui-page-header-copy">
+      <p class="ui-page-eyebrow">전체 운영 · 회원 관리</p>
+      <h1>면접 지원자 결과</h1>
+      <p class="ui-page-subtitle">차수별 명단과 결과 안내문을 관리하고, 지원자 단톡방에 전용 링크를 공유합니다.</p>
+    </div>
+  </header>
+  {% include '_admin_members_tabs.html' %}
   {% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<div class="panel p-4 mb-4 {% if category != 'success' %}text-red-700{% endif %}">{{ message }}</div>{% endfor %}{% endwith %}
   <section class="panel p-5 mb-6"><h2 class="text-lg font-extrabold">새 모집 차수 만들기</h2><form class="flex gap-2 mt-3 flex-wrap" method="post" action="{{ url_for('admin_recruitment_results_create') }}"><input class="field flex-1 min-w-64" name="title" maxlength="120" required placeholder="예: 2026년 하반기 신입 회원 모집"><button class="btn" type="submit">관리 페이지 만들기</button></form></section>
   <section><h2 class="text-lg font-extrabold mb-3">모집 차수</h2><div class="grid md:grid-cols-2 gap-3">

@@ -5,6 +5,7 @@
 <meta name="app-layout" content="canvas"><meta name="color-scheme" content="light"><meta name="theme-color" content="#d20f17">
 <title>{% block title %}책 먹는 호반우{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static',filename='lms.css') }}">
+<link rel="stylesheet" href="{{ url_for('static',filename='lms_ui_tokens.css') }}">
 <link rel="stylesheet" href="{{ url_for('static',filename='lms_feedback.css') }}">
 <script defer src="{{ url_for('static',filename='lms_feedback.js') }}"></script>
 <link rel="stylesheet" href="{{ url_for('static',filename='lms_improvements.css') }}">
@@ -17,9 +18,9 @@
 </head><body class="lms-page lms-nav-expanded {% if lms_isolated_auth|default(false) %}lms-isolated-auth{% endif %} {% if lms_course %}lms-course-page{% endif %} {% if lms_aside %}lms-has-aside{% endif %} {% if lms_page == 'dashboard' %}lms-dashboard-page{% endif %}" data-lms-page="{{ lms_page|default('content') }}">
 <a class="lms-skip" href="#lms-content">본문으로 건너뛰기</a>
 {% if not lms_isolated_auth|default(false) %}{% include '_lms_navigation.html' %}
-<div class="lms-mobile-header"><button type="button" data-lms-menu aria-label="전역 메뉴 열기">{{ icon('menu') }}</button><div class="lms-mobile-heading">{% if lms_course %}<span class="lms-mobile-course-name">{{ course_breadcrumb_label|default(lms_course.name) }}</span>{% endif %}<span>{{ lms_title|default('책 먹는 호반우') }}</span></div><button type="button" data-lms-quick-search aria-label="기능 빠른 검색 (Ctrl+K)"><svg class="lms-icon" width="22" height="22" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="7"/><path d="m17.5 17.5 6 6"/></svg></button>{% if lms_course %}<button type="button" data-lms-course-toggle aria-label="강의실 메뉴 열기">{{ icon('chevron') }}</button>{% endif %}</div>
+<div class="lms-mobile-header"><button type="button" data-lms-menu aria-label="전역 메뉴 열기">{{ icon('menu') }}</button><div class="lms-mobile-heading">{% if lms_course %}<span class="lms-mobile-course-name">{{ course_breadcrumb_label|default(lms_course.name) }}</span>{% endif %}<span>{{ lms_title|default('책 먹는 호반우') }}</span></div>{% if session.user_role %}<button type="button" class="lms-mobile-bell" data-lms-panel="lms-notifications" aria-controls="lms-notifications" aria-expanded="false" aria-label="알림 열기">{{ icon('bell', 20) }}<small data-notification-badge hidden></small></button>{% endif %}<button type="button" data-lms-quick-search aria-label="기능 빠른 검색 (Ctrl+K)"><svg class="lms-icon" width="22" height="22" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="7"/><path d="m17.5 17.5 6 6"/></svg></button>{% if lms_course %}<button type="button" data-lms-course-toggle aria-label="강의실 메뉴 열기">{{ icon('chevron') }}</button>{% endif %}</div>
 {% endif %}<div class="lms-wrapper">
-{% if not lms_isolated_auth|default(false) and lms_page != 'dashboard' %}<header class="lms-breadcrumb"><button type="button" data-lms-course-toggle aria-label="{{ '위키' if lms_page == 'wiki' else '강의실' }} 메뉴 접기" aria-expanded="true">{{ icon('menu') }}</button><nav aria-label="현재 위치"><a href="{{ course_breadcrumb_href|default(url_for('seminars',term_id=lms_course.id) if lms_course else url_for('main_index')) }}">{% if lms_course %}{{ course_breadcrumb_label|default(lms_course.name) }}{% else %}책 먹는 호반우{% endif %}</a><span aria-hidden="true">›</span><span>{{ lms_title|default('') }}</span></nav>{% include '_lms_search_trigger.html' %}</header>{% endif %}
+{% if not lms_isolated_auth|default(false) and lms_page != 'dashboard' %}<header class="lms-breadcrumb"><button type="button" data-lms-course-toggle aria-label="{{ '위키' if lms_page == 'wiki' else '강의실' }} 메뉴 접기" aria-expanded="true">{{ icon('menu') }}</button><nav aria-label="현재 위치"><a href="{{ course_breadcrumb_href|default(url_for('seminars',term_id=lms_course.id) if lms_course else url_for('main_index')) }}">{% if lms_course %}{{ course_breadcrumb_label|default(lms_course.name) }}{% else %}책 먹는 호반우{% endif %}</a><span aria-hidden="true">›</span><span>{{ lms_title|default('') }}</span></nav><div class="lms-header-tools">{% if session.user_role %}<button type="button" class="lms-bell-btn" data-lms-panel="lms-notifications" aria-controls="lms-notifications" aria-expanded="false" aria-label="알림 열기">{{ icon('bell', 18) }}<small data-notification-badge hidden></small></button>{% endif %}{% include '_lms_search_trigger.html' %}</div></header>{% endif %}
 <div class="lms-columns">
 {% if lms_course %}<aside class="lms-course-menu" id="lms-course-menu">{% block course_navigation %}{% with term=lms_course %}{% include '_classroom_nav.html' %}{% endwith %}{% endblock %}</aside>{% endif %}
 <main class="lms-content" id="lms-content">
@@ -29,38 +30,71 @@
 </div></div>
 {% if not lms_isolated_auth|default(false) %}{% include '_lms_feedback.html' %}
 {% if session.user_role %}
+{% set _notice_board = notice_board|default(none) %}
 {% set _qs_base = [
-  {'title': '홈', 'url': url_for('main_index'), 'group': '회원', 'keywords': '대시보드 홈 메인', 'description': '내 활동과 다음 세미나 요약 보기'},
-  {'title': '세미나 일정', 'url': url_for('seminars'), 'group': '회원', 'keywords': '세미나 일정 투표 발제', 'description': '학기 세미나 일정·발제문·도서 확인'},
-  {'title': '지금 참여하기', 'url': url_for('engagement_now'), 'group': '회원', 'keywords': '후기 벽돌책 모집 책추천 참여', 'description': '진행 중인 후기·벽돌책·책 추천'},
-  {'title': '내 활동', 'url': url_for('my_page'), 'group': '회원', 'keywords': '마이페이지 내활동 기록', 'description': '내 프로필과 활동 기록 보기'},
-  {'title': '내 학기 참석 현황', 'url': url_for('my_term_attendance'), 'group': '회원', 'keywords': '출석 참석 횟수 현황', 'description': '이번 학기 출석·인정 횟수 확인'},
-  {'title': '캘린더', 'url': url_for('lms_calendar'), 'group': '회원', 'keywords': '캘린더 달력 일정 세미나', 'description': '월간 세미나·행사 일정 확인'},
-  {'title': '게시판', 'url': url_for('boards.index'), 'group': '회원', 'keywords': '공지 게시판 후기 글', 'description': '동아리 공지사항·게시판 목록'},
-  {'title': '책 추천', 'url': url_for('book_suggestions'), 'group': '회원', 'keywords': '도서 추천 책', 'description': '함께 읽을 책 추천과 공감'},
-  {'title': '동아리방 시간표·신청', 'url': url_for('club_room'), 'group': '회원', 'keywords': '동방 동아리방 예약 시간표', 'description': '동아리방 이용 시간표와 예약 신청'},
-  {'title': '역대 커리큘럼·발제·토의 아카이브', 'url': url_for('public_archive'), 'group': '회원', 'keywords': '아카이브 커리큘럼 발제문 토의 일지 도서 필담 미식회', 'description': '역대 커리큘럼 도서·발제문·서기 정리 토의 기록'},
-  {'title': '세미나 전 자료', 'url': url_for('member_pre_seminar'), 'group': '회원', 'keywords': '세미나 전 자료 논문 서평 작가 배경', 'description': '회원 전용 세미나 전 읽기 자료·학술 논문·서평 모음'},
-  {'title': '이용 안내', 'url': url_for('help_member'), 'group': '회원', 'keywords': '도움말 안내', 'description': '사이트 이용 방법과 안내'}
+  {'title': '홈 · 대시보드', 'url': url_for('main_index'), 'group': '회원', 'keywords': '대시보드 홈 메인 할일 오늘 dashboard home', 'description': '내 활동과 다음 세미나 요약 보기'},
+  {'title': '세미나 커리큘럼 · 일정', 'url': url_for('seminars'), 'group': '회원', 'keywords': '세미나 커리큘럼 일정 도서 책 curriculum seminar', 'description': '학기 세미나 주차별 도서·일정·발제문 확인'},
+  {'title': '발제문 목록 · 작성', 'url': url_for('seminars', section='topics'), 'group': '회원', 'keywords': '발제문 발제 제출 질문 마감 topic topics', 'description': '학기 발제문 마감 확인 및 제출·열람'},
+  {'title': '세미나 자료 · 공유 후기', 'url': url_for('seminars', section='resources'), 'group': '회원', 'keywords': '자료 기록 후기 리뷰 resources', 'description': '회차별 공유 후기·진행 자료 확인'},
+  {'title': '공지사항', 'url': url_for('boards.board_list', slug=_notice_board.slug) if _notice_board else url_for('boards.index'), 'group': '회원', 'keywords': '공지 공지사항 안내 notice notices', 'description': '동아리 공식 공지사항 바로 보기'},
+  {'title': '게시판 · 후기', 'url': url_for('boards.index'), 'group': '회원', 'keywords': '게시판 공지 후기 자유글 세미나기록 board boards', 'description': '동아리 게시판 및 후기 목록'},
+  {'title': '내 학기 출석 현황', 'url': url_for('my_term_attendance'), 'group': '회원', 'keywords': '출석 참석 내출석 횟수 현황 미달 attendance', 'description': '이번 학기 확정 출석·인정 횟수 확인'},
+  {'title': '내 활동 · 마이페이지', 'url': url_for('my_page'), 'group': '회원', 'keywords': '마이페이지 내활동 기록 프로필 mypage', 'description': '내 프로필과 누적 활동 기록 보기'},
+  {'title': '지금 참여하기', 'url': url_for('engagement_now'), 'group': '회원', 'keywords': '후기 벽돌책 모집 책추천 참여 신청 engagement', 'description': '진행 중인 후기·벽돌책·책 추천 바로가기'},
+  {'title': '책 추천 · 도서 제안', 'url': url_for('book_suggestions'), 'group': '회원', 'keywords': '도서 추천 책 신간 제안 book suggest', 'description': '함께 읽을 책 추천과 공감'},
+  {'title': '동아리방 시간표 · 신청', 'url': url_for('club_room'), 'group': '회원', 'keywords': '동방 동아리방 예약 시간표 개방 clubroom', 'description': '동아리방 이용 시간표와 예약 신청'},
+  {'title': '캘린더 · 월간 일정', 'url': url_for('lms_calendar'), 'group': '회원', 'keywords': '캘린더 달력 일정 세미나 행사 calendar', 'description': '월간 세미나·행사 일정 한눈에 보기'},
+  {'title': '회원 소개', 'url': url_for('profiles_page'), 'group': '회원', 'keywords': '회원소개 멤버 프로필 사람들 profile', 'description': '함께하는 동아리 회원 소개 보기'},
+  {'title': '역대 커리큘럼·발제·토의 아카이브', 'url': url_for('public_archive'), 'group': '회원', 'keywords': '아카이브 역대 커리큘럼 발제문 토의 일지 도서 필담 미식회 archive', 'description': '역대 커리큘럼 도서·발제문·서기 정리 토의 기록'},
+  {'title': '세미나 전 자료', 'url': url_for('member_pre_seminar'), 'group': '회원', 'keywords': '세미나 전 자료 논문 서평 작가 배경 읽기', 'description': '회원 전용 세미나 전 읽기 자료·학술 논문·서평 모음'},
+  {'title': '알림 · 브라우저 알림 설정', 'url': url_for('notification_center'), 'group': '회원', 'keywords': '알림 푸시 브라우저 알림설정 notification push', 'description': '전체 알림 내역과 브라우저 푸시 설정'},
+  {'title': '비밀번호 · 계정 보안 설정', 'url': url_for('account_password'), 'group': '회원', 'keywords': '비밀번호 핀 번호 변경 계정 보안 로그인 password pin', 'description': '로그인 비밀번호(PIN) 설정 및 변경'},
+  {'title': '이용 안내 · 도움말', 'url': url_for('help_member'), 'group': '회원', 'keywords': '도움말 안내 이용안내 매뉴얼 help guide', 'description': '사이트 이용 방법과 참여 안내'},
+  {'title': '외부 랜딩페이지', 'url': url_for('public_landing'), 'group': '회원', 'keywords': '랜딩 외부 소개 동아리소개 landing', 'description': '신규 지원자에게 보이는 동아리 소개 페이지'}
 ] %}
-{% if wiki_enabled and wiki_url|default('') %}{% set _qs_base = _qs_base + [{'title': '회원 위키', 'url': wiki_url, 'group': '회원', 'keywords': '위키 가이드 문서', 'description': '동아리 회원 위키 바로가기'}] %}{% endif %}
+{% if wiki_enabled and wiki_url|default('') %}{% set _qs_base = _qs_base + [{'title': '회원 위키', 'url': wiki_url, 'group': '회원', 'keywords': '위키 가이드 문서 동아리규정 wiki', 'description': '동아리 회원 위키 바로가기'}] %}{% endif %}
 {% if session.user_role in ['admin', 'officer'] and not session.member_preview %}
 {% set _qs_staff = [
-  {'title': '운영 관리 대시보드', 'url': url_for('admin_dashboard'), 'group': '운영진', 'keywords': '운영 관리 대시보드', 'description': '동아리 운영 현황 한눈에 보기'},
-  {'title': '세미나 운영', 'url': url_for('admin_seminars'), 'group': '운영진', 'keywords': '세미나 회차 생성 관리', 'description': '세미나 회차·도서·발제·사회자 관리'},
-  {'title': '조 편성', 'url': url_for('bookclub_index'), 'group': '운영진', 'keywords': '조편성 팀짜기 그룹', 'description': '세미나 조 편성 생성·수정'},
-  {'title': '학기 출석·명단 관리', 'url': url_for('admin_term_attendance'), 'group': '운영진', 'keywords': '출석 확정 명단', 'description': '학기 출석 확정 및 현황 관리'},
-  {'title': '전체 회원·가입 승인', 'url': url_for('records_members'), 'group': '운영진', 'keywords': '회원 가입 승인 코드 비활성', 'description': '전체 회원 목록·가입 승인·계정 관리'},
-  {'title': '학기 회원 명단', 'url': url_for('admin_term_members'), 'group': '운영진', 'keywords': '학기 명단 휴회 활동', 'description': '학기별 활동·휴회 회원 명단 관리'},
-  {'title': '벽돌책·도서 추천 관리', 'url': url_for('admin_engagement'), 'group': '운영진', 'keywords': '벽돌책 모집 선정', 'description': '벽돌책 모집 및 추천 도서 관리'},
-  {'title': '스페셜 이벤트', 'url': url_for('admin_special_events'), 'group': '운영진', 'keywords': '행사 OT 종강총회 이벤트', 'description': 'OT·종강총회 등 특별 행사 관리'},
-  {'title': '기록·통계', 'url': url_for('records_hub'), 'group': '운영진', 'keywords': '기록 통계 벽돌책 소모임', 'description': '세미나·벽돌책·소모임 누적 기록'},
-  {'title': '임원 인수인계 위키 설문', 'url': url_for('admin_handover_surveys'), 'group': '운영진', 'keywords': '인수인계 위키 설문 임원', 'description': '비로그인 인수인계 링크 발급·위키 초안 복사'},
-  {'title': '운영진 위키', 'url': (officer_wiki_url() if officer_wiki_url is defined else none) or '/wiki/w/운영진:대문', 'group': '운영진', 'keywords': '운영진 위키 인수인계', 'description': '운영진 전용 위키 문서'}
+  {'title': '운영 홈 · 운영 개요', 'url': url_for('admin_dashboard'), 'group': '운영진', 'keywords': '운영홈 운영개요 운영 관리 대시보드 admin overview', 'description': '동아리 운영 현황과 주간 체크리스트 한눈에 보기'},
+  {'title': '세미나 운영 (도서·일정·발제·조편성)', 'url': url_for('admin_seminars'), 'group': '운영진', 'keywords': '세미나 운영 회차 도서 사회자 발제 생성 관리', 'description': '학기별 도서·일정·사회자·발제문·후기 통합 관리'},
+  {'title': '조 편성 · 팀 나누기', 'url': url_for('bookclub_index'), 'group': '운영진', 'keywords': '조편성 팀짜기 그룹 조배정 making_team', 'description': '세미나 조 편성 생성·추천·수정'},
+  {'title': '발제문 관리 (세미나 운영)', 'url': url_for('admin_seminars', section='topics'), 'group': '운영진', 'keywords': '발제문 관리 제출 현황 word 다운로드 연장', 'description': '주차별 발제문 제출 확인·Word 내보내기·연장'},
+  {'title': '출석·조 편성 보기 (세미나 운영)', 'url': url_for('admin_seminars', section='attendance'), 'group': '운영진', 'keywords': '카카오톡 투표 참석명단 출석확정', 'description': '회차별 참석 예정 명단과 조 편성 바로 보기'},
+  {'title': '학기 출석 · 기준 설정 · 엑셀', 'url': url_for('admin_term_attendance'), 'group': '운영진', 'keywords': '학기출석 출석 확정 명단 최소출석 미달 OT 엑셀', 'description': '학기 최소 참석 기준·미달자·OT 인정·엑셀 내보내기'},
+  {'title': '전체 출석 매트릭스', 'url': url_for('admin_attendance_matrix'), 'group': '운영진', 'keywords': '출석 매트릭스 출석표 전체출석 matrix excel', 'description': '기간별 회원×회차 전체 출석표 및 엑셀 다운로드'},
+  {'title': '맡은 업무 · 할 일 워크벤치', 'url': url_for('operation_workbench'), 'group': '운영진', 'keywords': '맡은업무 업무 할일 워크벤치 반복업무 tasks', 'description': '배정된 운영 업무 확인 및 완료 처리'},
+  {'title': '버그·개선 제보 관리', 'url': url_for('admin_bug_reports'), 'group': '운영진', 'keywords': '버그 제보 불편 개선 문의 처리상태 bug', 'description': '회원이 보낸 버그·개선 제보 확인 및 메모'},
+  {'title': '학기 관리 · 새 학기 생성', 'url': url_for('admin_term_members'), 'group': '운영진', 'keywords': '학기관리 학기 명단 휴회 활동 종료 새학기 term', 'description': '새 학기 생성과 학기별 활동·휴식·종료 명단 관리'},
+  {'title': '전체 회원 · 가입 승인 · 코드', 'url': url_for('records_members'), 'group': '운영진', 'keywords': '회원 가입 승인 코드 비활성 OT 자동승인 중복합치기 member', 'description': '전체 회원 목록·가입 코드·OT 자동승인·계정 관리'},
+  {'title': '면접 지원자 결과 · 회비 확인', 'url': url_for('admin_recruitment_results'), 'group': '운영진', 'keywords': '면접 지원자 합격 불합격 회비 입금 신입모집 recruitment', 'description': '모집 차수별 지원자 결과 발표와 회비 입금 확인'},
+  {'title': '특별 행사 (OT·MT·총회)', 'url': url_for('admin_special_events'), 'group': '운영진', 'keywords': '행사 OT MT 종강총회 워크숍 스페셜이벤트 event', 'description': 'OT·MT·종강총회 등 특별 행사와 참석자 관리'},
+  {'title': '벽돌책 · 도서 추천 관리', 'url': url_for('admin_engagement'), 'group': '운영진', 'keywords': '벽돌책 모집 선정 추천 도서관리 brick', 'description': '벽돌책 모집 개설·지원자 선정 및 추천 도서 관리'},
+  {'title': '세미나실 예약 현황 · 총동연 캐시', 'url': url_for('admin_seminar_rooms'), 'group': '운영진', 'keywords': '세미나실 대여 예약 총동연 민주 백호 통일 room', 'description': '총동연 세미나실 예약 달력과 신청 글 생성 도우미'},
+  {'title': '기록 · 통계 허브', 'url': url_for('records_hub'), 'group': '운영진', 'keywords': '기록 통계 아카이브 현황 records', 'description': '세미나·벽돌책·소모임 누적 기록과 통계 허브'},
+  {'title': '세미나 진행 기록 목록', 'url': url_for('records_seminars'), 'group': '운영진', 'keywords': '세미나기록 진행기록 히스토리 history', 'description': '저장된 과거 세미나 진행 기록 조회 및 수정'},
+  {'title': '과거 세미나 수동 추가', 'url': url_for('manual_entry'), 'group': '운영진', 'keywords': '수동추가 과거세미나 기록추가 manual', 'description': '누락된 과거 세미나 진행 기록 직접 입력'},
+  {'title': '벽돌책 활동 기록', 'url': url_for('records_brick_books'), 'group': '운영진', 'keywords': '벽돌책기록 벽돌책관리 brick books', 'description': '역대 벽돌책 모임과 참여자 기록 관리'},
+  {'title': '소모임 활동 기록', 'url': url_for('records_study_groups'), 'group': '운영진', 'keywords': '소모임 자율소모임 study groups', 'description': '자율 소모임 운영 현황과 회차 기록 관리'},
+  {'title': '활동 통계 · 출석 랭킹', 'url': url_for('records_analytics'), 'group': '운영진', 'keywords': '통계 랭킹 차트 출석순위 분석 analytics', 'description': '시기별 세미나·출석 랭킹 및 참여 통계'},
+  {'title': '운영진 안내 · 매뉴얼', 'url': url_for('help_admin'), 'group': '운영진', 'keywords': '운영진안내 매뉴얼 체크리스트 가이드 help admin', 'description': '운영진 주간·학기별 점검 가이드'},
+  {'title': '임원 인수인계 위키 설문', 'url': url_for('admin_handover_surveys'), 'group': '운영진', 'keywords': '인수인계 위키 설문 임원 초안 학교메일 handover', 'description': '비로그인 인수인계 링크 발급·위키 초안 복사'}
 ] %}
+{% if session.user_role == 'admin' %}
+{% set _qs_staff = _qs_staff + [
+  {'title': '전체 설정 · 직책 권한', 'url': url_for('operation_settings'), 'group': '운영진', 'keywords': '전체설정 설정 직책 권한 역할 관리자 settings roles', 'description': '직책별 기본 업무 권한 설정'},
+  {'title': '게시판 관리 · 삭제 글 복구', 'url': url_for('boards.admin_index'), 'group': '운영진', 'keywords': '게시판관리 삭제복구 게시판설정 board admin', 'description': '게시판 생성·순서 변경 및 삭제된 글 복구'},
+  {'title': '개인정보 정리 · 파기', 'url': url_for('admin_privacy_cleanup'), 'group': '운영진', 'keywords': '개인정보 파기 정리 비활성 지원자 privacy cleanup', 'description': '비활성 회원 및 종료 모집 차수 개인정보 파기'}
+] %}
+{% endif %}
 {% set _qs_items = _qs_base + _qs_staff %}
 {% else %}
 {% set _qs_items = _qs_base %}
+{% endif %}
+{% if not member_preview %}
+{% set _officer_wiki = officer_wiki_url() if officer_wiki_url is defined else none %}
+{% if _officer_wiki %}
+{% set _qs_items = _qs_items + [{'title': '운영진 위키', 'url': _officer_wiki, 'group': '운영진', 'keywords': '운영진 위키 인수인계 운영문서 officer wiki', 'description': '운영진 전용 위키 문서'}] %}
+{% endif %}
 {% endif %}
 {% else %}
 {% set _qs_items = [

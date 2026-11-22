@@ -1,8 +1,8 @@
 {% extends 'lms_admin_base.html' %}
 {% from '_lms_icons.html' import icon %}
 {% set lms_page = 'operations' %}
-{% set lms_title = '이번 주 운영 개요' %}
-{% block title %}전체 운영 개요{% endblock %}
+{% set lms_title = '운영 홈' %}
+{% block title %}운영 홈 · 책 먹는 호반우{% endblock %}
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_operations.css') }}">{% endblock %}
 
 {% block content %}
@@ -11,30 +11,52 @@
 {% set active_topics = topic_events|selectattr('is_active')|list %}
 
 <div class="lms-operations-body">
-  <header class="overview-head">
-    <div>
-      <p class="overview-eyebrow">전체 운영</p>
-      <h1>이번 주 운영 개요</h1>
-      <p>선택한 세미나에서 아직 끝내지 않은 작업을 확인하세요.</p>
+  <header class="ui-page-header">
+    <div class="ui-page-header-copy">
+      <p class="ui-page-eyebrow">전체 운영</p>
+      <h1>운영 홈</h1>
+      <p class="ui-page-subtitle">이번 주 세미나 준비 상태와 미완료 작업을 한눈에 확인하세요.</p>
     </div>
-    <a class="overview-guide-link" href="{{ url_for('help_admin') }}">운영진 안내</a>
+    <div class="ui-page-actions">
+      <a class="ui-btn ui-btn-primary" href="{{ url_for('admin_seminars', term_id=overview.term.id) if (overview and overview.term) else url_for('admin_seminars') }}">이번 학기 세미나 운영</a>
+      <a class="ui-btn ui-btn-secondary" href="{{ url_for('operation_workbench') }}">맡은 업무</a>
+      <a class="ui-btn ui-btn-ghost" href="{{ url_for('help_admin') }}">운영진 안내</a>
+    </div>
   </header>
 
-
+  {% include '_admin_home_tabs.html' %}
 
   {% if load_error %}
     {% include '_load_error.html' %}
   {% else %}
-  <section aria-labelledby="member-management-title">
-    <div class="lms-section-toolbar"><h2 id="member-management-title">학기</h2><a class="lms-button" href="{{ url_for('admin_term_members') }}">학기 관리·새 학기</a></div>
-    <p class="lms-small">세미나·발제문·출석·회원 명단·임원은 각 학기 안에서, 회원 정보와 로그인 권한은 왼쪽 ‘회원·계정’에서 관리합니다.</p>
-    <div class="lms-admin-term-links">{% for item in seminar_terms %}<article><h3>{{ item.name }}</h3><p class="lms-small">{{ item.start_date }} ~ {{ item.end_date }}</p><nav aria-label="{{ item.name }} 관리"><a href="{{ url_for('admin_seminars',term_id=item.id) }}">세미나 운영</a><a href="{{ url_for('admin_term_members',term_id=item.id) }}">학기 설정</a><a href="{{ url_for('seminars',term_id=item.id) }}">강의실</a></nav></article>{% endfor %}</div>
-  </section>
+  <div class="ui-kpi-grid" aria-label="운영 현황 요약">
+    <div class="ui-kpi-card is-accent">
+      <span class="ui-kpi-label">활성 학기</span>
+      <strong class="ui-kpi-value">{{ active_terms|length }}</strong>
+      <span class="ui-kpi-meta">{{ active_terms[0].name if active_terms else '진행 중인 학기 없음' }}</span>
+    </div>
+    <div class="ui-kpi-card">
+      <span class="ui-kpi-label">전체 회원</span>
+      <strong class="ui-kpi-value">{{ all_members|length }}</strong>
+      <span class="ui-kpi-meta"><a href="{{ url_for('records_members') }}">회원 관리 →</a></span>
+    </div>
+    <div class="ui-kpi-card">
+      <span class="ui-kpi-label">접수 중 발제문</span>
+      <strong class="ui-kpi-value">{{ active_topics|length }}</strong>
+      <span class="ui-kpi-meta">{% if overview and overview.pending_attendance %}출석 미확정 {{ overview.pending_attendance|length }}건{% else %}출석 확인 대기 없음{% endif %}</span>
+    </div>
+    <div class="ui-kpi-card">
+      <span class="ui-kpi-label">최근 진행 기록</span>
+      <strong class="ui-kpi-value overview-stat-date" style="font-size:20px">{{ latest_history.date if latest_history else '없음' }}</strong>
+      <span class="ui-kpi-meta"><a href="{{ url_for('records_seminars') }}">기록·통계 →</a></span>
+    </div>
+  </div>
+
   {% if overview %}
   <section class="operations-current" aria-labelledby="operations-current-title">
     <div class="operations-pickers">
-      <details class="operations-term-picker"><summary>{{ overview.term.name if overview.term else '학기 없음' }} · 학기 변경</summary><form method="get"><label for="overview-term">학기</label><select id="overview-term" name="term_id">{% for term in overview.terms %}<option value="{{ term.id }}" {% if overview.term and term.id == overview.term.id %}selected{% endif %}>{{ term.name }}</option>{% endfor %}</select><button class="home-btn home-btn-secondary">학기 선택</button></form></details>
-      {% if overview.sessions %}<form method="get"><input type="hidden" name="term_id" value="{{ overview.term.id }}"><label for="overview-session">확인할 세미나</label><select id="overview-session" name="session_id">{% for item in overview.sessions %}<option value="{{ item.id }}" {% if overview.selected and item.id == overview.selected.id %}selected{% endif %}>{{ item.meeting_date|seminar_date }}</option>{% endfor %}</select><button class="home-btn home-btn-secondary">회차 선택</button></form>{% endif %}
+      <details class="operations-term-picker"><summary>{{ overview.term.name if overview.term else '학기 없음' }} · 학기 변경</summary><form method="get"><label for="overview-term">학기</label><select id="overview-term" name="term_id">{% for term in overview.terms %}<option value="{{ term.id }}" {% if overview.term and term.id == overview.term.id %}selected{% endif %}>{{ term.name }}</option>{% endfor %}</select><button class="ui-btn ui-btn-secondary ui-btn-sm">학기 선택</button></form></details>
+      {% if overview.sessions %}<form method="get"><input type="hidden" name="term_id" value="{{ overview.term.id }}"><label for="overview-session">확인할 세미나</label><select id="overview-session" name="session_id">{% for item in overview.sessions %}<option value="{{ item.id }}" {% if overview.selected and item.id == overview.selected.id %}selected{% endif %}>{{ item.meeting_date|seminar_date }}</option>{% endfor %}</select><button class="ui-btn ui-btn-secondary ui-btn-sm">회차 선택</button></form>{% endif %}
     </div>
     {% if overview.selected %}
       {% set selected=overview.selected %}
@@ -48,99 +70,58 @@
         {% elif task.key in ['roster', 'attendance'] %}{% set task_url=url_for('admin_seminar_roster', session_id=selected.id) %}
         {% elif task.key == 'groups' %}{% set task_url=url_for('bookclub_index', session_id=selected.id) %}
         {% else %}{% set task_url=url_for('admin_seminars', term_id=overview.term.id, _anchor='week-' ~ selected.seminar_week_id) %}{% endif %}
-        <li><span>{{ task.label }} <small>미완료</small></span><a class="home-btn home-btn-secondary" href="{{ task_url }}">{{ task.action }} →</a></li>
+        <li><span>{{ task.label }} <small>미완료</small></span><a class="ui-btn ui-btn-secondary ui-btn-sm" href="{{ task_url }}">{{ task.action }} →</a></li>
       {% else %}<li class="operations-complete">이 회차의 준비·기록 작업이 모두 완료됐어요.</li>{% endfor %}
       </ul>
       <p class="overview-task-help">실제 출석 확정은 세미나 당일부터 표시됩니다. 참석 예정 명단과 실제 출석은 별도로 확인해주세요.</p>
-    {% else %}<h2 id="operations-current-title">등록된 세미나가 없어요.</h2><a class="home-btn home-btn-primary" href="{{ url_for('admin_seminars', schedule=1) }}">도서·일정 등록</a>{% endif %}
+    {% else %}<h2 id="operations-current-title">등록된 세미나가 없어요.</h2><a class="ui-btn ui-btn-primary" href="{{ url_for('admin_seminars', schedule=1) }}">도서·일정 등록</a>{% endif %}
     {% if overview.pending_attendance %}
     <details class="operations-pending"><summary>지난 세미나 출석 미확정 {{ overview.pending_attendance|length }}건</summary><ul>{% for item in overview.pending_attendance %}<li><a href="{{ url_for('admin_seminar_roster', session_id=item.id) }}">{{ item.meeting_date|seminar_date }} · {{ item.book_title }} 출석 확정 →</a></li>{% endfor %}</ul></details>
     {% endif %}
   </section>
   {% endif %}
-  <details class="overview-reference"><summary>전체 운영 순서와 데이터 보기</summary>
-  <section class="overview-next" aria-labelledby="workflow-title">
-    <div class="overview-next-copy">
-      <p class="overview-kicker">권장 순서</p>
-      <h2 id="workflow-title">도서 확인부터 기록 저장까지</h2>
-      <p>각 단계를 눌러 작업하고 다시 이 화면으로 돌아와 다음 단계로 진행하세요.</p>
+
+  <section class="ui-card" aria-labelledby="member-management-title">
+    <div class="ui-card-head">
+      <h2 id="member-management-title">학기 바로가기</h2>
+      <a class="ui-btn ui-btn-secondary ui-btn-sm" href="{{ url_for('admin_term_members') }}">학기 관리·새 학기</a>
     </div>
-    <a class="overview-next-action" href="{{ url_for('admin_seminars') }}">첫 단계 시작</a>
+    <p class="lms-small">세미나·발제문·출석은 각 학기 강의실에서, 학기 생성·명단·임원은 ‘학기 관리’에서 다룹니다.</p>
+    <div class="lms-admin-term-links">{% for item in seminar_terms %}<article><h3>{{ item.name }}</h3><p class="lms-small">{{ item.start_date }} ~ {{ item.end_date }}</p><nav aria-label="{{ item.name }} 관리"><a href="{{ url_for('admin_seminars',term_id=item.id) }}">세미나 운영</a><a href="{{ url_for('admin_term_members',term_id=item.id) }}">학기 관리</a><a href="{{ url_for('seminars',term_id=item.id) }}">강의실</a></nav></article>{% endfor %}</div>
   </section>
 
-  <section class="overview-workflow" aria-label="주간 운영 5단계">
-    <a class="workflow-card" href="{{ url_for('admin_seminars') }}">
-      <span class="workflow-num">1</span>
-      <span class="workflow-body"><strong>도서·일정 확인</strong><small>{% if active_terms %}활성 학기 {{ active_terms|length }}개{% else %}활성 학기 확인 필요{% endif %}</small></span>
-      <span class="workflow-arrow" aria-hidden="true">→</span>
-    </a>
-    <a class="workflow-card" href="{{ url_for('admin_seminars') }}">
-      <span class="workflow-num">2</span>
-      <span class="workflow-body"><strong>발제문 수집</strong><small>{% if active_topics %}현재 접수 중 {{ active_topics|length }}건{% else %}현재 열린 수집 없음{% endif %}</small></span>
-      <span class="workflow-arrow" aria-hidden="true">→</span>
-    </a>
-    <a class="workflow-card" href="{{ url_for('admin_seminars') }}">
-      <span class="workflow-num">3</span>
-      <span class="workflow-body"><strong>참석자 확인</strong><small>본 세미나·추가 세미나 참석 명단 반영</small></span>
-      <span class="workflow-arrow" aria-hidden="true">→</span>
-    </a>
-    <a class="workflow-card" href="{{ url_for('bookclub_index') }}">
-      <span class="workflow-num">4</span>
-      <span class="workflow-body"><strong>조 편성</strong><small>참석자·발제자 검토 후 추천 생성</small></span>
-      <span class="workflow-arrow" aria-hidden="true">→</span>
-    </a>
-    <a class="workflow-card" href="{{ url_for('records_seminars') }}">
-      <span class="workflow-num">5</span>
-      <span class="workflow-body"><strong>기록 확인</strong><small>{% if latest_history %}최근 저장 {{ latest_history.date }}{% else %}아직 저장된 진행 기록 없음{% endif %}</small></span>
-      <span class="workflow-arrow" aria-hidden="true">→</span>
-    </a>
-  </section>
-
-  <section class="overview-summary" aria-labelledby="summary-title">
-    <div class="overview-section-head">
-      <div><p class="overview-kicker">상태 요약</p><h2 id="summary-title">운영 데이터</h2></div>
-      <span>숫자는 현황 확인용입니다.</span>
-    </div>
-    <div class="overview-stat-grid">
-      <div class="overview-stat"><span>전체 회원</span><strong>{{ all_members|length }}</strong></div>
-      <div class="overview-stat"><span>활성 학기</span><strong>{{ active_terms|length }}</strong></div>
-      <div class="overview-stat"><span>접수 중 발제문</span><strong>{{ active_topics|length }}</strong></div>
-      <div class="overview-stat"><span>최근 진행 기록</span><strong class="overview-stat-date">{% if latest_history %}{{ latest_history.date }}{% else %}없음{% endif %}</strong></div>
-    </div>
-  </section>
-
-  </details>
-  <details class="overview-reference"><summary>업무별 도구 모아보기 (왼쪽 메뉴와 같음)</summary>
-  <section aria-labelledby="tools-title">
-    <div class="overview-section-head">
-      <div><p class="overview-kicker">그 밖의 관리</p><h2 id="tools-title">업무별 도구</h2></div>
-    </div>
-    <div class="overview-tool-groups">
-      <div class="overview-tool-group">
-        <h3>사람</h3>
-        <a href="{{ url_for('records_members') }}"><strong>회원 관리</strong><span>정보·상태·활동 요약</span></a>
-        <a href="{{ url_for('admin_recruitment_results') }}"><strong>면접 지원자 결과</strong><span>명단·결과·공유 링크</span></a>
-      </div>
-      <div class="overview-tool-group">
-        <h3>활동</h3>
-        <a href="{{ url_for('admin_special_events') }}"><strong>활동·행사</strong><span>MT·워크숍·강연 기록</span></a>
-        <a href="{{ url_for('admin_engagement') }}"><strong>벽돌책·도서 추천</strong><span>모집·후기·추천 관리</span></a>
-        <a href="{{ url_for('admin_seminar_rooms') }}"><strong>세미나실 예약 현황</strong><span>달력과 장소 확인</span></a>
-      </div>
-      <div class="overview-tool-group">
-        <h3>기록·시스템</h3>
-        <a href="{{ url_for('records_hub') }}"><strong>기록·통계</strong><span>세미나·출석·통계</span></a>
-        <a href="{{ url_for('admin_bug_reports') }}"><strong>버그 제보</strong><span>불편 사항 처리</span></a>
-        <a href="{{ url_for('help_admin') }}"><strong>운영진 안내</strong><span>점검·인수인계 순서</span></a>
-      </div>
-    </div>
-  </section>
+  <details class="overview-reference">
+    <summary>주간 운영 5단계 가이드 보기</summary>
+    <section class="overview-workflow" aria-label="주간 운영 5단계" style="margin-top:12px">
+      <a class="workflow-card" href="{{ url_for('admin_seminars') }}">
+        <span class="workflow-num">1</span>
+        <span class="workflow-body"><strong>도서·일정 확인</strong><small>{% if active_terms %}활성 학기 {{ active_terms|length }}개{% else %}활성 학기 확인 필요{% endif %}</small></span>
+        <span class="workflow-arrow" aria-hidden="true">→</span>
+      </a>
+      <a class="workflow-card" href="{{ url_for('admin_seminars') }}">
+        <span class="workflow-num">2</span>
+        <span class="workflow-body"><strong>발제문 수집</strong><small>{% if active_topics %}현재 접수 중 {{ active_topics|length }}건{% else %}현재 열린 수집 없음{% endif %}</small></span>
+        <span class="workflow-arrow" aria-hidden="true">→</span>
+      </a>
+      <a class="workflow-card" href="{{ url_for('admin_seminars') }}">
+        <span class="workflow-num">3</span>
+        <span class="workflow-body"><strong>참석자 확인</strong><small>본 세미나·추가 세미나 참석 명단 반영</small></span>
+        <span class="workflow-arrow" aria-hidden="true">→</span>
+      </a>
+      <a class="workflow-card" href="{{ url_for('bookclub_index') }}">
+        <span class="workflow-num">4</span>
+        <span class="workflow-body"><strong>조 편성</strong><small>참석자·발제자 검토 후 추천 생성</small></span>
+        <span class="workflow-arrow" aria-hidden="true">→</span>
+      </a>
+      <a class="workflow-card" href="{{ url_for('records_seminars') }}">
+        <span class="workflow-num">5</span>
+        <span class="workflow-body"><strong>기록 확인</strong><small>{% if latest_history %}최근 저장 {{ latest_history.date }}{% else %}아직 저장된 진행 기록 없음{% endif %}</small></span>
+        <span class="workflow-arrow" aria-hidden="true">→</span>
+      </a>
+    </section>
   </details>
   {% endif %}
 </div>
 </div>
 {% endblock %}
-{% block scripts %}
-
-
-{% endblock %}
+{% block scripts %}{% endblock %}

@@ -1,0 +1,5 @@
+{% set ep = request.endpoint or '' %}
+<nav class="ui-tabs" aria-label="회원 관리 탭">
+  <a class="ui-tab{% if ep in ['records_members', 'records_member_profile'] %} is-active{% endif %}" href="{{ url_for('records_members') }}" {% if ep in ['records_members', 'records_member_profile'] %}aria-current="page"{% endif %}>전체 회원·가입 승인</a>
+  <a class="ui-tab{% if ep.startswith('admin_recruitment_result') %} is-active{% endif %}" href="{{ url_for('admin_recruitment_results') }}" {% if ep.startswith('admin_recruitment_result') %}aria-current="page"{% endif %}>면접 지원자</a>
+</nav>

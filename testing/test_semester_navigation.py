@@ -77,7 +77,7 @@ class NavigationRoutesTests(unittest.TestCase):
         page = self.client.get('/admin/term_members?term_id=term')
         self.assertEqual(page.status_code, 200)
         text = page.get_data(as_text=True)
-        self.assertIn('학기 강의실 메뉴', text)
+        self.assertIn('전체 운영 메뉴', text)
         self.assertIn('/admin/term_members?term_id=term', text)
         self.assertNotIn('id="new-term"', text)
         self.assertIn('href="/admin/dashboard"', text)

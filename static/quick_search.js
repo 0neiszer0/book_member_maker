@@ -204,7 +204,7 @@
       if (!groups.has(item.group)) groups.set(item.group, []);
       groups.get(item.group).push(item);
     }
-    filtered = filtered.map(item => ({ ...item, group: '메뉴' })).concat(...groups.values());
+    filtered = filtered.map(item => ({ ...item, group: item.group || '메뉴' })).concat(...groups.values());
     activeIndex = 0;
     list.replaceChildren();
     emptyEl.hidden = loading || filtered.length > 0;

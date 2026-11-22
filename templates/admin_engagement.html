@@ -1,7 +1,8 @@
 {% extends 'engagement_base.html' %}
 {% block content %}
 
-<section class="eg-header"><div class="eg-kicker">전체 운영</div><h1>벽돌책·도서 추천</h1><p class="eg-lead">추천 도서를 벽돌책 모집과 후기로 이어서 관리합니다.</p><div class="eg-actions"><a class="lms-button lms-button-primary" href="{{ url_for('engagement_now') }}">지금 참여하기 보기</a></div></section>
+<section class="eg-header"><div class="eg-kicker">전체 운영 · 동아리 활동</div><h1>벽돌책·도서 추천</h1><p class="eg-lead">추천 도서를 벽돌책 모집과 후기로 이어서 관리합니다.</p><div class="eg-actions"><a class="lms-button lms-button-primary" href="{{ url_for('engagement_now') }}">지금 참여하기 보기</a></div></section>
+{% include '_admin_activities_tabs.html' %}
 
 <section class="eg-panel" style="margin-top:16px">
   <h2>추천에서 벽돌책 모집 만들기</h2>

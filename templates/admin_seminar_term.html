@@ -8,44 +8,49 @@
 {% block content %}
 <div class="lms-operations">
 <div class="lms-operations-body">
-        <div class="flex items-center justify-between">
-            <h1 class="text-2xl font-bold ops-accent">{{ term.name }} 회차 관리</h1>
-            <a href="{{ url_for('admin_dashboard') }}" class="text-sm text-gray-400 hover:text-white">← 대시보드</a>
-        </div>
+        <header class="ui-page-header">
+            <div class="ui-page-header-copy">
+                <p class="ui-page-eyebrow">{{ term.name }} · 학기 운영</p>
+                <h1>{{ term.name }} 회차 관리</h1>
+                <p class="ui-page-subtitle">학기 일정, 회차별 도서, 발제문 수집, 투표 시간, 참석자 명단을 관리합니다.</p>
+            </div>
+            <div class="ui-page-actions">
+                <a href="{{ url_for('admin_seminars', term_id=term.id) }}" class="ui-btn ui-btn-sm">← 세미나 운영</a>
+            </div>
+        </header>
 
         <!-- 학기 정보 수정 -->
         <div class="ops-panel p-6 rounded-lg">
             <h2 class="text-lg font-bold mb-4 ops-accent">학기 정보</h2>
             <form id="termUpdateForm" class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
                 <div class="md:col-span-2">
-                    <label class="block text-xs text-gray-400 mb-1">학기명</label>
+                    <label class="block text-xs muted mb-1">학기명</label>
                     <input type="text" name="name" value="{{ term.name }}" required
-                        class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm">
+                        class="ops-field w-full rounded px-2 py-1.5 text-sm">
                 </div>
                 <div>
-                    <label class="block text-xs text-gray-400 mb-1">첫 세미나 날짜</label>
+                    <label class="block text-xs muted mb-1">첫 세미나 날짜</label>
                     <input type="date" name="start_date" value="{{ term.start_date }}"
-                        class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm">
+                        class="ops-field w-full rounded px-2 py-1.5 text-sm">
                 </div>
                 <div>
-                    <label class="block text-xs text-gray-400 mb-1">마지막 세미나 날짜</label>
+                    <label class="block text-xs muted mb-1">마지막 세미나 날짜</label>
                     <input type="date" name="end_date" value="{{ term.end_date }}"
-                        class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm">
+                        class="ops-field w-full rounded px-2 py-1.5 text-sm">
                 </div>
                 <div>
-                    <label class="block text-xs text-gray-400 mb-1">한도</label>
+                    <label class="block text-xs muted mb-1">한도</label>
                     <input type="number" name="max_capacity" value="{{ term.max_capacity }}" min="1"
-                        class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm">
+                        class="ops-field w-full rounded px-2 py-1.5 text-sm">
                 </div>
-                <div class="md:col-span-5 flex items-center gap-3">
+                <div class="md:col-span-5 flex items-center gap-3 flex-wrap">
                     <label class="flex items-center gap-2 text-sm">
                         <input type="checkbox" name="is_active" {% if term.is_active %}checked{% endif %}> 활성
                     </label>
-                    <button type="submit"
-                        class="ops-primary text-black font-bold py-1.5 px-4 rounded text-sm hover:opacity-80">
+                    <button type="submit" class="ui-btn ui-btn-primary ui-btn-sm">
                         저장
                     </button>
-                    <span class="text-xs text-gray-400">마지막 세미나 날짜를 늦추면 누락된 월/목 회차가 자동 추가됩니다 (기존 회차는 보존).</span>
+                    <span class="text-xs muted">마지막 세미나 날짜를 늦추면 누락된 월/목 회차가 자동 추가됩니다 (기존 회차는 보존).</span>
                 </div>
             </form>
         </div>
@@ -53,7 +58,7 @@
         <!-- 회차 목록 -->
         <div class="ops-panel p-6 rounded-lg">
             <h2 class="text-lg font-bold mb-4 ops-accent">회차 목록 ({{ sessions|length }}개)</h2>
-            <p class="text-xs text-gray-500 mb-3">
+            <p class="text-xs muted mb-3">
                 {{ icon('help',18) }} 책 제목을 수정하면 바로 저장됩니다. 회차 카드에서 <strong>참석자 관리</strong>·<strong>진행 기록 연동</strong>이 가능합니다.
             </p>
 
@@ -69,8 +74,8 @@
 
             {# === 지난 회차 (접힘) === #}
             {% if past_sessions %}
-            <details class="bg-gray-900/40 rounded-lg border ops-border">
-                <summary class="cursor-pointer px-4 py-3 text-sm text-gray-300 hover:text-white">
+            <details class="ops-surface rounded-lg border ops-border">
+                <summary class="cursor-pointer px-4 py-3 text-sm muted font-semibold">
                     {{ icon('folder',18) }} 지난 회차 {{ past_sessions|length }}개 보기
                 </summary>
                 <div class="space-y-3 p-4">
@@ -82,7 +87,7 @@
             {% endif %}
 
             {% if not sessions %}
-            <p class="text-center text-gray-500 py-6">회차가 없습니다.</p>
+            <p class="text-center muted py-6">회차가 없습니다.</p>
             {% endif %}
         </div>
     </div>
@@ -177,17 +182,18 @@
                 if (data.status === 'success') {
                     const list = document.getElementById('attendees-' + sessionId);
                     // 빈 상태 메시지 제거
-                    if (list.querySelector('.text-gray-500')) list.innerHTML = '';
+                    const emptyNote = list.querySelector('[data-empty-attendees]');
+                    if (emptyNote) emptyNote.remove();
                     if (list.querySelector(`[data-member-id="${memberId}"]`)) {
                         // 이미 있음
                     } else {
                         const span = document.createElement('span');
-                        span.className = 'inline-flex items-center gap-1 bg-green-900/50 border border-green-700 text-green-200 px-2 py-1 rounded text-xs';
+                        span.className = 'ui-pill is-success text-xs';
                         span.dataset.memberId = memberId;
                         span.appendChild(document.createTextNode(memberName + ' '));
                         const removeButton = document.createElement('button');
                         removeButton.type = 'button';
-                        removeButton.className = 'text-red-400 hover:text-red-300 ml-1';
+                        removeButton.className = 'ops-accent ml-1';
                         removeButton.textContent = '×';
                         removeButton.setAttribute('aria-label', memberName + ' 참석자 제거');
                         removeButton.onclick = () => removeAttendee(sessionId, parseInt(memberId, 10), removeButton);
@@ -266,10 +272,10 @@
                 if (data.status === 'success') {
                     if (data.is_active) {
                         btn.textContent = '활성';
-                        btn.className = 'text-xs px-2 py-1 rounded bg-green-700 hover:bg-green-600';
+                        btn.className = 'ui-btn ui-btn-sm ops-approved';
                     } else {
                         btn.textContent = '비활성';
-                        btn.className = 'text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600';
+                        btn.className = 'ui-btn ui-btn-sm';
                     }
                 } else {
                     alert('실패: ' + (data.message || '오류'));

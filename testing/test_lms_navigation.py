@@ -91,11 +91,11 @@ class LmsNavigationTests(unittest.TestCase):
         self.fake.rows['seminar_terms'].append(dict(id='archive', name='2025-2학기', start_date='2025-09-01', end_date='2025-12-31', is_active=False, share_token='archive-test'))
         self.fake.rows['seminar_weeks'].append(dict(id='archive-week', term_id='archive', week_start='2025-10-20', book_title='지난 학기 도서'))
         self.fake.rows['seminar_sessions'].append(dict(id='archive-session', term_id='archive', seminar_week_id='archive-week', day_type='thu', meeting_date='2025-10-23'))
-        for source in ('/admin/term_attendance?term_id=archive', '/admin/seminars?term_id=archive', '/admin/term_members?term_id=archive', '/admin/seminar_sessions/archive-session/roster', '/admin/seminar_sessions/archive-session/moderator'):
+        for source in ('/admin/term_attendance?term_id=archive', '/admin/seminars?term_id=archive', '/admin/seminar_sessions/archive-session/roster', '/admin/seminar_sessions/archive-session/moderator'):
             html = self.client.get(source).get_data(as_text=True)
             nav = re.search(r'<nav class="lms-classroom-nav".*?</nav>', html, re.S).group()
             links = [urlsplit(unescape(href)) for href in re.findall(r'href="([^"]+)"', nav)]
-            for destination in ('seminars', 'term_members', 'term_attendance'):
+            for destination in ('seminars', 'term_attendance'):
                 with self.subTest(source=source, destination=destination):
                     href = '/admin/' + destination + '?term_id=archive'
                     matching = [link for link in links if link.path == '/admin/' + destination]
@@ -105,6 +105,10 @@ class LmsNavigationTests(unittest.TestCase):
                     self.assertEqual(response.status_code, 200)
                     self.assertRegex(response.get_data(as_text=True), r'<option[^>]*value="archive"[^>]*selected')
             self.assertNotIn('/making_team?term_id=', nav)
+        term_members_html = self.client.get('/admin/term_members?term_id=archive').get_data(as_text=True)
+        self.assertIn('aria-label="전체 운영 메뉴"', term_members_html)
+        self.assertIn('aria-current="page">학기 관리', term_members_html)
+        self.assertRegex(term_members_html, r'<option[^>]*value="archive"[^>]*selected')
         overview = self.client.get('/admin/dashboard?term_id=archive').get_data(as_text=True)
         self.assertIn('aria-label="전체 운영 메뉴"', overview)
         self.assertIn('href="/admin/term_members?term_id=archive"', overview)
@@ -175,15 +179,15 @@ class LmsNavigationTests(unittest.TestCase):
         self.login('member')
         self.fake.rows['seminar_terms'].append(dict(id='archive', name='2025-2학기', start_date='2025-09-01', end_date='2025-12-31', is_active=False, share_token='archive'))
         classroom = self.client.get('/seminars?term_id=archive').get_data(as_text=True)
-        self.assertIn('href="/board/notices?term_id=archive"', classroom)
+        self.assertIn('href="/boards?term_id=archive"', classroom)
         for path in ('/board/notices?term_id=archive', '/board/notices/post?term_id=archive', '/boards?term_id=archive'):
             with self.subTest(path=path):
                 html = self.assert_lms_response(path)
                 self.assertIn('aria-label="학기 강의실 메뉴"', html)
                 self.assertIn('href="/seminars?term_id=archive"', html)
                 self.assertNotIn('aria-label="게시판 메뉴"', html)
+                self.assertIn('aria-current="page">게시판', html)
                 if '/boards?' not in path:
-                    self.assertIn('aria-current="page">공지사항', html)
                     self.assertIn('테스트 공지', html)  # Global notices appear in every semester.
         self.fake.rows['posts'] = [dict(self.fake.rows['posts'][0], id='post-'+str(i)) for i in range(21)]
         listing = self.client.get('/board/notices?term_id=archive&q=테스트').get_data(as_text=True)

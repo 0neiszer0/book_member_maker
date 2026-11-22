@@ -30,7 +30,14 @@ def course_menu(html):
 class AdminNavigationSimplifyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        from types import SimpleNamespace
         cls.fake = FakeSupabase()
+        cls.fake.rpc = lambda name, params=None: SimpleNamespace(
+            execute=lambda: SimpleNamespace(
+                data={'inactive_count': 0, 'inactive_preview': [], 'campaigns': []}
+                if name == 'privacy_cleanup_summary' else {}
+            )
+        )
         spec = importlib.util.spec_from_file_location('_admin_nav_simplify_app', Path(__file__).parents[1] / 'app.py')
         cls.module = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = cls.module
@@ -60,7 +67,7 @@ class AdminNavigationSimplifyTests(unittest.TestCase):
         self.login('admin')
         label, links = course_menu(self.page('/admin/dashboard'))
         self.assertEqual(label, '전체 운영 메뉴')
-        self.assertLessEqual(len(links), 12)
+        self.assertEqual([t for _, _, t in links], ['운영 홈', '학기 관리', '회원 관리', '동아리 활동', '기록·통계', '설정'])
         for href, _, text in links:
             with self.subTest(item=text):
                 menu, landed = course_menu(self.page(href))
@@ -71,6 +78,7 @@ class AdminNavigationSimplifyTests(unittest.TestCase):
         self.login('admin')
         label, links = course_menu(self.page('/admin/seminars?term_id=term'))
         self.assertEqual(label, '학기 강의실 메뉴')
+        self.assertEqual([t for _, _, t in links], ['커리큘럼', '게시판', '내 출석', '세미나 운영', '학기 출석'])
         for href, _, text in links:
             with self.subTest(item=text):
                 menu, landed = course_menu(self.page(href))
@@ -85,18 +93,20 @@ class AdminNavigationSimplifyTests(unittest.TestCase):
                 self.assertIn('class="lms-settings-tabs"', html)
                 for tab in ('회원 명단', '임원·부원', '반복 업무·알림'):
                     self.assertIn(f'>{tab}</a>', html)
-                _, links = course_menu(html)
-                self.assertIn('학기 설정', [t for _, current, t in links if current])
+                menu, links = course_menu(html)
+                self.assertEqual(menu, '전체 운영 메뉴')
+                self.assertEqual([t for _, current, t in links if current], ['학기 관리'])
 
     def test_global_settings_are_tabs(self):
         self.login('admin')
-        for path in ('/operations/settings', '/admin/boards'):
+        for path in ('/operations/settings', '/admin/boards', '/admin/handover', '/admin/privacy'):
             with self.subTest(path=path):
                 html = self.page(path)
                 self.assertIn('class="lms-settings-tabs"', html)
-                self.assertIn('>직책·기본 업무</a>', html)
+                for tab in ('직책·기본 업무', '게시판', '임원 인수인계 설문', '개인정보 정리'):
+                    self.assertIn(f'>{tab}</a>', html)
                 _, links = course_menu(html)
-                self.assertEqual([t for _, current, t in links if current], ['전체 설정'])
+                self.assertEqual([t for _, current, t in links if current], ['설정'])
 
     def test_global_term_list_does_not_embed_a_term_roster_editor(self):
         self.login('admin')
@@ -112,18 +122,20 @@ class AdminNavigationSimplifyTests(unittest.TestCase):
         self.assertNotIn('학기 운영</p>', html)
         _, links = course_menu(html)
         texts = [t for _, _, t in links]
-        self.assertIn('맡은 업무', texts)
-        for staff_only in ('세미나 운영', '도서·일정·사회자', '발제문 관리', '출석·조 편성', '학기 설정', '학기 참석 현황'):
-            self.assertNotIn(staff_only, texts)
+        self.assertEqual(texts, ['커리큘럼', '게시판', '내 출석'])
+        for removed in ('공지사항', '발제문', '자료·기록', '맡은 업무', '세미나 운영', '도서·일정·사회자', '발제문 관리', '출석·조 편성', '학기 설정', '학기 출석', '학기 참석 현황'):
+            self.assertNotIn(removed, texts)
 
     def test_officer_settings_links_follow_capabilities(self):
         self.login('officer')
         _, links = course_menu(self.page('/seminars?term_id=term'))
         texts = [t for _, _, t in links]
-        self.assertIn('세미나 운영', texts)
-        for removed in ('도서·일정·사회자', '발제문 관리', '출석·조 편성'):
+        self.assertEqual(texts, ['커리큘럼', '게시판', '내 출석', '세미나 운영', '학기 출석'])
+        for removed in ('도서·일정·사회자', '발제문 관리', '출석·조 편성', '맡은 업무', '학기 설정'):
             self.assertNotIn(removed, texts)
-        self.assertNotIn('>전체 설정</a>', self.page('/admin/dashboard'), 'global settings stay primary-admin only')
+        _, admin_links = course_menu(self.page('/admin/dashboard'))
+        self.assertEqual([t for _, _, t in admin_links], ['운영 홈', '학기 관리', '회원 관리', '동아리 활동', '기록·통계'])
+        self.assertNotIn('>설정</a>', self.page('/admin/dashboard'), 'global settings stay primary-admin only')
         self.assertEqual(self.client.get('/operations/settings').status_code, 403)
 
     def test_seminar_subpages_highlight_consolidated_seminar_operations_link(self):
@@ -139,6 +151,11 @@ class AdminNavigationSimplifyTests(unittest.TestCase):
                 menu, landed = course_menu(self.page(path))
                 self.assertEqual(menu, '학기 강의실 메뉴')
                 self.assertIn('세미나 운영', [t for _, current, t in landed if current])
+        for path in ('/admin/term_attendance?term_id=term', '/admin/attendance_matrix?term_id=term'):
+            with self.subTest(path=path):
+                menu, landed = course_menu(self.page(path))
+                self.assertEqual(menu, '학기 강의실 메뉴')
+                self.assertIn('학기 출석', [t for _, current, t in landed if current])
 
 
 if __name__ == '__main__':

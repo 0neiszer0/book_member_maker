@@ -409,8 +409,9 @@ class OfficerRouteTests(RouteTests):
 
 
 class OfficerNavTests(OfficerRouteTests):
-    """'운영진 위키' global nav entry: officers and admins only."""
-    LINK = '<span>운영진 위키</span>'
+    """'운영진 위키' is removed from the left rail and surfaced via Quick Search for officers/admins."""
+    RAIL_LINK = '<span>운영진 위키</span>'
+    QS_URL = '/wiki/w/%EC%9A%B4%EC%98%81%EC%A7%84:%EB%8C%80%EB%AC%B8'
 
     def nav_html(self):
         self.module.app.extensions['officer_wiki_nav_cache'].clear()
@@ -423,38 +424,57 @@ class OfficerNavTests(OfficerRouteTests):
                 return html
         self.fail('no page with the global navigation rendered')
 
+    def quick_search_urls(self, html):
+        import json, re
+        match = re.search(r'<script id="lms-quick-search-items" type="application/json">(.*?)</script>', html, re.S)
+        return {item['url'] for item in json.loads(match.group(1))} if match else set()
+
     def test_officer_sees_officer_wiki_link(self):
         self.login(3)
         html = self.nav_html()
-        self.assertIn(self.LINK, html)
-        self.assertIn('/wiki/w/%EC%9A%B4%EC%98%81%EC%A7%84:%EB%8C%80%EB%AC%B8', html)
+        self.assertNotIn(self.RAIL_LINK, html)
+        self.assertIn(self.QS_URL, self.quick_search_urls(html))
 
     def test_admin_sees_officer_wiki_link(self):
         self.db.rows['members'][0]['role'] = 'admin'
         self.login(1)
-        self.assertIn(self.LINK, self.nav_html())
+        html = self.nav_html()
+        self.assertNotIn(self.RAIL_LINK, html)
+        self.assertIn(self.QS_URL, self.quick_search_urls(html))
 
     def test_member_and_anonymous_do_not_see_officer_wiki_link(self):
-        self.assertNotIn(self.LINK, self.nav_html())
+        anon_html = self.nav_html()
+        self.assertNotIn(self.RAIL_LINK, anon_html)
+        self.assertNotIn(self.QS_URL, self.quick_search_urls(anon_html))
         self.login(1)
-        self.assertNotIn(self.LINK, self.nav_html())
-        self.assertNotIn(self.LINK, self.client.get('/wiki/w/대문').get_data(as_text=True))
+        member_html = self.nav_html()
+        self.assertNotIn(self.RAIL_LINK, member_html)
+        self.assertNotIn(self.QS_URL, self.quick_search_urls(member_html))
+        wiki_html = self.client.get('/wiki/w/대문').get_data(as_text=True)
+        self.assertNotIn(self.RAIL_LINK, wiki_html)
+        self.assertNotIn(self.QS_URL, self.quick_search_urls(wiki_html))
 
     def test_officer_wiki_link_hidden_when_wiki_disabled_or_lookup_fails(self):
         self.login(3)
         with patch.dict(self.module.app.config, WIKI_ENABLED=False):
-            self.assertNotIn(self.LINK, self.nav_html())
+            html = self.nav_html()
+            self.assertNotIn(self.RAIL_LINK, html)
+            self.assertNotIn(self.QS_URL, self.quick_search_urls(html))
         original = self.db.table
         def table(name):
             if name == 'term_officers':
                 raise RuntimeError('offline')
             return original(name)
         with patch.object(self.db, 'table', side_effect=table):
-            self.assertNotIn(self.LINK, self.nav_html())
+            html = self.nav_html()
+            self.assertNotIn(self.RAIL_LINK, html)
+            self.assertNotIn(self.QS_URL, self.quick_search_urls(html))
 
     def test_officer_wiki_link_on_wiki_pages_uses_page_access(self):
         self.login(3)
-        self.assertIn(self.LINK, self.client.get('/wiki/w/대문').get_data(as_text=True))
+        html = self.client.get('/wiki/w/대문').get_data(as_text=True)
+        self.assertNotIn(self.RAIL_LINK, html)
+        self.assertIn(self.QS_URL, self.quick_search_urls(html))
 
 
 # Inherit RouteTests' fixtures only; its own tests already run once above.

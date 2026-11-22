@@ -2,7 +2,18 @@
 {% set lms_title='학기 참석 현황' %}
 {% block title %}학기 참석 현황 · 책 먹는 호반우{% endblock %}
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_attendance.css') }}">{% endblock %}
-{% block content %}<div class="attendance-shell" data-csrf="{{ csrf_token }}"><h1>학기 참석 현황</h1><p class="attendance-lead">실제 참석을 확정한 세미나·OT와 벽돌책 모임 기록을 합산합니다. 같은 주차의 본 세미나와 추가 세미나는 모두 참석해도 1회입니다.</p>
+{% block content %}<div class="attendance-shell" data-csrf="{{ csrf_token }}">
+<header class="ui-page-header">
+  <div class="ui-page-header-copy">
+    <p class="ui-page-eyebrow">{% if term %}{{ term.name }} · 학기 운영{% else %}전체 운영 · 학기 출석{% endif %}</p>
+    <h1>학기 참석 현황</h1>
+    <p class="ui-page-subtitle attendance-lead">실제 참석을 확정한 세미나·OT와 벽돌책 모임 기록을 합산합니다. 같은 주차의 본 세미나와 추가 세미나는 모두 참석해도 1회입니다.</p>
+  </div>
+</header>
+<nav class="ui-tabs" aria-label="학기 출석 탭">
+  <a class="ui-tab is-active" href="{{ url_for('admin_term_attendance', term_id=term.id) if term else url_for('admin_term_attendance') }}" aria-current="page">학기 참석 현황</a>
+  <a class="ui-tab" href="{{ url_for('admin_attendance_matrix', term_id=term.id) if term else url_for('admin_attendance_matrix') }}">전체 출석 매트릭스</a>
+</nav>
 <form method="get" class="attendance-term-bar"><label class="attendance-inline-label" for="term-select">학기 선택</label><select id="term-select" name="term_id" onchange="this.form.submit()">{% for item in terms %}<option value="{{ item.id }}" {% if term and item.id == term.id %}selected{% endif %}>{{ item.name }}</option>{% endfor %}</select>{% if term %}<p class="attendance-period"><span>{{ term.start_date }}</span> ~ <span>{{ term.end_date }}</span></p>{% endif %}</form>
 {% if not report %}<p class="attendance-notice">먼저 세미나 운영에서 학기를 만들어주세요.</p>{% else %}
 {% if operation_can("members",term.id) %}<p class="attendance-roster-link"><a href="{{ url_for('admin_term_members', term_id=term.id) }}">이 학기의 회원 명단 관리 →</a></p>{% endif %}

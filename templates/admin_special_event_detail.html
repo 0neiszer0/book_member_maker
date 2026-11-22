@@ -8,23 +8,28 @@
 {% block content %}
 <div class="lms-operations">
 <div class="lms-operations-body">
-        <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
-            <h1 class="text-2xl sm:text-3xl font-bold ops-accent">{{ icon('notice',18) }} {{ event.name }}</h1>
-            <a href="{{ url_for('admin_special_events') }}" class="text-sm text-gray-400 hover:ops-accent">← 스페셜 이벤트 목록</a>
-        </div>
-
-
+        <header class="ui-page-header">
+            <div class="ui-page-header-copy">
+                <p class="ui-page-eyebrow">전체 운영 · 동아리 활동</p>
+                <h1>{{ event.name }}</h1>
+                <p class="ui-page-subtitle">특별 행사 정보와 실제 참석자 명단을 관리합니다.</p>
+            </div>
+            <div class="ui-page-actions">
+                <a href="{{ url_for('admin_special_events') }}" class="ui-btn ui-btn-sm">← 특별 행사 목록</a>
+            </div>
+        </header>
+        {% include '_admin_activities_tabs.html' %}
 
         <!-- 이벤트 정보 -->
         <div class="ops-panel rounded-lg p-5 mb-6">
             <h2 class="text-lg font-bold ops-accent mb-3">이벤트 정보</h2>
             <form id="infoForm" class="grid grid-cols-1 md:grid-cols-6 gap-3">
                 <div class="md:col-span-3">
-                    <label class="block text-xs text-gray-400 mb-1">이름</label>
+                    <label class="block text-xs muted mb-1">이름</label>
                     <input name="name" value="{{ event.name }}" class="ops-field w-full rounded px-3 py-2 text-sm">
                 </div>
                 <div>
-                    <label class="block text-xs text-gray-400 mb-1">분류</label>
+                    <label class="block text-xs muted mb-1">분류</label>
                     <select name="category" class="ops-field w-full rounded px-3 py-2 text-sm">
                         {% for c in ['event','mt','workshop','lecture'] %}
                         <option value="{{ c }}" {% if event.category==c %}selected{% endif %}>{{ c }}</option>
@@ -32,19 +37,19 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs text-gray-400 mb-1">시작일</label>
+                    <label class="block text-xs muted mb-1">시작일</label>
                     <input name="event_date" type="date" value="{{ event.event_date }}" class="ops-field w-full rounded px-3 py-2 text-sm">
                 </div>
                 <div>
-                    <label class="block text-xs text-gray-400 mb-1">종료일</label>
+                    <label class="block text-xs muted mb-1">종료일</label>
                     <input name="end_date" type="date" value="{{ event.end_date or '' }}" class="ops-field w-full rounded px-3 py-2 text-sm">
                 </div>
                 <div class="md:col-span-3">
-                    <label class="block text-xs text-gray-400 mb-1">장소</label>
+                    <label class="block text-xs muted mb-1">장소</label>
                     <input name="location" value="{{ event.location or '' }}" class="ops-field w-full rounded px-3 py-2 text-sm">
                 </div>
                 <div class="md:col-span-3">
-                    <label class="block text-xs text-gray-400 mb-1">학기 연결</label>
+                    <label class="block text-xs muted mb-1">학기 연결</label>
                     <select name="term_id" class="ops-field w-full rounded px-3 py-2 text-sm">
                         <option value="">없음</option>
                         {% for t in terms %}
@@ -53,11 +58,11 @@
                     </select>
                 </div>
                 <div class="md:col-span-6">
-                    <label class="block text-xs text-gray-400 mb-1">설명</label>
+                    <label class="block text-xs muted mb-1">설명</label>
                     <textarea name="description" rows="3" class="ops-field w-full rounded px-3 py-2 text-sm">{{ event.description or '' }}</textarea>
                 </div>
                 <div class="md:col-span-6 text-right">
-                    <button type="submit" class="ops-primary text-black font-bold py-2 px-5 rounded text-sm hover:opacity-80">저장</button>
+                    <button type="submit" class="ui-btn ui-btn-primary">저장</button>
                 </div>
             </form>
         </div>
@@ -67,13 +72,13 @@
             <h2 class="text-lg font-bold ops-accent mb-3">참여자 ({{ attendees|length }}명)</h2>
 
             <div class="mb-4">
-                <label class="block text-xs text-gray-400 mb-1">회원 추가 (이름 검색 후 체크)</label>
+                <label class="block text-xs muted mb-1">회원 추가 (이름 검색 후 체크)</label>
                 <input id="memberSearch" placeholder="이름으로 검색…" class="ops-field w-full rounded px-3 py-2 text-sm mb-2">
-                <div id="memberPicker" class="max-h-48 overflow-y-auto border ops-border rounded p-2 mb-2 text-sm">
+                <div id="memberPicker" class="max-h-48 overflow-y-auto border ops-border ops-surface rounded p-2 mb-2 text-sm">
                     {% for m in all_members %}
-                    <label class="block px-2 py-1 hover:bg-gray-800 cursor-pointer">
+                    <label class="block px-2 py-1 rounded cursor-pointer">
                         <input type="checkbox" class="mr-2 member-cb" value="{{ m.id }}" data-name="{{ m.name }}">
-                        {{ m.name }} <span class="text-xs text-gray-500">{{ m.student_id or '-' }}</span>
+                        {{ m.name }} <span class="text-xs muted">{{ m.student_id or '-' }}</span>
                     </label>
                     {% endfor %}
                 </div>
@@ -84,7 +89,7 @@
                         <option value="speaker">발표</option>
                     </select>
                     <input id="newNote" placeholder="메모 (선택)" class="ops-field flex-1 rounded px-3 py-2 text-sm">
-                    <button id="addBtn" class="ops-primary text-black font-bold py-2 px-4 rounded text-sm hover:opacity-80">+ 추가</button>
+                    <button id="addBtn" class="ui-btn ui-btn-primary">+ 추가</button>
                 </div>
             </div>
 
@@ -94,13 +99,13 @@
                 {% set m = a.members or {} %}
                 <span class="member-chip" data-attendee-id="{{ a.id }}">
                     <strong>{{ m.name }}</strong>
-                    <span class="text-xs text-gray-400">({{ a.role }}{% if a.note %}·{{ a.note }}{% endif %})</span>
+                    <span class="text-xs muted">({{ a.role }}{% if a.note %}·{{ a.note }}{% endif %})</span>
                     <button type="button" class="remove-att">×</button>
                 </span>
                 {% endfor %}
             </div>
             {% else %}
-            <p class="text-center text-gray-500 py-4">아직 참여자가 없습니다.</p>
+            <p class="text-center muted py-4">아직 참여자가 없습니다.</p>
             {% endif %}
         </div>
     </div>

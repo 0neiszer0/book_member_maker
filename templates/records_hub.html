@@ -16,10 +16,6 @@
         {{ records_stats([('활성 회원', member_count), ('세미나 회차', seminar_count), ('벽돌책', brick_book_count), ('소모임', study_group_count)]) }}
 
         <div class="records-directory">
-            <a href="{{ url_for('records_members') }}" class="records-card">
-                <h2>회원명부 <span aria-hidden="true">→</span></h2>
-                <p>전체 회원 목록과 개인별 활동 이력 보기.</p>
-            </a>
             <a href="{{ url_for('records_seminars') }}" class="records-card">
                 <h2>세미나 진행 현황 <span aria-hidden="true">→</span></h2>
                 <p>날짜·도서·장르·참여명단으로 본 모든 세미나 회차.</p>

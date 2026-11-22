@@ -1,0 +1,6 @@
+{% set ep = request.endpoint or '' %}
+<nav class="ui-tabs" aria-label="운영 홈 탭">
+  <a class="ui-tab{% if ep == 'admin_dashboard' %} is-active{% endif %}" href="{{ url_for('admin_dashboard') }}" {% if ep == 'admin_dashboard' %}aria-current="page"{% endif %}>운영 개요</a>
+  <a class="ui-tab{% if ep == 'operation_workbench' %} is-active{% endif %}" href="{{ url_for('operation_workbench') }}" {% if ep == 'operation_workbench' %}aria-current="page"{% endif %}>맡은 업무</a>
+  <a class="ui-tab{% if ep == 'admin_bug_reports' %} is-active{% endif %}" href="{{ url_for('admin_bug_reports') }}" {% if ep == 'admin_bug_reports' %}aria-current="page"{% endif %}>버그 제보</a>
+</nav>

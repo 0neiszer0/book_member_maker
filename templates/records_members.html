@@ -24,6 +24,8 @@
     </div>
   </header>
 
+  {% include '_admin_members_tabs.html' %}
+
   {% set lo = login_overview or {} %}
   {% set pending_list = lo.pending_signups or [] %}
   <section class="records-panel members-auth-panel" id="login-admin" aria-labelledby="login-admin-title">
