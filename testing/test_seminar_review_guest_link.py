@@ -57,6 +57,33 @@ class GuestSeminarReviewTests(unittest.TestCase):
         data.setdefault("csrf_token", self.csrf())
         return self.client.post(PATH, data=data)
 
+    def test_guest_email_verification_edit_and_wrong_email(self):
+        from flask import session
+        from datetime import timedelta
+        result = self.post(author_name='??', student_id='2026000009', review_content='??', knu_email='Student')
+        self.assertEqual(result.status_code, 200)
+        self.assertNotIn('id="review-edit-code"', result.get_data(as_text=True))
+        self.assertEqual(self.db.rows['seminar_reviews'][0]['knu_email'], 'student@knu.ac.kr')
+        self.db.rows['seminar_reviews'][0]['id'] = 'review-1'
+        def grant(app, db, purpose, scope, code):
+            if code != '123456': return False
+            session['guest_email_grants'] = {f'{purpose}:{scope}': {'email': 'student@knu.ac.kr', 'until': (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()}}
+            return True
+        with patch('engagement.request_guest_email_code', return_value='student@knu.ac.kr'), patch('engagement.verify_guest_email_code', side_effect=grant):
+            csrf = self.csrf()
+            self.assertEqual(self.client.post(PATH + '/email/request', data={'csrf_token':csrf, 'knu_email':'student'}).status_code, 200)
+            self.assertEqual(self.client.post(PATH + '/email/verify', data={'csrf_token':csrf, 'email_code':'000000'}).status_code, 400)
+            result = self.client.post(PATH + '/email/verify', data={'csrf_token':csrf, 'email_code':'123456'})
+            self.assertIn('??', result.get_data(as_text=True))
+            result = self.post(author_name='??', student_id='2026000009', review_content='??', knu_email='student')
+            self.assertEqual(result.status_code, 200)
+        self.assertEqual(self.db.rows['seminar_reviews'][0]['memorable_point'], '??')
+        with self.client.session_transaction() as state:
+            state['guest_email_grants']['review_edit:form-1']['email'] = 'other@knu.ac.kr'
+            state.modified = True
+        self.assertEqual(self.post(author_name='??', student_id='2026000009', review_content='??').status_code, 403)
+        self.assertEqual(self.client.post(PATH + '/email/request', data={'knu_email':'student'}).status_code, 403)
+
     def test_guest_and_member_photo_upload_and_preview(self):
         import io
         from types import SimpleNamespace

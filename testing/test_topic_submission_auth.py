@@ -67,6 +67,36 @@ class TopicSubmissionAuthorizationTests(unittest.TestCase):
     def tearDown(self):
         self.app_module.supabase = self.original_supabase
 
+    def test_guest_email_submission_and_verified_edit(self):
+        from unittest.mock import patch
+        from flask import session
+        from datetime import timedelta
+        self.fake.rows['topic_submissions'] = []
+        client = self.app_module.app.test_client()
+        data = {'event_id': 'event-1', 'author_name': '??', 'department': '????', 'student_id': '2026000009', 'topics': [{'topic': '??'}], 'knu_email': 'Student'}
+        result = client.post('/api/topics/submit', json=data)
+        self.assertEqual(result.status_code, 200)
+        self.assertTrue(result.json['edit_token'])
+        self.assertEqual(self.fake.rows['topic_submissions'][0]['knu_email'], 'student@knu.ac.kr')
+        self.fake.rows['topic_submissions'][0]['id'] = 'guest-1'
+        self.assertEqual(client.post('/api/topics/load', json=data).status_code, 403)
+        def grant(app, db, purpose, scope, code):
+            if code != '123456': return False
+            session['guest_email_grants'] = {f'{purpose}:{scope}': {'email': 'student@knu.ac.kr', 'until': (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()}}
+            return True
+        with patch('topic_routes.request_guest_email_code', return_value='student@knu.ac.kr'), patch('topic_routes.verify_guest_email_code', side_effect=grant):
+            self.assertEqual(client.post('/api/topics/edit-email/request', json={'event_id':'event-1', 'email':'student'}).status_code, 200)
+            self.assertEqual(client.post('/api/topics/edit-email/verify', json={'event_id':'event-1', 'code':'000000'}).status_code, 400)
+            verified = client.post('/api/topics/edit-email/verify', json={'event_id':'event-1', 'code':'123456'})
+            self.assertTrue(verified.json['found'])
+            data['topics'] = [{'topic':'??'}]
+            self.assertEqual(client.post('/api/topics/submit', json=data).status_code, 200)
+        self.assertEqual(self.fake.rows['topic_submissions'][0]['topics'], [{'topic':'??'}])
+        with client.session_transaction() as state:
+            state['guest_email_grants']['topic_edit:event-1']['email'] = 'other@knu.ac.kr'
+            state.modified = True
+        self.assertEqual(client.post('/api/topics/submit', json=data).status_code, 403)
+
     def test_name_and_student_id_do_not_bypass_member_ownership(self):
         client = self.app_module.app.test_client()
         response = client.post("/api/topics/load", json={
