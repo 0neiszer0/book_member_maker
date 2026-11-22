@@ -1297,10 +1297,12 @@ def admin_recruitment_result_settings(campaign_id):
         questions = normalize_application_questions(request.form.get('application_questions', ''))
         previous = _recruitment_campaign(campaign_id).get('application_questions') or DEFAULT_APPLICATION_QUESTIONS
         by_label = {q['label']: q for q in previous}
+        is_structured = request.form.get('application_questions', '').lstrip().startswith('[{')
         for q in questions:
-            if q['label'] in by_label:
+            if q['label'] in by_label and not is_structured:
                 q['id'] = by_label[q['label']]['id']
-                q['placeholder'] = by_label[q['label']].get('placeholder', '')
+                if not q.get('placeholder'):
+                    q['placeholder'] = by_label[q['label']].get('placeholder', '')
         slots = normalize_interview_slot_options(request.form.get('interview_slot_options', ''))
         if len(request.form.get('application_intro', '')) > 3000 or len(request.form.get('application_deadline', '')) > 120:
             raise ValueError('모집 안내문의 글자 수를 확인해주세요.')

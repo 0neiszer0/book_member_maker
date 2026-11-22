@@ -145,10 +145,24 @@ def parse_applicant_file(filename, content, max_rows=500, max_bytes=2 * 1024 * 1
 
 
 DEFAULT_APPLICATION_QUESTIONS = [
-    {"id": "motivation", "label": "동아리 지원 동기 및 기대하는 점", "placeholder": "책을 읽고 함께 나누고 싶은 이유를 자유롭게 적어주세요.", "required": True},
-    {"id": "favorite_book", "label": "인상 깊게 읽었거나 함께 나누고 싶은 책", "placeholder": "책 제목과 간단한 이유를 적어주세요.", "required": True},
-    {"id": "intro", "label": "정기 세미나 외에 해보고 싶은 활동이나 자기소개", "placeholder": "평소 독서 스타일이나 관심 분야를 자유롭게 적어주세요.", "required": False},
+    {"id": "motivation", "label": "동아리 지원 동기 및 기대하는 점", "placeholder": "책을 읽고 함께 나누고 싶은 이유와 동아리에서 기대하는 점을 구체적으로 적어주세요. (최소 200자 이상)", "required": True, "min_length": 200, "max_length": 1500},
+    {"id": "favorite_book", "label": "인상 깊게 읽었거나 함께 나누고 싶은 책", "placeholder": "책 제목과 인상 깊었던 이유를 자유롭게 적어주세요. (최소 200자 이상)", "required": True, "min_length": 200, "max_length": 1500},
+    {"id": "intro", "label": "정기 세미나 외에 해보고 싶은 활동이나 자기소개", "placeholder": "평소 독서 스타일, 관심 분야, 소모임 아이디어 등을 자유롭게 적어주세요.", "required": False, "min_length": 0, "max_length": 1500},
 ]
+
+
+def _int_in_range(value, low, high, default):
+    if value is None or value == '':
+        return default
+    if isinstance(value, bool):
+        raise ValueError("글자수 제한 형식을 확인해주세요.")
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        raise ValueError("글자수 제한 형식을 확인해주세요.")
+    if not low <= number <= high:
+        raise ValueError(f"글자수 제한은 {low}~{high} 범위로 입력해주세요.")
+    return number
 
 
 def normalize_application_questions(raw):
@@ -156,7 +170,7 @@ def normalize_application_questions(raw):
     import hashlib
     if isinstance(raw, str):
         try:
-            raw = json.loads(raw) if raw.lstrip().startswith('[') and not raw.lstrip().startswith('[선택]') else raw.splitlines()
+            raw = json.loads(raw) if raw.lstrip().startswith('[') and not raw.lstrip().startswith('[선택]') and not raw.lstrip().startswith('[최소') else raw.splitlines()
         except ValueError:
             raw = raw.splitlines()
     if not isinstance(raw, list) or len(raw) > 15:
@@ -167,19 +181,39 @@ def normalize_application_questions(raw):
             label = item.strip()
             if not label:
                 continue
-            required = not label.startswith('[선택]')
-            if not required:
-                label = label[4:].strip()
-            item = {"id": "q_" + hashlib.sha256(label.encode('utf-8')).hexdigest()[:16], "label": label, "placeholder": "", "required": required}
+            required = True
+            min_length = 0
+            while True:
+                if label.startswith('[선택]'):
+                    required, label = False, label[4:].strip()
+                    continue
+                tag = re.match(r'\[최소\s*(\d{1,4})\s*자\]\s*', label)
+                if tag:
+                    min_length, label = int(tag.group(1)), label[tag.end():].strip()
+                    continue
+                break
+            item = {"id": "q_" + hashlib.sha256(label.encode('utf-8')).hexdigest()[:16], "label": label, "placeholder": "", "required": required, "min_length": min_length}
         if not isinstance(item, dict):
             raise ValueError("질문 형식을 확인해주세요.")
         ident, label = item.get('id'), item.get('label')
         placeholder, required = item.get('placeholder', ''), item.get('required')
         if not isinstance(ident, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,80}', ident) or ident in ids or not isinstance(label, str) or not 1 <= len(label.strip()) <= 200 or not isinstance(placeholder, str) or len(placeholder) > 200 or not isinstance(required, bool):
             raise ValueError("질문 ID, 내용 또는 필수 여부를 확인해주세요.")
+        min_length = _int_in_range(item.get('min_length'), 0, 2000, 0)
+        max_length = _int_in_range(item.get('max_length'), 50, 3000, 3000)
+        if min_length > max_length:
+            raise ValueError(f"'{label.strip()}' 항목의 최소 글자수는 최대 글자수보다 클 수 없습니다.")
         ids.add(ident)
-        result.append({"id": ident, "label": label.strip(), "placeholder": placeholder, "required": required})
+        result.append({"id": ident, "label": label.strip(), "placeholder": placeholder, "required": required, "min_length": min_length, "max_length": max_length})
     return result
+
+
+def normalize_phone(value):
+    phone = re.sub(r'[\s]', '', value or '')
+    digits = phone.replace('-', '')
+    if re.fullmatch(r'010[0-9]{8}', digits):
+        return f"{digits[:3]}-{digits[3:7]}-{digits[7:]}"
+    return phone
 
 
 def normalize_interview_slot_options(raw):
@@ -194,7 +228,7 @@ def validate_application_submission(campaign, form):
     name = (form.get('name') or '').strip()
     sid = normalize_student_id(form.get('student_id'))
     department = (form.get('department') or '').strip()
-    phone = (form.get('phone') or '').strip()
+    phone = normalize_phone(form.get('phone'))
     email = (form.get('knu_email') or '').strip().lower()
     note = (form.get('interview_availability_note') or '').strip()
     if form.get('website'):
@@ -203,6 +237,8 @@ def validate_application_submission(campaign, form):
         raise ValueError('이름과 학번을 확인해주세요.')
     if not 1 <= len(department) <= 100 or not re.fullmatch(r'[0-9-]{8,25}', phone):
         raise ValueError('학과와 연락처를 확인해주세요.')
+    if email.endswith('@knu.ac.kr'):
+        email = email[:-len('@knu.ac.kr')]
     if email and '@' not in email:
         email += '@knu.ac.kr'
     if email and (len(email) > 254 or not re.fullmatch(r'[a-z0-9._%+-]+@knu\.ac\.kr', email)):
@@ -214,8 +250,13 @@ def validate_application_submission(campaign, form):
     answers = {}
     for q in normalize_application_questions(campaign.get('application_questions', DEFAULT_APPLICATION_QUESTIONS)):
         answer = (form.get('answer_' + q['id']) or '').strip()
-        if len(answer) > 3000 or (q['required'] and not answer):
-            raise ValueError('지원서의 필수 답변과 글자 수를 확인해주세요.')
+        max_length, min_length = q.get('max_length') or 3000, q.get('min_length') or 0
+        if q['required'] and not answer:
+            raise ValueError(f"'{q['label']}' 항목을 입력해주세요.")
+        if answer and min_length > 0 and len(answer) < min_length:
+            raise ValueError(f"'{q['label']}' 항목은 최소 {min_length}자 이상 작성해주세요. (현재 {len(answer)}자)")
+        if len(answer) > max_length:
+            raise ValueError(f"'{q['label']}' 항목은 최대 {max_length}자 이하로 작성해주세요.")
         answers[q['id']] = {'label': q['label'], 'answer': answer}
     return {'name': name, 'name_key': normalize_applicant_name(name), 'student_id': sid, 'department': department, 'phone': phone, 'knu_email': email or None, 'interview_availability': list(dict.fromkeys(selected)), 'interview_availability_note': note or None, 'answers': answers}
 
