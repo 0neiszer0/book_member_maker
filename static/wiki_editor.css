@@ -212,3 +212,14 @@
     .wiki-visual-hint { padding: 6px 12px 10px; }
     .wiki-starter-cards { grid-template-columns: 1fr; }
 }
+/* Drag-selection quick actions */
+.wiki-selection-bar { position: fixed; z-index: 70; display: flex; align-items: center; gap: 2px; padding: 4px; color: #fff; background: #273238; border-radius: 8px; box-shadow: 0 6px 24px #18232c55; }
+.wiki-selection-bar[hidden] { display: none; }
+.wiki-selection-bar button { min-height: 30px; padding: 3px 10px; font: inherit; font-size: 13px; color: #fff; background: transparent; border: 0; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.wiki-selection-bar button:hover, .wiki-selection-bar button:focus-visible { background: #d20f17; }
+.wiki-selection-divider { align-self: stretch; width: 1px; margin: 3px 4px; background: #ffffff40; }
+.wiki-action-toast { position: fixed; z-index: 70; right: 16px; bottom: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; max-width: calc(100vw - 32px); padding: 10px 14px; font-size: 14px; color: #fff; background: #273238; border-radius: 8px; box-shadow: 0 6px 24px #18232c55; }
+.wiki-action-toast[hidden] { display: none; }
+.wiki-action-toast a { color: #fff; font-weight: 700; text-underline-offset: 3px; }
+.wiki-action-toast .wiki-action-toast-sub { font-weight: 400; color: #d6dde1; }
+.wiki-action-toast-close { padding: 0 6px; font: inherit; font-size: 18px; color: #fff; background: transparent; border: 0; cursor: pointer; }

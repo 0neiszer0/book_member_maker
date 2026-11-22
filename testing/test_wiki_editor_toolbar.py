@@ -90,8 +90,8 @@ class EditorToolbarTests(unittest.TestCase):
         self.assertEqual(html.select_one('[data-command=modeRaw]')['aria-pressed'], 'false')
         self.assertIn('원문 보기', html.select_one('.wiki-help').text)
         data = json.loads(html.select_one('#wiki-templates-data').string)
-        self.assertEqual([t['key'] for t in data], ['blank', 'guide', 'seminar', 'book', 'officer'])
-        self.assertEqual(len(html.select('#wiki-template-dialog [data-template-key]')), 4)
+        self.assertEqual([t['key'] for t in data], ['blank', 'guide', 'seminar', 'book', 'officer', 'person', 'event'])
+        self.assertEqual(len(html.select('#wiki-template-dialog [data-template-key]')), 6)
         self.assertIsNone(html.select_one('#wiki-starter-bar'))
         root = pathlib.Path(__file__).resolve().parent.parent / 'static'
         js = (root / 'wiki_editor.js').read_text(encoding='utf-8')
@@ -106,7 +106,7 @@ class EditorToolbarTests(unittest.TestCase):
         self.login()
         html = BeautifulSoup(self.client.get('/wiki/new').data, 'html.parser')
         radios = html.select('input[type=radio][name=template]')
-        self.assertEqual([r['value'] for r in radios], ['blank', 'guide', 'seminar', 'book', 'officer'])
+        self.assertEqual([r['value'] for r in radios], ['blank', 'guide', 'seminar', 'book', 'officer', 'person', 'event'])
         self.assertTrue(radios[0].has_attr('checked'))
         response = self.client.get('/wiki/new?title=새문서&template=guide')
         self.assertEqual(response.status_code, 302)
@@ -134,7 +134,7 @@ class EditorToolbarTests(unittest.TestCase):
         self.assertIsNone(html.select_one('#wiki-starter-bar'))
         empty = BeautifulSoup(self.client.get('/wiki/edit/새문서').data, 'html.parser')
         self.assertIsNotNone(empty.select_one('#wiki-starter-bar'))
-        self.assertEqual(len(empty.select('#wiki-starter-bar [data-template-key]')), 4)
+        self.assertEqual(len(empty.select('#wiki-starter-bar [data-template-key]')), 6)
         self.assertEqual(empty.select_one('#wiki-content').text.strip(), '')
         blank = BeautifulSoup(self.client.get('/wiki/edit/새문서?template=blank').data, 'html.parser')
         self.assertEqual(blank.select_one('#wiki-content').text.strip(), '')
@@ -149,6 +149,37 @@ class EditorToolbarTests(unittest.TestCase):
             self.assertIn('==', template['content'])
             self.assertNotIn('?' * 2, template['content'])
             self.assertEqual(template['content'].count('{{{'), template['content'].count('}}}'))
+
+    def test_person_event_templates_and_selection_hooks(self):
+        from wiki_templates import WIKI_STARTER_TEMPLATES, starter_template
+        titles = {t['key']: t['title'] for t in WIKI_STARTER_TEMPLATES}
+        self.assertEqual(titles['person'], '인물·회원 소개')
+        self.assertEqual(titles['event'], '행사·활동 기록')
+        self.assertEqual(len(WIKI_STARTER_TEMPLATES), 7)
+        self.assertIn('== 주요 활동 ==', starter_template('person')['content'])
+        self.login()
+        missing = lambda client, title, revision=None: dict(title=title, source='', version='0', exists=False, history=[])
+        with patch.object(self.engine, 'document', side_effect=missing):
+            html = BeautifulSoup(self.client.get('/wiki/edit/박민서?template=person').data, 'html.parser')
+            self.assertIn('== 특징 및 일화 ==', html.select_one('#wiki-content').text)
+            for selector in ['#wiki-selection-bar', '[data-selection-action=newDoc]', '[data-selection-action=sectionBelow]',
+                             '[data-selection-action=bold]', '#wiki-action-toast', 'form.wiki-editor[data-edit-base]']:
+                self.assertIsNotNone(html.select_one(selector), selector)
+            self.assertIn('__TITLE__', html.select_one('form.wiki-editor')['data-edit-base'])
+        root = pathlib.Path(__file__).resolve().parent.parent / 'static'
+        js = (root / 'wiki_editor.js').read_text(encoding='utf-8')
+        for token in ['selectionSectionBelow', 'selectionNewDoc', 'updateSelectionBar', 'data-selection-action', 'wiki-selection-bar']:
+            self.assertIn(token.replace('data-selection-action', 'selectionAction'), js, token)
+
+    def test_document_view_selection_pill_only_for_editors_on_latest(self):
+        self.login()
+        html = BeautifulSoup(self.client.get('/wiki/w/대문').data, 'html.parser')
+        self.assertIsNotNone(html.select_one('#wiki-doc-selection-pill'))
+        old = BeautifulSoup(self.client.get('/wiki/w/대문?revision=1').data, 'html.parser')
+        self.assertIsNone(old.select_one('#wiki-doc-selection-pill'))
+        with patch('wiki_routes.can_edit_title', return_value=False):
+            ro = BeautifulSoup(self.client.get('/wiki/w/대문').data, 'html.parser')
+        self.assertIsNone(ro.select_one('#wiki-doc-selection-pill'))
 
     def test_classic_preview_submit_still_works_without_js(self):
         self.login()

@@ -4,4 +4,40 @@
 {% if officer_doc %}<p class="lms-alert">운영진 전용 문서입니다. 일반 회원에게는 보이지 않습니다.</p>{% endif %}
 {% if revision %}<p class="lms-alert">r{{ revision }} 버전을 보고 있습니다. <a href="{{ url_for('wiki.document',title=doc.title) }}">최신 문서 보기</a></p>{% endif %}
 {% if doc.exists %}<article class="wiki-prose">{{ rendered }}</article>{% else %}<p class="lms-empty">아직 작성되지 않은 문서입니다.</p>{% endif %}
+{% if can_edit_doc and not revision and doc.exists %}
+<div id="wiki-doc-selection-pill" class="wiki-doc-selection-pill" role="toolbar" aria-label="선택한 글자로 새 문서 만들기" data-edit-base="{{ url_for('wiki.edit', title='__TITLE__') }}" hidden><a class="wiki-doc-pill-main" target="_blank" rel="noopener" href="#"></a><a class="wiki-doc-pill-person" target="_blank" rel="noopener" href="#">인물 틀로 만들기</a></div>
+<style>.wiki-doc-selection-pill{position:fixed;z-index:60;display:flex;gap:4px;padding:4px;background:#273238;border-radius:999px;box-shadow:0 6px 24px #18232c55;font-size:13px;line-height:1.2}.wiki-doc-selection-pill[hidden]{display:none}.wiki-doc-selection-pill a{padding:6px 12px;color:#fff!important;text-decoration:none!important;white-space:nowrap;border-radius:999px;background:transparent!important;border:0!important}.wiki-doc-selection-pill a:hover,.wiki-doc-selection-pill a:focus-visible{background:#d20f17!important}.wiki-doc-selection-pill .wiki-doc-pill-person{color:#d6dde1!important}</style>
+<script>
+(function () {
+    var pill = document.getElementById('wiki-doc-selection-pill'), article = document.querySelector('article.wiki-prose');
+    if (!pill || !article) return;
+    var main = pill.querySelector('.wiki-doc-pill-main'), person = pill.querySelector('.wiki-doc-pill-person'), base = pill.dataset.editBase;
+    function validTitle(t) {
+        if (!t || t.length > 40 || /[\\[\]|\u0000-\u001f\u007f]/.test(t)) return false;
+        return !t.split('/').some(function (p) { return p === '.' || p === '..'; });
+    }
+    function hide() { pill.hidden = true; }
+    function update() {
+        var sel = window.getSelection();
+        if (!sel || !sel.rangeCount || sel.isCollapsed) return hide();
+        var range = sel.getRangeAt(0);
+        if (!article.contains(range.commonAncestorContainer)) return hide();
+        var text = sel.toString().trim();
+        if (!validTitle(text)) return hide();
+        var url = base.replace('__TITLE__', encodeURIComponent(text));
+        main.textContent = '\'' + text + '\' 새 문서 만들기 \u2197';
+        main.href = url;
+        person.href = url + '?template=person';
+        pill.hidden = false;
+        var rect = range.getBoundingClientRect(), width = pill.offsetWidth;
+        pill.style.top = Math.max(8, rect.top - pill.offsetHeight - 8) + 'px';
+        pill.style.left = Math.max(8, Math.min(window.innerWidth - width - 8, rect.left + rect.width / 2 - width / 2)) + 'px';
+    }
+    document.addEventListener('mouseup', function (e) { if (!pill.contains(e.target)) setTimeout(update, 0); });
+    document.addEventListener('keyup', function (e) { if (e.key === 'Escape') hide(); else if (e.shiftKey) update(); });
+    document.addEventListener('mousedown', function (e) { if (!pill.contains(e.target)) hide(); });
+    window.addEventListener('scroll', hide, {passive: true});
+})();
+</script>
+{% endif %}
 {% endblock %}

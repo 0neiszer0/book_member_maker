@@ -1921,6 +1921,114 @@ if (visualApi && visual) {
         }
     });
 }
+// ---- drag-selection quick actions (floating bar above selected text)
+const selectionBar = $('#wiki-selection-bar'), actionToast = $('#wiki-action-toast');
+let toastTimer = null;
+function hideSelectionBar() { if (selectionBar) selectionBar.hidden = true; }
+function selectionTitleOk(text) {
+    if (!text || text.length > 60 || /[\n\r\[\]|\u0000-\u001f\u007f]/.test(text)) return false;
+    return !text.split('/').some(part => part === '.' || part === '..');
+}
+function selectedTitle() {
+    if (mode !== 'visual' || composing) return null;
+    const selected = window.getSelection();
+    if (!selected.rangeCount || selected.isCollapsed) return null;
+    const range = selected.getRangeAt(0), host = hostOf(range);
+    if (!host || range.collapsed) return null;
+    const text = range.toString().trim();
+    return selectionTitleOk(text) ? {text, range, host} : null;
+}
+function updateSelectionBar() {
+    if (!selectionBar) return;
+    const found = selectedTitle();
+    if (!found) return hideSelectionBar();
+    selectionBar.hidden = false;
+    const rect = found.range.getBoundingClientRect();
+    const width = selectionBar.offsetWidth, height = selectionBar.offsetHeight;
+    selectionBar.style.top = Math.max(8, rect.top - height - 8) + 'px';
+    selectionBar.style.left = Math.max(8, Math.min(window.innerWidth - width - 8, rect.left + rect.width / 2 - width / 2)) + 'px';
+}
+function editUrl(title, query = '') {
+    return (source.form.dataset.editBase || '/wiki/edit/__TITLE__').replace('__TITLE__', encodeURIComponent(title)) + query;
+}
+function showActionToast(title) {
+    if (!actionToast) return;
+    actionToast.replaceChildren();
+    const message = mk('span', 'wiki-action-toast-text', '[[' + title + ']] 링크를 만들었어요.');
+    const open = mk('a', 'wiki-action-toast-main', "'" + title + "' 문서 바로 만들기 ↗");
+    const person = mk('a', 'wiki-action-toast-sub', '인물 틀로 만들기');
+    open.href = editUrl(title);
+    person.href = editUrl(title, '?template=person');
+    for (const a of [open, person]) { a.target = '_blank'; a.rel = 'noopener'; }
+    const close = mk('button', 'wiki-action-toast-close', '×');
+    close.type = 'button';
+    close.setAttribute('aria-label', '닫기');
+    close.addEventListener('click', () => { actionToast.hidden = true; });
+    actionToast.append(message, open, person, close);
+    actionToast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { actionToast.hidden = true; }, 8000);
+}
+function selectionNewDoc(found) {
+    record();
+    const a = mk('a', 'wiki-v-link', found.text);
+    a.href = '#';
+    a.dataset.namuLink = found.text;
+    a.dataset.namuHasCaption = '0';
+    a.contentEditable = 'false';
+    found.range.deleteContents();
+    found.range.insertNode(a);
+    found.range.setStartAfter(a);
+    found.range.collapse(true);
+    savedRange = found.range.cloneRange();
+    touch(found.host);
+    visualDirty = true;
+    syncNow();
+    record();
+    window.getSelection().removeAllRanges();
+    showActionToast(found.text);
+}
+function selectionSectionBelow(found) {
+    const wrap = found.host.closest('.wiki-v-block');
+    const at = wrap ? blocks.indexOf(wrap._block) : -1;
+    if (at < 0) return hint('문단을 만들 위치를 찾지 못했어요.');
+    record();
+    blocks.splice(at + 1, 0, {type: 'heading', level: 2, text: found.text}, newParagraph());
+    activeBlock = null;
+    changed();
+    syncNow();
+    renderVisual({index: at + 2, where: 'start'});
+    record();
+    const fresh = canvas.children[at + 2];
+    if (fresh && fresh.scrollIntoView) fresh.scrollIntoView({block: 'center', behavior: 'smooth'});
+}
+if (selectionBar && visualApi && visual) {
+    selectionBar.addEventListener('mousedown', event => event.preventDefault());
+    selectionBar.addEventListener('click', event => {
+        const button = event.target.closest('[data-selection-action]');
+        if (!button) return;
+        const action = button.dataset.selectionAction;
+        const found = selectedTitle() || null;
+        if (['bold', 'italic', 'strike'].includes(action)) {
+            formatSelection(action);
+        } else if (found && action === 'newDoc') selectionNewDoc(found);
+        else if (found && action === 'sectionBelow') selectionSectionBelow(found);
+        hideSelectionBar();
+    });
+    visual.addEventListener('mouseup', () => setTimeout(updateSelectionBar, 0));
+    visual.addEventListener('keyup', event => {
+        if (event.key === 'Escape') hideSelectionBar();
+        else if (!event.isComposing) updateSelectionBar();
+    });
+    document.addEventListener('selectionchange', () => {
+        if (selectionBar.hidden) return;
+        if (!selectedTitle()) hideSelectionBar();
+    });
+    document.addEventListener('mousedown', event => {
+        if (!selectionBar.contains(event.target) && !visual.contains(event.target)) hideSelectionBar();
+    });
+    window.addEventListener('scroll', hideSelectionBar, {passive: true});
+}
 context();
 ribbon.hidden = false;
 if (visualApi && visual) {
