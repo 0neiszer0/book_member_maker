@@ -5,7 +5,7 @@
 {% block title %}{{ lms_title }}{% endblock %}
 {% block head %}
 <meta name="robots" content="noindex,nofollow,noarchive">
-<meta property="og:title" content="면접 지원 결과 확인">
+<meta property="og:title" content="{% if portal_state == 'applying' %}동아리 신입 부원 모집{% else %}면접 지원 결과 확인{% endif %}">
 <link rel="stylesheet" href="{{ url_for('static', filename='lms_auth.css') }}">
 <style>
   .portal-tabs {display:flex; gap:8px; margin:20px 0} .portal-tabs button {flex:1; padding:12px; border:1px solid #e2e8f0; border-radius:999px; background:white; cursor:pointer} .portal-tabs button[aria-selected="true"] {background:#a6192e; color:white} .application-form label {display:block; margin:16px 0} .application-form textarea {min-height:100px} .application-form input, .application-form textarea {width:100%; box-sizing:border-box} .application-form input[type=checkbox] {width:auto} .application-form .slot {margin:8px 0} .honeypot {position:absolute; left:-10000px} .application-form small {color:#a6192e}
@@ -18,7 +18,7 @@
 {% endblock %}
 {% block content %}
     <section class="lms-result-portal">
-      <p class="lms-result-eyebrow">면접 지원 결과</p>
+      <p class="lms-result-eyebrow">{% if portal_state == 'applying' %}동아리 신입 부원 모집{% elif portal_state == 'pending' %}지원 접수 · 면접 심사{% else %}면접 지원 결과{% endif %}</p>
       <h1 class="lms-result-title">{% if campaign %}{{ campaign.title }}{% else %}지원 결과 확인{% endif %}</h1>
 
       {% if portal_state == 'unavailable' %}
@@ -81,7 +81,7 @@
           <input type="hidden" name="csrf_token" value="{{ sensitive_csrf_token() }}"><input type="hidden" name="action" value="lookup">
           <label class="lms-result-field">이름<input class="lms-result-input" type="text" name="name" maxlength="80" required autocomplete="off" placeholder="지원서에 작성한 이름"></label>
           <label class="lms-result-field">학번<input class="lms-result-input" type="text" name="student_id" inputmode="numeric" pattern="[0-9]{4,20}" maxlength="20" required autocomplete="off" placeholder="숫자만 입력"></label>
-          <button class="lms-button lms-button-primary" type="submit">내 결과 확인하기</button>
+          <button class="lms-button lms-button-primary" type="submit">{% if portal_state == 'lookup' %}내 결과 확인하기{% else %}내 지원 상태 확인하기{% endif %}</button>
         </form>
         </div>
         {% if campaign.contact_text %}<div class="lms-result-contact">{{ campaign.contact_text }}</div>{% endif %}
