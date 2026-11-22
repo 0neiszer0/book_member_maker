@@ -17,6 +17,7 @@ from minipc_security import LOGIN_PROVIDERS
 from wiki_access import (wiki_access, can_edit_title, can_read_title, is_officer_title,
                          strip_officer_includes, OFFICER_PREFIX)
 from wiki_engine import OpenNamu, EngineUnavailable, EditConflict, EditRejected
+from wiki_templates import WIKI_STARTER_TEMPLATES, starter_template
 
 
 _CSS_LEN = r'(?:0|\d{1,4}(?:\.\d{1,2})?(?:px|%|em|rem))'
@@ -358,8 +359,11 @@ def init_wiki_routes(app, get_db):
             title_value(title)
             if not can_edit_title(g.wiki_access, title):
                 return message(edit_denied(title), 403)
+            chosen = starter_template(request.args.get('template', ''))
+            if chosen:
+                return redirect(url_for('wiki.edit', title=title, template=chosen['key']))
             return redirect(url_for('wiki.edit', title=title))
-        return page('new.html')
+        return page('new.html', starter_templates=WIKI_STARTER_TEMPLATES)
 
     def render_draft(backend, client, title, content):
         return clean_wiki_html(backend.render(client, title, renderable(content)))
@@ -405,8 +409,12 @@ def init_wiki_routes(app, get_db):
             with backend.user(g.wiki_access.member_id) as client:
                 if request.method == 'GET':
                     doc = backend.document(client, title)
+                    chosen = starter_template(request.args.get('template', ''))
+                    # Starter content only ever fills a brand-new, empty page.
+                    if chosen and not doc['exists'] and not doc['source'].strip():
+                        doc = dict(doc, source=chosen['content'])
                     return page('edit.html', doc=doc, notice=notice, preview=preview, summary=summary,
-                                officer_doc=is_officer_title(title))
+                                officer_doc=is_officer_title(title), starter_templates=WIKI_STARTER_TEMPLATES)
                 if request.form.get('action') == 'preview':
                     preview = render_draft(backend, client, title, content)
                 elif not content.strip():
@@ -436,7 +444,7 @@ def init_wiki_routes(app, get_db):
                 raise
             notice, status = '위키 연결 또는 저장 결과를 확인하지 못했습니다. 작성한 내용은 유지했습니다. 최신 문서와 이력을 먼저 확인해 주세요.', 503
         return page('edit.html', doc=doc, notice=notice, preview=preview, summary=summary,
-                    officer_doc=is_officer_title(title)), status
+                    officer_doc=is_officer_title(title), starter_templates=WIKI_STARTER_TEMPLATES), status
 
     # Officer-only nav entry. Same officer rule as officer documents; cached
     # briefly per member so ordinary pages do not re-query the roster each time.

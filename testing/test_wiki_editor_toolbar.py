@@ -1,6 +1,8 @@
 """Ribbon editor page and the JSON live-preview endpoint (runs under unittest or pytest)."""
+import json
 import pathlib
 import unittest
+from urllib.parse import unquote
 from unittest.mock import patch
 
 from bs4 import BeautifulSoup
@@ -73,6 +75,81 @@ class EditorToolbarTests(unittest.TestCase):
             if token == "'100%'":
                 continue
             self.assertIn(token, js, token)
+    def test_visual_editor_markup_and_module_are_wired(self):
+        self.login()
+        html = BeautifulSoup(self.client.get('/wiki/edit/대문').data, 'html.parser')
+        scripts = [tag['src'] for tag in html.select('script[src]')]
+        visual = [i for i, src in enumerate(scripts) if 'wiki_namu_visual.js' in src]
+        editor = [i for i, src in enumerate(scripts) if 'wiki_editor.js' in src]
+        self.assertTrue(visual and editor and visual[0] < editor[0])
+        for selector in ['#wiki-workspace > #wiki-visual[hidden]', '#wiki-ribbon [data-command=modeVisual]',
+                         '#wiki-ribbon [data-command=modeRaw]', '#wiki-ribbon [data-command=template]',
+                         'dialog#wiki-template-dialog', 'script#wiki-templates-data']:
+            self.assertIsNotNone(html.select_one(selector), selector)
+        self.assertEqual(html.select_one('[data-command=modeVisual]')['aria-pressed'], 'true')
+        self.assertEqual(html.select_one('[data-command=modeRaw]')['aria-pressed'], 'false')
+        self.assertIn('원문 보기', html.select_one('.wiki-help').text)
+        data = json.loads(html.select_one('#wiki-templates-data').string)
+        self.assertEqual([t['key'] for t in data], ['blank', 'guide', 'seminar', 'book', 'officer'])
+        self.assertEqual(len(html.select('#wiki-template-dialog [data-template-key]')), 4)
+        self.assertIsNone(html.select_one('#wiki-starter-bar'))
+        root = pathlib.Path(__file__).resolve().parent.parent / 'static'
+        js = (root / 'wiki_editor.js').read_text(encoding='utf-8')
+        css = (root / 'wiki_editor.css').read_text(encoding='utf-8')
+        for token in ['visualDirty', 'compositionstart', 'compositionend', "addEventListener('submit'", 'wiki-v-raw-card']:
+            self.assertIn(token, js, token)
+        for token in ['.wiki-visual-editor', '.wiki-v-fold', '.wiki-v-raw-card', '.wiki-visual-add', '#wiki-starter-bar',
+                      'data-mode="visual"']:
+            self.assertIn(token, css, token)
+
+    def test_new_page_offers_starter_templates_and_redirects_with_choice(self):
+        self.login()
+        html = BeautifulSoup(self.client.get('/wiki/new').data, 'html.parser')
+        radios = html.select('input[type=radio][name=template]')
+        self.assertEqual([r['value'] for r in radios], ['blank', 'guide', 'seminar', 'book', 'officer'])
+        self.assertTrue(radios[0].has_attr('checked'))
+        response = self.client.get('/wiki/new?title=새문서&template=guide')
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(unquote(response.headers['Location']), '/wiki/edit/새문서?template=guide')
+        for template in ['blank', 'nonsense', '']:
+            response = self.client.get('/wiki/new?title=새문서&template=' + template)
+            self.assertEqual(unquote(response.headers['Location']), '/wiki/edit/새문서')
+
+    def fake_documents(self):
+        def document(client, title, revision=None):
+            if title == '새문서':
+                return dict(title=title, source='', version='0', exists=False, history=[])
+            return dict(title=title, source='sample', version='1', exists=True, history=[])
+        return patch.object(self.engine, 'document', side_effect=document)
+
+    def test_edit_prefills_template_only_for_empty_new_pages(self):
+        self.login()
+        with self.fake_documents():
+            self.check_template_prefill()
+
+    def check_template_prefill(self):
+        response = self.client.get('/wiki/edit/새문서?template=guide')
+        html = BeautifulSoup(response.data, 'html.parser')
+        self.assertIn('== 진행 순서 ==', html.select_one('#wiki-content').text)
+        self.assertIsNone(html.select_one('#wiki-starter-bar'))
+        empty = BeautifulSoup(self.client.get('/wiki/edit/새문서').data, 'html.parser')
+        self.assertIsNotNone(empty.select_one('#wiki-starter-bar'))
+        self.assertEqual(len(empty.select('#wiki-starter-bar [data-template-key]')), 4)
+        self.assertEqual(empty.select_one('#wiki-content').text.strip(), '')
+        blank = BeautifulSoup(self.client.get('/wiki/edit/새문서?template=blank').data, 'html.parser')
+        self.assertEqual(blank.select_one('#wiki-content').text.strip(), '')
+        existing = BeautifulSoup(self.client.get('/wiki/edit/대문?template=guide').data, 'html.parser')
+        self.assertEqual(existing.select_one('#wiki-content').text.lstrip(chr(10)), 'sample')
+        self.assertIsNone(existing.select_one('#wiki-starter-bar'))
+
+    def test_starter_templates_are_valid_utf8_namumark(self):
+        from wiki_templates import WIKI_STARTER_TEMPLATES
+        self.assertEqual(WIKI_STARTER_TEMPLATES[0]['content'], '')
+        for template in WIKI_STARTER_TEMPLATES[1:]:
+            self.assertIn('==', template['content'])
+            self.assertNotIn('?' * 2, template['content'])
+            self.assertEqual(template['content'].count('{{{'), template['content'].count('}}}'))
+
     def test_classic_preview_submit_still_works_without_js(self):
         self.login()
         response = self.client.post('/wiki/edit/대문', data=dict(action='preview', wiki_csrf='token',

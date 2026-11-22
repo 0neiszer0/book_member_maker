@@ -1,6 +1,7 @@
 {% extends 'wiki/base.html' %}
 {% block head %}{{ super() }}
 <link rel="stylesheet" href="{{ url_for('static', filename='wiki_editor.css') }}">
+<script defer src="{{ url_for('static', filename='wiki_namu_visual.js') }}"></script>
 <script defer src="{{ url_for('static', filename='wiki_editor.js') }}"></script>
 {% endblock %}
 {% macro button(command, label, hint='') -%}
@@ -8,7 +9,7 @@
 {%- endmacro %}
 {% block wiki_content %}
 <header class="wiki-heading"><h1>{{ doc.title }} <small>편집</small></h1><a href="{{ url_for('wiki.document',title=doc.title) }}">최신 문서 보기</a></header>
-<p class="wiki-help">나무마크로 작성합니다. {% if officer_doc %}운영진 전용 문서라 저장해도 운영진만 읽을 수 있으며{% else %}저장하면 회원들이 읽을 수 있으며{% endif %} 수정 이력에 남습니다. <a href="{{ url_for('wiki.document',title='위키 편집 안내') }}">편집 안내</a> · <a href="{{ url_for('wiki.document',title='문서 편집 가이드') }}">문법 가이드</a></p>
+<p class="wiki-help">화면에서 글자와 표를 바로 클릭해 편집할 수 있어요. 위키 문법(나무마크)이 필요할 때만 '원문 보기'를 누르세요. {% if officer_doc %}운영진 전용 문서라 저장해도 운영진만 읽을 수 있으며{% else %}저장하면 회원들이 읽을 수 있으며{% endif %} 수정 이력에 남습니다. <a href="{{ url_for('wiki.document',title='위키 편집 안내') }}">편집 안내</a> · <a href="{{ url_for('wiki.document',title='문서 편집 가이드') }}">문법 가이드</a></p>
 {% if notice %}<p class="lms-alert" role="alert">{{ notice }}</p>{% endif %}
 {% include 'wiki/_syntax_help.html' %}
 <form method="post" class="wiki-editor" data-preview-url="{{ url_for('wiki.preview', title=doc.title) }}">
@@ -23,11 +24,14 @@
     <span>{{ button('bullets','• 목록','글머리 기호 목록') }}{{ button('numbers','1. 목록','번호 목록') }}{{ button('quote','인용') }}{{ button('fold','접기') }}</span>
     <span>{{ button('rule','가로선') }}{{ button('break','줄바꿈') }}{{ button('toc','목차') }}</span>
     <span>{{ button('link','링크','링크 (Ctrl+K)') }}{{ button('note','각주') }}{{ button('table','표 ▾','표 삽입') }}</span>
-    <button type="button" data-command="split" aria-controls="wiki-live" aria-pressed="false">실시간 미리보기</button>
+    <span class="ribbon-mode" role="group" aria-label="편집 방식"><button type="button" data-command="modeVisual" aria-pressed="true">비주얼 편집</button><button type="button" data-command="modeRaw" aria-pressed="false">원문 보기</button></span>
+    <span>{{ button('template','틀 삽입','문서 틀 삽입') }}</span>
+    <button type="button" class="ribbon-raw-only" data-command="split" aria-controls="wiki-live" aria-pressed="false">실시간 미리보기</button>
   </div>
   <div id="wiki-context" hidden><span></span>{{ button('editTable','표 비주얼 편집 · 열 너비 조절') }}</div>
 </div>
-<div id="wiki-workspace"><textarea id="wiki-content" name="content" rows="23" required spellcheck="false">
+{% if not doc.exists and not doc.source.strip() %}<section id="wiki-starter-bar" aria-label="시작 틀 고르기"><strong>어떤 문서를 만들까요?</strong><span class="lms-small">틀을 고르면 바로 채워 줘요. 필요 없으면 그냥 쓰기 시작하세요.</span><div class="wiki-starter-cards">{% for t in starter_templates if t.key != 'blank' %}<a class="wiki-template-card" href="{{ url_for('wiki.edit', title=doc.title, template=t.key) }}" data-template-key="{{ t.key }}"><strong>{{ t.title }}</strong><span>{{ t.desc }}</span></a>{% endfor %}</div></section>{% endif %}
+<div id="wiki-workspace"><section id="wiki-visual" class="wiki-visual-editor" aria-label="비주얼 문서 편집기" hidden></section><textarea id="wiki-content" name="content" rows="23" required spellcheck="false">
 {{ doc.source }}</textarea>
 <section id="wiki-live" hidden aria-label="실시간 미리보기"><header><strong>미리보기</strong><small class="wiki-live-tip" hidden>미리보기 표의 세로선·오른쪽 끝을 드래그해 너비를 바로 조절할 수 있어요.</small>{{ button('refresh','새로 고침') }}</header><p role="status"></p><article class="wiki-prose"></article></section></div>
 <label for="wiki-summary">편집 요약 <span class="lms-small">(선택)</span></label><input id="wiki-summary" name="summary" maxlength="300" value="{{ summary }}" placeholder="무엇을 바꿨는지 짧게 남겨 주세요 (비워 두면 '문서 편집'으로 기록)">
@@ -37,6 +41,11 @@
 <dialog id="wiki-link" aria-labelledby="wiki-link-title"><h2 id="wiki-link-title">링크 삽입</h2>
 <form method="dialog"><label>문서명 또는 외부 URL<input name="target" required></label><label>표시 텍스트<input name="caption"></label>
 <footer>{{ button('close','취소') }}<button value="apply">링크 삽입</button></footer></form></dialog>
+<script type="application/json" id="wiki-templates-data">{{ starter_templates|tojson }}</script>
+<dialog id="wiki-template-dialog" aria-labelledby="wiki-template-title"><h2 id="wiki-template-title">문서 틀 삽입</h2>
+<fieldset class="wiki-template-mode" hidden><legend>넣는 방법</legend><label><input type="radio" name="template-mode" value="append" checked> 내용 아래에 추가</label><label><input type="radio" name="template-mode" value="replace"> 현재 내용 바꾸기</label></fieldset>
+<div class="wiki-starter-cards">{% for t in starter_templates if t.key != 'blank' %}<button type="button" class="wiki-template-card" data-template-key="{{ t.key }}"><strong>{{ t.title }}</strong><span>{{ t.desc }}</span></button>{% endfor %}</div>
+<footer>{{ button('close','닫기') }}</footer></dialog>
 <dialog id="wiki-picker" aria-labelledby="wiki-picker-title"><h2 id="wiki-picker-title">표 삽입</h2><div class="picker-grid"></div><output>1 × 1 표 삽입</output><footer>{{ button('close','취소') }}</footer></dialog>
 <dialog id="wiki-table" aria-labelledby="wiki-table-title"><h2 id="wiki-table-title">표 비주얼 편집 · 열 너비 조절</h2>
 <div class="table-tools"><label>표 너비 <select id="table-width"><option value="">자동</option>{% for width in ['100%','85%','70%'] %}<option>{{ width }}</option>{% endfor %}</select></label>{{ button('equal','열 너비 균등 분배') }}{{ button('header','첫 행 헤더 스타일') }}</div>
