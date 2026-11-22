@@ -190,24 +190,25 @@ class LocalLoginTests(unittest.TestCase):
         return next(m for m in self.db.rows["members"] if m["id"] == mid)
 
     # tests
-    def test_login_page_shows_school_email_first_and_collapses_pin(self):
+    def test_login_page_shows_pin_first_and_collapses_school_email(self):
         html = self.client.get("/login").get_data(as_text=True)
         self.assertIn("카카오·기존 아이디 로그인은", html)
         self.assertIn("활동 기록이 이어져요", html)
-        self.assertIn('<section id="school-email"', html)
+        self.assertIn('<section id="pin-login"', html)
+        self.assertIn('<details id="school-email" class="auth-details">', html)
         self.assertIn('placeholder="예: hobanu"', html)
         self.assertIn('class="knu-email-group"', html)
         self.assertIn('name="csrf_token"', html)
-        self.assertIn('<details id="pin-login" class="auth-details">', html)
-        self.assertIn("이미 설정한 6자리 PIN으로 빠른 로그인", html)
+        self.assertIn("6자리 PIN", html)
+        self.assertIn('data-auto-submit="true"', html)
         self.assertIn('placeholder="예: hobanu 또는 2026123456"', html)
         self.assertIn('placeholder="숫자 6자리"', html)
-        self.assertLess(html.index('action="/auth/email/request"'), html.index('id="pin-login"'))
+        self.assertLess(html.index('id="pin-login"'), html.index('action="/auth/email/request"'))
         self.assertNotIn("/login/kakao", html)
         self.assertNotIn('action="/login/password"', html)
         self.assertNotIn("기존 아이디·비밀번호 로그인", html)
-        self.assertNotIn("처음 오셨나요?", html)
-        self.assertNotIn('href="/signup', html)
+        self.assertIn("처음 오셨나요?", html)
+        self.assertIn('href="/signup', html)
 
     def test_explicit_legacy_mode_and_password_errors_show_password_form(self):
         from local_auth import GENERIC_LOGIN_ERROR

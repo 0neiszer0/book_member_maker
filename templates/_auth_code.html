@@ -1,5 +1,5 @@
-{% macro auth_code(name, label, field_id, autocomplete, masked=false, required=true, autofocus=false, help_text='') %}
-<div class="auth-label auth-code" data-auth-code data-digit-mask="{{ 'true' if masked else 'false' }}">
+{% macro auth_code(name, label, field_id, autocomplete, masked=false, required=true, autofocus=false, help_text='', auto_submit=false) %}
+<div class="auth-label auth-code" data-auth-code data-digit-mask="{{ 'true' if masked else 'false' }}"{% if auto_submit %} data-auto-submit="true"{% endif %}>
   <label id="{{ field_id }}-label" for="{{ field_id }}">{{ label }}</label>
   {% if help_text %}<span id="{{ field_id }}-help" class="auth-help">{{ help_text }}</span>{% endif %}
   <input class="auth-input" id="{{ field_id }}" name="{{ name }}" data-auth-code-value

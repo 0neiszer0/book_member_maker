@@ -21,6 +21,7 @@
 
     function syncOriginal() {
       original.value = boxes.map(box => box.value).join('');
+      if (original.value.length < 6) autoSubmitted = false;
       clearError();
     }
 
@@ -30,6 +31,26 @@
       syncOriginal();
     }
 
+    let autoSubmitted = false;
+
+    function maybeAutoSubmit() {
+      const form = original.form;
+      if (group.dataset.autoSubmit !== 'true' || autoSubmitted || !form) return;
+      if (!/^[0-9]{6}$/.test(original.value)) return;
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        const invalid = form.querySelector(':invalid');
+        if (invalid && invalid !== original) invalid.focus();
+        return;
+      }
+      autoSubmitted = true;
+      // Let the 6th digit render before the page navigates away.
+      setTimeout(() => {
+        if (form.requestSubmit) form.requestSubmit();
+        else form.submit();
+      }, 40);
+    }
+
     function enterDigits(index, digits) {
       const start = index + digits.length > boxes.length ? 0 : index;
       Array.from(digits).forEach((digit, offset) => {
@@ -37,6 +58,7 @@
       });
       syncOriginal();
       focusBox(start + digits.length);
+      maybeAutoSubmit();
     }
 
     boxes.forEach((box, index) => {
@@ -91,6 +113,8 @@
       }
     });
     original.form.addEventListener('reset', () => requestAnimationFrame(syncBoxes));
+
+    window.addEventListener('pageshow', () => { autoSubmitted = false; });
 
     syncBoxes();
     controls.hidden = false;

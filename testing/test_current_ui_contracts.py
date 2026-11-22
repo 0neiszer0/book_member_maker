@@ -17,7 +17,11 @@ class CurrentUiContractsTest(unittest.TestCase):
         self.assertNotIn("eva-", login.lower())
         self.assertNotIn("eva-", identity.lower())
         self.assertIn('id="school-email"', login)
-        self.assertIn("경북대 학교 메일(@knu.ac.kr) 로그인 · 가입", login)
+        self.assertIn('id="pin-login"', login)
+        self.assertIn("auto_submit=true", login)
+        self.assertLess(login.index('id="pin-login" aria-labelledby'), login.index('<details id="school-email"'))
+        self.assertIn("경북대 학교 메일(@knu.ac.kr) 인증", login)
+        self.assertIn("6자리 PIN 로그인으로 돌아가기", login)
 
     def test_auth_digit_inputs_use_shared_progressive_enhancement(self):
         auth = self.read("templates/auth_base.html")
@@ -26,6 +30,9 @@ class CurrentUiContractsTest(unittest.TestCase):
         script = self.read("static/auth_code_boxes.js")
         self.assertIn('<script defer src="{{ url_for(\'static\', filename=\'auth_code_boxes.js\') }}">', auth)
         self.assertIn('data-auth-code-controls hidden', macro)
+        self.assertIn('data-auto-submit="true"', macro)
+        self.assertIn("auto_submit=false", macro)
+        self.assertIn("maybeAutoSubmit", script)
         self.assertIn('data-digit-mask=', macro)
         self.assertIn('range(1, 7)', macro)
         self.assertIn('data-auth-code-toggle aria-pressed="false"', macro)
