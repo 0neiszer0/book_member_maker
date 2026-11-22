@@ -130,6 +130,9 @@
         {% endif %}
         <div class="eg-muted" style="color:#2d3b45">
           <p style="margin:0 0 8px"><strong>1. 맡은 업무 서술. (최대한 자세히)</strong><br><span style="white-space:pre-wrap">{{ resp.core_tasks }}</span></p>
+          {% if resp.role_gap_notes %}
+          <p style="margin:0 0 8px"><strong>위키 보강 항목 답변 (직책별 상세 확인)</strong><br><span style="white-space:pre-wrap">{{ resp.role_gap_notes }}</span></p>
+          {% endif %}
           {% if resp.hardships_and_tips %}
           <p style="margin:0 0 8px"><strong>2. 처음 맡았을 때 헤맸던 점 · 미리 알았으면 좋았을 점</strong><br><span style="white-space:pre-wrap">{{ resp.hardships_and_tips }}</span></p>
           {% endif %}
