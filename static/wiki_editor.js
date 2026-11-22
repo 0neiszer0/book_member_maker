@@ -276,7 +276,7 @@ function freshBinding(binding) {
 
 function commitTable(binding, fresh) {
     const result = serializeTable(fresh.model);
-    replace(fresh.block.start, fresh.block.end, result, 0, 0);
+    replace(fresh.block.start, fresh.block.end, result, 0, 0, {focus: false});
     binding.source = result;
     binding.refresh?.(fresh.model);
 }
@@ -353,7 +353,24 @@ function decorateTables() {
         edit.textContent = '표 편집';
         equal.textContent = '균등';
         equal.disabled = !ref;
-        bar.append(label, edit, equal);
+        bar.append(label);
+        const presets = [100, 85, 70].map(pct => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = pct + '%';
+            btn.dataset.tableWidth = String(pct);
+            btn.setAttribute('aria-label', '표 너비 ' + pct + '%');
+            btn.onclick = () => {
+                const fresh = freshBinding(binding);
+                if (!fresh) return;
+                setTableWidth(fresh.model, pct);
+                table.style.width = pct + '%';
+                commitTable(binding, fresh);
+                layout();
+            };
+            return btn;
+        });
+        bar.append(...presets, equal, edit);
         const widthLabel = model => label.textContent = '너비 ' + (tagValue(model.tableTags, 'tablewidth') || '자동');
         widthLabel(match.model);
         binding.refresh = fresh => widthLabel(fresh.model);
@@ -371,7 +388,7 @@ function decorateTables() {
             paintLiveWidths(table, fresh.model.widths);
             commitTable(binding, fresh);
         };
-        shell.append(bar);
+        shell.prepend(bar);
 
         const handles = [];
         const edge = document.createElement('div');
@@ -428,7 +445,6 @@ function decorateTables() {
         function layout() {
             const left = table.offsetLeft, top = table.offsetTop, w = table.offsetWidth, h = table.offsetHeight;
             edge.style.cssText = 'left:' + (left + w - 6) + 'px;top:' + top + 'px;height:' + h + 'px';
-            bar.style.cssText = 'left:' + (left + w - 6) + 'px;top:' + (top + 4) + 'px';
             if (ref) {
                 const cells = [...ref.cells];
                 handles.forEach((handle, k) => {
@@ -472,12 +488,12 @@ function context() {
     commandButton('redo').disabled = !redo.length;
 }
 
-function replace(start, end, value, a=value.length, b=a) {
+function replace(start, end, value, a=value.length, b=a, {focus = true} = {}) {
     undo.push({start, before:source.value.slice(start,end), after:value, old:selection(), next:[start+a,start+b]});
     if (undo.length > 80) undo.shift();
     redo.length = 0;
     source.setRangeText(value,start,end);
-    source.focus();
+    if (focus) source.focus();
     source.setSelectionRange(start+a,start+b);
     context();
     schedulePreview();
