@@ -12,7 +12,7 @@
 <p class="wiki-help">화면에서 글자와 표를 바로 클릭해 편집할 수 있어요. 위키 문법(나무마크)이 필요할 때만 '원문 보기'를 누르세요. {% if officer_doc %}운영진 전용 문서라 저장해도 운영진만 읽을 수 있으며{% else %}저장하면 회원들이 읽을 수 있으며{% endif %} 수정 이력에 남습니다. <a href="{{ url_for('wiki.document',title='위키 편집 안내') }}">편집 안내</a> · <a href="{{ url_for('wiki.document',title='문서 편집 가이드') }}">문법 가이드</a></p>
 {% if notice %}<p class="lms-alert" role="alert">{{ notice }}</p>{% endif %}
 {% include 'wiki/_syntax_help.html' %}
-<form method="post" class="wiki-editor" data-preview-url="{{ url_for('wiki.preview', title=doc.title) }}">
+<form method="post" class="wiki-editor" data-preview-url="{{ url_for('wiki.preview', title=doc.title) }}" data-edit-base="{{ url_for('wiki.edit', title='__TITLE__') }}">
 <input type="hidden" name="wiki_csrf" value="{{ wiki_csrf }}"><input type="hidden" name="version" value="{{ doc.version }}">
 <label for="wiki-content">문서 내용</label>
 <div id="wiki-ribbon" hidden>
@@ -38,6 +38,8 @@
 {% if notice %}<p class="lms-alert" role="alert">{{ notice }}</p>{% endif %}
 <div class="wiki-editor-actions"><button class="lms-button lms-button-primary lms-button-cta" name="action" value="save" type="submit">저장</button><button class="lms-button" name="action" value="preview" type="submit">미리보기</button><a class="lms-button" href="{{ url_for('wiki.document',title=doc.title) }}">취소</a><span class="lms-small">기준 버전 r{{ doc.version }}</span></div>
 </form>
+<div id="wiki-selection-bar" class="wiki-selection-bar" role="toolbar" aria-label="선택 텍스트 빠른 작업" hidden><button type="button" data-selection-action="newDoc">새 문서 연결</button><button type="button" data-selection-action="sectionBelow">아래에 문단 만들기</button><span class="wiki-selection-divider" aria-hidden="true"></span><button type="button" data-selection-action="bold" aria-label="굵게"><b>B</b></button><button type="button" data-selection-action="italic" aria-label="기울임"><i>I</i></button><button type="button" data-selection-action="strike" aria-label="취소선"><s>S</s></button></div>
+<div id="wiki-action-toast" class="wiki-action-toast" role="status" aria-live="polite" hidden></div>
 <dialog id="wiki-link" aria-labelledby="wiki-link-title"><h2 id="wiki-link-title">링크 삽입</h2>
 <form method="dialog"><label>문서명 또는 외부 URL<input name="target" required></label><label>표시 텍스트<input name="caption"></label>
 <footer>{{ button('close','취소') }}<button value="apply">링크 삽입</button></footer></form></dialog>
