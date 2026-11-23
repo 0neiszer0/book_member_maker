@@ -60,7 +60,7 @@
 
   <details style="margin-bottom:16px">
     <summary style="cursor:pointer;font-weight:700">위키용 초안 미리보기 (openNamu/Markdown)</summary>
-    <textarea id="wiki-draft-{{ form.id }}" class="eg-textarea" rows="10" readonly style="margin-top:10px;font-family:monospace;font-size:13px">{{ form.wiki_draft }}</textarea>
+    <textarea id="wiki-draft-{{ form.id }}" class="eg-textarea eg-wiki-draft" rows="10" readonly>{{ form.wiki_draft }}</textarea>
   </details>
 
   {% if form.grouped_responses %}

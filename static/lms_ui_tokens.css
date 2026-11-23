@@ -397,7 +397,8 @@ a.ui-kpi-card:hover {
 .lms-mobile-bell {
   position: relative;
   width: auto !important;
-  min-width: 32px;
+  min-width: 40px;
+  min-height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -405,8 +406,8 @@ a.ui-kpi-card:hover {
 
 .lms-mobile-bell [data-notification-badge] {
   position: absolute;
-  top: -4px;
-  right: -4px;
+  top: 2px;
+  right: 2px;
   background: #ffffff;
   color: var(--ui-accent);
   font-size: 10px;
@@ -426,6 +427,22 @@ a.ui-kpi-card:hover {
     width: 100%;
     overflow-x: auto;
     flex-wrap: nowrap;
+  }
+  .ui-tab,
+  .lms-page a.ui-tab {
+    min-height: 40px;
+    padding: 6px 14px;
+  }
+  .ui-btn,
+  .lms-page a.ui-btn,
+  .lms-page button.ui-btn {
+    min-height: 40px;
+  }
+  .ui-btn-sm,
+  .lms-page a.ui-btn-sm,
+  .lms-page button.ui-btn-sm {
+    min-height: 38px;
+    padding: 6px 12px;
   }
   .ui-kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

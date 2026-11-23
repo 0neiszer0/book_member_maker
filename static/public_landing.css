@@ -59,6 +59,11 @@ body.public-shell .arc-card:hover { border-color: #b60f17; }
 body.public-shell .arc-section-title { border-bottom-color: #282322; color: #282322; }
 body.public-shell .arc-pager { border-top-color: #d6cdc2; }
 
+@media (max-width: 767px) {
+  body.public-shell .arc-search-form input[type="search"] { width: 100%; font-size: 16px; }
+  .mast nav a, body.public-shell .arc-tab { min-height: 40px; display: inline-flex; align-items: center; }
+}
+
 @media (max-width: 680px) {
   .mast, .mast nav, footer nav { gap: .7rem; }
   .intro, .books, .programs { grid-template-columns: 1fr; }

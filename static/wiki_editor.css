@@ -118,10 +118,19 @@
     color: #fff; background: #d20f17; border-radius: 999px; box-shadow: 0 2px 8px #18232c50;
 }
 @media (max-width: 767px) {
-    #wiki-ribbon { top: 48px; }
+    #wiki-ribbon { top: 0; }
     .ribbon-tools { flex-wrap: nowrap; overflow-x: auto; }
     .ribbon-tools > * { flex-shrink: 0; white-space: nowrap; }
+    .ribbon-tools button, .ribbon-tools select { min-height: 38px; padding: 4px 8px; }
+    #wiki-style, #wiki-color, #wiki-table select, #wiki-table textarea, #wiki-link input, .wiki-visual-canvas .wiki-v-fold-title { font-size: 16px; }
     #wiki-table { padding: 12px; }
+    #wiki-table footer button, #wiki-picker footer button, #wiki-link footer button { min-height: 40px; padding: 6px 14px; }
+    .wiki-table-shell { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .wiki-v-table { table-layout: auto !important; width: max-content !important; min-width: 100%; }
+    .wiki-v-table col { width: auto !important; }
+    .wiki-v-table td { min-width: 76px; padding: 8px; }
+    .wiki-table-bar { opacity: 1; position: sticky; left: 0; justify-content: flex-start; }
+    .wiki-table-bar button { min-height: 32px; padding: 3px 10px; }
 }
 
 /* ---- Wave 7: visual-first editing ---------------------------------------- */
@@ -211,9 +220,11 @@
     .wiki-visual-add { padding: 8px 12px 12px; }
     .wiki-visual-hint { padding: 6px 12px 10px; }
     .wiki-starter-cards { grid-template-columns: 1fr; }
+    #wiki-template-dialog footer button { min-height: 40px; padding: 6px 14px; }
+    .wiki-selection-bar button { min-height: 36px; padding: 5px 10px; }
 }
 /* Drag-selection quick actions */
-.wiki-selection-bar { position: fixed; z-index: 70; display: flex; align-items: center; gap: 2px; padding: 4px; color: #fff; background: #273238; border-radius: 8px; box-shadow: 0 6px 24px #18232c55; }
+.wiki-selection-bar { position: fixed; z-index: 70; display: flex; flex-wrap: wrap; align-items: center; gap: 2px; max-width: calc(100vw - 16px); padding: 4px; color: #fff; background: #273238; border-radius: 8px; box-shadow: 0 6px 24px #18232c55; }
 .wiki-selection-bar[hidden] { display: none; }
 .wiki-selection-bar button { min-height: 30px; padding: 3px 10px; font: inherit; font-size: 13px; color: #fff; background: transparent; border: 0; border-radius: 6px; cursor: pointer; white-space: nowrap; }
 .wiki-selection-bar button:hover, .wiki-selection-bar button:focus-visible { background: #d20f17; }

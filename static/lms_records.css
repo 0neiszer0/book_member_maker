@@ -254,6 +254,12 @@
     .records-page .members-auth-grid { grid-template-columns: minmax(0, 1fr); }
     .records-page .members-kpi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+@media (max-width: 767px) {
+    .records-page .lms-button.members-action-btn { min-height: 38px; padding: 6px 12px; }
+    .records-page .members-auth-row > * { min-height: 40px; }
+    .records-page dialog { max-height: 90dvh; }
+    .records-page .records-field, .records-page .edit-field { font-size: 16px; }
+}
 @media (max-width: 620px) {
     .records-page .members-auth-panel { padding: 14px; }
     .records-page .members-kpi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }

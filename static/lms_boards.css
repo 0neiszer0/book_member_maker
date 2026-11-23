@@ -14,4 +14,8 @@
 .lms-page[data-lms-page="boards"] .lms-toolbar{flex-wrap:nowrap}.lms-board-search{min-width:0}.lms-page[data-lms-page="boards"] .lms-toolbar .lms-button{white-space:nowrap;flex-shrink:0}
 
 .lms-page[data-lms-page="boards"] .lms-board-list-toolbar{padding-bottom:0;border-bottom:0;margin-bottom:49px}
+.lms-board-body table{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;border-collapse:collapse;margin:16px 0}
+.lms-board-body :is(th,td){border:1px solid #c7cdd1;padding:8px 10px;min-width:80px;vertical-align:top}
+.lms-board-body th{background:#f5f5f5;font-weight:700}
 @media(max-width:767px){.lms-board-row{padding-left:12px}}
+@media(max-width:479px){.lms-page[data-lms-page="boards"] .lms-toolbar{flex-wrap:wrap}}
