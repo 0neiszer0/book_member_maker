@@ -9,7 +9,7 @@
 <meta property="og:title" content="{% if portal_state == 'applying' %}동아리 신입 부원 모집{% else %}면접 지원 결과 확인{% endif %}">
 <link rel="stylesheet" href="{{ url_for('static', filename='lms_auth.css') }}">
 <style>
-  .portal-tabs {display:flex; gap:8px; margin:20px 0} .portal-tabs button {flex:1; padding:12px; border:1px solid #e2e8f0; border-radius:999px; background:white; cursor:pointer} .portal-tabs button[aria-selected="true"] {background:#a6192e; color:white} .application-form label {display:block; margin:16px 0} .application-form textarea {min-height:100px} .application-form input, .application-form textarea {width:100%; box-sizing:border-box} .application-form input[type=checkbox] {width:auto} .application-form .slot {margin:8px 0} .honeypot {position:absolute; left:-10000px} .application-form small {color:#a6192e}
+  .portal-tabs {display:flex; gap:8px; margin:20px 0} .portal-tabs button {flex:1; padding:12px; border:1px solid #c7cdd1; border-radius:999px; background:#fff; color:#2d3b45; cursor:pointer} .portal-tabs button[aria-selected="true"] {background:#d20f17; border-color:#d20f17; color:#fff} .application-form label {display:block; margin:16px 0} .application-form textarea {min-height:100px} .application-form input, .application-form textarea {width:100%; box-sizing:border-box} .application-form input[type=checkbox] {width:auto} .application-form .slot {margin:8px 0} .honeypot {position:absolute; left:-10000px} .application-form small {color:#a80b12}
   .lms-result-dues { border: 1px solid #c7cdd1; border-radius: 6px; background: #fff; margin-top: 16px; padding: 16px; }
   .lms-result-dues h2 { font-size: 18px; margin: 0 0 8px; }
   .lms-result-dues p + p { margin-top: 8px; }

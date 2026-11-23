@@ -2,14 +2,42 @@
 {% set lms_title = '세미나 사전 자료 등록·관리' %}
 {% block content %}
 <style>
-.material-editor{max-width:1050px;margin:auto;padding:20px}.material-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}.material-editor label{display:block;font-weight:600}.material-editor input:not([type=checkbox]),.material-editor textarea{display:block;width:100%;box-sizing:border-box;padding:8px;margin-top:4px}.material-editor textarea{font-family:monospace;min-height:300px}.material-card,.material-preview{border:1px solid #d8dcdf;padding:16px;margin:14px 0;border-radius:4px}.material-preview{max-width:100%;overflow-x:auto}.material-actions{display:flex;gap:8px;flex-wrap:wrap}.material-actions a,.material-actions button{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:6px 12px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a;font:inherit;font-size:14px;font-weight:600;text-decoration:none;cursor:pointer}.material-actions button[type=submit]{background:#a6192e;border-color:#a6192e;color:#fff}.material-preview table{border-collapse:collapse}.material-preview td{border:1px solid #ccc;padding:6px}
-@media(max-width:767px){.material-editor{padding:12px}.material-editor input:not([type=checkbox]),.material-editor textarea{font-size:16px;min-height:40px}.material-actions a,.material-actions button{min-height:40px}.material-preview table{min-width:480px}}
+.material-editor{max-width:1050px;margin:0 auto;padding:20px;color:#2d3b45}
+.material-editor .ui-page-header{align-items:flex-start}
+.material-editor .ui-card{background:#fff;border:1px solid #d8dcdf;border-radius:8px;padding:20px;margin:0 0 16px}
+.material-editor h2{margin:0 0 14px;font-size:18px;font-weight:700;color:#2d3b45}
+.material-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin:14px 0}
+.material-editor label{display:block;font-weight:600;font-size:14px;color:#2d3b45}
+.material-editor input:not([type=checkbox]),.material-editor textarea{display:block;width:100%;box-sizing:border-box;padding:9px 10px;margin-top:4px;border:1px solid #c7cdd1;border-radius:6px;background:#fff;color:#2d3b45;font:inherit;font-weight:400}
+.material-editor input:focus-visible,.material-editor textarea:focus-visible{outline:2px solid #d20f17;outline-offset:1px;border-color:#d20f17}
+.material-editor input[type=file]{padding:12px;border-style:dashed;background:#f5f7f8;cursor:pointer}
+.material-editor textarea{font-family:Consolas,'Noto Sans KR',monospace;font-size:14px;line-height:1.6;min-height:300px;resize:vertical}
+.material-publish{display:flex;align-items:center;gap:8px;margin:4px 0 14px}
+.material-publish input{display:inline-block!important;width:auto!important;margin:0!important}
+.material-status{margin:0 0 14px;padding:10px 14px;border:1px solid #b7dfc2;border-radius:6px;background:#e4f5e8;color:#18542c;font-size:14px}
+.material-card{border:1px solid #d8dcdf;padding:14px 16px;margin:0 0 10px;border-radius:8px;background:#fff}
+.material-card h3{margin:0 0 6px;font-size:16px;color:#2d3b45}
+.material-meta{margin:0 0 10px;font-size:14px;color:#56616a;font-variant-numeric:tabular-nums}
+.material-pill{display:inline-block;padding:1px 10px;border-radius:999px;font-size:12px;font-weight:700;line-height:20px;border:1px solid #c7cdd1;background:#f5f7f8;color:#4d5962}
+.material-pill.is-live{background:#e4f5e8;border-color:#b7dfc2;color:#18542c}
+.material-preview{max-width:100%;overflow-x:auto;border:1px solid #d8dcdf;border-radius:8px;padding:20px;margin:0 0 16px;background:#fff;line-height:1.75;font-size:15px}
+.material-preview h3{margin:24px 0 8px;font-size:17px}
+.material-preview a{color:#b50c13;text-underline-offset:3px}
+.material-preview blockquote{margin:12px 0;padding:10px 14px;border:1px solid #d8dcdf;border-radius:6px;background:#f5f7f8}
+.material-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.material-actions a,.material-actions button{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:6px 14px;border:1px solid #c7cdd1;border-radius:6px;background:#fff;color:#2d3b45;font:inherit;font-size:14px;font-weight:600;text-decoration:none;cursor:pointer}
+.material-actions a:hover,.material-actions button:hover{background:#f5f7f8}
+.material-actions button[type=submit]{background:#d20f17;border-color:#d20f17;color:#fff}
+.material-actions button[type=submit]:hover{background:#a80b12;border-color:#a80b12}
+.material-actions button[data-action=delete]{color:#a80b12;border-color:#f0b7ba}
+.material-preview table{border-collapse:collapse;font-variant-numeric:tabular-nums}.material-preview td{border:1px solid #c7cdd1;padding:8px 10px}
+.material-note{font-size:14px;color:#56616a;margin:12px 0 0}
+@media(max-width:767px){.material-editor{padding:12px}.material-editor .ui-card{padding:14px}.material-editor input:not([type=checkbox]),.material-editor textarea{font-size:16px;min-height:40px}.material-editor textarea{min-height:260px}.material-actions a,.material-actions button{min-height:40px}.material-preview table{min-width:480px}}
 </style>
 <div class="material-editor">
-<h1>세미나 사전 자료 등록·관리</h1>
-<p><code>.md</code> 파일을 불러오거나 아래 본문 칸에 Markdown을 그대로 복사·붙여넣기한 뒤 공개 상태로 저장하면 회원용 /pre-seminar에 바로 게시됩니다.</p>
-<p><a href="{{ url_for('member_pre_seminar') }}">사전 자료실로 돌아가기</a></p>
-{% if request.args.get('saved') %}<p role="status">저장했습니다.</p>{% endif %}
+<header class="ui-page-header"><div class="ui-page-header-copy"><h1>세미나 사전 자료 등록·관리</h1><p class="ui-page-subtitle"><code>.md</code> 파일을 올리거나 Markdown을 붙여넣어 저장하면 공개 상태일 때 회원용 /pre-seminar에 바로 게시됩니다.</p></div><a class="lms-button" href="{{ url_for('member_pre_seminar') }}">사전 자료실 보기 →</a></header>
+{% if request.args.get('saved') %}<p class="material-status" role="status">저장했습니다.</p>{% endif %}
+<section class="ui-card">
 <h2>Markdown {{ '수정' if edit else '등록' }}</h2>
 <form action="{{ url_for('admin_pre_seminar_save') }}" method="post">
 <input type="hidden" name="csrf_token" value="{{ session.get('sensitive_csrf', '') }}">
@@ -23,14 +51,17 @@
 <label>세미나 날짜 <input type="date" name="seminar_date" value="{{ edit.date if edit else '' }}"></label>
 <label>판본/참고 메모 <input name="edition_note" value="{{ edit.edition_note if edit else '' }}"></label>
 </div>
-<label><input type="checkbox" name="is_published" {% if not edit or edit.is_published %}checked{% endif %}> 공개</label>
+<label class="material-publish"><input type="checkbox" name="is_published" {% if not edit or edit.is_published %}checked{% endif %}> 공개</label>
 <label>마크다운 본문 <textarea id="markdown-body" name="markdown_body" maxlength="300000" required>{{ edit.markdown_body if edit else '' }}</textarea></label>
-<div class="material-actions"><button type="button" id="preview-button">미리보기</button><button type="submit">저장</button>{% if edit %}<a href="{{ url_for('admin_pre_seminar') }}">새 자료 등록</a>{% endif %}</div>
+<div class="material-actions" style="margin-top:14px"><button type="button" id="preview-button">미리보기</button><button type="submit">저장</button>{% if edit %}<a href="{{ url_for('admin_pre_seminar') }}">새 자료 등록</a>{% endif %}</div>
 </form>
+</section>
 <div id="preview" class="material-preview" hidden aria-live="polite"></div>
+<section class="ui-card">
 <h2>등록된 DB 사전 자료 목록</h2>
-{% for book in books %}<article class="material-card"><h3>{{ book.title }}</h3><p>{{ book.author }} · {{ book.semester_label }} · {{ book.date }} · <strong>{{ '공개' if book.is_published else '비공개(초안)' }}</strong></p><div class="material-actions"><a href="{{ url_for('member_pre_seminar_book', slug=book.slug) }}">자료 보기</a><a href="{{ url_for('admin_pre_seminar', edit=book.id) }}">수정</a><button type="button" data-id="{{ book.id }}" data-action="toggle">공개 전환</button><button type="button" data-id="{{ book.id }}" data-action="delete">삭제</button></div></article>{% else %}<p>등록된 자료가 없습니다.</p>{% endfor %}
-<p>기존 15개 아카이브 자료는 사전 자료실에 자동으로 유지됩니다.</p>
+{% for book in books %}<article class="material-card"><h3>{{ book.title }}</h3><p class="material-meta">{{ book.author }} · {{ book.semester_label }} · {{ book.date }} · <span class="material-pill{% if book.is_published %} is-live{% endif %}">{{ '공개' if book.is_published else '비공개(초안)' }}</span></p><div class="material-actions"><a href="{{ url_for('member_pre_seminar_book', slug=book.slug) }}">자료 보기</a><a href="{{ url_for('admin_pre_seminar', edit=book.id) }}">수정</a><button type="button" data-id="{{ book.id }}" data-action="toggle">공개 전환</button><button type="button" data-id="{{ book.id }}" data-action="delete">삭제</button></div></article>{% else %}<p class="material-note">등록된 자료가 없습니다.</p>{% endfor %}
+<p class="material-note">기존 15개 아카이브 자료는 사전 자료실에 자동으로 유지됩니다.</p>
+</section>
 </div>
 <script>
 const csrf = {{ session.get('sensitive_csrf', '')|tojson }};

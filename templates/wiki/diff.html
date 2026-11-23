@@ -2,12 +2,12 @@
 {% block wiki_content %}<style>
 .wiki-diff{border-collapse:collapse;width:100%;font:13px/22px Consolas,'Noto Sans KR',monospace;table-layout:fixed}
 .wiki-diff td{padding:1px 8px;vertical-align:top;white-space:pre-wrap;overflow-wrap:anywhere;border-bottom:1px solid #f0f0f0}
-.wiki-diff .num{width:44px;color:#8a949b;text-align:right;user-select:none;padding-right:6px}
+.wiki-diff .num{width:44px;color:#56616a;font-variant-numeric:tabular-nums;text-align:right;user-select:none;padding-right:6px}
 .wiki-diff .mark{width:16px;text-align:center;user-select:none}
 .wiki-diff tr.add td{background:#e6ffec}.wiki-diff tr.add .mark{color:#1a7f37}
 .wiki-diff tr.del td{background:#ffebe9}.wiki-diff tr.del .mark{color:#cf222e}
 .wiki-diff ins{background:#abf2bc;text-decoration:none}.wiki-diff del{background:#ffc1c0;text-decoration:none}
-.wiki-diff tr.skip td{background:#f5f7f9;color:#6b7780;text-align:center;font-family:inherit}
+.wiki-diff tr.skip td{background:#f5f7f9;color:#4d5962;text-align:center;font-family:inherit}
 .wiki-diff-sum .add{color:#1a7f37;font-weight:700}.wiki-diff-sum .del{color:#cf222e;font-weight:700}
 </style>
 <header class="wiki-heading"><h1>{{ title }} <small>r{{ old }} ↔ r{{ new }} 비교</small></h1><nav aria-label="비교 도구"><a class="lms-button" href="{{ url_for('wiki.history',title=title) }}">수정 이력</a><a class="lms-button" href="{{ url_for('wiki.document',title=title,revision=new) }}">r{{ new }} 보기</a></nav></header>
