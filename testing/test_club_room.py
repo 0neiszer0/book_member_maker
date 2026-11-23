@@ -47,7 +47,8 @@ class RoomTests(unittest.TestCase):
             self.csrf = state['room_csrf']
         self.body = dict(action='create', edit_code=self.code, kind='regular',
                          starts_at='2099-10-05T12:00', ends_at='2099-10-05T14:00',
-                         representative='대표 공개', participants='참여자 비공개, 대표 공개', purpose='목적 비공개')
+                         representative='대표 공개', participants='참여자 비공개, 대표 공개', purpose='목적 비공개',
+                         knu_email='member@knu.ac.kr')
 
     def login(self, mid, role):
         with self.client.session_transaction() as state:
@@ -181,6 +182,61 @@ class RoomTests(unittest.TestCase):
         self.login(1,'officer')
         self.assertEqual(self.post({**self.body,'kind':'meeting','starts_at':'2099-10-05T08:00'}).status_code,400)
 
+    def test_regular_create_requires_school_email(self):
+        required = '학교 메일 아이디를 반드시 입력해주세요. 예: 아이디@knu.ac.kr'
+        without = {k: v for k, v in self.body.items() if k != 'knu_email'}
+        for body in (without, {**without, 'knu_email': '   '}):
+            result = self.post(body)
+            self.assertEqual(result.status_code, 400)
+            self.assertEqual(result.json['error'], required)
+        self.assertEqual(self.rpc_calls, [])
+        self.assertEqual(self.post().status_code, 200)
+        self.assertEqual(self.rpc_calls[-1][1]['p_knu_email'], 'member@knu.ac.kr')
+
+    def test_member_saved_email_still_satisfies_requirement(self):
+        self.db.rows['members'].append(dict(id=7, role='member', is_active=True, account_status='active',
+            member_status='active', knu_email='saved@knu.ac.kr', knu_email_verified_at='2026-01-01T00:00:00Z'))
+        self.login(7, 'member')
+        without = {k: v for k, v in self.body.items() if k != 'knu_email'}
+        self.assertEqual(self.post(without).status_code, 200)
+        self.assertEqual(self.rpc_calls[-1][1]['p_knu_email'], 'saved@knu.ac.kr')
+
+    def test_verified_guest_email_still_satisfies_requirement(self):
+        without = {k: v for k, v in self.body.items() if k != 'knu_email'}
+        with patch('club_room.get_verified_guest_email', return_value='guest@knu.ac.kr'):
+            self.assertEqual(self.post(without).status_code, 200)
+        self.assertEqual(self.rpc_calls[-1][1]['p_knu_email'], 'guest@knu.ac.kr')
+
+    def test_staff_meeting_does_not_need_email(self):
+        self.login(1, 'officer')
+        without = {k: v for k, v in self.body.items() if k != 'knu_email'}
+        self.assertEqual(self.post({**without, 'kind': 'meeting'}).status_code, 200)
+        self.assertIsNone(self.rpc_calls[-1][1]['p_knu_email'])
+        self.assertEqual(self.post({**without, 'kind': 'regular'}).status_code, 400)
+
+    def test_schedule_days_window_clamps_and_redacts(self):
+        rows = self.db.rows['club_room_bookings']
+        rows[0].update(starts_at='2026-11-01T12:00:00+09:00', ends_at='2026-11-01T14:00:00+09:00')
+        rows.append(dict(id=str(uuid4()), kind='regular', starts_at='2026-12-10T12:00:00+09:00',
+                         ends_at='2026-12-10T13:00:00+09:00', representative='먼 예약', participants=['x'],
+                         purpose='p', version=1, cancelled_at=None, knu_email='a@knu.ac.kr'))
+        rows.append(dict(id=str(uuid4()), kind='meeting', starts_at='2026-11-20T18:00:00+09:00',
+                         ends_at='2026-11-20T20:00:00+09:00', representative='회의장', participants=['y'],
+                         purpose='secret', version=1, cancelled_at=None, knu_email='b@knu.ac.kr'))
+        data = self.client.get('/api/club-room/schedule?date=2026-11-01&days=42')
+        self.assertEqual(data.status_code, 200)
+        kinds = sorted(b['kind'] for b in data.json['bookings'])
+        self.assertEqual(kinds, ['blocked', 'regular', 'regular'])
+        text = data.get_data(as_text=True)
+        for secret in ('secret', '회의장', 'knu_email', 'a@knu.ac.kr', 'b@knu.ac.kr', 'edit_digest', 'participants', 'purpose'):
+            self.assertNotIn(secret, text)
+        week = self.client.get('/api/club-room/schedule?date=2026-11-01').json['bookings']
+        self.assertEqual(len(week), 1)
+        self.assertEqual(len(self.client.get('/api/club-room/schedule?date=2026-11-01&days=7').json['bookings']), 1)
+        self.assertEqual(len(self.client.get('/api/club-room/schedule?date=2026-11-01&days=999').json['bookings']), 3)
+        self.assertEqual(len(self.client.get('/api/club-room/schedule?date=2026-11-01&days=0').json['bookings']), 1)
+        self.assertEqual(len(self.client.get('/api/club-room/schedule?date=2026-11-01&days=abc').json['bookings']), 1)
+
     def test_legacy_night_booking_remains_readable_and_cancellable(self):
         self.db.rows['club_room_bookings'][0]['starts_at']='2099-10-05T02:00:00+09:00'
         self.assertEqual(self.post(dict(action='read',edit_code=self.code)).status_code,200)
@@ -243,7 +299,7 @@ class RoomEmailTests(RoomTests):
         self.assertEqual(response.json['edit_code'], self.code)
         self.assertTrue(response.json['has_email'])
         self.assertNotIn('knu_email', response.json['booking'])
-        self.assertFalse(self.post(self.body).json['has_email'])
+        self.assertTrue(self.post(self.body).json['has_email'])
         self.assertEqual(self.post({**self.body, 'knu_email': 'x@gmail.com'}).status_code, 400)
         self.assertEqual(self.post({**self.body, 'knu_email': '한글'}).status_code, 400)
 
@@ -252,7 +308,7 @@ class RoomEmailTests(RoomTests):
         page = self.client.get('/club-room').get_data(as_text=True)
         self.assertIn('data-email="owner@knu.ac.kr"', page)
         self.assertIn('data-member="true"', page)
-        self.post()
+        self.post({k: v for k, v in self.body.items() if k != 'knu_email'})
         self.assertEqual(self.rpc_calls[-1][1]['p_knu_email'], 'owner@knu.ac.kr')
         mine = self.client.get('/api/club-room/my-bookings').json
         self.assertEqual(mine['email'], 'owner@knu.ac.kr')

@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const {kst, shiftDate, weekStart, slotState, freeRanges, calendarTarget, targetMatches, nowStatus, shareUrl} = require('../static/club_room.js');
+const {kst, shiftDate, weekStart, slotState, freeRanges, calendarTarget, targetMatches, nowStatus, shareUrl, monthGridRange, shiftMonth, groupBookingsByDate} = require('../static/club_room.js');
 const future = calendarTarget('?date=2027-01-03&booking=public-id', '2026-10-27');
 assert.equal(future.date, '2027-01-03');
 assert.equal(weekStart(future.date), '2026-12-28');
@@ -34,4 +34,40 @@ assert.equal(nowStatus(rows, at('2026-10-05T19:00:00+09:00')).text, '지금 예�
 assert.equal(nowStatus(rows, at('2026-10-05T07:00:00+09:00')).text, '현재 이용 시간이 아니에요 (09:00~24:00)');
 assert.equal(nowStatus([], at('2026-10-05T15:00:00+09:00')).tone, 'free');
 assert.equal(shareUrl('https://knu-read.xyz/'), 'https://knu-read.xyz/club-room');
+const nov = monthGridRange('2026-11-23');
+assert.deepEqual([nov.year, nov.month, nov.start, nov.end, nov.days], [2026, 11, '2026-11-01', '2026-12-05', 35]);
+assert.equal(nov.dates.length, 35);
+const dec = monthGridRange('2026-12-31');
+assert.deepEqual([dec.start, dec.end, dec.days], ['2026-11-29', '2027-01-02', 35]);
+const feb = monthGridRange('2026-02-10');
+assert.deepEqual([feb.start, feb.end, feb.days], ['2026-02-01', '2026-02-28', 28]);
+const leap = monthGridRange('2028-02-29');
+assert.deepEqual([leap.start, leap.end, leap.days], ['2028-01-30', '2028-03-04', 35]);
+const aug = monthGridRange('2026-08-15');
+assert.deepEqual([aug.start, aug.end, aug.days], ['2026-07-26', '2026-09-05', 42]);
+for (const ymd of ['2026-01-01', '2026-02-01', '2026-08-01', '2028-02-01', '2027-05-31', '2026-10-31']) {
+  const grid = monthGridRange(ymd);
+  assert.equal(new Date(grid.start + 'T00:00:00Z').getUTCDay(), 0);
+  assert.equal(new Date(grid.end + 'T00:00:00Z').getUTCDay(), 6);
+  assert.ok([28, 35, 42].includes(grid.days) && grid.days % 7 === 0);
+}
+assert.equal(shiftMonth('2026-01-31', 1), '2026-02-28');
+assert.equal(shiftMonth('2028-01-31', 1), '2028-02-29');
+assert.equal(shiftMonth('2026-12-15', 1), '2027-01-15');
+assert.equal(shiftMonth('2026-01-15', -1), '2025-12-15');
+assert.equal(shiftMonth('2026-03-31', -1), '2026-02-28');
+assert.equal(shiftMonth('2026-05-31', 0), '2026-05-31');
+assert.equal(shiftMonth('2026-11-23', 14), '2028-01-23');
+const grouped = groupBookingsByDate([
+  {kind:'blocked', starts_at:'2026-10-05T18:00:00+09:00', ends_at:'2026-10-05T20:00:00+09:00'},
+  {kind:'regular', representative:'B', starts_at:'2026-10-05T15:00:00+09:00', ends_at:'2026-10-05T16:00:00+09:00'},
+  {kind:'regular', representative:'A', starts_at:'2026-10-05T09:00:00+09:00', ends_at:'2026-10-05T10:00:00+09:00'},
+  {kind:'regular', representative:'N', starts_at:'2026-10-06T23:00:00+09:00', ends_at:'2026-10-07T00:00:00+09:00'}
+]);
+assert.deepEqual(grouped['2026-10-05'].all.map(row => row.representative || 'blocked'), ['A', 'B', 'blocked']);
+assert.equal(grouped['2026-10-05'].regular.length, 2);
+assert.equal(grouped['2026-10-05'].blocked.length, 1);
+assert.equal(grouped['2026-10-06'].all.length, 1);
+assert.equal(grouped['2026-10-07'], undefined);
+assert.deepEqual(groupBookingsByDate([]), {});
 console.log('Room calendar: KST, week/year boundaries, shared/blocked slots, midnight and free ranges passed.');
