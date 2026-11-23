@@ -5,8 +5,7 @@
 <button type="button" class="lms-global-item lms-account-button" data-lms-panel="lms-account" aria-controls="lms-account" aria-expanded="false">{{ icon('account',32) }}<span>계정</span></button>
 <a class="lms-global-item" href="{{ url_for('main_index') }}" {% if ep=='main_index' %}aria-current="page"{% endif %}>{{ icon('dashboard') }}<span>대시보드</span></a>
 {% if session.user_role %}<a class="lms-global-item" href="{{ url_for('seminars') }}" {% if ep in ['seminars','view_shared_topics','my_term_attendance','member_topic_reader','member_pre_seminar'] or ep.startswith('boards.') or scoped_term|default(none) or ep=='my_seminar_archive' %}aria-current="page"{% endif %}>{{ icon('book') }}<span>강의실</span></a>{% endif %}
-<a class="lms-global-item" href="{{ url_for('lms_calendar') }}" {% if ep=='lms_calendar' %}aria-current="page"{% endif %}>{{ icon('calendar') }}<span>캘린더</span></a>
-<a class="lms-global-item" href="{{ url_for('club_room') }}" {% if ep=='club_room' %}aria-current="page"{% endif %}>{{ icon('room') }}<span>동아리방</span></a>
+<a class="lms-global-item" href="{{ url_for('lms_calendar') }}" {% if ep in ['lms_calendar','club_room'] %}aria-current="page"{% endif %}>{{ icon('calendar') }}<span>캘린더</span></a>
 {% if session.user_role in ['admin','officer'] %}<a class="lms-global-item" href="{{ url_for('admin_dashboard') }}" {% if lms_admin_context|default(false) %}aria-current="page"{% endif %}>{{ icon('settings') }}<span>전체 운영</span></a>{% endif %}
 {% if wiki_enabled %}<a class="lms-global-item" href="{{ wiki_url }}" {% if ep.startswith('wiki.') %}aria-current="page"{% endif %}>{{ icon('document') }}<span>위키</span></a>{% endif %}
 <button type="button" class="lms-global-collapse" aria-label="메뉴 최소화" aria-expanded="true">{{ icon('arrow') }}</button>

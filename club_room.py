@@ -131,22 +131,26 @@ def init_club_room_routes(app, get_db, login_required):
             response.headers['X-Robots-Tag'] = 'noindex, nofollow'
         return response
 
-    @app.get('/club-room')
-    def club_room():
+    def room_context():
         session.setdefault('room_csrf', secrets.token_urlsafe(32))
         try:
             staff = bool(staff_id()) and not session.get('member_preview')
         except Exception:
             app.logger.exception('Room staff visibility check failed')
             staff = False
-        try:
-            email = active_email() or ''
-        except Exception:
-            email = ''
-        return render_template('club_room.html', room_staff=staff, room_csrf=session['room_csrf'],
-                               room_today=datetime.now(KST).date().isoformat(),
-                               room_is_guest=not bool(session.get('user_id')), room_user_email=email,
-                               room_email_verified=bool(email))
+        email = active_email() or ''
+        return dict(room_staff=staff, room_csrf=session['room_csrf'],
+                    room_today=datetime.now(KST).date().isoformat(),
+                    room_is_guest=not bool(session.get('user_id')), room_user_email=email,
+                    room_email_verified=bool(email))
+
+    app.extensions['club_room_context'] = room_context
+
+    @app.get('/club-room')
+    def club_room():
+        return render_template('integrated_calendar.html', calendar_today=datetime.now(KST).date().isoformat(),
+                               calendar_member=bool(session.get('user_id')), calendar_term=request.args.get('term_id', ''),
+                               public_room=not bool(session.get('user_role')), **room_context())
 
     @app.post('/api/club-room/email/request')
     def club_room_email_request():

@@ -1,0 +1,27 @@
+{% from '_knu_email_input.html' import knu_email_input %}
+  <dialog class="cr-dialog cr-my" id="cr-my"><button type="button" id="cr-my-close" aria-label="닫기">×</button><div><h2>내 예약 확인·수정·취소</h2><p>신청할 때 적은 학교 메일로 6자리 인증번호를 받으면<br>누구나 간단히 내 예약을 바꿀 수 있어요.</p></div>
+    <div>
+      <p class="cr-mail-state" id="cr-mail-state" role="status" hidden></p>
+      <form id="cr-mail-request" class="cr-mail-form"><label for="cr-mail-id">학교 메일 아이디</label><div class="cr-lookup-row">{{ knu_email_input(name='knu_email', id='cr-mail-id', required=true) }}<button class="cr-primary">인증번호 받기</button></div></form>
+      <form id="cr-mail-verify" class="cr-mail-form" hidden><label for="cr-otp">메일로 받은 6자리 인증번호</label><div class="cr-lookup-row"><input id="cr-otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="000000" required><button class="cr-primary">확인</button></div></form>
+      <p id="cr-mail-error" class="cr-error" role="alert" hidden></p>
+      <div id="cr-my-list" class="cr-my-list"></div>
+    </div>
+    {% if room_staff %}<details id="cr-staff-panel"><summary>운영진 예약·참여자 확인</summary><div id="cr-staff-list"></div></details>{% endif %}
+  </dialog>
+<dialog class="cr-dialog" id="cr-dialog" aria-labelledby="cr-dialog-title">
+  <div class="cr-dialog-heading"><div><p class="cr-eyebrow" id="cr-dialog-eyebrow">BOOK THE ROOM</p><h2 id="cr-dialog-title">동아리방 사용 신청</h2></div><button type="button" id="cr-close" aria-label="예약 창 닫기">×</button></div>
+  <form id="cr-form"><fieldset id="cr-fields"><input type="hidden" id="cr-kind" value="regular">
+    {% if room_staff %}<div class="cr-kind-switch" role="group" aria-label="신청 종류"><button type="button" data-kind="regular" aria-pressed="true">일반 사용 신청</button><button type="button" data-kind="meeting" aria-pressed="false">운영진 회의 등록</button></div>{% endif %}
+    <div class="cr-time-fields"><label class="cr-use-date">사용 날짜<input type="date" id="cr-start-date" required></label><label>시작 시간<select id="cr-start-hour">{% for hour in range(9,24) %}<option value="{{ '%02d'|format(hour) }}">{{ '%02d'|format(hour) }}:00</option>{% endfor %}</select></label><label>종료 시간<select id="cr-end-hour">{% for hour in range(10,25) %}<option value="{{ '%02d'|format(hour) }}">{{ '%02d'|format(hour) }}:00</option>{% endfor %}</select></label></div>
+    <p class="cr-duration" id="cr-duration"></p>
+    <label for="cr-email" id="cr-email-label">학교 메일 아이디 <strong class="cr-required" aria-hidden="true">*</strong> <span>필수 · 예약 수정·취소 시 6자리 인증에 사용</span></label>{{ knu_email_input(name='knu_email', id='cr-email', required=true) }}
+    <label for="cr-representative">대표자 이름 <span>시간표에 공개돼요</span></label><input id="cr-representative" maxlength="80" autocomplete="name" required>
+    <label for="cr-participants">참여자 이름 <span>신청자와 운영진만 확인해요</span></label><textarea id="cr-participants" rows="3" maxlength="17000" placeholder="대표자를 포함해 적어주세요. 예: 김하늘, 이봄, 박여름&#10;여러 줄을 그대로 붙여넣어도 돼요." required></textarea>
+    <label for="cr-purpose">사용 목적 <span>선택 · 비공개</span></label><input id="cr-purpose" maxlength="1000" placeholder="예: 책 읽기, 소모임">
+    <p class="cr-footnote" id="cr-meeting-note" hidden>회의 시간에는 새 일반 예약이 차단됩니다. 기존 예약은 유지되며 직접 조율해야 합니다.</p>
+  </fieldset>
+  <p id="cr-form-error" class="cr-error" role="alert" hidden></p>
+  <section id="cr-receipt" class="cr-receipt" hidden><h3 id="cr-receipt-title">예약 완료</h3><p id="cr-receipt-detail"></p></section>
+  <div class="cr-form-actions"><button type="button" class="cr-danger" id="cr-cancel" hidden>예약 취소</button><button type="submit" class="cr-primary" id="cr-save">사용 신청 완료</button></div></form>
+</dialog>

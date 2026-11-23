@@ -55,6 +55,7 @@
     const timing = event.allDay ? '날짜 일정' : clock(event.start) + (event.end ? '–' + clock(event.end) : '');
     a.textContent = '[' + names[event.type] + '] ' + timing + ' ' + event.title + (event.status ? ' · ' + event.status : '');
     a.title = a.textContent;
+    if (event.type === 'room' || event.type === 'blocked') a.addEventListener('click', e => { e.preventDefault(); window.dispatchEvent(new CustomEvent('clubroom:show-booking')); });
     return a;
   }
   function render() {
@@ -72,7 +73,7 @@
       const cell = document.createElement('section'); cell.className = view === 'agenda' ? '' : 'ic-cell';
       if (date === root.dataset.today) cell.classList.add('ic-today');
       if (view === 'month' && date.slice(0,7) !== $('ic-date').value.slice(0,7)) cell.classList.add('ic-other');
-      const h = document.createElement('h3'); h.textContent = view === 'month' ? String(day(date).getUTCDate()) : date + ' (' + '일월화수목금토'[day(date).getUTCDay()] + ')'; h.setAttribute('aria-label', date); cell.append(h);
+      const h = document.createElement('h3'); h.textContent = view === 'month' ? String(day(date).getUTCDate()) : date + ' (' + '일월화수목금토'[day(date).getUTCDay()] + ')'; h.setAttribute('aria-label', date); const choose = document.createElement('button'); choose.type = 'button'; choose.textContent = h.textContent; choose.addEventListener('click', () => { $('ic-date').value = date; load(); }); h.replaceChildren(choose); cell.append(h);
       if (view === 'week') {
         items.filter(e => !e.end).forEach(e => cell.append(link(e)));
         for (let hour = 0; hour < 24; hour++) {
@@ -91,9 +92,11 @@
   async function json(url) {const response = await fetch(url, {credentials: 'same-origin', cache: 'no-store', headers: {Accept: 'application/json'}}); if (!response.ok) throw new Error(String(response.status)); return response.json();}
   async function load() {
     syncControls();
+    window.dispatchEvent(new CustomEvent('calendar:date-selected', {detail: {date: $('ic-date').value || root.dataset.today}}));
     const ticket = ++revision, [start, end] = range();
     $('ic-status').textContent = '일정을 불러오는 중이에요.'; $('ic-error').hidden = true; $('ic-content').replaceChildren(); $('ic-content').setAttribute('aria-busy', 'true');
-    const urls = []; for (let date = start; date < end; date = shift(date, 7)) urls.push('/api/club-room/schedule?date=' + date);
+    const days = Math.round((day(end) - day(start)) / 86400000);
+    const urls = ['/api/club-room/schedule?date=' + start + '&days=' + days];
     const results = await Promise.allSettled(urls.map(json));
     const seminar = root.dataset.member === 'true' ? await Promise.allSettled([json('/api/calendar/seminars?' + new URLSearchParams({term_id: root.dataset.term}))]) : [];
     if (ticket !== revision) return;
@@ -136,5 +139,6 @@
     });
   });
   filterRoot.querySelectorAll('[data-filter]').forEach(input => input.addEventListener('change', render));
+  window.addEventListener('clubroom:changed', load);
   load();
 })();

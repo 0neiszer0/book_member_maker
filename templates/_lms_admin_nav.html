@@ -2,7 +2,7 @@
 {% set active_target = 'admin_dashboard' if endpoint in ['admin_dashboard','operation_workbench','admin_bug_reports','help_admin']
   else ('admin_term_members' if endpoint in ['admin_term_members','operation_officers','operation_rules','admin_seminars','admin_seminar_term','admin_seminar_roster','seminar_session_moderator','topic_document_setup','view_admin_topics','admin_term_attendance','bookclub_index','bookclub_ga_results','start_group_generation','manual_entry']
   else ('records_members' if endpoint in ['records_members','records_member_profile'] or endpoint.startswith('admin_recruitment_result')
-  else ('admin_special_events' if endpoint.startswith('admin_special_event') or endpoint.startswith('admin_engagement') or endpoint.startswith('admin_seminar_room')
+  else ('admin_special_events' if endpoint == 'admin_pre_seminar' or endpoint.startswith('admin_special_event') or endpoint.startswith('admin_engagement') or endpoint.startswith('admin_seminar_room')
   else ('records_hub' if endpoint.startswith('records_') or endpoint == 'admin_attendance_matrix'
   else ('operation_settings' if endpoint in ['operation_settings','boards.admin_index','admin_handover_surveys'] or endpoint.startswith('admin_privacy_')
   else endpoint))))) %}

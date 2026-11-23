@@ -39,7 +39,8 @@ def init_calendar_routes(app, get_db, login_required):
     @app.get('/calendar')
     def lms_calendar():
         return render_template('integrated_calendar.html', calendar_today=datetime.now(KST).date().isoformat(),
-                               calendar_member=bool(session.get('user_id')), calendar_term=request.args.get('term_id', ''))
+                               calendar_member=bool(session.get('user_id')), calendar_term=request.args.get('term_id', ''),
+                               public_room=False, **app.extensions['club_room_context']())
 
     @app.get('/api/calendar/seminars')
     @login_required(role='ANY')

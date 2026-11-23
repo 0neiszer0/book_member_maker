@@ -60,7 +60,7 @@ class RoomTests(unittest.TestCase):
 
     def test_public_form_and_schedule_never_disclose_private_fields(self):
         html = self.client.get('/club-room').get_data(as_text=True)
-        self.assertNotIn('id="cr-meeting"', html)
+        self.assertNotIn('data-kind="meeting"', html)
         self.assertNotIn('id="cr-staff-panel"', html)
         data = self.client.get('/api/club-room/schedule?date=2099-10-05')
         self.assertEqual(data.status_code,200)
@@ -94,7 +94,7 @@ class RoomTests(unittest.TestCase):
         self.assertEqual(self.post(body).status_code,403, 'stale claimed role is not authority')
         self.assertEqual(self.client.get('/api/club-room/staff').status_code,403)
         self.login(1,'officer')
-        self.assertIn('id="cr-meeting"',self.client.get('/club-room').get_data(as_text=True))
+        self.assertIn('data-kind="meeting"',self.client.get('/club-room').get_data(as_text=True))
         self.assertEqual(self.post(body).status_code,200)
         self.assertEqual(self.rpc_calls[-1][1]['p_actor'],1)
         data = self.client.get('/api/club-room/staff?date=2099-10-05')
@@ -278,7 +278,7 @@ class RoomEmailTests(RoomTests):
         self.assertIn('public-shell', guest)
         self.assertNotIn('lms-page', guest)
         self.assertIn('id="cr-share-link"', guest)
-        self.assertIn('id="cr-now-status"', guest)
+        self.assertIn('id="integrated-calendar"', guest)
         self.assertIn('id="cr-email"', guest)
         self.assertNotIn('id="cr-legacy"', guest)
         self.assertNotIn('id="cr-code-details"', guest)
@@ -290,6 +290,22 @@ class RoomEmailTests(RoomTests):
         self.assertIn('lms-page', member)
         self.assertNotIn('public-shell', member)
         self.assertEqual(member.count('club_room.js'), 1)
+
+    def test_unified_calendar_routes_show_booking_controls_without_login(self):
+        for path in ('/calendar', '/club-room'):
+            html = self.client.get(path).get_data(as_text=True)
+            for marker in ('id="integrated-calendar"', 'id="cr-new"', 'id="cr-my-open"', 'id="cr-dialog"', 'id="cr-email"'):
+                self.assertIn(marker, html)
+            for marker in ('data-kind="meeting"', 'class="cr-availability"', 'class="cr-staff"'):
+                self.assertNotIn(marker, html)
+        self.login(1, 'officer')
+        for path in ('/calendar', '/club-room'):
+            html = self.client.get(path).get_data(as_text=True)
+            self.assertIn('data-kind="meeting"', html)
+            self.assertIn('id="cr-staff-panel"', html)
+        with self.client.session_transaction() as state:
+            state['member_preview'] = True
+        self.assertNotIn('data-kind="meeting"', self.client.get('/calendar').get_data(as_text=True))
 
     def test_create_stores_normalized_email_and_still_returns_code(self):
         response = self.post({**self.body, 'knu_email': ' Owner '})

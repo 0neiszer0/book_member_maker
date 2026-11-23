@@ -200,6 +200,7 @@
       <a class="op-view-tab{% if ops_section == 'topics' %} is-active{% endif %}" href="{{ url_for('admin_seminars', term_id=term.id, section='topics') if term else url_for('admin_seminars', section='topics') }}" {% if ops_section == 'topics' %}aria-current="page"{% endif %}>발제문</a>
       <a class="op-view-tab{% if ops_section == 'attendance' %} is-active{% endif %}" href="{{ url_for('admin_seminars', term_id=term.id, section='attendance') if term else url_for('admin_seminars', section='attendance') }}" {% if ops_section == 'attendance' %}aria-current="page"{% endif %}>출석·조 편성</a>
     </div>
+    <a class="btn soft op-btn-secondary" href="{{ url_for('admin_pre_seminar') }}">세미나 사전 자료 등록 (MD)</a>
     <a class="btn soft op-btn-secondary op-schedule-jump" href="{{ url_for('admin_seminars', term_id=term.id, schedule=1, _anchor='schedule-tool') if term else '#schedule-tool' }}" data-open-schedule-tool>일정·도서 일괄 편집</a>
   </div>
 
