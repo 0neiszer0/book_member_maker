@@ -1,7 +1,7 @@
-.knu-email-group{box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:stretch;min-width:0;width:100%;border:1px solid #cbd5e1;border-radius:8px;background:#fff;overflow:hidden}
-.knu-email-group:focus-within{border-color:#2563eb;box-shadow:0 0 0 3px #2563eb33}
+.knu-email-group{box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:stretch;min-width:0;width:100%;border:1px solid var(--ui-border-strong,#c7cdd1);border-radius:var(--ui-radius-md,6px);background:#fff;overflow:hidden;transition:border-color .15s ease,box-shadow .15s ease}
+.knu-email-group:focus-within{border-color:#0374b5;box-shadow:0 0 0 3px rgba(3,116,181,0.18)}
 .knu-email-group input,.lms-page .knu-email-group input:not([type=checkbox]):not([type=radio]):not([type=hidden]){box-sizing:border-box;width:100%;min-width:0;border:0;border-radius:0;outline:none;box-shadow:none;background:transparent}
-.knu-email-suffix{display:flex;align-items:center;padding-inline:12px;border-left:1px solid #e2e8f0;background:#f1f5f9;color:#475569;font-size:14px;font-weight:600;white-space:nowrap}
+.knu-email-suffix{display:flex;align-items:center;padding-inline:12px;border-left:1px solid var(--ui-border,#d8dcdf);background:var(--ui-surface-subtle,#f1f4f6);color:var(--ui-ink-muted,#56616a);font-size:14px;font-weight:600;white-space:nowrap}
 
 .knu-email-group[hidden]{display:none}
 @media(max-width:480px){.knu-email-suffix{padding-inline:10px;font-size:13.5px}}

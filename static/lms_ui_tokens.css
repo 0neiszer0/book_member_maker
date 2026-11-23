@@ -1,21 +1,21 @@
 /* Unified design tokens & shared primitives across LMS, operations, attendance, records, and admin surfaces. */
 :root,
 body.lms-page {
-  --ui-bg: #f8fafc;
+  --ui-bg: #f5f7f8;
   --ui-surface: #ffffff;
-  --ui-surface-subtle: #f1f5f9;
-  --ui-border: #e2e8f0;
-  --ui-border-strong: #cbd5e1;
-  --ui-ink: #0f172a;
-  --ui-ink-muted: #475569;
-  --ui-ink-subtle: #64748b;
-  --ui-accent: #a6192e;
-  --ui-accent-hover: #881325;
-  --ui-accent-soft: #fef2f2;
-  --ui-radius-sm: 6px;
-  --ui-radius-md: 10px;
-  --ui-radius-lg: 14px;
-  --ui-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --ui-surface-subtle: #f1f4f6;
+  --ui-border: #d8dcdf;
+  --ui-border-strong: #c7cdd1;
+  --ui-ink: #2d3b45;
+  --ui-ink-muted: #56616a;
+  --ui-ink-subtle: #626e77;
+  --ui-accent: #d20f17;
+  --ui-accent-hover: #a80b12;
+  --ui-accent-soft: #fff5f5;
+  --ui-radius-sm: 4px;
+  --ui-radius-md: 6px;
+  --ui-radius-lg: 8px;
+  --ui-shadow-sm: 0 1px 2px rgba(45, 59, 69, 0.06);
 }
 
 /* Unified page header */
@@ -263,25 +263,26 @@ body.lms-page {
   font-size: 12px;
   font-weight: 600;
   line-height: 1.45;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .ui-pill.is-accent {
   background: var(--ui-accent-soft);
-  border-color: #fecaca;
+  border-color: #f3c4c6;
   color: var(--ui-accent);
 }
 
 .ui-pill.is-success {
   background: #ecfdf5;
-  border-color: #a7f3d0;
-  color: #065f46;
+  border-color: #b7e4c7;
+  color: #256d44;
 }
 
 .ui-pill.is-warn {
   background: #fffbeb;
-  border-color: #fde68a;
-  color: #92400e;
+  border-color: #f5d08a;
+  color: #9a4d00;
 }
 
 /* Unified KPI grid */
@@ -299,22 +300,27 @@ body.lms-page {
   padding: 16px 18px;
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
-  border-top: 3px solid var(--ui-border-strong);
   border-radius: var(--ui-radius-lg);
   box-shadow: var(--ui-shadow-sm);
   text-decoration: none;
   color: inherit;
   min-width: 0;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 a.ui-kpi-card:hover {
-  border-color: var(--ui-border-strong);
-  border-top-color: var(--ui-accent);
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
   text-decoration: none;
 }
 
 .ui-kpi-card.is-accent {
-  border-top-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  border-color: #f3c4c6;
+}
+
+.ui-kpi-card.is-accent .ui-kpi-value {
+  color: var(--ui-accent-hover);
 }
 
 .ui-kpi-label {
@@ -334,6 +340,7 @@ a.ui-kpi-card:hover {
 .ui-kpi-meta {
   font-size: 12.5px;
   color: var(--ui-ink-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Header notification bell button (next to Quick Search trigger) */
@@ -381,16 +388,17 @@ a.ui-kpi-card:hover {
   position: absolute;
   top: -5px;
   right: -5px;
-  min-width: 17px;
-  height: 17px;
+  min-width: 18px;
+  height: 18px;
   padding: 0 4px;
   border-radius: 999px;
   background: var(--ui-accent);
   color: #ffffff;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
-  line-height: 17px;
+  line-height: 18px;
   text-align: center;
+  font-variant-numeric: tabular-nums;
   border: 1.5px solid #ffffff;
 }
 
@@ -410,13 +418,14 @@ a.ui-kpi-card:hover {
   right: 2px;
   background: #ffffff;
   color: var(--ui-accent);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
-  line-height: 14px;
-  min-width: 15px;
-  height: 15px;
+  line-height: 15px;
+  min-width: 16px;
+  height: 16px;
   padding: 0 3px;
   border-radius: 999px;
+  font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 767px) {
