@@ -1,6 +1,9 @@
 {% extends 'wiki/base.html' %}
 {% block head %}{{ super() }}
 <link rel="stylesheet" href="{{ url_for('static', filename='wiki_editor.css') }}">
+<script>document.documentElement.classList.add('wiki-js');setTimeout(function(){var w=document.getElementById('wiki-workspace');if(w&&!w.dataset.mode)w.dataset.mode='raw';},8000);</script>
+<link rel="preload" as="script" href="{{ url_for('static', filename='wiki_namu_visual.js') }}">
+<link rel="preload" as="script" href="{{ url_for('static', filename='wiki_editor.js') }}">
 <script defer src="{{ url_for('static', filename='wiki_namu_visual.js') }}"></script>
 <script defer src="{{ url_for('static', filename='wiki_editor.js') }}"></script>
 {% endblock %}

@@ -6,12 +6,13 @@
 <div class="wiki-shell">
 <aside class="wiki-menu" aria-label="위키 메뉴">
   <a class="wiki-menu-title" href="{{ url_for('wiki.home') }}">책반우 위키</a>
-  <nav><a href="{{ url_for('wiki.document',title='대문') }}">대문</a><a href="{{ url_for('wiki.pages') }}">모든 문서</a><a href="{{ url_for('wiki.random_page') }}" rel="nofollow">랜덤 문서</a><a href="{{ url_for('wiki.document',title='처음 참여하기') }}">처음 참여하기</a><a href="{{ url_for('wiki.document',title='정기 세미나') }}">정기 세미나</a><a href="{{ url_for('wiki.document',title='위키 편집 안내') }}">편집 안내</a><a href="{{ url_for('wiki.document',title='문서 편집 가이드') }}">문법 가이드</a>{% if access and access.is_officer %}<a href="{{ url_for('wiki.document',title=officer_prefix ~ '대문') }}">운영진 문서</a>{% endif %}</nav>
+  {% if access and access.is_officer %}<div class="wiki-officer-box"><strong><span class="wiki-officer-badge">운영진 전용</span>운영진 전용 문서</strong><nav aria-label="운영진 문서"><a href="{{ url_for('wiki.document',title=officer_prefix ~ '대문') }}">운영진 대문</a><a href="{{ url_for('wiki.pages',scope='officer') }}">운영진 문서만 보기</a><a href="{{ url_for('wiki.new',officer='1') }}">운영진 새 문서 만들기</a></nav></div>{% endif %}
+  <nav><a href="{{ url_for('wiki.document',title='대문') }}">대문</a><a href="{{ url_for('wiki.pages') }}">모든 문서</a><a href="{{ url_for('wiki.random_page') }}" rel="nofollow">랜덤 문서</a><a href="{{ url_for('wiki.document',title='처음 참여하기') }}">처음 참여하기</a><a href="{{ url_for('wiki.document',title='정기 세미나') }}">정기 세미나</a><a href="{{ url_for('wiki.document',title='위키 편집 안내') }}">편집 안내</a><a href="{{ url_for('wiki.document',title='문서 편집 가이드') }}">문법 가이드</a></nav>
   {% if access %}<div class="wiki-access"><strong>{{ access.term_name or '학기 확인 필요' }}</strong><p>{{ access.reason }}</p></div>{% endif %}
   <a class="wiki-site-return" href="{{ url_for('main_index') }}">사이트 대시보드로</a>
 </aside>
 <section class="wiki-main">
-  <form class="wiki-search" action="{{ url_for('wiki.pages') }}" method="get" role="search"><label class="lms-sr" for="wiki-query">위키 문서 검색</label><input type="search" id="wiki-query" name="q" placeholder="문서 제목 검색" value="{{ query|default('') }}" maxlength="200"><button class="lms-button" type="submit">검색</button>{% if access and (access.can_edit or access.is_officer) %}<a class="lms-button" href="{{ url_for('wiki.new') }}">새 문서</a>{% endif %}</form>
+  <form class="wiki-search" action="{{ url_for('wiki.pages') }}" method="get" role="search"><label class="lms-sr" for="wiki-query">위키 문서 검색</label><input type="search" id="wiki-query" name="q" placeholder="문서 제목 검색" value="{{ query|default('') }}" maxlength="200"><button class="lms-button" type="submit">검색</button>{% if access and (access.can_edit or access.is_officer) %}<a class="lms-button" href="{{ url_for('wiki.new') }}">새 문서</a>{% endif %}{% if access and access.is_officer %}<a class="lms-button wiki-officer-link" href="{{ url_for('wiki.pages',scope='officer') }}">운영진 문서</a>{% endif %}</form>
   {% block wiki_content %}{% endblock %}
   <footer class="wiki-footer">책반우 회원 위키</footer>
 </section></div>

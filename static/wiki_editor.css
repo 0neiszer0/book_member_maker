@@ -126,9 +126,7 @@
     #wiki-table { padding: 12px; }
     #wiki-table footer button, #wiki-picker footer button, #wiki-link footer button { min-height: 40px; padding: 6px 14px; }
     .wiki-table-shell { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .wiki-v-table { table-layout: auto !important; width: max-content !important; min-width: 100%; }
-    .wiki-v-table col { width: auto !important; }
-    .wiki-v-table td { min-width: 76px; padding: 8px; }
+    .wiki-v-table:has(tr > :nth-child(5)) { min-width: 560px; }
     .wiki-table-bar { opacity: 1; position: sticky; left: 0; justify-content: flex-start; }
     .wiki-table-bar button { min-height: 32px; padding: 3px 10px; }
 }
@@ -142,7 +140,7 @@
 #wiki-workspace[data-mode="visual"] #wiki-content { display: none; }
 .wiki-visual-editor { box-sizing: border-box; width: 100%; min-width: 0; color: #273238; background: #fff; border: 1px solid var(--editor-line, #c7cdd1); border-radius: 0 0 6px 6px; }
 .wiki-visual-editor[hidden] { display: none; }
-.wiki-visual-canvas { min-height: 280px; padding: 20px 28px 56px; line-height: 1.7; cursor: text; }
+.wiki-visual-canvas { min-height: 280px; padding: 20px clamp(12px, 3vw, 28px) 56px; font-size: 16px; line-height: 1.8; cursor: text; }
 .wiki-visual-canvas > .wiki-v-block { position: relative; margin: 2px 0; border-radius: 6px; outline: 1px solid transparent; transition: outline-color .12s; }
 .wiki-visual-canvas > .wiki-v-block:hover { outline-color: #e3e7ea; }
 .wiki-visual-canvas > .wiki-v-block:focus-within { outline-color: #d20f1740; }
@@ -216,7 +214,6 @@
 .wiki-template-mode { display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 8px; padding: 8px 12px; border: 1px solid #dfe4e7; border-radius: 6px; font-size: 14px; }
 .wiki-template-mode[hidden], #wiki-template-dialog [hidden] { display: none; }
 @media (max-width: 767px) {
-    .wiki-visual-canvas { padding: 14px 12px 40px; }
     .wiki-visual-add { padding: 8px 12px 12px; }
     .wiki-visual-hint { padding: 6px 12px 10px; }
     .wiki-starter-cards { grid-template-columns: 1fr; }
@@ -234,3 +231,12 @@
 .wiki-action-toast a { color: #fff; font-weight: 700; text-underline-offset: 3px; }
 .wiki-action-toast .wiki-action-toast-sub { font-weight: 400; color: #d6dde1; }
 .wiki-action-toast-close { padding: 0 6px; font: inherit; font-size: 18px; color: #fff; background: transparent; border: 0; cursor: pointer; }
+
+/* Zero raw-markup flash: the head script adds .wiki-js before first paint. */
+html.wiki-js #wiki-workspace:not([data-mode="raw"]) #wiki-content { display: none; }
+html.wiki-js #wiki-workspace:not([data-mode="raw"]) #wiki-visual { display: block; min-height: 360px; }
+html.wiki-js #wiki-ribbon { display: block; }
+html.wiki-js #wiki-workspace[data-mode="raw"] #wiki-content { display: block; }
+#wiki-visual:empty::before { content: '편집 화면을 여는 중…'; display: block; padding: 24px 28px; color: #6b7780; font-size: 14px; }
+#wiki-ribbon, .wiki-visual-editor { max-width: 100%; }
+#wiki-ribbon { box-sizing: border-box; }

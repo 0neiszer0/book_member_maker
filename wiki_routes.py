@@ -284,13 +284,35 @@ def init_wiki_routes(app, get_db):
         if query:
             title_value(query)
         number = page_number()
+        officer = g.wiki_access.is_officer
+        scope = request.args.get('scope', 'all') if officer else 'all'
+        if scope not in ('all', 'officer', 'public'):
+            scope = 'all'
         backend = engine()
+        has_next = False
         with backend.user(g.wiki_access.member_id) as client:
-            titles = backend.titles(client, query, number)
-        # Decide paging on the engine's page size before hiding officer titles.
-        has_next = len(titles) == 50
-        titles = [t for t in titles if can_read_title(g.wiki_access, t if isinstance(t, str) else str(t))]
-        return page('pages.html', titles=titles, query=query, number=number, has_next=has_next)
+            if scope == 'officer' and not query:
+                # Officer titles sort together but may sit past page 1: gather them all (bounded).
+                titles = []
+                for n in range(1, 41):
+                    batch = backend.titles(client, '', n)
+                    titles += [t if isinstance(t, str) else str(t) for t in batch]
+                    if len(batch) < 50:
+                        break
+                number = 1
+            else:
+                titles = backend.titles(client, query, number)
+                # Decide paging on the engine's page size before hiding titles.
+                has_next = len(titles) == 50
+        titles = [t if isinstance(t, str) else str(t) for t in titles]
+        titles = [t for t in titles if can_read_title(g.wiki_access, t)]
+        if scope == 'officer':
+            titles = [t for t in titles if is_officer_title(t)]
+        elif scope == 'public':
+            titles = [t for t in titles if not is_officer_title(t)]
+        items = [dict(title=t, officer=officer and is_officer_title(t)) for t in titles]
+        return page('pages.html', titles=titles, items=items, query=query, number=number,
+                    has_next=has_next, scope=scope)
 
     @bp.get('/random')
     def random_page():
@@ -363,7 +385,8 @@ def init_wiki_routes(app, get_db):
             if chosen:
                 return redirect(url_for('wiki.edit', title=title, template=chosen['key']))
             return redirect(url_for('wiki.edit', title=title))
-        return page('new.html', starter_templates=WIKI_STARTER_TEMPLATES)
+        return page('new.html', starter_templates=WIKI_STARTER_TEMPLATES,
+                    officer_new=g.wiki_access.is_officer and request.args.get('officer') == '1')
 
     def render_draft(backend, client, title, content):
         return clean_wiki_html(backend.render(client, title, renderable(content)))
