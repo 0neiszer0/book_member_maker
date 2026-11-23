@@ -181,6 +181,29 @@ function findAllTables(source) {
     return found.map((t, index) => ({index, start: t.start, end: t.end, source: source.slice(t.start, t.end)}));
 }
 
+// Right-edge drag: columns 0..n-2 keep their exact pixel width, only the last
+// column follows the pointer. Returns {tablePct, widths} (percent of the table).
+function resizeTableEdge(colPx, boxWidth, deltaX, minColPx = 40) {
+    if (!Array.isArray(colPx) || !colPx.length || !(boxWidth > 0)) return null;
+    const n = colPx.length;
+    const left = colPx.slice(0, -1).reduce((a, b) => a + b, 0);
+    const minLast = Math.max(minColPx, boxWidth * 0.06);
+    const maxLast = Math.max(minLast, boxWidth - left);
+    const newLast = Math.max(minLast, Math.min(maxLast, colPx[n - 1] + (Number(deltaX) || 0)));
+    let tablePct = Math.max(25, Math.min(100, Math.round((left + newLast) * 100 / boxWidth)));
+    tablePct = Math.max(tablePct, Math.min(100, Math.ceil((left + minLast) * 100 / boxWidth - 1e-9)));
+    const compute = pct => {
+        if (n === 1) return [100];
+        const snapped = pct / 100 * boxWidth;
+        const widths = colPx.slice(0, -1).map(px => percent(px * 100 / snapped));
+        widths.push(percent(100 - widths.reduce((a, b) => a + b, 0)));
+        return widths;
+    };
+    let widths = compute(tablePct);
+    while (n > 1 && widths[n - 1] < 5 && tablePct < 100) widths = compute(++tablePct);
+    return {tablePct, widths};
+}
+
 function setTableWidth(model, widthPercent) {
     const width = Math.max(25, Math.min(100, Math.round(Number(widthPercent)) || 100));
     setTag(model.tableTags, t => t.startsWith('tablewidth='), 'tablewidth=' + width + '%');
@@ -201,7 +224,7 @@ function matchTables(source, shapes) {
     });
 }
 
-if (typeof module !== 'undefined' && module.exports) module.exports = {parseTable, serializeTable, tableAt, equalWidths, resizeWidths, findAllTables, setTableWidth, matchTables};
+if (typeof module !== 'undefined' && module.exports) module.exports = {parseTable, serializeTable, tableAt, equalWidths, resizeWidths, resizeTableEdge, findAllTables, setTableWidth, matchTables};
 if (typeof document === 'undefined') return;
 const $ = selector => document.querySelector(selector);
 const source = $('#wiki-content');
@@ -404,17 +427,30 @@ function decorateTables() {
         dragHandle(edge, event => {
             const fresh = freshBinding(binding);
             if (!fresh) return null;
-            return {fresh, x: event.clientX, width: table.getBoundingClientRect().width,
-                    box: shell.getBoundingClientRect().width || 1, pct: null};
+            const colPx = ref && columns >= 1 ? [...ref.cells].map(cell => cell.getBoundingClientRect().width) : null;
+            return {fresh, x: event.clientX, width: table.getBoundingClientRect().width, colPx,
+                    box: shell.getBoundingClientRect().width || 1, pct: null, widths: null};
         }, (state, event) => {
-            const px = state.width + event.clientX - state.x;
-            state.pct = Math.max(25, Math.min(100, Math.round(px * 100 / state.box)));
-            table.style.width = state.pct + '%';
+            const res = state.colPx && resizeTableEdge(state.colPx, state.box, event.clientX - state.x);
+            if (res) {
+                state.pct = res.tablePct;
+                state.widths = res.widths;
+                table.style.width = res.tablePct + '%';
+                paintLiveWidths(table, res.widths);
+            } else {
+                const px = state.width + event.clientX - state.x;
+                state.pct = Math.max(25, Math.min(100, Math.round(px * 100 / state.box)));
+                table.style.width = state.pct + '%';
+            }
             badgeAt('표 너비 ' + state.pct + '%', event.clientX, event.clientY);
             layout();
         }, (state, event, commit) => {
             if (commit && state.pct !== null) {
                 setTableWidth(state.fresh.model, state.pct);
+                if (state.widths) {
+                    state.fresh.model.widths = state.widths;
+                    state.fresh.model.widthsChanged = true;
+                }
                 commitTable(binding, state.fresh);
             }
             layout();
@@ -1170,12 +1206,19 @@ function blockElement(b) {
     return wrap;
 }
 
+let pendingLayouts = null;
 function renderVisual(focus) {
     const y = window.scrollY;
     vObservers.forEach(o => o.disconnect());
     vObservers = [];
     if (!blocks.length) blocks.push(newParagraph());
-    canvas.replaceChildren(...blocks.map(blockElement));
+    // One fragment, one DOM swap; table handle layout (forced reflow) runs once in a single frame.
+    const queued = pendingLayouts = [];
+    const frag = document.createDocumentFragment();
+    blocks.forEach(b => frag.append(blockElement(b)));
+    pendingLayouts = null;
+    canvas.replaceChildren(frag);
+    if (queued.length) requestAnimationFrame(() => queued.forEach(fn => fn()));
     window.scrollTo(window.scrollX, y);
     if (focus) focusBlock(Math.max(0, Math.min(focus.index, blocks.length - 1)), focus.where);
     updateStyleSelect();
@@ -1505,16 +1548,29 @@ function tableShell(b, tableModel) {
     edge.setAttribute('aria-label', '표 너비 조절');
     shell.append(edge);
     dragHandle(edge, event => ({x: event.clientX, width: table.getBoundingClientRect().width,
-            box: shell.getBoundingClientRect().width || 1, pct: null}), (state, event) => {
-        const px = state.width + event.clientX - state.x;
-        state.pct = Math.max(25, Math.min(100, Math.round(px * 100 / state.box)));
-        table.style.width = state.pct + '%';
+            colPx: ref && columns >= 1 ? [...ref.cells].map(cell => cell.getBoundingClientRect().width) : null,
+            box: shell.getBoundingClientRect().width || 1, pct: null, widths: null}), (state, event) => {
+        const res = state.colPx && resizeTableEdge(state.colPx, state.box, event.clientX - state.x);
+        if (res) {
+            state.pct = res.tablePct;
+            state.widths = res.widths;
+            table.style.width = res.tablePct + '%';
+            paintLiveWidths(table, res.widths);
+        } else {
+            const px = state.width + event.clientX - state.x;
+            state.pct = Math.max(25, Math.min(100, Math.round(px * 100 / state.box)));
+            table.style.width = state.pct + '%';
+        }
         badgeAt('표 너비 ' + state.pct + '%', event.clientX, event.clientY);
         layout();
     }, (state, event, commit) => {
         if (commit && state.pct !== null) {
             record();
             setTableWidth(tableModel, state.pct);
+            if (state.widths) {
+                tableModel.widths = state.widths;
+                tableModel.widthsChanged = true;
+            }
             commitVisualTable(b);
             showWidth();
             record();
@@ -1561,7 +1617,7 @@ function tableShell(b, tableModel) {
         observer.observe(table);
         vObservers.push(observer);
     }
-    requestAnimationFrame(layout);
+    if (pendingLayouts) pendingLayouts.push(layout); else requestAnimationFrame(layout);
     return shell;
 }
 window.addEventListener('resize', () => visual.querySelectorAll('.wiki-table-shell').forEach(shell => shell.layout && shell.layout()));
@@ -2034,9 +2090,20 @@ if (selectionBar && visualApi && visual) {
 context();
 ribbon.hidden = false;
 if (visualApi && visual) {
-    startVisual();
+    try {
+        startVisual();
+    } catch (error) {
+        // Never leave an empty frame: fall back to the plain NamuMark textarea.
+        if (window.console) console.error(error);
+        mode = 'raw';
+        workspace.dataset.mode = 'raw';
+        visual.hidden = true;
+        source.hidden = false;
+        source.required = true;
+    }
 } else if (window.matchMedia && window.matchMedia('(min-width: 960px)').matches) {
     // Without the visual module, wide screens open with the rendered preview.
     run('split');
 }
+if (!visualApi || !visual) workspace.dataset.mode = 'raw';
 })();

@@ -1,6 +1,7 @@
 {% extends 'wiki/base.html' %}
 {% block wiki_content %}<header class="wiki-heading"><h1>{{ '검색 결과' if query else '모든 문서' }}</h1></header>
+{% if access and access.is_officer %}<nav class="wiki-scope-tabs" aria-label="문서 범위">{% for key, label in [('all','전체 문서'),('officer','운영진 전용'),('public','일반 문서')] %}<a href="{{ url_for('wiki.pages', q=query or None, scope=None if key == 'all' else key) }}"{% if scope == key %} aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}</nav>{% endif %}
 {% if query %}<p>“{{ query }}” 문서를 찾습니다.</p>{% endif %}
-<ul class="wiki-page-list">{% for title in titles %}<li><a href="{{ url_for('wiki.document',title=title) }}">{{ title }}</a></li>{% else %}<li>문서가 없습니다.</li>{% endfor %}</ul>
-<nav class="wiki-pagination" aria-label="문서 목록 페이지">{% if number>1 %}<a href="{{ url_for('wiki.pages',q=query,page=number-1) }}">이전</a>{% endif %}<span>{{ number }}페이지</span>{% if has_next %}<a href="{{ url_for('wiki.pages',q=query,page=number+1) }}">다음</a>{% endif %}</nav>
+<ul class="wiki-page-list">{% for item in items %}<li{% if item.officer %} class="is-officer"{% endif %}><a href="{{ url_for('wiki.document',title=item.title) }}">{{ item.title }}</a>{% if item.officer %}<span class="wiki-officer-pill">운영진 전용</span>{% endif %}</li>{% else %}<li>문서가 없습니다.</li>{% endfor %}</ul>
+<nav class="wiki-pagination" aria-label="문서 목록 페이지">{% if number>1 %}<a href="{{ url_for('wiki.pages',q=query,page=number-1,scope=None if scope == 'all' else scope) }}">이전</a>{% endif %}<span>{{ number }}페이지</span>{% if has_next %}<a href="{{ url_for('wiki.pages',q=query,page=number+1,scope=None if scope == 'all' else scope) }}">다음</a>{% endif %}</nav>
 {% endblock %}

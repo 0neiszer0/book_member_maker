@@ -10,9 +10,12 @@ from hashlib import sha256, sha3_256
 import hmac
 from pathlib import Path
 import sqlite3
+import threading
+import time
 from urllib.parse import quote, urlsplit, unquote
 
 import requests
+from requests.adapters import HTTPAdapter
 
 
 class EngineUnavailable(Exception):
@@ -48,6 +51,12 @@ class OpenNamu:
         if not self.database.is_file():
             raise ValueError('An initialized openNamu database is required')
         self.secret = secret.encode()
+        # Already-verified identities, keyed by the SQLite file's (mtime, size) so any
+        # direct edit of alist/user_set invalidates the entry; short TTL as a backstop.
+        self._verified = {}
+        self._verified_lock = threading.Lock()
+        # One keep-alive pool to the loopback engine; cookies live in per-request Sessions.
+        self._adapter = HTTPAdapter(pool_connections=1, pool_maxsize=16)
 
     def credentials(self, member_id):
         digest = hmac.new(self.secret, ('identity:' + str(member_id)).encode(), sha256).hexdigest()
@@ -55,8 +64,37 @@ class OpenNamu:
         password = hmac.new(self.secret, ('password:' + str(member_id)).encode(), sha256).hexdigest()
         return username, password
 
+    PROVISION_TTL = 120
+
+    def _db_stamp(self):
+        try:
+            stat = self.database.stat()
+        except OSError:
+            return None
+        # WAL mode keeps recent writes in the -wal file, so include it in the stamp.
+        stamp = [stat.st_mtime_ns, stat.st_size]
+        for suffix in ('-wal', '-shm'):
+            try:
+                other = Path(str(self.database) + suffix).stat()
+                stamp += [other.st_mtime_ns, other.st_size]
+            except OSError:
+                stamp += [0, 0]
+        return tuple(stamp)
+
     def provision(self, member_id):
         username, password = self.credentials(member_id)
+        stamp, now = self._db_stamp(), time.monotonic()
+        with self._verified_lock:
+            hit = self._verified.get(member_id)
+        if stamp is not None and hit and hit[0] == stamp and hit[1] > now:
+            return username, password
+        result = self._provision(username, password)
+        if stamp is not None:
+            with self._verified_lock:
+                self._verified[member_id] = (stamp, now + self.PROVISION_TTL)
+        return result
+
+    def _provision(self, username, password):
         expected = {'pw': sha3_256(password.encode()).hexdigest(), 'acl': self.GROUP, 'encode': 'sha3'}
         # mode=rw cannot silently create a new or accidentally empty wiki.
         with sqlite3.connect(self.database.as_uri() + '?mode=rw', uri=True, timeout=5) as db:
@@ -111,21 +149,23 @@ class OpenNamu:
             username, password = self.provision(member_id)
         except sqlite3.Error as exc:
             raise EngineUnavailable('Wiki account store unavailable') from exc
-        with requests.Session() as client:
-            client.trust_env = False
-            self.request(client, 'POST', '/login', data={'id': username, 'password': password})
+        # Not `with Session()`: closing a session would also close the shared pooled adapter.
+        client = requests.Session()
+        client.trust_env = False
+        client.mount('http://', self._adapter)
+        self.request(client, 'POST', '/login', data={'id': username, 'password': password})
+        try:
             auth = self.json(client, '/api/v2/auth')
             if auth.get('name') != self.GROUP or not auth.get('info', {}).get('edit'):
                 raise EngineUnavailable('Wiki identity could not be verified')
+            yield client
+        finally:
+            # The engine uses an in-memory session store; expire each bridge
+            # session instead of growing it with every page view.
             try:
-                yield client
-            finally:
-                # The engine uses an in-memory session store; expire each bridge
-                # session instead of growing it with every page view.
-                try:
-                    self.request(client, 'GET', '/logout')
-                except EngineUnavailable:
-                    pass
+                self.request(client, 'GET', '/logout')
+            except EngineUnavailable:
+                pass
 
     def history(self, client, title, page=1):
         return self.json(client, f'/api/v2/history/{page}/normal/' + quote(title, safe=''))['data']
