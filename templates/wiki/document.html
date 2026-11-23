@@ -6,7 +6,7 @@
 {% if doc.exists %}<article class="wiki-prose">{{ rendered }}</article>{% else %}<p class="lms-empty">아직 작성되지 않은 문서입니다.</p>{% endif %}
 {% if can_edit_doc and not revision and doc.exists %}
 <div id="wiki-doc-selection-pill" class="wiki-doc-selection-pill" role="toolbar" aria-label="선택한 글자로 새 문서 만들기" data-edit-base="{{ url_for('wiki.edit', title='__TITLE__') }}" hidden><a class="wiki-doc-pill-main" target="_blank" rel="noopener" href="#"></a><a class="wiki-doc-pill-person" target="_blank" rel="noopener" href="#">인물 틀로 만들기</a></div>
-<style>.wiki-doc-selection-pill{position:fixed;z-index:60;display:flex;gap:4px;padding:4px;background:#273238;border-radius:999px;box-shadow:0 6px 24px #18232c55;font-size:13px;line-height:1.2}.wiki-doc-selection-pill[hidden]{display:none}.wiki-doc-selection-pill a{padding:6px 12px;color:#fff!important;text-decoration:none!important;white-space:nowrap;border-radius:999px;background:transparent!important;border:0!important}.wiki-doc-selection-pill a:hover,.wiki-doc-selection-pill a:focus-visible{background:#d20f17!important}.wiki-doc-selection-pill .wiki-doc-pill-person{color:#d6dde1!important}</style>
+<style>.wiki-doc-selection-pill{position:fixed;z-index:60;display:flex;flex-wrap:wrap;gap:4px;max-width:calc(100vw - 16px);padding:4px;background:#273238;border-radius:20px;box-shadow:0 6px 24px #18232c55;font-size:13px;line-height:1.2}.wiki-doc-selection-pill[hidden]{display:none}.wiki-doc-selection-pill a{max-width:100%;overflow:hidden;text-overflow:ellipsis;padding:6px 12px;color:#fff!important;text-decoration:none!important;white-space:nowrap;border-radius:999px;background:transparent!important;border:0!important}.wiki-doc-selection-pill a:hover,.wiki-doc-selection-pill a:focus-visible{background:#d20f17!important}.wiki-doc-selection-pill .wiki-doc-pill-person{color:#d6dde1!important}@media(max-width:767px){.wiki-doc-selection-pill a{min-height:36px;display:inline-flex;align-items:center}}</style>
 <script>
 (function () {
     var pill = document.getElementById('wiki-doc-selection-pill'), article = document.querySelector('article.wiki-prose');
@@ -29,8 +29,10 @@
         main.href = url;
         person.href = url + '?template=person';
         pill.hidden = false;
-        var rect = range.getBoundingClientRect(), width = pill.offsetWidth;
-        pill.style.top = Math.max(8, rect.top - pill.offsetHeight - 8) + 'px';
+        var rect = range.getBoundingClientRect(), width = pill.offsetWidth, height = pill.offsetHeight;
+        var top = rect.top - height - 8;
+        if (top < 8) top = Math.min(window.innerHeight - height - 8, rect.bottom + 8);
+        pill.style.top = Math.max(8, top) + 'px';
         pill.style.left = Math.max(8, Math.min(window.innerWidth - width - 8, rect.left + rect.width / 2 - width / 2)) + 'px';
     }
     document.addEventListener('mouseup', function (e) { if (!pill.contains(e.target)) setTimeout(update, 0); });

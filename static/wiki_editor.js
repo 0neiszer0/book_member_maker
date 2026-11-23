@@ -1945,7 +1945,9 @@ function updateSelectionBar() {
     selectionBar.hidden = false;
     const rect = found.range.getBoundingClientRect();
     const width = selectionBar.offsetWidth, height = selectionBar.offsetHeight;
-    selectionBar.style.top = Math.max(8, rect.top - height - 8) + 'px';
+    let top = rect.top - height - 8;
+    if (top < 8) top = Math.min(window.innerHeight - height - 8, rect.bottom + 8);
+    selectionBar.style.top = Math.max(8, top) + 'px';
     selectionBar.style.left = Math.max(8, Math.min(window.innerWidth - width - 8, rect.left + rect.width / 2 - width / 2)) + 'px';
 }
 function editUrl(title, query = '') {

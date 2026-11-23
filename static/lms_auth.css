@@ -89,3 +89,4 @@ body:has(.lms-result-portal) { background: #f8fafc; }
 .portal-confirm-phone strong{display:block;font-size:26px;line-height:34px;letter-spacing:.02em}
 .portal-confirm-summary{color:#56616a}
 .portal-confirm-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:16px}
+@media(max-width:767px){.lms-page .auth-btn{min-height:44px;font-size:15px}.lms-result-portal input:not([type=checkbox]):not([type=radio]):not([type=hidden]),.lms-result-portal select,.lms-result-portal textarea{font-size:16px}.portal-confirm-dialog{max-height:90dvh;overflow:auto;padding:18px}}

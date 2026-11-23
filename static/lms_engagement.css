@@ -53,6 +53,7 @@
 .eg-admin-status{padding:12px;border:1px solid #c7cdd1;background:#f5f5f5;margin:20px 0;font-size:14px;line-height:21px}
 .eg-flash{padding:12px;border:1px solid #c7cdd1;background:#f5f5f5;margin-bottom:16px;font-size:14px;line-height:21px}
 .eg-flash-danger{border-color:#a82623;color:#a82623}
+.eg-wiki-draft{margin-top:10px;font-family:monospace;font-size:13px}
 @media(max-width:767px){
   .eg-panel{padding:16px}
   .eg-grid{grid-template-columns:1fr}
@@ -61,4 +62,5 @@
   .eg-book{grid-template-columns:64px minmax(0,1fr);gap:12px}
   .eg-cover{width:64px;height:86px}
   .eg-form{gap:18px}
+  .eg-wiki-draft,.eg-input,.eg-textarea,.eg-select{font-size:16px}
 }

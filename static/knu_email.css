@@ -4,3 +4,4 @@
 .knu-email-suffix{display:flex;align-items:center;padding-inline:12px;border-left:1px solid #e2e8f0;background:#f1f5f9;color:#475569;font-size:14px;font-weight:600;white-space:nowrap}
 
 .knu-email-group[hidden]{display:none}
+@media(max-width:480px){.knu-email-suffix{padding-inline:10px;font-size:13.5px}}

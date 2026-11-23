@@ -39,7 +39,7 @@
   outline:none;
   padding:4px 2px !important;
   min-height:32px !important;
-  font-size:15.5px;
+  font-size:16px;
   line-height:24px;
   color:#2d3b45;
   background:transparent;
@@ -233,6 +233,10 @@
     width:calc(100vw - 16px);
     max-width:calc(100vw - 16px);
     max-height:82vh;
+  }
+  .lms-qs-close{
+    min-height:36px;
+    padding:6px 10px;
   }
   .lms-qs-foot{
     display:none;
