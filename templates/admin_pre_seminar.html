@@ -31,24 +31,34 @@
 .material-actions button[type=submit]:hover{background:#a80b12;border-color:#a80b12}
 .material-actions button[data-action=delete]{color:#a80b12;border-color:#f0b7ba}
 .material-preview table{border-collapse:collapse;font-variant-numeric:tabular-nums}.material-preview td{border:1px solid #c7cdd1;padding:8px 10px}
+.material-week-link{color:#a80b12;font-weight:600;text-underline-offset:3px}
+.material-editor select{display:block;width:100%;box-sizing:border-box;padding:9px 10px;margin-top:4px;border:1px solid #c7cdd1;border-radius:6px;background:#fff;color:#2d3b45;font:inherit;font-weight:400}
+.material-editor select:focus-visible{outline:2px solid #d20f17;outline-offset:1px;border-color:#d20f17}
+.material-week{margin:0 0 14px}
 .material-note{font-size:14px;color:#56616a;margin:12px 0 0}
 @media(max-width:767px){.material-editor{padding:12px}.material-editor .ui-card{padding:14px}.material-editor input:not([type=checkbox]),.material-editor textarea{font-size:16px;min-height:40px}.material-editor textarea{min-height:260px}.material-actions a,.material-actions button{min-height:40px}.material-preview table{min-width:480px}}
 </style>
 <div class="material-editor">
 <header class="ui-page-header"><div class="ui-page-header-copy"><h1>세미나 사전 자료 등록·관리</h1><p class="ui-page-subtitle"><code>.md</code> 파일을 올리거나 Markdown을 붙여넣어 저장하면 공개 상태일 때 회원용 /pre-seminar에 바로 게시됩니다.</p></div><a class="lms-button" href="{{ url_for('member_pre_seminar') }}">사전 자료실 보기 →</a></header>
-{% if request.args.get('saved') %}<p class="material-status" role="status">저장했습니다.</p>{% endif %}
+{% if request.args.get('saved') %}<p class="material-status" role="status">저장했습니다.{% if return_term %} <a href="{{ url_for('admin_seminars', term_id=return_term, _anchor=('week-' ~ back_week) if back_week else None) }}">← 세미나 운영으로 돌아가기</a>{% endif %}</p>{% endif %}
 <section class="ui-card">
 <h2>Markdown {{ '수정' if edit else '등록' }}</h2>
 <form action="{{ url_for('admin_pre_seminar_save') }}" method="post">
 <input type="hidden" name="csrf_token" value="{{ session.get('sensitive_csrf', '') }}">
 <input type="hidden" name="material_id" value="{{ edit.id if edit else '' }}">
+{% if return_term %}<input type="hidden" name="return_term" value="{{ return_term }}">{% endif %}
+{% set cur_week = (edit.seminar_week_id if edit else (prefill.seminar_week_id if prefill else '')) %}
+<label class="material-week">연결할 세미나 주차 <select id="seminar-week-id" name="seminar_week_id">
+<option value="">연결 안 함 (독립 자료)</option>
+{% for opt in week_options %}<option value="{{ opt.id }}" data-title="{{ opt.book_title }}" data-author="{{ opt.book_author }}" data-semester-label="{{ opt.term_name }}" data-semester="{{ opt.semester_code }}" data-date="{{ opt.meeting_date }}" {% if opt.id == cur_week|string %}selected{% endif %}>{{ opt.label }}</option>{% endfor %}
+</select></label>
 <label>마크다운 파일 불러오기 <input id="md-file" type="file" accept=".md,.markdown,.txt"></label>
 <div class="material-grid">
-<label>도서 제목 <input name="title" id="title" required value="{{ edit.title if edit else '' }}"></label>
-<label>저자 <input name="author" value="{{ edit.author if edit else '' }}"></label>
-<label>학기 표시명 <input name="semester_label" placeholder="2026년 2학기" value="{{ edit.semester_label if edit else '' }}"></label>
-<label>학기 코드 <input name="semester" placeholder="2026-2" value="{{ edit.semester if edit else '' }}"></label>
-<label>세미나 날짜 <input type="date" name="seminar_date" value="{{ edit.date if edit else '' }}"></label>
+<label>도서 제목 <input name="title" id="title" required value="{{ edit.title if edit else (prefill.title if prefill else '') }}"></label>
+<label>저자 <input name="author" value="{{ edit.author if edit else (prefill.author if prefill else '') }}"></label>
+<label>학기 표시명 <input name="semester_label" placeholder="2026년 2학기" value="{{ edit.semester_label if edit else (prefill.semester_label if prefill else '') }}"></label>
+<label>학기 코드 <input name="semester" placeholder="2026-2" value="{{ edit.semester if edit else (prefill.semester if prefill else '') }}"></label>
+<label>세미나 날짜 <input type="date" name="seminar_date" value="{{ edit.date if edit else (prefill.date if prefill else '') }}"></label>
 <label>판본/참고 메모 <input name="edition_note" value="{{ edit.edition_note if edit else '' }}"></label>
 </div>
 <label class="material-publish"><input type="checkbox" name="is_published" {% if not edit or edit.is_published %}checked{% endif %}> 공개</label>
@@ -59,7 +69,7 @@
 <div id="preview" class="material-preview" hidden aria-live="polite"></div>
 <section class="ui-card">
 <h2>등록된 DB 사전 자료 목록</h2>
-{% for book in books %}<article class="material-card"><h3>{{ book.title }}</h3><p class="material-meta">{{ book.author }} · {{ book.semester_label }} · {{ book.date }} · <span class="material-pill{% if book.is_published %} is-live{% endif %}">{{ '공개' if book.is_published else '비공개(초안)' }}</span></p><div class="material-actions"><a href="{{ url_for('member_pre_seminar_book', slug=book.slug) }}">자료 보기</a><a href="{{ url_for('admin_pre_seminar', edit=book.id) }}">수정</a><button type="button" data-id="{{ book.id }}" data-action="toggle">공개 전환</button><button type="button" data-id="{{ book.id }}" data-action="delete">삭제</button></div></article>{% else %}<p class="material-note">등록된 자료가 없습니다.</p>{% endfor %}
+{% for book in books %}<article class="material-card"><h3>{{ book.title }}</h3><p class="material-meta">{{ book.author }} · {{ book.semester_label }} · {{ book.date }} · <span class="material-pill{% if book.is_published %} is-live{% endif %}">{{ '공개' if book.is_published else '비공개(초안)' }}</span>{% set lw = week_options_by_id.get(book.seminar_week_id|string) if book.seminar_week_id else None %}{% if lw %} · <a class="material-week-link" href="{{ url_for('admin_seminars', term_id=lw.term_id, _anchor='week-' ~ lw.id) }}">연결 세미나: {{ lw.term_name }} · {{ lw.meeting_date }}</a>{% endif %}</p><div class="material-actions"><a href="{{ url_for('member_pre_seminar_book', slug=book.slug) }}">자료 보기</a><a href="{{ url_for('admin_pre_seminar', edit=book.id) }}">수정</a><button type="button" data-id="{{ book.id }}" data-action="toggle">공개 전환</button><button type="button" data-id="{{ book.id }}" data-action="delete">삭제</button></div></article>{% else %}<p class="material-note">등록된 자료가 없습니다.</p>{% endfor %}
 <p class="material-note">기존 15개 아카이브 자료는 사전 자료실에 자동으로 유지됩니다.</p>
 </section>
 </div>
@@ -67,6 +77,8 @@
 const csrf = {{ session.get('sensitive_csrf', '')|tojson }};
 const body = document.getElementById('markdown-body');
 document.getElementById('md-file').addEventListener('change', e => { const file=e.target.files[0]; if(!file)return; const reader=new FileReader(); reader.onload=()=>{body.value=reader.result; const title=document.getElementById('title'); if(!title.value.trim()){const match=body.value.match(/^#\s+(.+)$/m); title.value=match ? match[1].trim() : file.name.replace(/\.[^.]+$/, '');}}; reader.readAsText(file, 'UTF-8'); });
+(function(){const sel=document.getElementById('seminar-week-id');if(!sel)return;const map={title:'data-title',author:'data-author',semester_label:'data-semester-label',semester:'data-semester',seminar_date:'data-date'};const form=sel.form;let applied={};
+sel.addEventListener('change',()=>{const opt=sel.selectedOptions[0];if(!opt||!opt.value){return;}for(const [name,attr] of Object.entries(map)){const input=form.elements[name];if(!input)continue;const next=opt.getAttribute(attr)||'';if(!input.value.trim()||input.value===applied[name]){input.value=next;applied[name]=next;}}});})();
 function element(tag, text){const el=document.createElement(tag); if(text !== undefined)el.textContent=text; return el;}
 function appendRuns(parent,runs){for(const run of runs){let el;if(run.href){el=element('a',run.text);el.href=run.href;el.target='_blank';el.rel='noopener noreferrer';}else if(run.strong)el=element('strong',run.text);else if(run.em)el=element('em',run.text);else if(run.code)el=element('code',run.text);else el=document.createTextNode(run.text);parent.append(el);}}
 document.getElementById('preview-button').addEventListener('click',async()=>{const panel=document.getElementById('preview');panel.hidden=false;panel.replaceChildren();try{const response=await fetch({{ url_for('admin_pre_seminar_preview')|tojson }},{method:'POST',headers:{'Content-Type':'application/json','X-App-CSRF':csrf},body:JSON.stringify({markdown_body:body.value})});if(!response.ok)throw Error();const data=await response.json();for(const sec of data.sections){panel.append(element('h3',sec.heading));for(const item of sec.items){let el;if(item.type==='table'){el=element('table');for(const row of item.rows){const tr=element('tr');for(const cell of row)tr.append(element('td',cell));el.append(tr);}}else if(item.type==='li'){el=element('ul');const li=element('li');appendRuns(li,item.runs);el.append(li);}else{el=element(item.type==='quote'?'blockquote':'p');appendRuns(el,item.runs);}panel.append(el);}}if(data.references.length){panel.append(element('h3','참고 링크 바로가기'));const ul=element('ul');for(const ref of data.references){const li=element('li');appendRuns(li,[{text:ref.title,href:ref.url}]);ul.append(li);}panel.append(ul);}}catch(e){panel.textContent='미리보기를 불러오지 못했습니다.';}});

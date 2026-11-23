@@ -6,7 +6,7 @@ import json
 import re
 import unicodedata
 import uuid
-from datetime import datetime, timezone
+from datetime import date as _date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -137,10 +137,170 @@ def _load_db_pre_seminar_materials(get_db, include_drafts=False):
                 "semester_label": row.get("semester_label") or row.get("semester") or "최신 세미나",
                 "date": row.get("seminar_date") or "", "edition_note": row.get("edition_note") or "",
                 **parsed, "source": "db", "is_published": bool(row.get("is_published", True)),
-                "markdown_body": row.get("markdown_body") or ""})
+                "markdown_body": row.get("markdown_body") or "",
+                "seminar_week_id": row.get("seminar_week_id") or "",
+                "reference_count": len(parsed.get("references") or []),
+                "section_count": len(parsed.get("sections") or []),
+                "created_at": row.get("created_at") or ""})
         return books
     except Exception:
         return []
+
+
+def _norm_book_title(value) -> str:
+    text = unicodedata.normalize("NFKC", str(value or "")).lower()
+    return re.sub(r"[^\w가-힣]+", "", text)
+
+
+def _titles_match(a: str, b: str) -> bool:
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    return len(a) >= 2 and len(b) >= 2 and (a in b or b in a)
+
+
+def _parse_day(value):
+    try:
+        return _date.fromisoformat(str(value or "")[:10])
+    except ValueError:
+        return None
+
+
+def _week_dates(week):
+    days = {str(s.get("meeting_date") or "")[:10] for s in (week.get("sessions") or []) if s.get("meeting_date")}
+    return days, _parse_day(week.get("week_start"))
+
+
+def _date_matches(material_date, days, start) -> bool:
+    day = str(material_date or "")[:10]
+    if not day:
+        return False
+    if day in days:
+        return True
+    parsed = _parse_day(day)
+    return bool(parsed and start and abs((parsed - start).days) <= 6)
+
+
+def _light_material(m: dict) -> dict:
+    return {
+        "id": m.get("id") or "", "slug": m.get("slug") or "", "title": m.get("title") or "",
+        "author": m.get("author") or "", "date": m.get("date") or "",
+        "source": m.get("source") or "archive", "is_published": bool(m.get("is_published", True)),
+        "seminar_week_id": m.get("seminar_week_id") or "",
+        "reference_count": m.get("reference_count", len(m.get("references") or [])),
+        "section_count": m.get("section_count", len(m.get("sections") or [])),
+    }
+
+
+def attach_pre_seminar_materials_to_weeks(db, weeks, *, include_drafts=False):
+    """Attach week["pre_seminar"] (lightweight dict or None). Fail-soft; never mutates cached JSON."""
+    try:
+        db_materials = _load_db_pre_seminar_materials((lambda: db) if db is not None else None, include_drafts=include_drafts)
+    except Exception:
+        db_materials = []
+    try:
+        archive = [
+            {**b, "source": "archive", "is_published": True,
+             "reference_count": len(b.get("references") or []), "section_count": len(b.get("sections") or [])}
+            for b in (_load_json_snapshot(PRE_SEMINAR_PATH).get("books", []) or [])
+        ]
+    except Exception:
+        archive = []
+    unlinked_db = [m for m in db_materials if not m.get("seminar_week_id")]
+    placeholder = _norm_book_title("도서 미정")
+    for week in weeks:
+        week["pre_seminar"] = None
+        wid = str(week.get("id") or "")
+        linked = [m for m in db_materials if wid and str(m.get("seminar_week_id") or "") == wid]
+        if linked:
+            linked.sort(key=lambda m: (bool(m.get("is_published")), str(m.get("created_at") or "")), reverse=True)
+            week["pre_seminar"] = _light_material(linked[0])
+            continue
+        days, start = _week_dates(week)
+        title = _norm_book_title(week.get("book_title"))
+        if not title or title == placeholder:
+            continue
+        found = None
+        for pool in (unlinked_db, archive):
+            found = next((m for m in pool if _date_matches(m.get("date"), days, start)
+                          and _titles_match(_norm_book_title(m.get("title")), title)), None)
+            if found:
+                break
+        if not found:
+            exact = [m for m in unlinked_db + archive if _norm_book_title(m.get("title")) == title]
+            if len(exact) == 1:
+                found = exact[0]
+        if found:
+            week["pre_seminar"] = _light_material(found)
+    return weeks
+
+
+def find_linked_week_for_material(db, book, week_id=None):
+    """Return the seminar week a material belongs to (with term + latest topic event), or None."""
+    try:
+        if db is None or not book:
+            return None
+        cols = "id,term_id,book_title,week_start"
+        week = None
+        wanted = str(book.get("seminar_week_id") or "").strip()
+        if wanted:
+            week = (db.table("seminar_weeks").select(cols).eq("id", wanted).limit(1).execute().data or [None])[0]
+        if week is None and week_id:
+            cand = (db.table("seminar_weeks").select(cols).eq("id", str(week_id)).limit(1).execute().data or [None])[0]
+            if cand:
+                sessions = db.table("seminar_sessions").select("meeting_date").eq("seminar_week_id", cand["id"]).execute().data or []
+                hit = attach_pre_seminar_materials_to_weeks(db, [{**cand, "sessions": sessions}])[0].get("pre_seminar")
+                if hit and hit.get("slug") == book.get("slug"):
+                    week = cand
+        if week is None and not wanted:
+            weeks = db.table("seminar_weeks").select(cols).execute().data or []
+            sessions = db.table("seminar_sessions").select("seminar_week_id,meeting_date").execute().data or []
+            for w in weeks:
+                w = {**w, "sessions": [s for s in sessions if s.get("seminar_week_id") == w.get("id")]}
+                days, start = _week_dates(w)
+                title = _norm_book_title(w.get("book_title"))
+                if title and _date_matches(book.get("date"), days, start) and _titles_match(_norm_book_title(book.get("title")), title):
+                    week = {k: w[k] for k in ("id", "term_id", "book_title", "week_start")}
+                    break
+        if not week:
+            return None
+        term = (db.table("seminar_terms").select("id,name").eq("id", week["term_id"]).limit(1).execute().data or [{}])[0]
+        events = db.table("topic_events").select("id,share_token,is_active,created_at").eq("seminar_week_id", week["id"]).order("created_at", desc=True).execute().data or []
+        return {"term_id": week["term_id"], "term_name": term.get("name") or "", "week_id": week["id"],
+                "book_title": week.get("book_title") or "", "topic_event_id": events[0]["id"] if events else None}
+    except Exception:
+        return None
+
+
+def build_week_options(db):
+    """Seminar weeks for the admin linker: newest term first, week_start ascending. Fail-soft."""
+    try:
+        terms = db.table("seminar_terms").select("*").execute().data or []
+        weeks = db.table("seminar_weeks").select("*").execute().data or []
+        sessions = db.table("seminar_sessions").select("seminar_week_id,meeting_date").execute().data or []
+    except Exception:
+        return []
+    term_by_id = {str(t["id"]): t for t in terms}
+    dates = {}
+    for s in sessions:
+        if s.get("meeting_date"):
+            dates.setdefault(str(s.get("seminar_week_id")), []).append(str(s["meeting_date"])[:10])
+    options = []
+    for w in weeks:
+        term = term_by_id.get(str(w.get("term_id")), {})
+        meeting = min(dates.get(str(w["id"]), []) or [str(w.get("week_start") or "")[:10]])
+        title = w.get("book_title") or ""
+        options.append({
+            "id": str(w["id"]), "term_id": w.get("term_id"), "term_name": term.get("name") or "",
+            "semester_code": str(term.get("semester_code") or term.get("name") or ""),
+            "term_start": str(term.get("start_date") or ""), "week_start": str(w.get("week_start") or ""),
+            "book_title": title, "book_author": w.get("book_author") or "", "meeting_date": meeting,
+            "label": " · ".join(x for x in (term.get("name") or "", meeting, title or "도서 미정") if x),
+        })
+    options.sort(key=lambda o: o["week_start"])
+    options.sort(key=lambda o: o["term_start"], reverse=True)
+    return options
 
 
 def _book_matches_query(book: dict[str, Any], needle: str) -> bool:
@@ -272,9 +432,17 @@ def init_public_archive_routes(app, login_required, get_db=None):
             if sem_books:
                 grouped.append({**sem, "books": sem_books})
 
+        linked_week = None
+        if selected_slug is not None and active_book is not None and get_db is not None:
+            try:
+                linked_week = find_linked_week_for_material(get_db(), active_book, (request.args.get("week_id") or "").strip() or None)
+            except Exception:
+                linked_week = None
+
         resp = make_response(
             render_template(
                 "member_pre_seminar.html",
+                linked_week=linked_week,
                 description=payload.get("description", ""),
                 semesters=semesters,
                 selected_semester=selected_semester,
@@ -307,10 +475,26 @@ def init_public_archive_routes(app, login_required, get_db=None):
     @login_required(role="admin")
     def admin_pre_seminar():
         books = _load_db_pre_seminar_materials(get_db, include_drafts=True)
-        edit = next((b for b in books if str(b["id"]) == request.args.get("edit")), None)
-        if request.args.get("edit") and edit is None:
+        week_options = build_week_options(get_db()) if get_db is not None else []
+        week_options_by_id = {o["id"]: o for o in week_options}
+        edit_arg = (request.args.get("edit") or "").strip()
+        week_id = (request.args.get("week_id") or "").strip()
+        edit = next((b for b in books if str(b["id"]) == edit_arg), None)
+        if edit_arg and edit is None:
             abort(404)
-        return render_template("admin_pre_seminar.html", books=books, edit=edit)
+        prefill = None
+        if week_id and not edit_arg and week_id in week_options_by_id:
+            if request.args.get("new") != "1":
+                edit = next((b for b in books if str(b.get("seminar_week_id") or "") == week_id), None)
+            if edit is None:
+                opt = week_options_by_id[week_id]
+                prefill = {"seminar_week_id": week_id, "title": opt["book_title"], "author": opt["book_author"],
+                           "semester_label": opt["term_name"], "semester": opt["semester_code"], "date": opt["meeting_date"]}
+        return_term = (request.args.get("return_term") or "").strip()
+        back_week = week_id or (str(edit.get("seminar_week_id") or "") if edit else "")
+        return render_template("admin_pre_seminar.html", books=books, edit=edit, week_options=week_options,
+                               week_options_by_id=week_options_by_id, prefill=prefill, return_term=return_term,
+                               back_week=back_week)
 
     @app.post("/admin/pre-seminar/save")
     @login_required(role="admin")
@@ -325,12 +509,24 @@ def init_public_archive_routes(app, login_required, get_db=None):
         db = require_db()
         material_id = str(data.get("material_id") or "").strip()
         table = "pre_seminar_materials"
+        seminar_week_id = str(data.get("seminar_week_id") or "").strip() or None
+        if seminar_week_id:
+            try:
+                week_rows = db.table("seminar_weeks").select("id").eq("id", seminar_week_id).limit(1).execute().data or []
+            except Exception:
+                week_rows = []
+            if not week_rows:
+                return (jsonify(ok=False, error="연결할 세미나 주차를 찾을 수 없습니다."), 400)
         row = {key: str(data.get(key) or "").strip() for key in ("author", "semester", "semester_label", "seminar_date", "edition_note")}
         if not row["semester"]:
             row["semester"] = row["seminar_date"][:4] or str(datetime.now().year)
             row["semester"] += "-custom"
         row.update(title=title, markdown_body=body, is_published=data.get("is_published") in (True, "true", "on", "1"), updated_at=datetime.now(timezone.utc).isoformat())
+        if seminar_week_id:
+            row["seminar_week_id"] = seminar_week_id
         if material_id:
+            if "seminar_week_id" in data:
+                row["seminar_week_id"] = seminar_week_id
             found = db.table(table).select("id").eq("id", material_id).limit(1).execute().data or []
             if not found:
                 abort(404)
@@ -345,7 +541,15 @@ def init_public_archive_routes(app, login_required, get_db=None):
                 n += 1
             row.update(id=str(uuid.uuid4()), slug=slug, created_by=session.get("user_id"))
             db.table(table).insert(row).execute()
-        return jsonify(ok=True) if request.is_json else redirect(url_for("admin_pre_seminar", saved=1), code=303)
+        if request.is_json:
+            return jsonify(ok=True)
+        extra = {}
+        return_term = str(data.get("return_term") or "").strip()
+        if return_term:
+            extra["return_term"] = return_term
+        if seminar_week_id:
+            extra["week_id"] = seminar_week_id
+        return redirect(url_for("admin_pre_seminar", saved=1, **extra), code=303)
 
     @app.post("/api/admin/pre-seminar/preview")
     @login_required(role="admin")

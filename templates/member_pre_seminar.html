@@ -24,6 +24,7 @@
 .pre-detail{border:1px solid #d8dcdf;border-radius:6px;background:#fff;padding:24px}
 .pre-detail-head{padding-bottom:16px;margin-bottom:20px;border-bottom:1px solid #d8dcdf;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .pre-detail-head h2{margin:4px 0 6px;font-size:24px;line-height:1.35;color:#2d3b45;font-weight:700}
+.pre-detail-actions{display:flex;flex-wrap:wrap;gap:8px}
 .pre-edition{font-size:14px;color:#56616a;margin:4px 0 0}
 .pre-sec{margin-bottom:24px}
 .pre-sec:last-child{margin-bottom:0}
@@ -91,7 +92,12 @@
           <h2>{{ active_book.title }}</h2>
           {% if active_book.edition_note %}<p class="pre-edition">{{ active_book.edition_note }}</p>{% endif %}
         </div>
-        {% if has_archive_book %}<a class="lms-button" href="{{ url_for('public_archive_book', slug=active_book.slug) }}">발제문·토의 기록 보기</a>{% endif %}
+        <div class="pre-detail-actions">
+          {% if linked_week %}<a class="lms-button" href="{{ url_for('seminars', term_id=linked_week.term_id, week_id=linked_week.week_id, _anchor='week-' ~ linked_week.week_id) }}">← 해당 세미나로 돌아가기</a>{% endif %}
+          {% if linked_week and linked_week.topic_event_id %}<a class="lms-button" href="{{ url_for('member_topic_reader', event_id=linked_week.topic_event_id) }}">이 세미나 발제문 보기</a>{% endif %}
+          {% if is_staff and active_book.source == 'db' %}<a class="lms-button" href="{{ url_for('admin_pre_seminar', edit=active_book.id) }}">이 자료 수정</a>{% endif %}
+          {% if has_archive_book %}<a class="lms-button" href="{{ url_for('public_archive_book', slug=active_book.slug) }}">발제문·토의 기록 보기</a>{% endif %}
+        </div>
       </header>
 
       {% macro render_runs(runs) -%}

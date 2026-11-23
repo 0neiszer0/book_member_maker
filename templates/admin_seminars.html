@@ -139,6 +139,20 @@
           <p class="muted schedule-author-display mt-1">{{ week.book_author or '' }}</p>
           <p class="muted schedule-note-display mt-2 text-sm" style="white-space:pre-wrap;overflow-wrap:anywhere">{{ week.note or '' }}</p>
           <div class="mt-4"><button type="button" class="btn soft op-btn-secondary" data-open-schedule="{{ week.id }}">도서·사회자 함께 편집</button></div>
+          {% set ps = week.pre_seminar %}{% set ps_ret = term.id if term else None %}
+          <div class="op-pre-seminar-box" data-pre-seminar-status="{{ 'public' if ps and ps.source == 'db' and ps.is_published else ('draft' if ps and ps.source == 'db' else ('archive' if ps else 'none')) }}">
+            <div class="op-pre-seminar-head"><span class="op-pre-seminar-label">읽기 전 자료</span>
+              {% if ps and ps.source == 'db' and ps.is_published %}<span class="chip op-pre-pill op-pill-live">공개</span>
+              {% elif ps and ps.source == 'db' %}<span class="chip op-pre-pill op-pill-amber">초안(비공개)</span>
+              {% elif ps %}<span class="chip op-pre-pill op-status-pill">아카이브 연결됨</span>
+              {% else %}<span class="chip op-pre-pill op-status-pill">미등록</span>{% endif %}</div>
+            <div class="op-pre-seminar-links">
+              {% if ps and ps.source == 'db' and ps.is_published %}<a href="{{ url_for('member_pre_seminar_book', slug=ps.slug) }}">자료 보기</a><a href="{{ url_for('admin_pre_seminar', edit=ps.id, return_term=ps_ret) }}">수정</a>
+              {% elif ps and ps.source == 'db' %}<a href="{{ url_for('admin_pre_seminar', edit=ps.id, return_term=ps_ret) }}">수정·공개</a>
+              {% elif ps %}<a href="{{ url_for('member_pre_seminar_book', slug=ps.slug) }}">자료 보기</a><a href="{{ url_for('admin_pre_seminar', week_id=week.id, return_term=ps_ret) }}">DB 자료로 등록</a>
+              {% else %}<a href="{{ url_for('admin_pre_seminar', week_id=week.id, return_term=ps_ret) }}">이 세미나 사전 자료 등록</a>{% endif %}
+            </div>
+          </div>
           {% if not mon_active %}
           <div class="op-mon-inactive-note">
             <span>추가 세미나 미운영</span>

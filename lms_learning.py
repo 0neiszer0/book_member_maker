@@ -51,6 +51,8 @@ def member_weeks(db, term_id=None):
         if is_break_week(week) and not any(s.get('history') for s in week['sessions']):
             continue
         weeks.append(week)
+    from public_archive_routes import attach_pre_seminar_materials_to_weeks
+    attach_pre_seminar_materials_to_weeks(db, weeks, include_drafts=False)
     return context['terms'], context['term'], weeks, []
 
 

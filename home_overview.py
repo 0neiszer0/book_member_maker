@@ -79,6 +79,13 @@ def member_seminar_summary(db, member_id, today=None):
     events = decorate_topic_submission_states(db, member_id, list(context['topics'].values()), today)
     target = next((s for s in context['sessions'] if s['meeting_date'] >= today.isoformat()), None)
     seminar = session_summary(context, target)
+    if seminar:
+        try:
+            from public_archive_routes import attach_pre_seminar_materials_to_weeks
+            week = {**context['weeks'].get(seminar.get('seminar_week_id'), {}), 'sessions': [target]}
+            seminar['pre_seminar'] = attach_pre_seminar_materials_to_weeks(db, [week], include_drafts=False)[0].get('pre_seminar')
+        except Exception:
+            seminar['pre_seminar'] = None
     tasks = []
     for event in events:
         if event['open'] and not event['submitted']:

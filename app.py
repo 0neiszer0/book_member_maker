@@ -110,7 +110,7 @@ install_static_assets(app)
 install_storage_media(app)
 init_wiki_routes(app, lambda: supabase)
 from universal_search import init_universal_search
-from public_archive_routes import render_public_landing
+from public_archive_routes import render_public_landing, attach_pre_seminar_materials_to_weeks
 init_universal_search(app, lambda: supabase)
 app.add_url_rule('/landing', 'public_landing', render_public_landing)
 
@@ -3858,6 +3858,7 @@ def _load_weekly_seminar_view(term_id=None):
             topic['share_url'] = f"{PUBLIC_BASE_URL}/shared_topics?token={topic['share_token']}"
         week['topic_event'] = topic
         week['is_past'] = bool(week['sessions']) and all(row['is_past'] for row in week['sessions'])
+    attach_pre_seminar_materials_to_weeks(supabase, weeks, include_drafts=True)
     return terms, term, weeks
 
 

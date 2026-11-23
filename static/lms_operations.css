@@ -316,6 +316,13 @@
 }
 .lms-operations .op-book-card{background:var(--ui-bg,#f5f7f8);border:1px solid var(--ui-border,#d8dcdf);border-radius:var(--ui-radius-lg,8px);padding:18px;display:flex;flex-direction:column}
 .lms-operations .op-mon-inactive-note{margin-top:auto;padding-top:14px;border-top:1px dashed var(--ui-border-strong,#c7cdd1);display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--ui-ink-subtle,#626e77)}
+.lms-operations .op-pre-seminar-box{margin-top:14px;padding-top:12px;border-top:1px solid var(--ui-border,#d8dcdf);display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px}
+.lms-operations .op-pre-seminar-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.lms-operations .op-pre-seminar-label{font-size:13px;font-weight:700;color:var(--ui-ink,#2d3b45)}
+.lms-operations .op-pre-pill{border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;white-space:nowrap}
+.lms-operations .op-pill-live{background:#e4f5e8;border-color:#b7dfc2;color:#18542c}
+.lms-operations .op-pre-seminar-links{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;font-weight:600}
+.lms-operations .op-pre-seminar-links a{color:#a80b12;text-decoration:underline;text-underline-offset:3px}
 .lms-operations .op-link-btn{border:0;background:transparent;box-shadow:none;min-height:auto;padding:2px 4px;font-size:12.5px;font-weight:600;color:var(--ui-accent,#d20f17);text-decoration:underline}
 .lms-operations .op-link-btn:hover{color:var(--ui-accent-hover,#a80b12);background:transparent;box-shadow:none}
 .lms-operations .op-session-card{background:var(--ui-surface,#ffffff);border:1px solid var(--ui-border,#d8dcdf);border-radius:var(--ui-radius-lg,8px);padding:18px}
