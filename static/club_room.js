@@ -48,9 +48,42 @@
     while (end < 24 && busy(end)) end++;
     return {tone: 'busy', text: end >= 24 ? '지금 예약이 있어요 · 오늘은 자정까지 이어져요' : '지금 예약이 있어요 · ' + pad(end) + ':00부터 비어 있어요'};
   }
+  const dayOf = value => new Date(value + 'T00:00:00Z').getUTCDay();
+  const daysBetween = (from, to) => Math.round((Date.parse(to + 'T00:00:00Z') - Date.parse(from + 'T00:00:00Z')) / (24 * hourMs));
+  function monthGridRange(ymd) {
+    const year = Number(ymd.slice(0, 4)), month = Number(ymd.slice(5, 7));
+    const first = ymd.slice(0, 8) + '01';
+    const last = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+    const start = shiftDate(first, -dayOf(first)), end = shiftDate(last, 6 - dayOf(last));
+    const days = daysBetween(start, end) + 1;
+    return {year, month, start, end, days, dates: Array.from({length: days}, (_, i) => shiftDate(start, i))};
+  }
+  function shiftMonth(ymd, delta) {
+    const total = Number(ymd.slice(0, 4)) * 12 + Number(ymd.slice(5, 7)) - 1 + delta;
+    const year = Math.floor(total / 12), month = total % 12 + 1;
+    const day = Math.min(Number(ymd.slice(8, 10)), new Date(Date.UTC(year, month, 0)).getUTCDate());
+    return year + '-' + pad(month) + '-' + pad(day);
+  }
+  // Bucket bookings by every KST date they touch; each bucket is sorted by start time.
+  function groupBookingsByDate(rows) {
+    const groups = {};
+    for (const row of rows || []) {
+      const from = Date.parse(row.starts_at || row.start_time), to = Date.parse(row.ends_at || row.end_time);
+      if (!Number.isFinite(from)) continue;
+      const first = kst(from).slice(0, 10), lastDay = Number.isFinite(to) && to > from ? kst(to - 1).slice(0, 10) : first;
+      for (let day = first, guard = 0; day <= lastDay && guard < 60; day = shiftDate(day, 1), guard++) {
+        const group = groups[day] || (groups[day] = {regular: [], blocked: [], all: []});
+        group.all.push(row);
+        (row.kind === 'blocked' || row.kind === 'meeting' ? group.blocked : group.regular).push(row);
+      }
+    }
+    const byStart = (a, b) => Date.parse(a.starts_at || a.start_time) - Date.parse(b.starts_at || b.start_time);
+    Object.values(groups).forEach(group => { group.all.sort(byStart); group.regular.sort(byStart); group.blocked.sort(byStart); });
+    return groups;
+  }
   const shareUrl = origin => origin.replace(/\/+$/, '') + '/club-room';
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {kst, shiftDate, weekStart, slotState, freeRanges, calendarTarget, targetMatches, nowStatus, shareUrl}; return;
+    module.exports = {kst, shiftDate, weekStart, slotState, freeRanges, calendarTarget, targetMatches, nowStatus, shareUrl, monthGridRange, shiftMonth, groupBookingsByDate}; return;
   }
   const root = document.getElementById('club-room');
   const homeStatus = document.getElementById('cr-home-status');
@@ -69,7 +102,7 @@
   const staff = root.dataset.staff === 'true';
   const dialog = $('cr-dialog'), form = $('cr-form');
   const calendarLink = calendarTarget(window.location.search, root.dataset.today);
-  let selected = calendarLink.date, bookings = [], now = Date.now(), current = null, calendarFocused = false;
+  let view = 'month', loaded = null, selected = calendarLink.date, bookings = [], now = Date.now(), current = null, calendarFocused = false;
   let busy = false, dirty = false, ready = false, requestNumber = 0, staffRequest = 0;
   function node(tag, text, className) {
     const element = document.createElement(tag);
@@ -88,18 +121,23 @@
     return data;
   }
   function render() {
-    const focusedLabel = document.activeElement.closest('#cr-days, #cr-grid') ? document.activeElement.getAttribute('aria-label') : null;
+    const focusedLabel = document.activeElement.closest('#cr-days, #cr-grid, #cr-month-grid') ? document.activeElement.getAttribute('aria-label') : null;
     $('cr-date').value = selected;
     $('cr-summary-date').textContent = dateText(selected);
     $('cr-days').replaceChildren(); $('cr-grid').replaceChildren(); $('cr-free').replaceChildren();
-    const start = weekStart(selected);
+    const start = weekStart(selected), month = view === 'month';
+    $('cr-calendar').dataset.view = view;
+    $('cr-month-wrap').hidden = !month; $('cr-days').hidden = month;
+    document.querySelectorAll('.cr-view-switch button').forEach(button => { const on = button.dataset.view === view; button.classList.toggle('is-active', on); button.setAttribute('aria-pressed', String(on)); });
+    $('cr-prev').setAttribute('aria-label', month ? '이전 달' : '이전 주'); $('cr-next').setAttribute('aria-label', month ? '다음 달' : '다음 주');
     renderNow();
-    for (let i = 0; i < 7; i++) {
+    if (month) renderMonth();
+    for (let i = 0; i < (month ? 0 : 7); i++) {
       const day = shiftDate(start, i), isSelected = day === selected;
       const tab = node('button', undefined, isSelected ? 'is-selected' : '');
       tab.type = 'button'; tab.setAttribute('aria-pressed', String(isSelected)); tab.setAttribute('aria-label', dateText(day));
       tab.append(node('span', '일월화수목금토'[new Date(day + 'T00:00:00Z').getUTCDay()]), node('strong', String(Number(day.slice(8)))));
-      tab.addEventListener('click', () => { selected = day; render(); if (staff) refreshStaff(); }); $('cr-days').append(tab);
+      tab.addEventListener('click', () => goto(day)); $('cr-days').append(tab);
     }
     if (ready) {
       const start = Date.parse(selected + 'T00:00:00+09:00');
@@ -130,29 +168,61 @@
       });
       if (!ranges.length) $('cr-free').textContent = '예약 없는 시간이 없어요. 일반 예약과는 함께 사용할 수 있어요.';
     }
+    const dayCount = ready ? (groupBookingsByDate(bookings)[selected] || {all: []}).all.length : 0;
+    $('cr-day-title').textContent = dateText(selected) + (ready ? (dayCount ? ' · 예약 ' + dayCount + '건' : ' · 예약 없음') : '');
     $('cr-new').disabled = !ready || selected < kst(now).slice(0,10);
+    $('cr-day-book').disabled = $('cr-new').disabled;
     if (staff) $('cr-meeting').disabled = $('cr-new').disabled;
     if (focusedLabel) [...root.querySelectorAll('button[aria-label]')].find(button => button.getAttribute('aria-label') === focusedLabel)?.focus({preventScroll:true});
+  }
+  function renderMonth() {
+    const range = monthGridRange(selected), groups = ready ? groupBookingsByDate(bookings) : {}, today = kst(now).slice(0, 10);
+    $('cr-month-title').textContent = range.year + '년 ' + range.month + '월';
+    $('cr-month-grid').replaceChildren();
+    range.dates.forEach(day => {
+      const group = groups[day] || {regular: [], blocked: [], all: []}, total = group.all.length;
+      const cell = node('button', undefined, 'cr-cal-cell' + (Number(day.slice(5, 7)) !== range.month ? ' is-outside' : '') + (day === today ? ' is-today' : '') + (day === selected ? ' is-selected' : ''));
+      cell.type = 'button'; cell.dataset.date = day; cell.setAttribute('aria-pressed', String(day === selected));
+      cell.setAttribute('aria-label', Number(day.slice(0, 4)) + '년 ' + Number(day.slice(5, 7)) + '월 ' + Number(day.slice(8)) + '일, ' + (total ? '예약 ' + total + '건' : '예약 없음') + (day === today ? ', 오늘' : ''));
+      const chips = node('span', undefined, 'cr-cal-chips'), dots = node('span', undefined, 'cr-cal-dots');
+      group.all.slice(0, 3).forEach(row => {
+        const blocked = row.kind === 'blocked' || row.kind === 'meeting', from = kst(row.starts_at);
+        chips.append(node('span', (from.slice(0, 10) === day ? from.slice(11) : '00:00') + ' ' + (blocked ? '동아리 일정' : row.representative || '예약'), 'cr-chip ' + (blocked ? 'is-blocked' : 'is-regular')));
+        dots.append(node('span', undefined, 'cr-pip ' + (blocked ? 'is-blocked' : 'is-regular')));
+      });
+      if (total > 3) chips.append(node('span', '+' + (total - 3) + '건', 'cr-cal-more'));
+      if (total) dots.append(node('span', total + '건', 'cr-cal-count'));
+      cell.append(node('span', String(Number(day.slice(8))), 'cr-cal-num'), chips, dots);
+      cell.addEventListener('click', () => goto(day));
+      $('cr-month-grid').append(cell);
+    });
+  }
+  const rangeFor = day => { if (view === 'month') { const r = monthGridRange(day); return {start: r.start, days: r.days}; } return {start: weekStart(day), days: 7}; };
+  const covers = day => !!loaded && day >= loaded.start && day <= shiftDate(loaded.start, loaded.days - 1);
+  function goto(day) {
+    selected = day; const range = rangeFor(day);
+    if (!loaded || loaded.start !== range.start || loaded.days !== range.days) { ready = false; render(); refresh(); }
+    else { render(); if (staff) refreshStaff(); }
   }
   let todayRows = null;
   function renderNow() {
     const el = $('cr-now-status'), today = kst(now).slice(0, 10);
-    const rows = weekStart(selected) === weekStart(today) && ready ? bookings : todayRows;
+    const rows = covers(today) && ready ? bookings : todayRows;
     if (!rows) return;
     const status = nowStatus(rows, now);
     el.textContent = status.text; el.dataset.tone = status.tone;
   }
   async function refreshToday() {
     const thisWeek = weekStart(kst(Date.now()).slice(0, 10));
-    if (weekStart(selected) === thisWeek) { todayRows = null; return; }
+    if (covers(kst(Date.now()).slice(0, 10))) { todayRows = null; return; }
     try { const data = await api('/api/club-room/schedule?date=' + thisWeek); todayRows = data.bookings; now = Date.parse(data.now); renderNow(); } catch (_) {}
   }
   async function refresh() {
-    const seq = ++requestNumber, start = weekStart(selected);
+    const seq = ++requestNumber, range = rangeFor(selected);
     try {
-      const data = await api('/api/club-room/schedule?date=' + start);
+      const data = await api('/api/club-room/schedule?date=' + range.start + (view === 'month' ? '&days=' + range.days : ''));
       if (seq !== requestNumber) return;
-      bookings = data.bookings; now = Date.parse(data.now); ready = true; message('cr-error', ''); refreshToday();
+      loaded = range; bookings = data.bookings; now = Date.parse(data.now); ready = true; message('cr-error', ''); refreshToday();
       $('cr-updated').textContent = '방금 확인 · 화면이 열려 있으면 30초마다 갱신'; render();
       if (staff) refreshStaff();
     } catch (error) {
@@ -191,6 +261,8 @@
   function showForm(booking) {
     dirty = false; form.reset(); $('cr-fields').hidden = false; $('cr-fields').disabled = false; $('cr-save').hidden = false;
     $('cr-email').value = root.dataset.email ? root.dataset.email.replace(/@knu\.ac\.kr$/, '') : '';
+    const emailNeeded = !current.version && booking.kind !== 'meeting';
+    $('cr-email').required = emailNeeded; $('cr-email').setAttribute('aria-required', String(emailNeeded));
     $('cr-email').closest('.knu-email-group').hidden = $('cr-email-label').hidden = !!current.version;
     $('cr-receipt').hidden = true; message('cr-form-error', ''); $('cr-kind').value = booking.kind;
     $('cr-representative').value = booking.representative || ''; $('cr-participants').value = (booking.participants || []).join(', '); $('cr-purpose').value = booking.purpose || '';
@@ -251,7 +323,13 @@
     } catch (error) { message('cr-form-error', error.message); }
     finally { setBusy(false); }
   }
-  $('cr-form').addEventListener('submit', event => { event.preventDefault(); if (current && !$('cr-save').hidden) save(current.version ? 'update' : 'create'); });
+  $('cr-form').addEventListener('submit', event => {
+    event.preventDefault();
+    if (current && !current.version && $('cr-kind').value !== 'meeting' && !$('cr-email').value.trim()) {
+      message('cr-form-error', '학교 메일 아이디를 반드시 입력해주세요.'); $('cr-email').focus(); return;
+    }
+    if (current && !$('cr-save').hidden) save(current.version ? 'update' : 'create');
+  });
   form.addEventListener('input', event => {
     dirty = true;
     if (event.target.id === 'cr-start-hour' && Number($('cr-end-hour').value) <= Number(event.target.value)) $('cr-end-hour').value = pad(Number(event.target.value) + 1);
@@ -263,9 +341,11 @@
   window.addEventListener('beforeunload', event => { if (dirty || busy) { event.preventDefault(); event.returnValue = ''; } });
   $('cr-new').addEventListener('click', () => openNew(selected, selected === kst(now).slice(0,10) ? Number(kst(now).slice(11,13)) : 9));
   if (staff) { $('cr-meeting').addEventListener('click', () => openNew(selected, selected === kst(now).slice(0,10) ? Number(kst(now).slice(11,13)) : 9, 'meeting')); $('cr-staff-panel').addEventListener('toggle', refreshStaff); }
-  $('cr-date').addEventListener('change', () => { if (/^\d{4}-\d{2}-\d{2}$/.test($('cr-date').value)) { selected = $('cr-date').value; ready = false; render(); refresh(true); } });
-  for (const [id, offset] of [['cr-prev',-7],['cr-next',7]]) $(id).addEventListener('click', () => { selected = shiftDate(selected,offset); ready = false; render(); refresh(true); });
-  $('cr-today').addEventListener('click', () => { selected = kst(new Date()).slice(0,10); ready = false; render(); refresh(true); });
+  $('cr-date').addEventListener('change', () => { if (/^\d{4}-\d{2}-\d{2}$/.test($('cr-date').value)) goto($('cr-date').value); });
+  for (const [id, direction] of [['cr-prev',-1],['cr-next',1]]) $(id).addEventListener('click', () => goto(view === 'month' ? shiftMonth(selected, direction) : shiftDate(selected, direction * 7)));
+  $('cr-today').addEventListener('click', () => goto(kst(new Date()).slice(0,10)));
+  document.querySelectorAll('.cr-view-switch button').forEach(button => button.addEventListener('click', () => { if (view !== button.dataset.view) { view = button.dataset.view; goto(selected); } }));
+  $('cr-day-book').addEventListener('click', () => $('cr-new').click());
   $('cr-refresh').addEventListener('click', () => refresh());
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
   setInterval(() => { if (!document.hidden) refresh(); }, 30000);

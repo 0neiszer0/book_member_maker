@@ -105,7 +105,11 @@ def init_club_room_routes(app, get_db, login_required):
 
     def schedule_rows(private=False):
         start = date.fromisoformat(request.args.get('date') or datetime.now(KST).date().isoformat())
-        end = start + timedelta(days=7)
+        try:
+            days = min(42, max(1, int(request.args.get('days', 7))))
+        except (TypeError, ValueError):
+            days = 7
+        end = start + timedelta(days=days)
         first = datetime.combine(start, time(), KST).isoformat()
         last = datetime.combine(end, time(), KST).isoformat()
         rows = []
@@ -229,6 +233,8 @@ def init_club_room_routes(app, get_db, login_required):
                         return jsonify(error='학교 메일 아이디를 확인해주세요. 예: 아이디@knu.ac.kr'), 400
                 else:
                     knu_email = (verified or '') if not actor else (member_email() or '')
+                if not knu_email and body.get('kind', 'regular') != 'meeting':
+                    return jsonify(error='학교 메일 아이디를 반드시 입력해주세요. 예: 아이디@knu.ac.kr'), 400
             digest = edit_digest(code, app.secret_key) if code else ''
             if action == 'read':
                 rows = get_db().table('club_room_bookings').select(PRIVATE_FIELDS + ',edit_digest,knu_email') \

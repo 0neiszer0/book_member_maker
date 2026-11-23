@@ -12,11 +12,17 @@
   </header>
   <section class="cr-availability" aria-labelledby="cr-free-title"><div><p class="cr-eyebrow" id="cr-summary-date">선택한 날짜</p><h2 id="cr-free-title">예약 가능한 시간</h2></div><div id="cr-free" role="status">시간표를 확인하고 있어요.</div></section>
   <p class="cr-footnote">위 시간은 빈 구간 안내예요. 구간을 누른 뒤 원하는 시작·종료 시간을 1시간 단위로 선택하면, 여러 시간도 한 번에 신청할 수 있어요.</p>
-  <section class="cr-calendar" aria-label="동아리방 예약 시간표">
-    <div class="cr-toolbar"><div class="cr-date-controls"><button id="cr-prev" aria-label="이전 주">←</button><label class="cr-date-label">날짜 <input type="date" id="cr-date" value="{{ room_today }}" required></label><button id="cr-next" aria-label="다음 주">→</button><button id="cr-today">오늘</button></div><button id="cr-refresh">새로고침</button></div>
+  <section class="cr-calendar" id="cr-calendar" data-view="month" aria-label="동아리방 예약 시간표">
+    <div class="cr-toolbar"><div class="cr-view-switch" role="group" aria-label="보기 방식"><button type="button" class="is-active" data-view="month" aria-pressed="true">달력 보기</button><button type="button" data-view="week" aria-pressed="false">주간 보기</button></div><div class="cr-date-controls"><button id="cr-prev" aria-label="이전 주">←</button><label class="cr-date-label">날짜 <input type="date" id="cr-date" value="{{ room_today }}" required></label><button id="cr-next" aria-label="다음 주">→</button><button id="cr-today">오늘</button></div><button id="cr-refresh">새로고침</button></div>
     <div class="cr-calendar-meta"><p><span class="cr-dot cr-free-dot"></span>예약 없음 <span class="cr-dot cr-shared-dot"></span>함께 사용 가능 <span class="cr-dot cr-blocked-dot"></span>이용 불가</p><span id="cr-updated" role="status">불러오는 중</span></div>
     <p class="cr-error" id="cr-error" role="alert" hidden></p>
-    <div class="cr-days" id="cr-days" aria-label="날짜 선택"></div>
+    <div class="cr-month-wrap" id="cr-month-wrap">
+      <div class="cr-month-head"><h3 id="cr-month-title" aria-live="polite"></h3><p class="cr-month-legend"><span class="cr-pip is-regular"></span>일반 예약 <span class="cr-pip is-blocked"></span>동아리 일정 <span class="cr-pip is-today"></span>오늘</p></div>
+      <div class="cr-cal-weekdays" aria-hidden="true"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
+      <div class="cr-month-grid" id="cr-month-grid" role="group" aria-label="월간 달력, 날짜를 누르면 예약을 확인해요"></div>
+    </div>
+    <div class="cr-days" id="cr-days" aria-label="날짜 선택" hidden></div>
+    <div class="cr-day-head"><h3 id="cr-day-title"></h3><button type="button" id="cr-day-book" disabled>이 날짜 예약</button></div>
     <div class="cr-bookings" id="cr-grid" aria-label="선택한 날짜의 예약"></div>
     <p class="cr-footnote">한국시간 · 1시간 단위 · 00:00~09:00은 이용하지 않아요. ‘예약 없음’은 실제 이용 여부가 아닌 등록된 예약 기준입니다.</p>
   </section>
@@ -42,7 +48,7 @@
   <form id="cr-form"><fieldset id="cr-fields"><input type="hidden" id="cr-kind" value="regular">
     <div class="cr-time-fields"><label class="cr-use-date">사용 날짜<input type="date" id="cr-start-date" required></label><label>시작 시간<select id="cr-start-hour">{% for hour in range(9,24) %}<option value="{{ '%02d'|format(hour) }}">{{ '%02d'|format(hour) }}:00</option>{% endfor %}</select></label><label>종료 시간<select id="cr-end-hour">{% for hour in range(10,25) %}<option value="{{ '%02d'|format(hour) }}">{{ '%02d'|format(hour) }}:00</option>{% endfor %}</select></label></div>
     <p class="cr-duration" id="cr-duration"></p>
-    <label for="cr-email" id="cr-email-label">학교 메일 아이디 <span>· 수정·취소 시 6자리 인증에 사용</span></label>{{ knu_email_input(name='knu_email', id='cr-email') }}
+    <label for="cr-email" id="cr-email-label">학교 메일 아이디 <strong class="cr-required" aria-hidden="true">*</strong> <span>필수 · 예약 수정·취소 시 6자리 인증에 사용</span></label>{{ knu_email_input(name='knu_email', id='cr-email', required=true) }}
     <label for="cr-representative">대표자 이름 <span>시간표에 공개돼요</span></label><input id="cr-representative" maxlength="80" autocomplete="name" required>
     <label for="cr-participants">참여자 이름 <span>신청자와 운영진만 확인해요</span></label><textarea id="cr-participants" rows="3" maxlength="17000" placeholder="대표자를 포함해 적어주세요. 예: 김하늘, 이봄, 박여름&#10;여러 줄을 그대로 붙여넣어도 돼요." required></textarea>
     <label for="cr-purpose">사용 목적 <span>선택 · 비공개</span></label><input id="cr-purpose" maxlength="1000" placeholder="예: 책 읽기, 소모임">

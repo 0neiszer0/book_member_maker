@@ -115,3 +115,54 @@
 
 .cr-shell .knu-email-group input,.cr-dialog .knu-email-group input:not([type=hidden]){width:100%;min-width:0;border:0;border-radius:0;outline:none;box-shadow:none;background:transparent}
 .cr-lookup-row .knu-email-group{flex:1}
+
+/* Monthly calendar view */
+.cr-view-switch{display:inline-flex;border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;background:#fff}
+.cr-shell .cr-view-switch button{border:0;border-radius:0;min-height:38px;padding:6px 14px;background:#fff}
+.cr-shell .cr-view-switch button+button{border-left:1px solid #cbd5e1}
+.cr-shell .cr-view-switch button.is-active{background:#a6192e;color:#fff;font-weight:700}
+.cr-toolbar{flex-wrap:wrap}
+.cr-month-wrap[hidden],.cr-days[hidden]{display:none}
+.cr-calendar[data-view=month] .cr-calendar-meta p{display:none}
+.cr-month-head{display:flex;justify-content:space-between;align-items:center;gap:8px 16px;flex-wrap:wrap;padding:10px 16px;border-top:1px solid #e2e8f0}
+.cr-month-head h3{margin:0;font-size:20px}
+.cr-month-legend{margin:0;font-size:12px;color:#64748b;display:flex;align-items:center;flex-wrap:wrap;gap:4px 6px}
+.cr-pip{display:inline-block;width:8px;height:8px;border-radius:50%;flex:none}
+.cr-month-legend .cr-pip+.cr-pip,.cr-month-legend .cr-pip:not(:first-child){margin-left:8px}
+.cr-pip.is-regular{background:#f59e0b}.cr-pip.is-blocked{background:#a6192e}
+.cr-pip.is-today{background:#fff;box-shadow:0 0 0 2px #a6192e;width:10px;height:10px}
+.cr-cal-weekdays,.cr-month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+.cr-cal-weekdays{border-top:1px solid #e2e8f0;background:#f8fafc;text-align:center;font-size:12px;font-weight:700;color:#475569}
+.cr-cal-weekdays span{padding:6px 0}
+.cr-cal-weekdays span:first-child{color:#b91c1c}.cr-cal-weekdays span:last-child{color:#1d4ed8}
+.cr-month-grid{gap:1px;background:#e2e8f0;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0}
+.cr-shell .cr-month-grid .cr-cal-cell{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-height:104px;padding:6px;border:0;border-radius:0;background:#fff;text-align:left;overflow:hidden;position:relative}
+.cr-shell .cr-month-grid .cr-cal-cell:hover{background:#f8fafc}
+.cr-cal-num{font-size:13px;font-weight:700;line-height:22px;min-width:22px;height:22px;text-align:center}
+.cr-cal-cell:nth-child(7n+1) .cr-cal-num{color:#b91c1c}.cr-cal-cell:nth-child(7n) .cr-cal-num{color:#1d4ed8}
+.cr-shell .cr-month-grid .cr-cal-cell.is-outside{background:#f8fafc}
+.cr-cal-cell.is-outside .cr-cal-num,.cr-cal-cell.is-outside .cr-chip{opacity:.5;color:#94a3b8}
+.cr-cal-cell.is-today .cr-cal-num{background:#a6192e;color:#fff!important;border-radius:50%}
+.cr-shell .cr-month-grid .cr-cal-cell.is-selected{background:#fff1f2;box-shadow:inset 0 0 0 2px #a6192e}
+.cr-cal-chips{display:flex;flex-direction:column;gap:2px;width:100%}
+.cr-chip{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:17px;padding:0 6px;border-radius:5px}
+.cr-chip.is-regular{background:#fef3c7;color:#92400e}.cr-chip.is-blocked{background:#fee2e2;color:#881325}
+.cr-cal-more{font-size:11px;color:#64748b;padding-left:4px}
+.cr-cal-dots{display:none;align-items:center;gap:3px;flex-wrap:wrap}
+.cr-cal-count{font-size:10px;line-height:14px;padding:0 5px;border-radius:999px;background:#f1f5f9;color:#475569;font-weight:700}
+.cr-day-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px 0;flex-wrap:wrap}
+.cr-day-head h3{margin:0;font-size:16px}
+.cr-shell .cr-day-head button{background:#fff1f2;border-color:#fecdd3;color:#a6192e;font-weight:700}
+.cr-required{color:#a6192e;font-weight:700}
+.cr-dialog .cr-required{display:inline}
+@media(max-width:640px){
+.cr-toolbar{gap:8px}
+.cr-date-controls{width:100%;flex-wrap:nowrap}.cr-date-label input{max-width:116px;padding:8px 6px}.cr-toolbar>#cr-refresh{margin-left:0;width:100%}
+.cr-view-switch{width:100%}.cr-shell .cr-view-switch button{flex:1}
+.cr-month-head{padding:10px 12px}.cr-month-head h3{font-size:18px}
+.cr-shell .cr-month-grid .cr-cal-cell{min-height:48px;padding:4px 2px;align-items:center;gap:2px}
+.cr-cal-chips{display:none}.cr-cal-dots{display:flex;justify-content:center}
+.cr-cal-num{font-size:13px}
+.cr-day-head{padding:12px 12px 0}
+.cr-dialog{width:calc(100vw - 16px);padding:14px}
+}
