@@ -78,9 +78,14 @@ class AdminNavigationSimplifyTests(unittest.TestCase):
         self.login('admin')
         label, links = course_menu(self.page('/admin/seminars?term_id=term'))
         self.assertEqual(label, '학기 강의실 메뉴')
-        self.assertEqual([t for _, _, t in links], ['커리큘럼', '게시판', '내 출석', '세미나 운영', '학기 출석'])
+        self.assertEqual([t for _, _, t in links], ['커리큘럼', '세미나 전 자료', '게시판', '내 출석', '세미나 운영', '사전 자료 등록(MD)', '학기 출석'])
         for href, _, text in links:
             with self.subTest(item=text):
+                if text in ('세미나 전 자료', '사전 자료 등록(MD)'):
+                    expected = '/pre-seminar' if text == '세미나 전 자료' else '/admin/pre-seminar'
+                    self.assertEqual(href, expected)
+                    self.page(href)
+                    continue
                 menu, landed = course_menu(self.page(href))
                 self.assertEqual(menu, '학기 강의실 메뉴', f'{text} must stay inside the term')
                 self.assertIn(text, [t for _, current, t in landed if current])
@@ -122,7 +127,7 @@ class AdminNavigationSimplifyTests(unittest.TestCase):
         self.assertNotIn('학기 운영</p>', html)
         _, links = course_menu(html)
         texts = [t for _, _, t in links]
-        self.assertEqual(texts, ['커리큘럼', '게시판', '내 출석'])
+        self.assertEqual(texts, ['커리큘럼', '세미나 전 자료', '게시판', '내 출석'])
         for removed in ('공지사항', '발제문', '자료·기록', '맡은 업무', '세미나 운영', '도서·일정·사회자', '발제문 관리', '출석·조 편성', '학기 설정', '학기 출석', '학기 참석 현황'):
             self.assertNotIn(removed, texts)
 
@@ -130,7 +135,7 @@ class AdminNavigationSimplifyTests(unittest.TestCase):
         self.login('officer')
         _, links = course_menu(self.page('/seminars?term_id=term'))
         texts = [t for _, _, t in links]
-        self.assertEqual(texts, ['커리큘럼', '게시판', '내 출석', '세미나 운영', '학기 출석'])
+        self.assertEqual(texts, ['커리큘럼', '세미나 전 자료', '게시판', '내 출석', '세미나 운영', '사전 자료 등록(MD)', '학기 출석'])
         for removed in ('도서·일정·사회자', '발제문 관리', '출석·조 편성', '맡은 업무', '학기 설정'):
             self.assertNotIn(removed, texts)
         _, admin_links = course_menu(self.page('/admin/dashboard'))
