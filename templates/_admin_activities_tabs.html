@@ -3,4 +3,5 @@
   <a class="ui-tab{% if ep.startswith('admin_special_event') %} is-active{% endif %}" href="{{ url_for('admin_special_events') }}" {% if ep.startswith('admin_special_event') %}aria-current="page"{% endif %}>특별 행사 (OT·MT·총회)</a>
   <a class="ui-tab{% if ep.startswith('admin_engagement') %} is-active{% endif %}" href="{{ url_for('admin_engagement') }}" {% if ep.startswith('admin_engagement') %}aria-current="page"{% endif %}>벽돌책·도서 추천</a>
   <a class="ui-tab{% if ep.startswith('admin_seminar_room') %} is-active{% endif %}" href="{{ url_for('admin_seminar_rooms') }}" {% if ep.startswith('admin_seminar_room') %}aria-current="page"{% endif %}>세미나실 예약</a>
+  <a class="ui-tab{% if ep == 'admin_pre_seminar' %} is-active{% endif %}" href="{{ url_for('admin_pre_seminar') }}" {% if ep == 'admin_pre_seminar' %}aria-current="page"{% endif %}>세미나 사전 자료 (MD)</a>
 </nav>

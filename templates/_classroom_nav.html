@@ -6,9 +6,11 @@
 <nav class="lms-classroom-nav" aria-label="학기 강의실 메뉴">
 <p class="lms-term-name">{{ term.name }}</p>
 <a href="{{ url_for('seminars', term_id=term.id) }}" {% if page in ['curriculum', 'assignments', 'resources'] %}aria-current="page"{% endif %}>커리큘럼</a>
+<a href="{{ url_for('member_pre_seminar') }}" {% if ep in ['member_pre_seminar','member_pre_seminar_book'] %}aria-current="page"{% endif %}>세미나 전 자료</a>
 <a href="{{ url_for('boards.index', term_id=term.id) }}" {% if page in ['boards', 'notices'] or ep.startswith('boards.') %}aria-current="page"{% endif %}>게시판</a>
 <a href="{{ url_for('my_term_attendance', term_id=term.id) }}" {% if page == 'attendance' %}aria-current="page"{% endif %}>내 출석</a>
 {% if show_operations %}<p class="lms-term-name lms-nav-group-label">학기 운영</p>
-{% if is_staff %}<a href="{{ url_for('admin_seminars', term_id=term.id) }}" {% if ep in ['admin_seminars','admin_seminar_term','seminar_session_moderator','view_admin_topics','topic_document_setup','admin_seminar_roster','bookclub_index'] %}aria-current="page"{% endif %}>세미나 운영</a>{% endif %}
+{% if is_staff %}<a href="{{ url_for('admin_seminars', term_id=term.id) }}" {% if ep in ['admin_seminars','admin_seminar_term','seminar_session_moderator','view_admin_topics','topic_document_setup','admin_seminar_roster','bookclub_index'] %}aria-current="page"{% endif %}>세미나 운영</a>
+<a href="{{ url_for('admin_pre_seminar') }}" {% if ep == 'admin_pre_seminar' %}aria-current="page"{% endif %}>사전 자료 등록(MD)</a>{% endif %}
 {% if can_attendance %}<a href="{{ url_for('admin_term_attendance', term_id=term.id) }}" {% if ep in ['admin_term_attendance','admin_attendance_matrix'] %}aria-current="page"{% endif %}>학기 출석</a>{% endif %}
 {% endif %}</nav>{% endif %}

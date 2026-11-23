@@ -1,11 +1,13 @@
 {% extends 'lms_admin_base.html' %}
+{% set lms_title = '세미나 사전 자료 등록·관리' %}
 {% block content %}
 <style>
 .material-editor{max-width:1050px;margin:auto;padding:20px}.material-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}.material-editor label{display:block;font-weight:600}.material-editor input:not([type=checkbox]),.material-editor textarea{display:block;width:100%;box-sizing:border-box;padding:8px;margin-top:4px}.material-editor textarea{font-family:monospace;min-height:300px}.material-card,.material-preview{border:1px solid #d8dcdf;padding:16px;margin:14px 0;border-radius:4px}.material-preview{max-width:100%;overflow-x:auto}.material-actions{display:flex;gap:8px;flex-wrap:wrap}.material-actions a,.material-actions button{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:6px 12px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a;font:inherit;font-size:14px;font-weight:600;text-decoration:none;cursor:pointer}.material-actions button[type=submit]{background:#a6192e;border-color:#a6192e;color:#fff}.material-preview table{border-collapse:collapse}.material-preview td{border:1px solid #ccc;padding:6px}
 @media(max-width:767px){.material-editor{padding:12px}.material-editor input:not([type=checkbox]),.material-editor textarea{font-size:16px;min-height:40px}.material-actions a,.material-actions button{min-height:40px}.material-preview table{min-width:480px}}
 </style>
 <div class="material-editor">
-<h1>사전 자료 등록·관리</h1>
+<h1>세미나 사전 자료 등록·관리</h1>
+<p><code>.md</code> 파일을 불러오거나 아래 본문 칸에 Markdown을 그대로 복사·붙여넣기한 뒤 공개 상태로 저장하면 회원용 /pre-seminar에 바로 게시됩니다.</p>
 <p><a href="{{ url_for('member_pre_seminar') }}">사전 자료실로 돌아가기</a></p>
 {% if request.args.get('saved') %}<p role="status">저장했습니다.</p>{% endif %}
 <h2>Markdown {{ '수정' if edit else '등록' }}</h2>

@@ -42,7 +42,7 @@
   {'title': '내 활동 · 마이페이지', 'url': url_for('my_page'), 'group': '회원', 'keywords': '마이페이지 내활동 기록 프로필 mypage', 'description': '내 프로필과 누적 활동 기록 보기'},
   {'title': '지금 참여하기', 'url': url_for('engagement_now'), 'group': '회원', 'keywords': '후기 벽돌책 모집 책추천 참여 신청 engagement', 'description': '진행 중인 후기·벽돌책·책 추천 바로가기'},
   {'title': '책 추천 · 도서 제안', 'url': url_for('book_suggestions'), 'group': '회원', 'keywords': '도서 추천 책 신간 제안 book suggest', 'description': '함께 읽을 책 추천과 공감'},
-  {'title': '동아리방 시간표 · 신청', 'url': url_for('club_room'), 'group': '회원', 'keywords': '동방 동아리방 예약 시간표 개방 clubroom', 'description': '동아리방 이용 시간표와 예약 신청'},
+  {'title': '동아리방 시간표 · 신청', 'url': url_for('lms_calendar'), 'group': '회원', 'keywords': '동방 동아리방 예약 시간표 개방 clubroom', 'description': '동아리방 이용 시간표와 예약 신청'},
   {'title': '캘린더 · 월간 일정', 'url': url_for('lms_calendar'), 'group': '회원', 'keywords': '캘린더 달력 일정 세미나 행사 calendar', 'description': '월간 세미나·행사 일정 한눈에 보기'},
   {'title': '회원 소개', 'url': url_for('profiles_page'), 'group': '회원', 'keywords': '회원소개 멤버 프로필 사람들 profile', 'description': '함께하는 동아리 회원 소개 보기'},
   {'title': '역대 커리큘럼·발제·토의 아카이브', 'url': url_for('public_archive'), 'group': '회원', 'keywords': '아카이브 역대 커리큘럼 발제문 토의 일지 도서 필담 미식회 archive', 'description': '역대 커리큘럼 도서·발제문·서기 정리 토의 기록'},
@@ -55,6 +55,7 @@
 {% if wiki_enabled and wiki_url|default('') %}{% set _qs_base = _qs_base + [{'title': '회원 위키', 'url': wiki_url, 'group': '회원', 'keywords': '위키 가이드 문서 동아리규정 wiki', 'description': '동아리 회원 위키 바로가기'}] %}{% endif %}
 {% if session.user_role in ['admin', 'officer'] and not session.member_preview %}
 {% set _qs_staff = [
+  {'title': '세미나 사전 자료 등록·관리 (MD 복붙)', 'url': url_for('admin_pre_seminar'), 'group': '운영진', 'keywords': '세미나 사전 자료 마크다운 md 업로드 등록 붙여넣기 pre-seminar', 'description': 'Markdown 파일 업로드 또는 복붙으로 세미나 전 읽기 자료 게시'},
   {'title': '운영 홈 · 운영 개요', 'url': url_for('admin_dashboard'), 'group': '운영진', 'keywords': '운영홈 운영개요 운영 관리 대시보드 admin overview', 'description': '동아리 운영 현황과 주간 체크리스트 한눈에 보기'},
   {'title': '세미나 운영 (도서·일정·발제·조편성)', 'url': url_for('admin_seminars'), 'group': '운영진', 'keywords': '세미나 운영 회차 도서 사회자 발제 생성 관리', 'description': '학기별 도서·일정·사회자·발제문·후기 통합 관리'},
   {'title': '조 편성 · 팀 나누기', 'url': url_for('bookclub_index'), 'group': '운영진', 'keywords': '조편성 팀짜기 그룹 조배정 making_team', 'description': '세미나 조 편성 생성·추천·수정'},

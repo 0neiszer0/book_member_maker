@@ -120,116 +120,9 @@
     if (!response.ok && data.status !== 'overlap') throw new Error(data.error || '정보를 확인하지 못했어요.');
     return data;
   }
-  function render() {
-    const focusedLabel = document.activeElement.closest('#cr-days, #cr-grid, #cr-month-grid') ? document.activeElement.getAttribute('aria-label') : null;
-    $('cr-date').value = selected;
-    $('cr-summary-date').textContent = dateText(selected);
-    $('cr-days').replaceChildren(); $('cr-grid').replaceChildren(); $('cr-free').replaceChildren();
-    const start = weekStart(selected), month = view === 'month';
-    $('cr-calendar').dataset.view = view;
-    $('cr-month-wrap').hidden = !month; $('cr-days').hidden = month;
-    document.querySelectorAll('.cr-view-switch button').forEach(button => { const on = button.dataset.view === view; button.classList.toggle('is-active', on); button.setAttribute('aria-pressed', String(on)); });
-    $('cr-prev').setAttribute('aria-label', month ? '이전 달' : '이전 주'); $('cr-next').setAttribute('aria-label', month ? '다음 달' : '다음 주');
-    renderNow();
-    if (month) renderMonth();
-    for (let i = 0; i < (month ? 0 : 7); i++) {
-      const day = shiftDate(start, i), isSelected = day === selected;
-      const tab = node('button', undefined, isSelected ? 'is-selected' : '');
-      tab.type = 'button'; tab.setAttribute('aria-pressed', String(isSelected)); tab.setAttribute('aria-label', dateText(day));
-      tab.append(node('span', '일월화수목금토'[new Date(day + 'T00:00:00Z').getUTCDay()]), node('strong', String(Number(day.slice(8)))));
-      tab.addEventListener('click', () => goto(day)); $('cr-days').append(tab);
-    }
-    if (ready) {
-      const start = Date.parse(selected + 'T00:00:00+09:00');
-      const rows = bookings.filter(row => overlaps(row, start, start + 24 * hourMs)).sort((a,b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
-      for (const row of rows) {
-        const item = node('div', undefined, 'cr-booking-row' + (row.kind === 'blocked' ? ' is-blocked' : ''));
-        const from = kst(row.starts_at), to = kst(row.ends_at);
-        item.append(node('strong', (from.slice(0,10) === selected ? from.slice(11) : from.replace('T',' ')) + '–' + (to.slice(0,10) === selected ? to.slice(11) : to === shiftDate(selected,1) + 'T00:00' ? '24:00' : to.replace('T',' '))),
-          node('span', row.kind === 'blocked' ? '이용 불가 · 동아리 일정' : row.representative),
-          node('small', row.kind === 'blocked' ? '이 시간 외에 신청해주세요' : '함께 사용 가능'));
-        $('cr-grid').append(item);
-        if (targetMatches(calendarLink, row, selected)) {
-          item.classList.add('cr-calendar-target'); item.tabIndex = -1;
-          item.setAttribute('aria-label', '캘린더에서 선택한 일정');
-          if (!calendarFocused) {calendarFocused = true; item.focus({preventScroll:true}); item.scrollIntoView({block:'center'});}
-        }
-      }
-      if (!rows.length) $('cr-grid').append(node('p', '등록된 예약이 없어요. 원하는 시간으로 신청하세요.', 'cr-empty'));
-    }
-    if (!ready) $('cr-free').textContent = '시간표를 다시 불러온 뒤 확인해주세요.';
-    else {
-      const ranges = freeRanges(bookings, selected, now);
-      ranges.forEach(([startHour, endHour]) => {
-        const button = node('button'); button.type = 'button';
-        button.append(node('strong',pad(startHour) + ':00–' + pad(endHour) + ':00'),node('span','이 시간에 예약하기 →'));
-        button.setAttribute('aria-label',pad(startHour)+':00부터 '+pad(endHour)+':00 사이 예약하기');
-        button.addEventListener('click', () => openNew(selected, startHour, 'regular', endHour)); $('cr-free').append(button);
-      });
-      if (!ranges.length) $('cr-free').textContent = '예약 없는 시간이 없어요. 일반 예약과는 함께 사용할 수 있어요.';
-    }
-    const dayCount = ready ? (groupBookingsByDate(bookings)[selected] || {all: []}).all.length : 0;
-    $('cr-day-title').textContent = dateText(selected) + (ready ? (dayCount ? ' · 예약 ' + dayCount + '건' : ' · 예약 없음') : '');
-    $('cr-new').disabled = !ready || selected < kst(now).slice(0,10);
-    $('cr-day-book').disabled = $('cr-new').disabled;
-    if (staff) $('cr-meeting').disabled = $('cr-new').disabled;
-    if (focusedLabel) [...root.querySelectorAll('button[aria-label]')].find(button => button.getAttribute('aria-label') === focusedLabel)?.focus({preventScroll:true});
-  }
-  function renderMonth() {
-    const range = monthGridRange(selected), groups = ready ? groupBookingsByDate(bookings) : {}, today = kst(now).slice(0, 10);
-    $('cr-month-title').textContent = range.year + '년 ' + range.month + '월';
-    $('cr-month-grid').replaceChildren();
-    range.dates.forEach(day => {
-      const group = groups[day] || {regular: [], blocked: [], all: []}, total = group.all.length;
-      const cell = node('button', undefined, 'cr-cal-cell' + (Number(day.slice(5, 7)) !== range.month ? ' is-outside' : '') + (day === today ? ' is-today' : '') + (day === selected ? ' is-selected' : ''));
-      cell.type = 'button'; cell.dataset.date = day; cell.setAttribute('aria-pressed', String(day === selected));
-      cell.setAttribute('aria-label', Number(day.slice(0, 4)) + '년 ' + Number(day.slice(5, 7)) + '월 ' + Number(day.slice(8)) + '일, ' + (total ? '예약 ' + total + '건' : '예약 없음') + (day === today ? ', 오늘' : ''));
-      const chips = node('span', undefined, 'cr-cal-chips'), dots = node('span', undefined, 'cr-cal-dots');
-      group.all.slice(0, 3).forEach(row => {
-        const blocked = row.kind === 'blocked' || row.kind === 'meeting', from = kst(row.starts_at);
-        chips.append(node('span', (from.slice(0, 10) === day ? from.slice(11) : '00:00') + ' ' + (blocked ? '동아리 일정' : row.representative || '예약'), 'cr-chip ' + (blocked ? 'is-blocked' : 'is-regular')));
-        dots.append(node('span', undefined, 'cr-pip ' + (blocked ? 'is-blocked' : 'is-regular')));
-      });
-      if (total > 3) chips.append(node('span', '+' + (total - 3) + '건', 'cr-cal-more'));
-      if (total) dots.append(node('span', total + '건', 'cr-cal-count'));
-      cell.append(node('span', String(Number(day.slice(8))), 'cr-cal-num'), chips, dots);
-      cell.addEventListener('click', () => goto(day));
-      $('cr-month-grid').append(cell);
-    });
-  }
-  const rangeFor = day => { if (view === 'month') { const r = monthGridRange(day); return {start: r.start, days: r.days}; } return {start: weekStart(day), days: 7}; };
-  const covers = day => !!loaded && day >= loaded.start && day <= shiftDate(loaded.start, loaded.days - 1);
-  function goto(day) {
-    selected = day; const range = rangeFor(day);
-    if (!loaded || loaded.start !== range.start || loaded.days !== range.days) { ready = false; render(); refresh(); }
-    else { render(); if (staff) refreshStaff(); }
-  }
-  let todayRows = null;
-  function renderNow() {
-    const el = $('cr-now-status'), today = kst(now).slice(0, 10);
-    const rows = covers(today) && ready ? bookings : todayRows;
-    if (!rows) return;
-    const status = nowStatus(rows, now);
-    el.textContent = status.text; el.dataset.tone = status.tone;
-  }
-  async function refreshToday() {
-    const thisWeek = weekStart(kst(Date.now()).slice(0, 10));
-    if (covers(kst(Date.now()).slice(0, 10))) { todayRows = null; return; }
-    try { const data = await api('/api/club-room/schedule?date=' + thisWeek); todayRows = data.bookings; now = Date.parse(data.now); renderNow(); } catch (_) {}
-  }
-  async function refresh() {
-    const seq = ++requestNumber, range = rangeFor(selected);
-    try {
-      const data = await api('/api/club-room/schedule?date=' + range.start + (view === 'month' ? '&days=' + range.days : ''));
-      if (seq !== requestNumber) return;
-      loaded = range; bookings = data.bookings; now = Date.parse(data.now); ready = true; message('cr-error', ''); refreshToday();
-      $('cr-updated').textContent = '방금 확인 · 화면이 열려 있으면 30초마다 갱신'; render();
-      if (staff) refreshStaff();
-    } catch (error) {
-      if (seq !== requestNumber) return;
-      ready = false; render(); message('cr-error', error.message); $('cr-updated').textContent = '최신 상태 확인 필요';
-    }
-  }
+  function render() { $('cr-new').disabled = selected < kst(now).slice(0, 10); }
+  function refresh() { now = Date.now(); ready = true; render(); if (staff) refreshStaff(); }
+  window.addEventListener('calendar:date-selected', event => { selected = event.detail.date; render(); });
   async function refreshStaff() {
     const seq = ++staffRequest;
     if (!$('cr-staff-panel').open) return;
@@ -263,7 +156,7 @@
     $('cr-email').value = root.dataset.email ? root.dataset.email.replace(/@knu\.ac\.kr$/, '') : '';
     const emailNeeded = !current.version && booking.kind !== 'meeting';
     $('cr-email').required = emailNeeded; $('cr-email').setAttribute('aria-required', String(emailNeeded));
-    $('cr-email').closest('.knu-email-group').hidden = $('cr-email-label').hidden = !!current.version;
+    $('cr-email').closest('.knu-email-group').hidden = $('cr-email-label').hidden = !!current.version || booking.kind === 'meeting';
     $('cr-receipt').hidden = true; message('cr-form-error', ''); $('cr-kind').value = booking.kind;
     $('cr-representative').value = booking.representative || ''; $('cr-participants').value = (booking.participants || []).join(', '); $('cr-purpose').value = booking.purpose || '';
     const from = kst(booking.starts_at), to = kst(booking.ends_at);
@@ -280,6 +173,8 @@
     $('cr-meeting-note').hidden = booking.kind !== 'meeting';
     if (!supported) { $('cr-save').hidden = true; $('cr-fields').disabled = true; message('cr-form-error', '기존 예약은 그대로 유지돼요: ' + timeText(booking) + '. 야간 예약 변경은 운영진에게 문의해주세요. 취소는 가능합니다.'); }
     if (booking.cancelled_at) { $('cr-save').hidden = true; $('cr-fields').disabled = true; message('cr-form-error', '취소된 예약이에요. 다시 사용하려면 새로 신청해주세요.'); }
+    document.querySelectorAll('[data-kind]').forEach(button => { button.hidden = !!current.version; button.setAttribute('aria-pressed', String(button.dataset.kind === booking.kind)); });
+    if ($('cr-my').open) $('cr-my').close();
     if (!dialog.open) dialog.showModal();
   }
   function openNew(day, hour, kind = 'regular', endHour = hour + 1) {
@@ -319,7 +214,7 @@
       $('cr-receipt-detail').textContent = (mailed ? '예약이 완료되었어요! 수정·취소가 필요하면 학교 메일 인증으로 언제든 변경할 수 있어요.\n' : '') + timeText(data.booking) + '\n대표자 ' + data.booking.representative + (body.kind === 'meeting' ? '\n기존 예약은 유지됩니다. 필요한 경우 직접 조율해주세요.' : ' · 참여 ' + data.booking.participants.length + '명');
       $('cr-dialog-title').textContent = '처리 완료';
       loadMine();
-      refresh();
+      refresh(); window.dispatchEvent(new CustomEvent('clubroom:changed'));
     } catch (error) { message('cr-form-error', error.message); }
     finally { setBusy(false); }
   }
@@ -340,15 +235,21 @@
   $('cr-close').addEventListener('click', close); dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
   window.addEventListener('beforeunload', event => { if (dirty || busy) { event.preventDefault(); event.returnValue = ''; } });
   $('cr-new').addEventListener('click', () => openNew(selected, selected === kst(now).slice(0,10) ? Number(kst(now).slice(11,13)) : 9));
-  if (staff) { $('cr-meeting').addEventListener('click', () => openNew(selected, selected === kst(now).slice(0,10) ? Number(kst(now).slice(11,13)) : 9, 'meeting')); $('cr-staff-panel').addEventListener('toggle', refreshStaff); }
-  $('cr-date').addEventListener('change', () => { if (/^\d{4}-\d{2}-\d{2}$/.test($('cr-date').value)) goto($('cr-date').value); });
-  for (const [id, direction] of [['cr-prev',-1],['cr-next',1]]) $(id).addEventListener('click', () => goto(view === 'month' ? shiftMonth(selected, direction) : shiftDate(selected, direction * 7)));
-  $('cr-today').addEventListener('click', () => goto(kst(new Date()).slice(0,10)));
-  document.querySelectorAll('.cr-view-switch button').forEach(button => button.addEventListener('click', () => { if (view !== button.dataset.view) { view = button.dataset.view; goto(selected); } }));
-  $('cr-day-book').addEventListener('click', () => $('cr-new').click());
-  $('cr-refresh').addEventListener('click', () => refresh());
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
-  setInterval(() => { if (!document.hidden) refresh(); }, 30000);
+  if (staff) $('cr-staff-panel').addEventListener('toggle', refreshStaff);
+  document.querySelectorAll('[data-kind]').forEach(button => button.addEventListener('click', () => {
+    const kind = button.dataset.kind;
+    $('cr-kind').value = kind;
+    $('cr-email').required = kind === 'regular';
+    $('cr-email').setAttribute('aria-required', String(kind === 'regular'));
+    $('cr-email').closest('.knu-email-group').hidden = $('cr-email-label').hidden = kind === 'meeting';
+    $('cr-meeting-note').hidden = kind !== 'meeting';
+    $('cr-dialog-title').textContent = kind === 'meeting' ? '운영진 회의 등록' : '동아리방 사용 신청';
+    $('cr-save').textContent = kind === 'meeting' ? '회의 일정 등록' : '사용 신청 완료';
+    document.querySelectorAll('[data-kind]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+  }));
+  $('cr-my-open').addEventListener('click', () => $('cr-my').showModal());
+  $('cr-my-close').addEventListener('click', () => $('cr-my').close());
+  window.addEventListener('clubroom:show-booking', () => { if (!$('cr-my').open) $('cr-my').showModal(); });
   ['cr-mail-id', 'cr-email'].forEach(id => $(id).addEventListener('input', event => { event.target.value = event.target.value.replace(/@knu\.ac\.kr$/i, ''); }));
   const mine = {email: root.dataset.email || ''};
   function mineMessage(text) { message('cr-mail-error', text); }

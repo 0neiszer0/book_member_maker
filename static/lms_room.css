@@ -166,3 +166,7 @@
 .cr-day-head{padding:12px 12px 0}
 .cr-dialog{width:calc(100vw - 16px);padding:14px}
 }
+
+.cr-kind-switch{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}.cr-kind-switch button{min-height:44px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;background:white;cursor:pointer}.cr-kind-switch button[aria-pressed="true"]{background:#a6192e;color:white}.cr-my{max-height:85vh;overflow:auto}.cr-dialog{box-sizing:border-box;max-width:calc(100vw - 24px)}
+
+dialog.cr-my:not([open]){display:none} #club-room > #integrated-calendar .cr-primary{min-height:40px;border:1px solid #a6192e;border-radius:8px;padding:8px 12px;background:#a6192e;color:#fff;font-weight:700;cursor:pointer}
