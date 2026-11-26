@@ -97,20 +97,18 @@ class QuickSearchAndHandoverTests(unittest.TestCase):
         return match.group(1), html
 
     # --- 1. Quick Search Tests ---
-    def test_quick_search_guest_only_sees_public_items(self):
-        resp = self.client.get("/login")
-        self.assertEqual(resp.status_code, 200)
-        html = resp.get_data(as_text=True)
-        self.assertIn("quick_search.js", html)
-        self.assertIn("quick_search.css", html)
-        items = self._extract_quick_search_items(html)
-        urls = {item["url"] for item in items}
-        self.assertIn("/", urls)
-        self.assertIn("/club-room", urls)
-        self.assertNotIn("/mypage", urls)
-        self.assertNotIn("/admin/members", urls)
-        self.assertNotIn("/making_team", urls)
-        self.assertNotIn("/admin/handover", urls)
+    def test_guest_auth_pages_omit_quick_search(self):
+        for path in ("/login", "/signup"):
+            with self.subTest(path=path):
+                response = self.client.get(path)
+                self.assertEqual(response.status_code, 200)
+                html = response.get_data(as_text=True)
+                self.assertIn('class="auth-brand"', html)
+                self.assertNotIn('id="lms-global"', html)
+                self.assertNotIn("data-lms-quick-search", html)
+                self.assertNotIn('id="lms-quick-search-items"', html)
+                self.assertNotIn("quick_search.js", html)
+                self.assertNotIn("quick_search.css", html)
 
     def test_quick_search_member_excludes_staff_items(self):
         self.login("member")
