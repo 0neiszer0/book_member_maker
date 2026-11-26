@@ -388,6 +388,10 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
                 and member.get('auth_provider') == 'local')
 
     def email_page(email='', purpose='login', *, sent=False, error=None, status=200):
+        if purpose == 'signup':
+            return render_template('signup.html', email=email, email_purpose='signup', email_sent=sent,
+                                   email_error=error, values={},
+                                   next_url=safe_internal_next_url(request.values.get('next')) or ''), status
         return login_page(auth_section='email', email=email, email_purpose=purpose,
                           email_sent=sent, email_error=error, status=status)
 
@@ -656,7 +660,7 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
         code = active_signup_code()
         return render_template('signup.html', error=error, values=values,
                                code_ready=bool(code), code_required=bool(code) and not code.get('open'),
-                               member_min=MEMBER_MIN_PASSWORD,
+                               member_min=MEMBER_MIN_PASSWORD, legacy_signup=True,
                                next_url=safe_internal_next_url(request.values.get('next')) or ''), status
 
     @app.route('/signup', methods=['GET', 'POST'])
@@ -666,8 +670,11 @@ def install_local_auth(app, get_db, login_required, primary_admin_check):
         if request.method == 'GET':
             if valid_email_grant('enroll'):
                 return redirect(url_for('email_auth_enroll'), code=303)
-            next_url = safe_internal_next_url(request.args.get('next'))
-            return redirect(url_for('login', mode='email', next=next_url), code=303)
+            if request.args.get('legacy') == '1':
+                return signup_form()
+            return render_template('signup.html', email='', email_purpose='signup', values={},
+                                   legacy_signup=False,
+                                   next_url=safe_internal_next_url(request.args.get('next')) or '')
         form = request.form
         values = dict(name=(form.get('name') or '').strip(),
                       student_id=normalize_member_student_id(form.get('student_id')),

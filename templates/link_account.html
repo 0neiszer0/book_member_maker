@@ -40,7 +40,7 @@
 </section>
 {% endmacro %}
 
-{% block content %}
+{% block auth_content %}
 <div class="auth-profile">
   {% if profile_pic %}<img class="auth-avatar" src="{{ profile_pic }}" alt="카카오 프로필">{% endif %}
   <h1>{{ social_name or '회원' }}님, 반가워요</h1>

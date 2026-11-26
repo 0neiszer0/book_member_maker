@@ -170,8 +170,15 @@ class LmsNavigationTests(unittest.TestCase):
         self.assertEqual(html.count('data-attendance-key='), 3)
         self.assertNotIn('다른 회원 비공개', html)
 
-    def test_guest_login_uses_lms_shell_and_room_uses_public_shell(self):
-        self.assert_lms_response('/login')
+    def test_guest_login_uses_isolated_auth_shell_and_room_uses_public_shell(self):
+        login = self.client.get('/login')
+        self.assertEqual(login.status_code, 200)
+        login_html = login.get_data(as_text=True)
+        self.assertIn('name="app-layout" content="canvas"', login_html)
+        self.assertIn('lms-isolated-auth', login_html)
+        self.assertEqual(login_html.count('id="lms-content"'), 1)
+        self.assertNotIn('id="lms-global"', login_html)
+        self.assertNotIn('class="lms-breadcrumb"', login_html)
         response = self.client.get('/club-room')
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)

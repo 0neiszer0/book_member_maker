@@ -1,7 +1,26 @@
 {% extends 'lms_base.html' %}
 {% set lms_page = 'auth' %}
+{% set lms_isolated_auth = not session.user_role %}
 {% set lms_title = {'login': '로그인', 'login_password': '로그인', 'signup': '회원가입', 'account_convert': '아이디 만들기', 'account_setup': '비밀번호 정하기', 'account_password': '비밀번호 변경'}.get(request.endpoint, '회원 정보 확인') %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='lms_auth.css') }}">
 <script defer src="{{ url_for('static', filename='auth_code_boxes.js') }}"></script>
+{% endblock %}
+{% block content %}
+<div class="auth-stage">
+  {% if lms_isolated_auth %}
+  <header class="auth-brand">
+    <a class="auth-brand-link" href="{{ url_for('main_index') }}">
+      <svg class="auth-brand-mark" width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true" focusable="false">
+        <rect width="40" height="40" rx="8" fill="#d20f17"/>
+        <path d="M10 13.5c3.6-1.4 7-1 10 1.2v13.6c-3-2.2-6.4-2.6-10-1.2V13.5Z" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M30 13.5c-3.6-1.4-7-1-10 1.2v13.6c3-2.2 6.4-2.6 10-1.2V13.5Z" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/>
+      </svg>
+      <span class="auth-brand-name">책 먹는 호반우</span>
+    </a>
+    <p class="auth-brand-sub">경북대학교 중앙독서동아리</p>
+  </header>
+  {% endif %}
+  {% block auth_content %}{% endblock %}
+</div>
 {% endblock %}
