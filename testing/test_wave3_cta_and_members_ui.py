@@ -156,7 +156,11 @@ class Wave3CtaAndMembersUiTest(unittest.TestCase):
         header_nav = dom.select_one("header.mast nav")
         self.assertIsNotNone(header_nav)
         nav_links = [(a.get_text(strip=True), a.get("href")) for a in header_nav.select("a")]
-        self.assertEqual(nav_links, [("역대 아카이브", "/archive"), ("로그인", "/login")])
+        self.assertEqual(nav_links, [
+            ("역대 아카이브", "/archive"),
+            ("세미나 전 자료", "/pre-seminar"),
+            ("로그인", "/login"),
+        ])
 
         self.assertIsNone(dom.select_one("header.mast [data-lms-quick-search]"))
         self.assertIsNone(dom.select_one("#lms-quick-search-items"))
