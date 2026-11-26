@@ -400,7 +400,7 @@ class Wave13PreSeminarReaderTests(PublicArchiveAndPreSeminarTests):
             "edition_note": "", "markdown_body": GODOT_MD, "is_published": True, "created_at": "2026-11-20T00:00:00Z"}]
         self.login("member")
         html = self.client.get("/pre-seminar/waiting-for-godot").get_data(as_text=True)
-        self.assertIn("2026-2학기 (9권)", html)
+        self.assertEqual(html.count("2026-2학기 (9권)"), 1)
         self.assertIn("2026 여름방학 (7권)", html)
         self.assertIn("전체 (16권)", html)
         self.assertNotIn("(1권)", html)

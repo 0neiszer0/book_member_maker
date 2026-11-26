@@ -186,7 +186,7 @@
           <input type="search" id="pre-book-filter" class="pre-search" placeholder="도서명·저자 검색" aria-label="도서명 또는 저자 검색" autocomplete="off">
           {% for grp in grouped_books %}
           <div class="pre-sem-group">
-            <h2 class="pre-sem-heading">{{ grp.label }} ({{ grp.books|length }}권)</h2>
+            <h2 class="pre-sem-heading">{{ grp.label }}</h2>
             <ul class="pre-book-list">
               {% for b in grp.books %}
               <li class="pre-book-item" data-search="{{ (b.title ~ ' ' ~ (b.author or ''))|lower }}">
