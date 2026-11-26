@@ -1,4 +1,4 @@
-{% extends 'lms_base.html' %}
+{% extends 'lms_base.html' if session.get('user_role') else '_public_shell.html' %}
 {% set lms_title = active_book.title + ' · 세미나 전 자료' if active_book else '세미나 전 자료' %}
 {% set lms_page = 'pre_seminar' %}
 {% block title %}{{ lms_title }} · 책 먹는 호반우{% endblock %}
@@ -12,6 +12,14 @@
 .pre-crumb a:hover,.pre-toplink:hover{text-decoration:underline}
 .pre-toplinks{display:flex;align-items:center;gap:4px 16px;flex-wrap:wrap;font-size:14px}
 .pre-toplink{color:#56616a;font-weight:500}
+.pre-toplink-login{display:inline-flex;align-items:center;min-height:36px;box-sizing:border-box;padding:4px 14px;border:1px solid #e3b5b8;border-radius:999px;background:#fff5f5;color:#a80b12;font-weight:700;font-size:14px;text-decoration:none}
+.pre-toplink-login:hover{background:#ffe9ea;border-color:#a80b12;text-decoration:none}
+body.public-shell .pre-shell{margin:0 auto;padding:14px 0 36px}
+.pre-login-cta{margin-top:24px;padding:18px 20px;border:1px solid #d8dcdf;border-radius:6px;background:#f8f9fa}
+.pre-shell .pre-login-eyebrow{margin:0 0 4px;font-size:12.5px;font-weight:700;color:#a80b12}
+.pre-shell .pre-login-title{margin:0;font-size:17px;font-weight:700;line-height:1.45;color:#2d3b45}
+.pre-shell .pre-login-desc{margin:6px 0 0;font-size:14px;line-height:1.6;color:#56616a}
+.pre-login-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .pre-layout{display:grid;grid-template-columns:276px minmax(0,1fr);gap:22px;align-items:start}
 .pre-sidebar{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow-y:auto;border:1px solid #d8dcdf;border-radius:6px;background:#fff}
 .pre-catalog>summary{list-style:none;display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 12px;cursor:pointer}
@@ -105,7 +113,9 @@
   .pre-topbar{margin-bottom:8px}
   .pre-shell .pre-title{font-size:21px}
   .pre-detail{padding:14px 12px 18px;border-radius:6px}
-  .pre-detail-actions .lms-button{min-height:44px}
+  .pre-detail-actions .lms-button,.pre-login-actions .lms-button{min-height:44px}
+  .pre-toplink-login{min-height:44px}
+  .pre-login-cta{padding:16px 14px}
   .pre-search{font-size:16px;min-height:44px}
   .pre-filter-tab{min-height:40px;font-size:13.5px}
   .pre-book-link{min-height:44px;box-sizing:border-box}
@@ -162,6 +172,7 @@
     <div class="pre-toplinks">
       {% if is_staff %}<a class="pre-toplink" href="{{ url_for('admin_pre_seminar') }}">사전 자료 관리</a>{% endif %}
       <a class="pre-toplink" href="{{ url_for('public_archive') }}">공개 아카이브</a>
+      {% if not is_logged_in %}<a class="pre-toplink-login" href="{{ login_url }}">회원 로그인</a>{% endif %}
     </div>
   </div>
 
@@ -212,12 +223,13 @@
         {% if eyebrow %}<p class="pre-eyebrow">{{ eyebrow }}</p>{% endif %}
         <h1 class="pre-title">{{ active_book.title }}</h1>
         {% if active_book.edition_note %}<p class="pre-edition">{{ active_book.edition_note }}</p>{% endif %}
-        {% if linked_week or is_staff or has_archive_book %}
+        {% if linked_week or is_staff or has_archive_book or not is_logged_in %}
         <div class="pre-detail-actions">
           {% if linked_week %}<a class="lms-button" href="{{ url_for('seminars', term_id=linked_week.term_id, week_id=linked_week.week_id, _anchor='week-' ~ linked_week.week_id) }}">← 해당 세미나로 돌아가기</a>{% endif %}
           {% if linked_week and linked_week.topic_event_id %}<a class="lms-button" href="{{ url_for('member_topic_reader', event_id=linked_week.topic_event_id) }}">이 세미나 발제문 보기</a>{% endif %}
           {% if is_staff and active_book.source == 'db' %}<a class="lms-button" href="{{ url_for('admin_pre_seminar', edit=active_book.id) }}">이 자료 수정</a>{% endif %}
           {% if has_archive_book %}<a class="lms-button" href="{{ url_for('public_archive_book', slug=active_book.slug) }}">발제문·토의 기록 보기</a>{% endif %}
+          {% if not is_logged_in %}<a class="lms-button" href="{{ login_url }}">로그인하고 발제문·세미나 일정 보기 →</a>{% endif %}
         </div>
         {% endif %}
       </header>
@@ -242,6 +254,18 @@
           <li><a class="pre-ext-link" href="{{ ref.url }}" target="_blank" rel="noopener noreferrer">{{ ref.title }}</a></li>
           {% endfor %}
         </ul>
+      </section>
+      {% endif %}
+
+      {% if not is_logged_in %}
+      <section class="pre-login-cta" aria-labelledby="pre-login-title">
+        <p class="pre-login-eyebrow">책 먹는 호반우 회원이라면</p>
+        <h2 class="pre-login-title" id="pre-login-title">로그인하면 이 세미나의 발제문과 일정까지 이어서 볼 수 있어요</h2>
+        <p class="pre-login-desc">주차별 커리큘럼, 발제문 작성·열람, 출석 현황, 동아리방 예약까지 한 곳에서 이용할 수 있습니다.</p>
+        <div class="pre-login-actions">
+          <a class="lms-button lms-button-primary" href="{{ login_url }}">회원 로그인하기</a>
+          <a class="lms-button" href="{{ url_for('public_archive') }}">역대 아카이브 보기</a>
+        </div>
       </section>
       {% endif %}
 

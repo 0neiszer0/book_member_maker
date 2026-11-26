@@ -54,11 +54,9 @@
         <h1>역대 커리큘럼·발제·토의 아카이브</h1>
         <p class="arc-lead">2025-2학기부터 이어온 선정 도서와 부원들이 직접 작성한 발제문, 서기가 정리한 전체 토의 기록을 누구나 열람할 수 있습니다. 모든 기록은 개인정보 보호를 위해 익명화하여 공개합니다.</p>
       </div>
-      {% if session.user_role %}
       <div class="arc-hero-actions">
-        <a class="lms-button lms-button-primary" href="{{ url_for('member_pre_seminar') }}">회원 전용 세미나 전 자료</a>
+        <a class="lms-button lms-button-primary" href="{{ url_for('member_pre_seminar') }}">세미나 전 자료 보기</a>
       </div>
-      {% endif %}
     </div>
   </section>
 

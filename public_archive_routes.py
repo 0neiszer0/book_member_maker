@@ -9,6 +9,7 @@ import uuid
 from datetime import date as _date, datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote, urlencode
 
 from flask import abort, jsonify, make_response, redirect, render_template, request, session, url_for
 from member_notifications import check_csrf
@@ -615,16 +616,27 @@ def init_public_archive_routes(app, login_required, get_db=None):
                 next_book = ordered[idx + 1] if idx + 1 < len(ordered) else None
         outline = build_pre_seminar_outline(active_book.get("sections") or []) if active_book else []
 
+        is_logged_in = bool(session.get("user_role"))
+        is_staff = session.get("user_role") in ("admin", "officer")
         linked_week = None
-        if selected_slug is not None and active_book is not None and get_db is not None:
+        if is_logged_in and selected_slug is not None and active_book is not None and get_db is not None:
             try:
                 linked_week = find_linked_week_for_material(get_db(), active_book, (request.args.get("week_id") or "").strip() or None)
             except Exception:
                 linked_week = None
 
+        login_query = {k: request.args.get(k, "").strip() for k in ("semester", "book")}
+        login_query = {k: v for k, v in login_query.items() if v}
+        login_next = request.path
+        if login_query:
+            login_next = f"{request.path}?{urlencode(login_query)}"
+        login_url = f"{url_for('login')}?next={quote(login_next, safe='')}"
+
         resp = make_response(
             render_template(
                 "member_pre_seminar.html",
+                is_logged_in=is_logged_in,
+                login_url=login_url,
                 linked_week=linked_week,
                 description=payload.get("description", ""),
                 semesters=semesters,
@@ -636,19 +648,17 @@ def init_public_archive_routes(app, login_required, get_db=None):
                 prev_book=prev_book,
                 next_book=next_book,
                 has_archive_book=bool(active_book and any(b.get("slug") == active_book.get("slug") for b in _load_json_snapshot(PUBLIC_ARCHIVE_PATH).get("books", []))),
-                is_staff=session.get("user_role") in ("admin", "officer"),
+                is_staff=is_staff,
             )
         )
         resp.headers["Cache-Control"] = "private, no-store"
         return resp
 
     @app.get("/pre-seminar")
-    @login_required(role="ANY")
     def member_pre_seminar():
         return _render_pre_seminar(None)
 
     @app.get("/pre-seminar/<slug>")
-    @login_required(role="ANY")
     def member_pre_seminar_book(slug: str):
         return _render_pre_seminar(slug)
 

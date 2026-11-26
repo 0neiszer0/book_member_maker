@@ -1,4 +1,4 @@
-"""Unit tests for public archive (/archive), member-only pre-seminar materials (/pre-seminar), and zero-PII guarantees."""
+"""Unit tests for public archive (/archive), public pre-seminar materials (/pre-seminar), and zero-PII guarantees."""
 
 from __future__ import annotations
 
@@ -193,8 +193,10 @@ class PublicArchiveAndPreSeminarTests(unittest.TestCase):
         self.assertIn("미식회", html)
         for banned in ("2,397", "2397", "34시간"):
             self.assertNotIn(banned, html)
-        # Logged-out users must NOT see member-only pre-seminar route or materials
-        self.assertNotIn("/pre-seminar", html)
+        # Pre-seminar reading materials are public now: guests get the link too
+        self.assertIn('href="/pre-seminar"', html)
+        self.assertIn("세미나 전 자료 보기", html)
+        self.assertNotIn("회원 전용 세미나 전 자료", html)
 
         # Logged-in members still receive the Canvas LMS shell on /archive
         self.login("member")
@@ -238,12 +240,45 @@ class PublicArchiveAndPreSeminarTests(unittest.TestCase):
 
     # --- 3. Member-Only Pre-Seminar Routes (/pre-seminar & /pre-seminar/<slug>) ---
 
-    def test_pre_seminar_requires_login(self):
-        for path in ("/pre-seminar", "/pre-seminar/2026-summer-rashomon"):
+    def test_pre_seminar_public_access_and_login_cta(self):
+        cases = {
+            "/pre-seminar": "/login?next=%2Fpre-seminar",
+            "/pre-seminar/2026-summer-rashomon": "/login?next=%2Fpre-seminar%2F2026-summer-rashomon",
+        }
+        for path, login_href in cases.items():
             with self.subTest(path=path):
                 resp = self.client.get(path)
-                self.assertEqual(resp.status_code, 302)
-                self.assertIn("/login", resp.headers.get("Location", ""))
+                self.assertEqual(resp.status_code, 200)
+                self.assertEqual(resp.headers.get("Cache-Control"), "private, no-store")
+                html = resp.get_data(as_text=True)
+                self.assertIn('name="app-layout" content="public-landing"', html)
+                self.assertIn('header class="mast"', html)
+                self.assertNotIn('id="lms-global"', html)
+                self.assertNotIn("quick_search.js", html)
+                self.assertIn(f'href="{login_href}"', html)
+                self.assertIn('class="pre-toplink-login"', html)
+                self.assertIn('class="pre-login-cta"', html)
+                self.assertIn("회원 로그인하기", html)
+                self.assertIn("로그인하고 발제문·세미나 일정 보기", html)
+                for leak in ("/admin/pre-seminar", "/seminars?term_id=", "/seminars/topics/", "사전 자료 관리"):
+                    self.assertNotIn(leak, html)
+                # Reading material starts before the login invitation card
+                self.assertLess(html.index('class="pre-detail-head"'), html.index('class="pre-login-cta"'))
+
+        filtered = self.client.get("/pre-seminar?semester=2026-2").get_data(as_text=True)
+        self.assertIn('href="/login?next=%2Fpre-seminar%3Fsemester%3D2026-2"', filtered)
+
+        self.fake.rows["pre_seminar_materials"] = [{
+            "id": "draft", "slug": "secret-draft", "title": "비공개 초안", "semester": "2027-1",
+            "semester_label": "2027년 1학기", "markdown_body": "## 초안", "is_published": False,
+            "created_at": "2026-11-01T00:00:00Z",
+        }]
+        self.assertEqual(self.client.get("/pre-seminar/secret-draft").status_code, 404)
+        self.assertNotIn("비공개 초안", self.client.get("/pre-seminar").get_data(as_text=True))
+
+        admin = self.client.get("/admin/pre-seminar")
+        self.assertEqual(admin.status_code, 302)
+        self.assertIn("/login", admin.headers.get("Location", ""))
 
     def test_pre_seminar_logged_in_member_can_read_all_15_books(self):
         self.login("member")
@@ -256,6 +291,12 @@ class PublicArchiveAndPreSeminarTests(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.headers.get("Cache-Control"), "private, no-store")
         html = resp.get_data(as_text=True)
+        self.assertIn('name="app-layout" content="canvas"', html)
+        self.assertIn('id="lms-global"', html)
+        self.assertNotIn('class="pre-login-cta"', html)
+        self.assertNotIn('class="pre-toplink-login"', html)
+        self.assertNotIn("회원 로그인하기", html)
+        self.assertNotIn("로그인하고 발제문·세미나 일정 보기", html)
         self.assertIn("전체 (15권)", html)
         self.assertIn("라쇼몬", html)
         self.assertIn("클라라와 태양", html)

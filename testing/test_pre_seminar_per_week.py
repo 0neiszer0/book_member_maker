@@ -174,6 +174,29 @@ class PreSeminarPerWeekTests(unittest.TestCase):
         self.login("admin")
         self.assertIn("이 자료 수정", self.client.get("/pre-seminar/my-mind").get_data(as_text=True))
 
+    def test_detail_guest_hides_week_links_and_member_keeps_them(self):
+        self.add()
+        self.fake.rows["topic_events"] = [{"id": "event", "seminar_week_id": "week", "is_active": True, "share_token": "t", "created_at": "2026-11-01"}]
+        self.fake.calls.clear()
+        resp = self.client.get("/pre-seminar/my-mind")
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+        self.assertIn("새 도서", html)
+        self.assertNotIn("← 해당 세미나로 돌아가기", html)
+        self.assertNotIn("이 세미나 발제문 보기", html)
+        self.assertNotIn("/seminars/topics/", html)
+        self.assertNotIn("/seminars?term_id=", html)
+        self.assertNotIn("#week-week", html)
+        self.assertIn("next=%2Fpre-seminar%2Fmy-mind", html)
+        self.assertIn("회원 로그인하기", html)
+        self.assertNotIn("seminar_weeks", {c[1] for c in self.fake.calls})
+        self.login("member")
+        html = self.client.get("/pre-seminar/my-mind").get_data(as_text=True)
+        self.assertIn("← 해당 세미나로 돌아가기", html)
+        self.assertIn("이 세미나 발제문 보기", html)
+        self.assertNotIn("회원 로그인하기", html)
+        self.assertNotIn('class="pre-login-cta"', html)
+
     def test_detail_without_week_has_no_back_link(self):
         self.login("member")
         self.add(seminar_week_id=None, title="독립", slug="solo", seminar_date="2020-01-01")
