@@ -4,141 +4,239 @@
 {% block title %}{{ lms_title }} · 책 먹는 호반우{% endblock %}
 {% block head %}
 <style>
-.pre-shell{max-width:1120px}
-.pre-hero{padding:20px 24px;border:1px solid #d8dcdf;border-radius:6px;background:#f5f7f8;margin-bottom:20px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
-.pre-eyebrow{font-size:12px;font-weight:700;color:#a80b12;margin:0 0 6px;font-variant-numeric:tabular-nums}
-.pre-hero h1{margin:0 0 6px;font-size:25px;line-height:1.35;color:#2d3b45}
-.pre-lead{margin:0;font-size:14.5px;color:#56616a;line-height:1.6}
-.pre-filter-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px}
-.pre-filter-tab{display:inline-flex;align-items:center;padding:6px 12px;border:1px solid #c7cdd1;border-radius:6px;background:#fff;color:#2d3b45;font-size:14px;text-decoration:none;font-variant-numeric:tabular-nums}
+.pre-shell{max-width:1120px;color:#2d3b45}
+.pre-topbar{display:flex;align-items:center;justify-content:space-between;gap:8px 12px;flex-wrap:wrap;min-height:44px;margin:0 0 12px}
+.pre-crumb{display:flex;align-items:center;gap:8px;min-width:0;font-size:14px;color:#56616a}
+.pre-crumb strong{font-weight:700;color:#2d3b45}
+.pre-crumb a,.pre-toplink{display:inline-flex;align-items:center;min-height:44px;color:#a80b12;font-weight:600;text-decoration:none;text-underline-offset:3px}
+.pre-crumb a:hover,.pre-toplink:hover{text-decoration:underline}
+.pre-toplinks{display:flex;align-items:center;gap:4px 16px;flex-wrap:wrap;font-size:14px}
+.pre-toplink{color:#56616a;font-weight:500}
+.pre-layout{display:grid;grid-template-columns:276px minmax(0,1fr);gap:22px;align-items:start}
+.pre-sidebar{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow-y:auto;border:1px solid #d8dcdf;border-radius:6px;background:#fff}
+.pre-catalog>summary{list-style:none;display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 12px;cursor:pointer}
+.pre-catalog>summary::-webkit-details-marker{display:none}
+.pre-catalog[open]>summary{display:none}
+.pre-badge{flex:none;padding:3px 8px;border:1px solid #c7cdd1;border-radius:4px;background:#f5f7f8;font-size:12px;font-weight:700;color:#2d3b45;white-space:nowrap}
+.pre-catalog-cur{display:flex;flex-direction:column;min-width:0;flex:1}
+.pre-catalog-cur strong{font-size:14.5px;font-weight:700;color:#2d3b45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pre-catalog-cur small{font-size:12.5px;color:#56616a;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pre-chev{flex:none;font-size:14px;color:#56616a;transition:transform .15s ease}
+.pre-catalog[open] .pre-chev{transform:rotate(180deg)}
+.pre-catalog-body{padding:14px}
+.pre-filter-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.pre-filter-tab{display:inline-flex;align-items:center;min-height:32px;padding:4px 10px;border:1px solid #c7cdd1;border-radius:6px;background:#fff;color:#2d3b45;font-size:13px;text-decoration:none;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pre-filter-tab:hover{background:#f5f7f8;text-decoration:none}
 .pre-filter-tab[aria-current="page"]{background:#d20f17;border-color:#d20f17;color:#fff;font-weight:700}
-.pre-layout{display:grid;grid-template-columns:280px 1fr;gap:24px;align-items:start}
-.pre-sidebar{border:1px solid #d8dcdf;border-radius:6px;background:#fff;padding:14px}
-.pre-sem-group+ .pre-sem-group{margin-top:16px;padding-top:14px;border-top:1px solid #e3e6e8}
-.pre-sem-heading{font-size:12.5px;font-weight:700;color:#56616a;margin:0 0 8px}
-.pre-book-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
-.pre-book-link{display:block;padding:8px 10px;border:1px solid transparent;border-radius:6px;color:#2d3b45;font-size:14px;line-height:1.4;text-decoration:none}
+.pre-search{display:block;width:100%;box-sizing:border-box;min-height:38px;margin:0 0 12px;padding:7px 10px;border:1px solid #c7cdd1;border-radius:6px;background:#fff;color:#2d3b45;font:inherit;font-size:14px}
+.pre-search:focus-visible{outline:2px solid #d20f17;outline-offset:1px;border-color:#d20f17}
+.pre-sem-group+.pre-sem-group{margin-top:12px;padding-top:12px;border-top:1px solid #e3e6e8}
+.pre-shell .pre-sem-heading{line-height:1.4;font-family:inherit;font-size:12.5px;font-weight:700;color:#56616a;margin:0 0 6px;font-variant-numeric:tabular-nums}
+.pre-book-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.pre-book-link{display:block;padding:7px 10px;border:1px solid transparent;border-radius:6px;color:#2d3b45;font-size:14px;font-weight:600;line-height:1.4;text-decoration:none}
 .pre-book-link:hover{background:#f5f7f8;text-decoration:none}
-.pre-book-link[aria-current="page"]{background:#fff5f5;border-color:#f0b7ba;color:#a80b12;font-weight:700}
+.pre-book-link[aria-current="page"]{background:#fff5f5;border-color:#f0b7ba;color:#a80b12}
 .pre-book-link small{display:block;font-size:12px;color:#56616a;font-weight:400;margin-top:2px;font-variant-numeric:tabular-nums}
-.pre-detail{border:1px solid #d8dcdf;border-radius:6px;background:#fff;padding:24px}
-.pre-detail-head{padding-bottom:16px;margin-bottom:20px;border-bottom:1px solid #d8dcdf;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.pre-detail-head h2{margin:4px 0 6px;font-size:24px;line-height:1.35;color:#2d3b45;font-weight:700}
-.pre-detail-actions{display:flex;flex-wrap:wrap;gap:8px}
+.pre-filter-empty{margin:4px 0 0;font-size:13px;color:#56616a}
+.pre-detail{min-width:0;border:1px solid #d8dcdf;border-radius:6px;background:#fff;padding:22px 26px 26px}
+.pre-detail-head{padding-bottom:14px;margin-bottom:14px;border-bottom:1px solid #d8dcdf}
+.pre-eyebrow{font-size:12.5px;font-weight:700;color:#a80b12;margin:0 0 4px;font-variant-numeric:tabular-nums}
+.pre-shell .pre-title{margin:0 0 4px;font-size:24px;line-height:1.35;color:#2d3b45;font-weight:700;overflow-wrap:anywhere}
 .pre-edition{font-size:14px;color:#56616a;margin:4px 0 0}
-.pre-sec{margin-bottom:24px}
-.pre-sec:last-child{margin-bottom:0}
-.pre-sec-h{font-size:18px;font-weight:700;color:#2d3b45;margin:28px 0 10px;padding-bottom:6px;border-bottom:1px solid #eef0f2}
-.pre-sec-h3{font-size:16px;font-weight:700;color:#2d3b45;margin:24px 0 8px}.pre-sec:first-child>.pre-sec-h{margin-top:0}
+.pre-detail-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.pre-readbar{display:flex;align-items:center;gap:10px;margin:0 0 16px}
+.pre-jump{display:flex;gap:6px;flex:1;min-width:0;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:2px 0}
+.pre-jump::-webkit-scrollbar{display:none}
+.pre-jump-pill{display:inline-flex;align-items:center;flex:none;min-height:32px;padding:4px 12px;border:1px solid #d8dcdf;border-radius:999px;background:#f5f7f8;color:#2d3b45;font-size:13px;font-weight:600;text-decoration:none}
+.pre-jump-pill:hover{background:#eef0f2;text-decoration:none}
+.pre-toggle-all{flex:none;min-height:36px;padding:6px 12px;border:1px solid #c7cdd1;border-radius:6px;background:#fff;color:#2d3b45;font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.pre-toggle-all:hover{background:#f5f7f8}
+.pre-toggle-all[aria-pressed="true"]{color:#a80b12;border-color:#f0b7ba}
+.pre-jump-pill:focus-visible,.pre-toggle-all:focus-visible,.pre-toggle>summary:focus-visible,.pre-catalog>summary:focus-visible,.pre-book-link:focus-visible{outline:2px solid #d20f17;outline-offset:2px}
+.pre-group{margin:26px 0 0}
+.pre-group:first-child{margin-top:0}
+.pre-shell .pre-group-title{font-size:18px;font-weight:700;color:#2d3b45;line-height:1.4;margin:0 0 10px;padding-bottom:7px;border-bottom:1px solid #e3e6e8;scroll-margin-top:16px}
+.pre-group>.pre-toggle:first-of-type{margin-top:0}
+.pre-body>.pre-toggle-major{margin-top:12px}
+.pre-body>.pre-toggle-major:first-child{margin-top:0}
+.pre-toggle{border:1px solid #d8dcdf;border-radius:6px;background:#fff;margin:0 0 8px;scroll-margin-top:16px}
+.pre-toggle>summary{list-style:none;display:flex;align-items:flex-start;gap:10px;min-height:44px;box-sizing:border-box;padding:11px 14px;cursor:pointer;font-size:15px;font-weight:600;color:#2d3b45;line-height:1.45;border-radius:6px}
+.pre-toggle>summary::-webkit-details-marker{display:none}
+.pre-toggle>summary:hover{background:#f8f9fa}
+.pre-chevron{flex:none;width:0;height:0;margin-top:6px;border-style:solid;border-width:5px 0 5px 7px;border-color:transparent transparent transparent #56616a;transition:transform .15s ease}
+.pre-toggle[open]>summary{background:#f8f9fa;border-bottom:1px solid #eef0f2;border-radius:6px 6px 0 0}
+.pre-toggle[open]>summary>.pre-chevron{transform:rotate(90deg);border-left-color:#d20f17}
+.pre-toggle-title{min-width:0;overflow-wrap:anywhere}
+.pre-toggle-major>summary{font-size:16px;font-weight:700}
+.pre-toggle-body{padding:14px 16px 16px}
+.pre-toggle-body>.pre-toggle:last-child{margin-bottom:0}
+.pre-toggle-sub{background:#fbfcfd;border-color:#e3e6e8}
+.pre-toggle-sub>summary{font-size:14.5px;font-weight:600}
+.pre-toggle-sub>summary:hover,.pre-toggle-sub[open]>summary{background:#f5f7f8}
 .pre-p{max-width:72ch;font-size:15px;line-height:1.78;color:#2d3b45;margin:0 0 10px;overflow-wrap:anywhere}
-.pre-ul{max-width:72ch;margin:0 0 12px;padding-left:20px;font-size:15px;line-height:1.75;color:#2d3b45}
+.pre-ul{max-width:72ch;margin:0 0 12px;padding-left:20px;font-size:15px;line-height:1.75;color:#2d3b45;overflow-wrap:anywhere}
 .pre-ul li+li{margin-top:6px}
-.pre-quote{max-width:72ch;margin:10px 0 12px;padding:10px 14px;border:1px solid #d8dcdf;border-radius:6px;background:#f5f7f8;font-size:14.5px;line-height:1.7;color:#2d3b45}
-.pre-table-wrap{overflow-x:auto;margin:10px 0 14px}
+.pre-quote{max-width:72ch;margin:10px 0 12px;padding:10px 14px;border:1px solid #d8dcdf;border-radius:6px;background:#f5f7f8;font-size:14.5px;line-height:1.7;color:#2d3b45;overflow-wrap:anywhere}
+.pre-toggle-body>:last-child,.pre-group>.pre-p:last-child{margin-bottom:0}
+.pre-table-wrap{overflow-x:auto;margin:10px 0 14px;-webkit-overflow-scrolling:touch}
 .pre-table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
 .pre-table td{border:1px solid #d8dcdf;padding:8px 10px;vertical-align:top;line-height:1.55}
 .pre-table tr:first-child td{background:#f5f7f8;font-weight:700}
-.pre-ext-link{color:#b50c13;text-underline-offset:3px;text-decoration:underline;overflow-wrap:anywhere}
+.pre-ext-link{color:#a80b12;text-underline-offset:3px;text-decoration:underline;overflow-wrap:anywhere}
 .pre-refs{margin-top:24px;padding:16px;background:#f5f7f8;border:1px solid #d8dcdf;border-radius:6px}
-.pre-refs h3{margin:0 0 10px;font-size:15px;font-weight:700;color:#2d3b45}
+.pre-shell .pre-refs h2{line-height:1.4;margin:0 0 10px;font-size:15px;font-weight:700;color:#2d3b45}
 .pre-refs ul{margin:0;padding-left:18px;font-size:14px;line-height:1.7}
 .pre-refs li+li{margin-top:6px}
-@media(max-width:860px){.pre-layout{grid-template-columns:1fr}.pre-detail{padding:16px}}
+.pre-pager{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:24px;padding-top:16px;border-top:1px solid #e3e6e8}
+.pre-pager a{display:flex;flex-direction:column;gap:2px;min-height:44px;box-sizing:border-box;padding:9px 12px;border:1px solid #d8dcdf;border-radius:6px;color:#2d3b45;text-decoration:none;min-width:0}
+.pre-pager a:hover{background:#f5f7f8}
+.pre-pager small{font-size:12.5px;color:#56616a;font-weight:600}
+.pre-pager span{font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pre-pager .pre-next{grid-column:2;text-align:right}
+@media(prefers-reduced-motion:reduce){.pre-chevron,.pre-chev{transition:none}}
+@media(max-width:900px){
+  .pre-layout{grid-template-columns:minmax(0,1fr);gap:12px}
+  .pre-sidebar{position:static;max-height:none;overflow:visible}
+  .pre-catalog[open]>summary{display:flex;border-bottom:1px solid #e3e6e8}
+  .pre-catalog-body{max-height:65vh;overflow-y:auto}
+  .pre-detail{padding:16px}
+}
+@media(max-width:767px){
+  .pre-topbar{margin-bottom:8px}
+  .pre-shell .pre-title{font-size:21px}
+  .pre-detail{padding:14px 12px 18px;border-radius:6px}
+  .pre-detail-actions .lms-button{min-height:44px}
+  .pre-search{font-size:16px;min-height:44px}
+  .pre-filter-tab{min-height:40px;font-size:13.5px}
+  .pre-book-link{min-height:44px;box-sizing:border-box}
+  .pre-jump-pill{min-height:40px}
+  .pre-toggle-all{min-height:44px}
+  .pre-toggle>summary{padding:11px 12px}
+  .pre-toggle-body{padding:12px 14px}
+  .pre-toggle-sub .pre-toggle-body{padding:12px}
+  .pre-p,.pre-ul{font-size:15.5px;line-height:1.75}
+  .pre-pager span{white-space:normal}
+}
 </style>
 {% endblock %}
+{% macro render_runs(runs) -%}
+  {%- for run in runs -%}
+    {%- if run.href -%}<a class="pre-ext-link" href="{{ run.href }}" target="_blank" rel="noopener noreferrer">{{ run.text }}</a>{%- elif run.strong -%}<strong>{{ run.text }}</strong>{%- elif run.em -%}<em>{{ run.text }}</em>{%- elif run.code -%}<code>{{ run.text }}</code>{%- else -%}{{ run.text }}{%- endif -%}
+  {%- endfor -%}
+{%- endmacro %}
+{% macro render_blocks(blocks) -%}
+  {%- for item in blocks -%}
+    {%- if item.type == 'p' -%}
+    <p class="pre-p">{{ render_runs(item.get('runs', [])) }}</p>
+    {%- elif item.type == 'ul' -%}
+    <ul class="pre-ul">{% for runs in item.get('items', []) %}<li>{{ render_runs(runs) }}</li>{% endfor %}</ul>
+    {%- elif item.type == 'li' -%}
+    <ul class="pre-ul"><li>{{ render_runs(item.get('runs', [])) }}</li></ul>
+    {%- elif item.type == 'quote' -%}
+    <blockquote class="pre-quote">{{ render_runs(item.get('runs', [])) }}</blockquote>
+    {%- elif item.type == 'table' -%}
+    <div class="pre-table-wrap"><table class="pre-table"><tbody>{% for row in item.get('rows', []) %}<tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+    {%- endif -%}
+  {%- endfor -%}
+{%- endmacro %}
+{% macro render_node(node) -%}
+  {%- if node.is_toggle -%}
+  <details class="pre-toggle{% if node.variant %} pre-toggle-{{ node.variant }}{% endif %}" id="{{ node.id }}"{% if node.default_open %} open{% endif %}>
+    <summary><span class="pre-chevron" aria-hidden="true"></span><span class="pre-toggle-title">{{ render_runs(node.heading_runs) }}</span></summary>
+    <div class="pre-toggle-body">{{ render_blocks(node.blocks) }}{% for child in node.children %}{{ render_node(child) }}{% endfor %}</div>
+  </details>
+  {%- else -%}
+  <section class="pre-group" aria-labelledby="{{ node.id }}">
+    <h2 class="pre-group-title" id="{{ node.id }}">{{ render_runs(node.heading_runs) }}</h2>
+    {{ render_blocks(node.blocks) }}{% for child in node.children %}{{ render_node(child) }}{% endfor %}
+  </section>
+  {%- endif -%}
+{%- endmacro %}
 {% block content %}
 <div class="pre-shell">
-  <section class="pre-hero">
-    <div>
-      <p class="pre-eyebrow">회원 전용 자료실 · 로그인 필요</p>
-      <h1>세미나 전 읽기 자료</h1>
-      <p class="pre-lead">{{ description or '세미나 전에 함께 살펴보면 좋은 작가 배경, 학술 논문, 서평과 참고 링크를 모았습니다.' }}</p>
+  <div class="pre-topbar">
+    <nav class="pre-crumb" aria-label="자료실 위치">
+      {% if linked_week %}<a href="{{ url_for('seminars', term_id=linked_week.term_id, week_id=linked_week.week_id, _anchor='week-' ~ linked_week.week_id) }}">← 해당 세미나</a><span aria-hidden="true">/</span>{% endif %}
+      <strong>세미나 전 읽기 자료</strong>
+    </nav>
+    <div class="pre-toplinks">
+      {% if is_staff %}<a class="pre-toplink" href="{{ url_for('admin_pre_seminar') }}">사전 자료 관리</a>{% endif %}
+      <a class="pre-toplink" href="{{ url_for('public_archive') }}">공개 아카이브</a>
     </div>
-    {% if is_staff %}<a class="lms-button" href="{{ url_for('admin_pre_seminar') }}">사전 자료 등록·관리</a>{% endif %}
-    <a class="lms-button" href="{{ url_for('public_archive') }}">공개 아카이브로 이동</a>
-  </section>
-
-  <nav class="pre-filter-tabs" aria-label="자료실 학기 필터">
-    <a class="pre-filter-tab" href="{{ url_for('member_pre_seminar') }}" {% if not selected_semester %}aria-current="page"{% endif %}>전체 ({{ all_books|length }}권)</a>
-    {% for sem in semesters %}
-    <a class="pre-filter-tab" href="{{ url_for('member_pre_seminar', semester=sem.id) }}" {% if selected_semester == sem.id %}aria-current="page"{% endif %}>{{ sem.label }}</a>
-    {% endfor %}
-  </nav>
+  </div>
 
   <div class="pre-layout">
     <aside class="pre-sidebar" aria-label="세미나 전 자료 도서 목록">
-      {% for grp in grouped_books %}
-      <div class="pre-sem-group">
-        <h2 class="pre-sem-heading">{{ grp.label }} ({{ grp.books|length }}권)</h2>
-        <ul class="pre-book-list">
-          {% for b in grp.books %}
-          <li>
-            <a class="pre-book-link" href="{{ url_for('member_pre_seminar_book', slug=b.slug) }}" {% if active_book and active_book.slug == b.slug %}aria-current="page"{% endif %}>
-              {{ b.title }}
-              <small>{{ b.author }} · {{ b.date }}</small>
-            </a>
-          </li>
+      <details class="pre-catalog" id="pre-catalog">
+        <summary>
+          <span class="pre-badge">도서 변경</span>
+          <span class="pre-catalog-cur">
+            <strong>{{ active_book.title if active_book else '도서 선택' }}</strong>
+            <small>{{ [active_book.semester_label if active_book else '', '전체 ' ~ all_books|length ~ '권']|select|join(' · ') }}</small>
+          </span>
+          <span class="pre-chev" aria-hidden="true">▾</span>
+        </summary>
+        <div class="pre-catalog-body">
+          <nav class="pre-filter-tabs" aria-label="자료실 학기 필터">
+            <a class="pre-filter-tab" href="{{ url_for('member_pre_seminar') }}" {% if not selected_semester %}aria-current="page"{% endif %}>전체 ({{ all_books|length }}권)</a>
+            {% for sem in semesters %}
+            <a class="pre-filter-tab" href="{{ url_for('member_pre_seminar', semester=sem.id) }}" {% if selected_semester == sem.id %}aria-current="page"{% endif %}>{{ sem.label }} ({{ sem.count }}권)</a>
+            {% endfor %}
+          </nav>
+          <input type="search" id="pre-book-filter" class="pre-search" placeholder="도서명·저자 검색" aria-label="도서명 또는 저자 검색" autocomplete="off">
+          {% for grp in grouped_books %}
+          <div class="pre-sem-group">
+            <h2 class="pre-sem-heading">{{ grp.label }} ({{ grp.books|length }}권)</h2>
+            <ul class="pre-book-list">
+              {% for b in grp.books %}
+              <li class="pre-book-item" data-search="{{ (b.title ~ ' ' ~ (b.author or ''))|lower }}">
+                <a class="pre-book-link" href="{{ url_for('member_pre_seminar_book', slug=b.slug) }}" {% if active_book and active_book.slug == b.slug %}aria-current="page"{% endif %}>
+                  {{ b.title }}
+                  {% set meta = [b.author, b.date]|select|join(' · ') %}{% if meta %}<small>{{ meta }}</small>{% endif %}
+                </a>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
           {% endfor %}
-        </ul>
-      </div>
-      {% endfor %}
+          <p class="pre-filter-empty" id="pre-filter-empty" hidden>검색 결과가 없습니다.</p>
+        </div>
+      </details>
+      <script>(function(){var el=document.getElementById('pre-catalog');if(el&&window.innerWidth>900)el.open=true;})();</script>
     </aside>
 
     <section class="pre-detail" aria-label="선택된 도서 세미나 전 자료">
       {% if active_book %}
       <header class="pre-detail-head">
-        <div>
-          <p class="pre-eyebrow">{{ active_book.semester_label }} · {{ active_book.date }} · {{ active_book.author }}</p>
-          <h2>{{ active_book.title }}</h2>
-          {% if active_book.edition_note %}<p class="pre-edition">{{ active_book.edition_note }}</p>{% endif %}
-        </div>
+        {% set eyebrow = [active_book.semester_label, active_book.date, active_book.author]|select|join(' · ') %}
+        {% if eyebrow %}<p class="pre-eyebrow">{{ eyebrow }}</p>{% endif %}
+        <h1 class="pre-title">{{ active_book.title }}</h1>
+        {% if active_book.edition_note %}<p class="pre-edition">{{ active_book.edition_note }}</p>{% endif %}
+        {% if linked_week or is_staff or has_archive_book %}
         <div class="pre-detail-actions">
           {% if linked_week %}<a class="lms-button" href="{{ url_for('seminars', term_id=linked_week.term_id, week_id=linked_week.week_id, _anchor='week-' ~ linked_week.week_id) }}">← 해당 세미나로 돌아가기</a>{% endif %}
           {% if linked_week and linked_week.topic_event_id %}<a class="lms-button" href="{{ url_for('member_topic_reader', event_id=linked_week.topic_event_id) }}">이 세미나 발제문 보기</a>{% endif %}
           {% if is_staff and active_book.source == 'db' %}<a class="lms-button" href="{{ url_for('admin_pre_seminar', edit=active_book.id) }}">이 자료 수정</a>{% endif %}
           {% if has_archive_book %}<a class="lms-button" href="{{ url_for('public_archive_book', slug=active_book.slug) }}">발제문·토의 기록 보기</a>{% endif %}
         </div>
+        {% endif %}
       </header>
 
-      {% macro render_runs(runs) -%}
-        {%- for run in runs -%}
-          {%- if run.href -%}<a class="pre-ext-link" href="{{ run.href }}" target="_blank" rel="noopener noreferrer">{{ run.text }}</a>{%- elif run.strong -%}<strong>{{ run.text }}</strong>{%- elif run.em -%}<em>{{ run.text }}</em>{%- elif run.code -%}<code>{{ run.text }}</code>{%- else -%}{{ run.text }}{%- endif -%}
-        {%- endfor -%}
-      {%- endmacro %}
-
-      {% for sec in active_book.sections %}
-      <section class="pre-sec">
-        {% if sec.level == 3 %}
-        <h3 class="pre-sec-h3">{{ sec.heading }}</h3>
-        {% else %}
-        <h3 class="pre-sec-h">{{ sec.heading }}</h3>
-        {% endif %}
-
-        {% for item in sec.get('items', []) %}
-          {% if item.type == 'p' %}
-            <p class="pre-p">{{ render_runs(item.get('runs', [])) }}</p>
-          {% elif item.type == 'li' %}
-            <ul class="pre-ul"><li>{{ render_runs(item.get('runs', [])) }}</li></ul>
-          {% elif item.type == 'quote' %}
-            <blockquote class="pre-quote">{{ render_runs(item.get('runs', [])) }}</blockquote>
-          {% elif item.type == 'table' %}
-            <div class="pre-table-wrap">
-              <table class="pre-table">
-                <tbody>
-                  {% for row in item.get('rows', []) %}
-                  <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-          {% endif %}
-        {% endfor %}
-      </section>
-      {% endfor %}
+      {% if outline %}
+      <div class="pre-readbar">
+        <nav class="pre-jump" aria-label="섹션 바로가기">
+          {% for node in outline %}<a class="pre-jump-pill" href="#{{ node.id }}">{{ node.heading }}</a>{% endfor %}
+        </nav>
+        <button type="button" id="pre-toggle-all" class="pre-toggle-all" aria-pressed="false">모두 펼치기</button>
+      </div>
+      <div class="pre-body">
+        {% for node in outline %}{{ render_node(node) }}{% endfor %}
+      </div>
+      {% endif %}
 
       {% if active_book.references %}
       <section class="pre-refs" aria-label="참고 링크 모음">
-        <h3>참고 링크 바로가기</h3>
+        <h2>참고 링크 바로가기</h2>
         <ul>
           {% for ref in active_book.references %}
           <li><a class="pre-ext-link" href="{{ ref.url }}" target="_blank" rel="noopener noreferrer">{{ ref.title }}</a></li>
@@ -146,10 +244,73 @@
         </ul>
       </section>
       {% endif %}
+
+      {% if prev_book or next_book %}
+      <nav class="pre-pager" aria-label="이전·다음 도서">
+        {% if prev_book %}<a class="pre-prev" href="{{ url_for('member_pre_seminar_book', slug=prev_book.slug) }}"><small>← 이전 도서</small><span>{{ prev_book.title }}</span></a>{% endif %}
+        {% if next_book %}<a class="pre-next" href="{{ url_for('member_pre_seminar_book', slug=next_book.slug) }}"><small>다음 도서 →</small><span>{{ next_book.title }}</span></a>{% endif %}
+      </nav>
+      {% endif %}
       {% else %}
       <p class="lms-empty">표시할 세미나 전 자료가 없습니다.</p>
       {% endif %}
     </section>
   </div>
 </div>
+<script>
+(function(){
+  var detail=document.querySelector('.pre-detail');
+  var btn=document.getElementById('pre-toggle-all');
+  var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function toggles(){return detail?detail.querySelectorAll('details.pre-toggle'):[];}
+  function sync(){
+    if(!btn)return;
+    var all=toggles(),open=all.length>0;
+    for(var i=0;i<all.length;i++){if(!all[i].open){open=false;break;}}
+    btn.textContent=open?'모두 접기':'모두 펼치기';
+    btn.setAttribute('aria-pressed',open?'true':'false');
+  }
+  function reveal(id){
+    var target=document.getElementById(id);
+    if(!target)return null;
+    for(var el=target;el&&el!==detail;el=el.parentElement){if(el.tagName==='DETAILS')el.open=true;}
+    return target;
+  }
+  if(btn){
+    btn.addEventListener('click',function(){
+      var open=btn.getAttribute('aria-pressed')!=='true',all=toggles();
+      for(var i=0;i<all.length;i++)all[i].open=open;
+      sync();
+    });
+    detail.addEventListener('toggle',sync,true);
+    sync();
+  }
+  document.querySelectorAll('.pre-jump-pill').forEach(function(pill){
+    pill.addEventListener('click',function(e){
+      var id=(pill.getAttribute('href')||'').slice(1),target=reveal(id);
+      if(!target)return;
+      e.preventDefault();
+      target.scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'});
+      if(history.replaceState)history.replaceState(null,'','#'+id);
+    });
+  });
+  if(location.hash.length>1){var hit=reveal(decodeURIComponent(location.hash.slice(1)));if(hit)hit.scrollIntoView({block:'start'});}
+  var filter=document.getElementById('pre-book-filter');
+  if(filter){
+    filter.addEventListener('input',function(){
+      var q=filter.value.trim().toLowerCase(),any=false;
+      document.querySelectorAll('.pre-sem-group').forEach(function(group){
+        var shown=0;
+        group.querySelectorAll('.pre-book-item').forEach(function(item){
+          var hit=!q||(item.getAttribute('data-search')||'').indexOf(q)!==-1;
+          item.hidden=!hit;if(hit)shown++;
+        });
+        group.hidden=shown===0;if(shown)any=true;
+      });
+      var empty=document.getElementById('pre-filter-empty');
+      if(empty)empty.hidden=any;
+    });
+  }
+})();
+</script>
 {% endblock %}

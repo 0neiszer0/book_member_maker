@@ -321,5 +321,117 @@ class MarkdownPublisherTests(PublicArchiveAndPreSeminarTests):
         self.assertEqual(self.client.get('/admin/pre-seminar').status_code,200)
 
 
+GODOT_MD = """# 요약본
+
+## 제1막
+
+블라디미르와 에스트라공이 *고도*를 기다린다.
+
+- 첫 장면
+- 두 번째 장면
+
+## 제2막
+
+### 다음 날
+
+나무에 잎이 돋았다.
+
+# 인물과 관계
+
+에스트라공과 블라디미르.
+
+---
+
+**본문 기준:** 사뮈엘 베케트, 오증자 옮김, 『고도를 기다리며』, 민음사 세계문학전집 43, 첨부 OCR 교정본. 제1막 9–93쪽, 제2막 97–163쪽. 배경 및 연구 자료의 출처는 각 항목에 표시하였다.
+"""
+
+
+class Wave13PreSeminarReaderTests(PublicArchiveAndPreSeminarTests):
+    def test_canonicalize_semester_merges_variants(self):
+        from public_archive_routes import canonicalize_semester, semester_sort_key
+        for raw in ("2026-2학기", "2026년 2학기", "2026-2", "2026 2학기"):
+            self.assertEqual(canonicalize_semester(raw), ("2026-2", "2026-2학기"))
+        self.assertEqual(canonicalize_semester("2026-여름"), ("2026-여름", "2026 여름방학"))
+        self.assertEqual(canonicalize_semester("2027-1", "2027년 1학기"), ("2027-1", "2027년 1학기"))
+        self.assertEqual(canonicalize_semester("", "", "2025-03-04")[0], "2025-custom")
+        order = sorted(["2026-여름", "2026-2", "2026-1", "2026-겨울"], key=semester_sort_key, reverse=True)
+        self.assertEqual(order, ["2026-2", "2026-여름", "2026-1", "2026-겨울"])
+
+    def test_colophon_and_rules_are_stripped(self):
+        from public_archive_routes import parse_pre_seminar_markdown, strip_editorial_colophon
+        cleaned = strip_editorial_colophon(GODOT_MD)
+        self.assertNotIn("본문 기준", cleaned)
+        self.assertNotIn("---", cleaned)
+        self.assertIn("에스트라공과 블라디미르.", cleaned)
+        self.assertEqual(strip_editorial_colophon("## A\n본문\n"), "## A\n본문\n")
+        parsed = parse_pre_seminar_markdown(GODOT_MD + "\n")
+        texts = [run["text"] for sec in parsed["sections"] for item in sec["items"] for run in item.get("runs", [])]
+        self.assertFalse(any("OCR" in t or "본문 기준" in t or t.strip() == "---" for t in texts))
+        mid = parse_pre_seminar_markdown("## A\n하나\n\n---\n\n둘")
+        self.assertEqual([i["runs"][0]["text"] for i in mid["sections"][0]["items"]], ["하나", "둘"])
+        self.assertEqual([s["level"] for s in parsed["sections"]], [1, 2, 2, 3, 1])
+
+    def test_outline_hierarchy_for_markdown_and_archive(self):
+        from public_archive_routes import build_pre_seminar_outline, parse_pre_seminar_markdown
+        outline = build_pre_seminar_outline(parse_pre_seminar_markdown(GODOT_MD)["sections"])
+        self.assertEqual([n["heading"] for n in outline], ["요약본", "인물과 관계"])
+        summary, people = outline
+        self.assertFalse(summary["is_toggle"])
+        self.assertEqual([c["heading"] for c in summary["children"]], ["제1막", "제2막"])
+        self.assertTrue(all(c["is_toggle"] and not c["default_open"] for c in summary["children"]))
+        self.assertEqual(summary["children"][0]["blocks"][1]["type"], "ul")
+        self.assertEqual(len(summary["children"][0]["blocks"][1]["items"]), 2)
+        self.assertEqual(summary["children"][1]["children"][0]["variant"], "sub")
+        self.assertTrue(people["is_toggle"])
+        self.assertEqual(people["variant"], "major")
+        books = {b["slug"]: b for b in json.loads(PRE_SEMINAR_JSON.read_text(encoding="utf-8"))["books"]}
+        klara = build_pre_seminar_outline(books["2026-2-klara-and-the-sun"]["sections"])
+        self.assertEqual([n["heading"] for n in klara], ["요약본", "인물과 관계", "작가", "더 깊이 파고 싶다면"])
+        self.assertEqual(len(klara[3]["children"]), 5)
+        self.assertTrue(klara[2]["is_toggle"])
+        devil = build_pre_seminar_outline(books["2026-summer-the-devil-and-the-good-lord"]["sections"])
+        self.assertEqual(devil[0]["heading"], "작품을 읽기 전에")
+        self.assertTrue(devil[0]["default_open"])
+
+    def test_db_book_merges_into_archive_semester_and_reader_ui(self):
+        self.fake.rows["pre_seminar_materials"] = [{
+            "id": "godot", "slug": "waiting-for-godot", "title": "고도를 기다리며", "author": "",
+            "semester": "2026-2학기", "semester_label": "2026-2학기", "seminar_date": "2026-11-26",
+            "edition_note": "", "markdown_body": GODOT_MD, "is_published": True, "created_at": "2026-11-20T00:00:00Z"}]
+        self.login("member")
+        html = self.client.get("/pre-seminar/waiting-for-godot").get_data(as_text=True)
+        self.assertIn("2026-2학기 (9권)", html)
+        self.assertIn("2026 여름방학 (7권)", html)
+        self.assertIn("전체 (16권)", html)
+        self.assertNotIn("(1권)", html)
+        self.assertNotIn("· 2026-11-26</small>", html)
+        self.assertIn("2026-2학기 · 2026-11-26</p>", html)
+        self.assertNotIn("2026-11-26 · </p>", html)
+        self.assertIn('<details class="pre-toggle"', html)
+        self.assertIn('id="pre-toggle-all"', html)
+        self.assertIn('id="pre-catalog"', html)
+        self.assertNotIn("pre-hero", html)
+        self.assertNotIn("본문 기준", html)
+        self.assertNotIn("<p class=\"pre-p\">---</p>", html)
+        self.assertLess(html.index('class="pre-catalog"'), html.index('class="pre-detail"'))
+        self.assertIn("다음 도서 →", html)
+        self.assertIn("2026-2학기 (9권)", self.client.get("/pre-seminar?semester=2026-2학기").get_data(as_text=True))
+        klara = self.client.get("/pre-seminar/2026-2-klara-and-the-sun").get_data(as_text=True)
+        self.assertIn('<details class="pre-toggle"', klara)
+        self.assertIn("← 이전 도서", klara)
+
+    def test_save_strips_colophon_and_canonicalizes_semester(self):
+        self.login("admin")
+        self.fake.rows["pre_seminar_materials"] = []
+        data = {"csrf_token": "test-csrf", "title": "고도를 기다리며", "semester": "2026-2학기", "semester_label": "",
+                "seminar_date": "2026-11-26", "markdown_body": GODOT_MD, "is_published": "on"}
+        self.assertEqual(self.client.post("/admin/pre-seminar/save", data=data).status_code, 303)
+        row = self.fake.rows["pre_seminar_materials"][0]
+        self.assertEqual(row["semester"], "2026-2")
+        self.assertEqual(row["semester_label"], "2026-2학기")
+        self.assertNotIn("본문 기준", row["markdown_body"])
+        self.assertNotIn("---", row["markdown_body"])
+
+
 if __name__ == "__main__":
     unittest.main()

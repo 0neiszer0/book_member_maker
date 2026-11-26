@@ -61,7 +61,88 @@ def _parse_md_inline(text):
     return runs
 
 
+_SEM_TERM = re.compile(r"(\d{4})\s*(?:년|-|\s)*([12])\s*학기?")
+_SEM_CODE = re.compile(r"^(\d{4})-([12])$")
+_SEM_SUMMER = re.compile(r"(\d{4})\s*(?:년|-|\s)*(여름|하계)(?:방학|학기)?")
+_SEM_WINTER = re.compile(r"(\d{4})\s*(?:년|-|\s)*(겨울|동계)(?:방학|학기)?")
+_SEASON_RANK = {"겨울": 0, "1": 1, "여름": 2, "2": 3}
+
+
+def canonicalize_semester(semester: str, semester_label: str = "", seminar_date: str = "") -> tuple[str, str]:
+    """Map "2026-2학기" / "2026년 2학기" / "2026-2" to one id ("2026-2") with a readable label."""
+    semester = str(semester or "").strip()
+    semester_label = str(semester_label or "").strip()
+    for source in (semester, semester_label):
+        if not source:
+            continue
+        match = _SEM_CODE.match(source) or _SEM_TERM.search(source)
+        if match:
+            year, num = match.group(1), match.group(2)
+            return f"{year}-{num}", semester_label or f"{year}-{num}학기"
+        match = _SEM_SUMMER.search(source)
+        if match:
+            return f"{match.group(1)}-여름", semester_label or f"{match.group(1)} 여름방학"
+        match = _SEM_WINTER.search(source)
+        if match:
+            return f"{match.group(1)}-겨울", semester_label or f"{match.group(1)} 겨울방학"
+    sem_id = semester or f"{str(seminar_date or '')[:4] or datetime.now().year}-custom"
+    return sem_id, semester_label or sem_id or "최신 세미나"
+
+
+def semester_sort_key(sem_id: str) -> tuple[int, int, str]:
+    match = re.match(r"^(\d{4})-(.+)$", str(sem_id or ""))
+    if not match:
+        return (0, 4, str(sem_id or ""))
+    return (int(match.group(1)), _SEASON_RANK.get(match.group(2), 4), str(sem_id))
+
+
+_HR = re.compile(r"(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,}")
+_COLOPHON_START = re.compile(r"^[(（\[]?\s*(?:본문\s*기준|판본\s*기준|텍스트\s*기준|자료\s*기준)\s*[:：]")
+_COLOPHON_ANY = re.compile(r"첨부\s*OCR|OCR\s*교정본|배경\s*및\s*연구\s*자료의\s*출처는\s*각\s*항목에\s*표시", re.I)
+
+
+def _is_colophon(text: str) -> bool:
+    plain = re.sub(r"[*_]+", "", text or "").strip()
+    plain = re.sub(r"^>\s*", "", plain)
+    return bool(_COLOPHON_START.match(plain) or _COLOPHON_ANY.search(plain))
+
+
+def strip_editorial_colophon(markdown_text: str) -> str:
+    """Drop trailing 본문 기준/첨부 OCR colophon blocks (and the rule above them) from a document."""
+    lines = (markdown_text or "").splitlines()
+    changed = False
+    while True:
+        end = len(lines)
+        while end and not lines[end - 1].strip():
+            end -= 1
+        start = end
+        while start and lines[start - 1].strip():
+            start -= 1
+        if start == end:
+            break
+        block = [line.strip() for line in lines[start:end]]
+        if all(_HR.fullmatch(line) for line in block) or _is_colophon(" ".join(block)):
+            lines = lines[:start]
+            changed = True
+            continue
+        # colophon lines glued to the paragraph above them (no blank line in between)
+        tail = end
+        while tail > start and (_is_colophon(lines[tail - 1]) or _HR.fullmatch(lines[tail - 1].strip())):
+            tail -= 1
+        if tail < end:
+            lines = lines[:tail]
+            changed = True
+            continue
+        break
+    if not changed:
+        return markdown_text or ""
+    return "\n".join(lines).rstrip() + "\n" if lines else ""
+
+
 def parse_pre_seminar_markdown(markdown_text: str) -> dict:
+    original = markdown_text or ""
+    markdown_text = strip_editorial_colophon(original)
+    stripped = markdown_text != original
     sections, references, seen = [], [], set()
     current = None
     paragraph = []
@@ -83,16 +164,23 @@ def parse_pre_seminar_markdown(markdown_text: str) -> dict:
         if paragraph:
             section()["items"].append({"type": "p", "runs": runs(" ".join(paragraph))})
             paragraph.clear()
-    for raw in (markdown_text or "").splitlines():
+    for raw in markdown_text.splitlines():
         line = raw.strip()
-        heading = re.match(r"^(#{1,3})\s+(.+?)\s*#*\s*$", line)
+        if line and _HR.fullmatch(line):
+            flush()
+            continue
+        heading = re.match(r"^(#{1,6})\s+(.+?)\s*#*\s*$", line)
         item = re.match(r"^(?:[-*]\s+|\d+\.\s+)(.*)$", line)
         quote = re.match(r"^>\s?(.*)$", line)
         if not line:
             flush()
         elif heading:
             flush()
-            current = {"heading": heading.group(2), "level": 3 if len(heading.group(1)) == 3 else 2, "items": []}
+            heading_runs = runs(heading.group(2))
+            plain = "".join(run["text"] for run in heading_runs).strip() or heading.group(2)
+            current = {"heading": plain, "level": min(len(heading.group(1)), 3), "items": []}
+            if any(len(run) > 1 for run in heading_runs):
+                current["heading_runs"] = heading_runs
             sections.append(current)
         elif item or quote:
             flush()
@@ -109,7 +197,76 @@ def parse_pre_seminar_markdown(markdown_text: str) -> dict:
         else:
             paragraph.append(line)
     flush()
+    if stripped:
+        while sections and not sections[-1]["items"]:
+            sections.pop()
     return {"sections": sections, "references": references}
+
+
+_LEAD_HEADINGS = ("개요", "작품 안내", "작품을 읽기 전에", "3분 요약")
+
+
+def _outline_blocks(items):
+    blocks = []
+    for item in items or []:
+        if item.get("type") == "li":
+            if blocks and blocks[-1]["type"] == "ul":
+                blocks[-1]["items"].append(item.get("runs") or [])
+            else:
+                blocks.append({"type": "ul", "items": [item.get("runs") or []]})
+        else:
+            blocks.append(item)
+    return blocks
+
+
+def build_pre_seminar_outline(sections: list[dict]) -> list[dict]:
+    """Turn flat H1/H2/H3 sections into major groups + Notion-style collapsible toggles."""
+    sections = [s for s in (sections or []) if isinstance(s, dict)]
+    if not sections:
+        return []
+
+    def level_of(sec):
+        try:
+            return max(1, min(int(sec.get("level") or 2), 3))
+        except (TypeError, ValueError):
+            return 2
+
+    top_level = min(level_of(s) for s in sections)
+    roots: list[dict] = []
+    stack: list[dict] = []
+    for index, sec in enumerate(sections, 1):
+        heading = str(sec.get("heading") or "").strip() or "개요"
+        node = {"id": f"sec-{index}", "heading": heading,
+                "heading_runs": sec.get("heading_runs") or [{"text": heading}],
+                "level": level_of(sec), "blocks": _outline_blocks(sec.get("items")),
+                "children": [], "is_toggle": True, "default_open": False, "variant": ""}
+        while stack and stack[-1]["level"] >= node["level"]:
+            stack.pop()
+        if node["level"] == top_level or not stack:
+            roots.append(node)
+        else:
+            stack[-1]["children"].append(node)
+        stack.append(node)
+
+    def mark(children, inside_toggle):
+        for child in children:
+            child["is_toggle"] = bool(child["blocks"] or child["children"])
+            child["default_open"] = False
+            child["variant"] = "sub" if inside_toggle else ""
+            mark(child["children"], child["is_toggle"])
+
+    short_doc = len(sections) <= 2
+    for position, node in enumerate(roots):
+        if node["children"]:
+            node["is_toggle"] = False
+            mark(node["children"], False)
+        elif not node["blocks"]:
+            node["is_toggle"] = False
+        else:
+            node["variant"] = "major"
+            node["default_open"] = short_doc or (
+                position == 0 and node["heading"] in _LEAD_HEADINGS and len(node["blocks"]) <= 2)
+    return roots
 
 
 def _slugify_material(title: str, custom_slug: str = "") -> str:
@@ -132,9 +289,11 @@ def _load_db_pre_seminar_materials(get_db, include_drafts=False):
         books = []
         for row in rows:
             parsed = parse_pre_seminar_markdown(row.get("markdown_body") or "")
+            sem_id, sem_label = canonicalize_semester(row.get("semester") or "", row.get("semester_label") or "",
+                                                      row.get("seminar_date") or "")
             books.append({"id": row["id"], "slug": row["slug"], "title": row["title"],
-                "author": row.get("author") or "", "semester": row.get("semester") or "custom",
-                "semester_label": row.get("semester_label") or row.get("semester") or "최신 세미나",
+                "author": row.get("author") or "", "semester": sem_id,
+                "semester_label": sem_label,
                 "date": row.get("seminar_date") or "", "edition_note": row.get("edition_note") or "",
                 **parsed, "source": "db", "is_published": bool(row.get("is_published", True)),
                 "markdown_body": row.get("markdown_body") or "",
@@ -293,7 +452,8 @@ def build_week_options(db):
         title = w.get("book_title") or ""
         options.append({
             "id": str(w["id"]), "term_id": w.get("term_id"), "term_name": term.get("name") or "",
-            "semester_code": str(term.get("semester_code") or term.get("name") or ""),
+            "semester_code": canonicalize_semester(term.get("semester_code") or term.get("name") or "",
+                                                   term.get("name") or "", meeting)[0],
             "term_start": str(term.get("start_date") or ""), "week_start": str(w.get("week_start") or ""),
             "book_title": title, "book_author": w.get("book_author") or "", "meeting_date": meeting,
             "label": " · ".join(x for x in (term.get("name") or "", meeting, title or "도서 미정") if x),
@@ -403,11 +563,36 @@ def init_public_archive_routes(app, login_required, get_db=None):
         payload = _load_json_snapshot(PRE_SEMINAR_PATH)
         db_books = _load_db_pre_seminar_materials(get_db)
         db_slugs = {b["slug"] for b in db_books}
-        all_books = db_books + [b for b in payload.get("books", []) if b.get("slug") not in db_slugs]
-        semesters_by_id = {sem["id"]: dict(sem) for sem in payload.get("semesters", [])}
+        archive_books = [b for b in payload.get("books", []) if b.get("slug") not in db_slugs]
+        semesters_by_id: dict[str, dict[str, Any]] = {sem["id"]: dict(sem) for sem in payload.get("semesters", [])}
         for book in db_books:
-            semesters_by_id[book["semester"]] = {"id": book["semester"], "label": book["semester_label"]}
-        semesters = sorted(semesters_by_id.values(), key=lambda sem: sem["id"], reverse=True)
+            known = semesters_by_id.setdefault(book["semester"], {"id": book["semester"], "label": book["semester_label"]})
+            book["semester_label"] = known.get("label") or book["semester_label"]
+        all_books = db_books + archive_books
+        books_by_sem: dict[str, list[dict[str, Any]]] = {}
+        for book in all_books:
+            sid = book.get("semester", "")
+            semesters_by_id.setdefault(sid, {"id": sid, "label": book.get("semester_label") or sid})
+            books_by_sem.setdefault(sid, []).append(book)
+        semesters = sorted(semesters_by_id.values(), key=lambda sem: semester_sort_key(sem.get("id", "")), reverse=True)
+        for sem in semesters:
+            sem_books = books_by_sem.get(sem.get("id", ""), [])
+            sem_books.sort(key=lambda b: b.get("date") or "", reverse=True)
+            sem["count"] = len(sem_books)
+        semesters = [sem for sem in semesters if sem["count"]]
+
+        selected_semester = (request.args.get("semester") or "").strip()
+        if selected_semester and selected_semester not in semesters_by_id:
+            canon = canonicalize_semester(selected_semester)[0]
+            if canon in semesters_by_id:
+                selected_semester = canon
+        grouped: list[dict[str, Any]] = []
+        for sem in semesters:
+            sid = sem.get("id", "")
+            if selected_semester and sid != selected_semester:
+                continue
+            grouped.append({**sem, "books": books_by_sem[sid]})
+        ordered = [b for grp in grouped for b in grp["books"]]
 
         if selected_slug is not None:
             active_book = next((b for b in all_books if b.get("slug") == selected_slug), None)
@@ -420,17 +605,15 @@ def init_public_archive_routes(app, login_required, get_db=None):
                 if active_book is None:
                     abort(404)
             else:
-                active_book = all_books[0] if all_books else None
+                active_book = ((ordered if selected_semester else all_books) or all_books or [None])[0]
 
-        selected_semester = (request.args.get("semester") or "").strip()
-        grouped: list[dict[str, Any]] = []
-        for sem in semesters:
-            sid = sem.get("id", "")
-            if selected_semester and sid != selected_semester:
-                continue
-            sem_books = [b for b in all_books if b.get("semester") == sid]
-            if sem_books:
-                grouped.append({**sem, "books": sem_books})
+        prev_book = next_book = None
+        if active_book is not None:
+            idx = next((i for i, b in enumerate(ordered) if b.get("slug") == active_book.get("slug")), None)
+            if idx is not None:
+                prev_book = ordered[idx - 1] if idx > 0 else None
+                next_book = ordered[idx + 1] if idx + 1 < len(ordered) else None
+        outline = build_pre_seminar_outline(active_book.get("sections") or []) if active_book else []
 
         linked_week = None
         if selected_slug is not None and active_book is not None and get_db is not None:
@@ -449,6 +632,9 @@ def init_public_archive_routes(app, login_required, get_db=None):
                 grouped_books=grouped,
                 all_books=all_books,
                 active_book=active_book,
+                outline=outline,
+                prev_book=prev_book,
+                next_book=next_book,
                 has_archive_book=bool(active_book and any(b.get("slug") == active_book.get("slug") for b in _load_json_snapshot(PUBLIC_ARCHIVE_PATH).get("books", []))),
                 is_staff=session.get("user_role") in ("admin", "officer"),
             )
@@ -503,7 +689,7 @@ def init_public_archive_routes(app, login_required, get_db=None):
         data = request.get_json(silent=True) if request.is_json else request.form
         data = data or {}
         title = str(data.get("title") or "").strip()
-        body = str(data.get("markdown_body") or "").strip()
+        body = strip_editorial_colophon(str(data.get("markdown_body") or "")).strip()
         if not title or not body or len(body) > 300000 or len(title) > 300000:
             return (jsonify(ok=False, error="제목과 본문을 확인해 주세요."), 400)
         db = require_db()
@@ -518,9 +704,7 @@ def init_public_archive_routes(app, login_required, get_db=None):
             if not week_rows:
                 return (jsonify(ok=False, error="연결할 세미나 주차를 찾을 수 없습니다."), 400)
         row = {key: str(data.get(key) or "").strip() for key in ("author", "semester", "semester_label", "seminar_date", "edition_note")}
-        if not row["semester"]:
-            row["semester"] = row["seminar_date"][:4] or str(datetime.now().year)
-            row["semester"] += "-custom"
+        row["semester"], row["semester_label"] = canonicalize_semester(row["semester"], row["semester_label"], row["seminar_date"])
         row.update(title=title, markdown_body=body, is_published=data.get("is_published") in (True, "true", "on", "1"), updated_at=datetime.now(timezone.utc).isoformat())
         if seminar_week_id:
             row["seminar_week_id"] = seminar_week_id
