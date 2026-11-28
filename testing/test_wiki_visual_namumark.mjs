@@ -123,3 +123,14 @@ test('real wiki_content files round trip without losing structure', () => {
         assert.equal(serializeBlocks(after), out, name + ' stable');
     }
 });
+
+test('list items with [br] soft breaks round trip losslessly', () => {
+    for (const src of [' * 가[br]나다', ' 1. 가나다[br]둘째줄', ' 1. 첫째\n 1. 둘[br]째\n  * 안[br]쪽\n 1. 셋째']) {
+        const blocks = parseBlocks(src);
+        assert.deepEqual(blocks.map(b => b.type), ['list']);
+        assert.equal(serializeBlocks(blocks), src);
+    }
+    const item = parseBlocks(' 1. 가[br]\'\'\'나\'\'\'다')[0].items[0];
+    assert.equal(item.text, '가[br]\'\'\'나\'\'\'다');
+    assert.match(inlineToHtml(item.text), /가<br>/);
+});

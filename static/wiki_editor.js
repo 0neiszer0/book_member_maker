@@ -204,6 +204,20 @@ function resizeTableEdge(colPx, boxWidth, deltaX, minColPx = 40) {
     return {tablePct, widths};
 }
 
+// Backspace at the start of a non-empty top-level list item: the item becomes a
+// paragraph that keeps its text, and the list is split around it.
+function unlistListItem(blocks, blockIndex, itemIndex, content) {
+    const block = blocks[blockIndex];
+    const beforeItems = block.items.slice(0, itemIndex);
+    const afterItems = block.items.slice(itemIndex + 1);
+    const replacement = [];
+    if (beforeItems.length) replacement.push({type: 'list', items: beforeItems});
+    replacement.push({type: 'paragraph', lines: [content]});
+    if (afterItems.length) replacement.push({type: 'list', items: afterItems});
+    blocks.splice(blockIndex, 1, ...replacement);
+    return {focusIndex: blockIndex + (beforeItems.length ? 1 : 0)};
+}
+
 function setTableWidth(model, widthPercent) {
     const width = Math.max(25, Math.min(100, Math.round(Number(widthPercent)) || 100));
     setTag(model.tableTags, t => t.startsWith('tablewidth='), 'tablewidth=' + width + '%');
@@ -224,7 +238,7 @@ function matchTables(source, shapes) {
     });
 }
 
-if (typeof module !== 'undefined' && module.exports) module.exports = {parseTable, serializeTable, tableAt, equalWidths, resizeWidths, resizeTableEdge, findAllTables, setTableWidth, matchTables};
+if (typeof module !== 'undefined' && module.exports) module.exports = {parseTable, serializeTable, tableAt, equalWidths, resizeWidths, resizeTableEdge, unlistListItem, findAllTables, setTableWidth, matchTables};
 if (typeof document === 'undefined') return;
 const $ = selector => document.querySelector(selector);
 const source = $('#wiki-content');
@@ -1019,6 +1033,18 @@ function atEnd(host) {
     holder.append(tail.cloneContents());
     return textOfDom(holder) === '';
 }
+function atStart(host) {
+    const range = caretIn(host);
+    if (!range || !range.collapsed) return false;
+    const head = document.createRange();
+    head.setStart(host, 0);
+    head.setEnd(range.startContainer, range.startOffset);
+    const holder = mk('div');
+    holder.append(head.cloneContents());
+    // Caret after a soft break: let the browser delete the <br> instead.
+    if (holder.querySelector('br')) return false;
+    return textOfDom(holder) === '';
+}
 function insertNodeAtCaret(host, node) {
     const range = caretIn(host);
     if (!range) return false;
@@ -1034,8 +1060,16 @@ function insertNodeAtCaret(host, node) {
 function insertBr(host) {
     const br = mk('br');
     if (!insertNodeAtCaret(host, br)) return;
+    // insertNode at the end of a text node leaves an empty text node behind;
+    // drop it so the trailing-<br> check below sees the real end of the line.
+    let next = br.nextSibling;
+    while (next && next.nodeType === 3 && !next.nodeValue) {
+        const empty = next;
+        next = next.nextSibling;
+        empty.remove();
+    }
     // A browser needs a trailing <br> to show a caret on the new last line.
-    if (!br.nextSibling) br.after(mk('br'));
+    if (!next) br.after(mk('br'));
     touch(host);
 }
 function insertPlain(host, value, single) {
@@ -1890,7 +1924,7 @@ if (visualApi && visual) {
                 changed();
                 renderVisual({index: at + 1, where: 'start'});
                 record();
-            } else if (b.type === 'list') {
+            } else if (b.type === 'list' && !event.shiftKey) {
                 event.preventDefault();
                 const li = host.closest('li');
                 if (!textOfDom(li).trim()) {
@@ -1934,10 +1968,30 @@ if (visualApi && visual) {
             }
         } else if (event.key === 'Backspace') {
             const range = caretIn(host);
-            if (!range || !range.collapsed || textOfDom(host) !== '') return;
+            if (!range || !range.collapsed) return;
             if (b.type === 'list') {
-                event.preventDefault();
                 const li = host.closest('li');
+                if (!li) return;
+                if (textOfDom(li) !== '') {
+                    if (!atStart(li)) return;
+                    event.preventDefault();
+                    record();
+                    if (li._item.indent > 1) {
+                        li._item.indent -= 1;
+                        li.style.marginLeft = (li._item.indent - 1) * 1.5 + 'em';
+                        renumber(wrap.querySelector('ul, ol'));
+                        changed();
+                    } else {
+                        syncItems(wrap);
+                        const content = textOfDom(li);
+                        const {focusIndex} = unlistListItem(blocks, at, b.items.indexOf(li._item), content);
+                        changed();
+                        renderVisual({index: focusIndex, where: 'start'});
+                    }
+                    record();
+                    return;
+                }
+                event.preventDefault();
                 const siblings = [...wrap.querySelectorAll('li')];
                 record();
                 if (siblings.length === 1) {
@@ -1953,7 +2007,7 @@ if (visualApi && visual) {
                     focusEl(neighbor, index ? 'end' : 'start');
                 }
                 record();
-            } else if (b.type === 'paragraph' && at > 0) {
+            } else if (b.type === 'paragraph' && at > 0 && textOfDom(host) === '') {
                 event.preventDefault();
                 structural(() => blocks.splice(at, 1), {index: at - 1, where: 'end'});
             }

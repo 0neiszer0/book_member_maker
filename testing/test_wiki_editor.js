@@ -35,3 +35,40 @@ test('handles one-column and invalid input', () => {
     assert.equal(resizeTableEdge([], 1000, 10), null);
     assert.equal(resizeTableEdge([100], 0, 10), null);
 });
+
+const {unlistListItem} = require('../static/wiki_editor.js');
+const visual = require('../static/wiki_namu_visual.js');
+const items = (...texts) => texts.map(text => ({indent: 1, ordered: true, marker: '1.', text}));
+
+test('unlistListItem turns a single item into a paragraph', () => {
+    const blocks = [{type: 'paragraph', lines: ['앞']}, {type: 'list', items: items('내용')}];
+    assert.deepEqual(unlistListItem(blocks, 1, 0, '내용'), {focusIndex: 1});
+    assert.deepEqual(blocks, [{type: 'paragraph', lines: ['앞']}, {type: 'paragraph', lines: ['내용']}]);
+});
+
+test('unlistListItem on the first item keeps the rest as a list', () => {
+    const blocks = [{type: 'list', items: items('첫째', '둘째')}];
+    assert.deepEqual(unlistListItem(blocks, 0, 0, '첫째'), {focusIndex: 0});
+    assert.deepEqual(blocks, [{type: 'paragraph', lines: ['첫째']}, {type: 'list', items: items('둘째')}]);
+});
+
+test('unlistListItem splits a middle item into list + paragraph + list', () => {
+    const blocks = [{type: 'list', items: items('첫째', '둘째', '셋째')}];
+    assert.deepEqual(unlistListItem(blocks, 0, 1, '둘째'), {focusIndex: 1});
+    assert.deepEqual(blocks.map(b => b.type), ['list', 'paragraph', 'list']);
+    assert.equal(visual.serializeBlocks(blocks), ' 1. 첫째\n\n둘째\n\n 1. 셋째');
+});
+
+test('unlistListItem on the last item', () => {
+    const blocks = [{type: 'list', items: items('첫째', '둘째')}];
+    assert.deepEqual(unlistListItem(blocks, 0, 1, '둘째'), {focusIndex: 1});
+    assert.deepEqual(blocks, [{type: 'list', items: items('첫째')}, {type: 'paragraph', lines: ['둘째']}]);
+});
+
+test('unlistListItem preserves [br] and inline markup', () => {
+    const content = "'''굵게'''[br][[링크]]";
+    const blocks = [{type: 'list', items: items(content)}];
+    unlistListItem(blocks, 0, 0, content);
+    assert.deepEqual(blocks, [{type: 'paragraph', lines: [content]}]);
+    assert.equal(visual.serializeBlocks(blocks), content);
+});
