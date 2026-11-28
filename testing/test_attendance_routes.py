@@ -267,5 +267,41 @@ class AttendanceRouteTests(unittest.TestCase):
             self.assertEqual(res.status_code, 409)
 
 
+    def test_group_cards_render_absence_picker_without_duplicate_checkboxes(self):
+        import re
+        self.add_group_plan()
+        self.fake.rows['history'][0].update(facilitators=['호반'], group_editor_state={'group_names': ['토론조']})
+        html = self.client.get('/admin/seminar_sessions/thu/roster').get_data(as_text=True)
+        self.assertIn('class="attendance-group-grid"', html)
+        self.assertIn('<h3>토론조</h3>', html)
+        self.assertIn('조 편성 화면에서 실제로 불참한 사람만 눌러 체크를 해제해 주세요.', html)
+        self.assertIn('id="absent-summary"', html)
+        self.assertIn('attendance-pre-absent-tag">사전 불참', html)
+        self.assertIn('attendance-role-tag">발제', html)
+        self.assertIn('모르는사람</strong><small>(회원 명단에 없음)', html)
+        values = re.findall(r'class="actual-choice" type="checkbox" value="(\d+)"', html)
+        self.assertEqual(sorted(values), ['1', '2', '3'])
+        self.assertEqual(self.checked_actual(html), {2})
+        self.assertIn('조 편성 외 회원 추가 선택', html)
+        self.assertLess(html.index('id="actual-attendance"'), html.index('id="roster-text"'))
+        self.assertNotIn('id="actual-confirmed-view"', html)
+        self.assertIn('>실제 출석 확정</button>', html)
+
+    def test_confirmed_attendance_shows_completion_and_asks_to_edit(self):
+        self.add_group_plan()
+        self.fake.rows['seminar_sessions'][0].update(attendance_confirmed_at='2026-08-13T12:00:00+00:00', actual_member_ids=[1, 2])
+        html = self.client.get('/admin/seminar_sessions/thu/roster').get_data(as_text=True)
+        self.assertIn('실제 참석 반영이 완료되었습니다.', html)
+        self.assertIn('실제 참석 2명 · 반영 시각 2026-08-13 21:00 (한국시간)', html)
+        self.assertIn('참석 명단을 수정하시겠어요?', html)
+        self.assertIn('id="edit-actual-attendance"', html)
+        self.assertIn('<div id="actual-editor" hidden>', html)
+        self.assertIn('id="cancel-edit-actual"', html)
+        self.assertIn('실제 참석 반영 수정 완료', html)
+        self.assertIn('attendance-absent-tag">불참', html)  # 불참자 in the group summary
+        self.assertEqual(self.checked_actual(html), {1, 2})
+        self.assertIn('<details class="attendance-panel attendance-roster-import">', html)
+
+
 if __name__ == '__main__':
     unittest.main()

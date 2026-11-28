@@ -5,7 +5,7 @@ import secrets
 from flask import abort, jsonify, render_template, request, session, send_file
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from attendance_workflow import (build_term_attendance, expected_member_ids,
-                                 match_roster_rows, parse_roster_text,
+                                 match_roster_rows, parse_roster_text, build_attendance_group_cards,
                                  attendance_is_confirmed, confirmed_history_session_ids,
                                  grouped_member_ids, normalize_member_name)
 from term_membership import scope_members
@@ -78,7 +78,7 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
     @login_required(role='admin')
     def admin_seminar_roster(session_id):
         target, members, audit, eligible, planned, no_shows = roster_context(session_id)
-        histories = db().table('history').select('seminar_session_id,present,groups,actual_member_ids,attendance_confirmed_at') \
+        histories = db().table('history').select('seminar_session_id,present,groups,actual_member_ids,attendance_confirmed_at,group_editor_state,facilitators') \
             .eq('seminar_session_id', session_id).execute().data or []
         target['attendance_confirmed'] = attendance_is_confirmed(target, confirmed_history_session_ids(histories))
         absent = {r['member_id'] for r in db().table('seminar_absences').select('member_id').eq('session_id', session_id)
@@ -120,13 +120,19 @@ def init_attendance_routes(app, get_supabase, login_required, rebuild_matrix=Non
                 return '아직 반영하지 않음'
             return datetime.fromisoformat(value.replace('Z', '+00:00')).astimezone(KST).strftime('%Y-%m-%d %H:%M')
         target['roster_updated_label'] = local_stamp(target.get('roster_updated_at'))
+        group_cards, grouped_card_member_ids = build_attendance_group_cards(histories, members, actual, no_shows | absent)
+        confirmed_stamp = target.get('attendance_confirmed_at') or max(
+            (h['attendance_confirmed_at'] for h in histories if h.get('attendance_confirmed_at')), default=None)
+        confirmed_at_label = local_stamp(confirmed_stamp) if confirmed_stamp else ''
         for row in audit:
             row['created_label'] = local_stamp(row.get('created_at'))
         return render_template('admin_seminar_roster.html', seminar=target, members=members,
                                audit=audit, eligible_ids=eligible,
                                planned_ids=planned, actual_ids=actual, csrf_token=csrf_token(),
                                grouped_ids=grouped, group_issues=group_issues, grouped_skipped=grouped_skipped,
-                               default_basis=default_basis,
+                               default_basis=default_basis, group_cards=group_cards,
+                               grouped_card_member_ids=grouped_card_member_ids,
+                               confirmed_at_label=confirmed_at_label,
                                today=datetime.now(KST).date().isoformat(),
                                confirmation_token=signer.dumps({'actor': session['user_id'], 'entry': confirmation_entry(target, actual)}))
 

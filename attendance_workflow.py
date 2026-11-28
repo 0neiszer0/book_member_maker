@@ -233,3 +233,71 @@ def build_term_attendance(members, histories, sessions, events, event_attendees,
                      'last_date': max((c['date'] for c in columns if matrix[mid].get(c['key'])), default='')})
     return {'members': rows, 'columns': columns, 'matrix': dict(matrix),
             'minimum': minimum, 'warnings': sorted(warnings)}
+
+
+def build_attendance_group_cards(histories, members, actual_ids, excluded_ids=()):
+    """Saved group plan -> read-only cards for picking real absentees.
+
+    Uses the same active-first exact-name rule as ``grouped_member_ids`` and
+    never guesses ambiguous or unknown names. A member id appears in at most
+    one card so the page never renders two checkboxes for the same person.
+    Returns (group_cards, grouped_card_member_ids).
+    """
+    active_by_name, all_by_name, by_id = defaultdict(list), defaultdict(list), {}
+    for member in members:
+        norm = normalize_member_name(member.get('name'))
+        if not norm:
+            continue
+        mid = int(member['id'])
+        by_id[mid] = member
+        all_by_name[norm].append(mid)
+        if member.get('is_active'):
+            active_by_name[norm].append(mid)
+    actual_set = {int(i) for i in actual_ids or []}
+    excluded = {int(i) for i in excluded_ids or []}
+    cards, card_ids, seen_names = [], set(), set()
+    for row in histories or []:
+        groups = row.get('groups')
+        if not isinstance(groups, list) or not groups:
+            continue
+        group_names = (row.get('group_editor_state') or {}).get('group_names') or []
+        facilitators = {normalize_member_name(n) for n in (row.get('facilitators') or [])
+                        if normalize_member_name(n)}
+        for idx, group in enumerate(groups):
+            if not isinstance(group, list):
+                continue
+            entries = []
+            for raw in group:
+                if not isinstance(raw, str):
+                    continue
+                name = normalize_member_name(raw)
+                if not name or name in seen_names:
+                    continue
+                seen_names.add(name)
+                active_hits = active_by_name.get(name, [])
+                hits = active_hits if active_hits else all_by_name.get(name, [])
+                mid = hits[0] if len(hits) == 1 and hits[0] not in card_ids else None
+                issue = None
+                if len(hits) != 1:
+                    issue = '동명이인' if hits else '회원 명단에 없음'
+                elif mid is None:
+                    continue  # Same member under a second spelling: keep one checkbox.
+                member = by_id.get(mid, {}) if mid else {}
+                if mid:
+                    card_ids.add(mid)
+                entries.append({
+                    'name': member.get('name') or name,
+                    'member_id': mid,
+                    'student_id': member.get('student_id') or '',
+                    'department': member.get('department') or '',
+                    'is_facilitator': name in facilitators,
+                    'pre_absent': mid in excluded if mid else False,
+                    'attended': mid in actual_set if mid else False,
+                    'issue': issue,
+                })
+            if not entries:
+                continue
+            custom = group_names[idx] if idx < len(group_names) and isinstance(group_names[idx], str) else ''
+            number = len(cards) + 1
+            cards.append({'index': number, 'title': custom.strip() or f'{number}조', 'members': entries})
+    return cards, card_ids

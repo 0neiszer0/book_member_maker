@@ -75,3 +75,66 @@
 .attendance-col-week,.attendance-col-session{width:8.3%}.attendance-col-date{width:22.6%}.attendance-col-kind{width:15%}.attendance-col-status,.attendance-col-detail{width:7.8%}.attendance-report-status{white-space:nowrap;color:#256d44}.attendance-learningx .attendance-report-table a{text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
 .attendance-report-notes{margin:20px 0;color:#56616a}.attendance-learningx .attendance-report-notes p{margin:8px 0}
 @media(max-width:767px){.attendance-report-toolbar{align-items:flex-start;gap:10px}.attendance-learningx .attendance-report-toolbar select,.attendance-term-bar select{font-size:16px;min-height:40px}.attendance-shell button,.attendance-actions a{min-height:40px}.attendance-report-table .attendance-col-week,.attendance-report-table .attendance-col-session{width:60px}.attendance-report-table .attendance-col-date{width:120px}.attendance-report-table .attendance-col-kind{width:80px}.attendance-report-table .attendance-col-status,.attendance-report-table .attendance-col-detail{width:76px}}
+
+/* Wave 17: group-first absence picker and confirmed-attendance summary. */
+.attendance-panel.attendance-panel-open{background:transparent;border:0;box-shadow:none;border-radius:0;padding:8px 0 0}
+.attendance-panel-open>div>h2{font-size:20px}
+.attendance-shell h1,.attendance-shell h2{text-wrap:balance}
+.attendance-roster-import>summary{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;min-height:44px;align-content:center}
+.attendance-roster-import>summary small{font-size:13px;font-weight:500;color:var(--ui-ink-subtle,#626e77);font-variant-numeric:tabular-nums}
+.attendance-roster-import[open]>summary{margin-bottom:8px}
+.attendance-shell h3{font-size:15px;font-weight:700;color:var(--ui-ink,#2d3b45);margin:0}
+.attendance-confirmed{display:flex;flex-direction:column;gap:16px}
+.attendance-confirmed-head{background:#f2fbf6;border:1px solid #b7e4c7;border-radius:var(--ui-radius-lg,8px);padding:16px 18px;color:#256d44}
+.attendance-panel .attendance-confirmed-head h2{color:#256d44;font-size:19px;margin:8px 0 4px}
+.attendance-shell .attendance-confirmed-meta{margin:0;color:#256d44;font-size:14px;font-variant-numeric:tabular-nums}
+.attendance-done-pill{display:inline-flex;align-items:center;min-height:24px;padding:0 10px;border-radius:999px;background:#ffffff;border:1px solid #b7e4c7;color:#256d44;font-size:12.5px;font-weight:700}
+.attendance-summary-grid,.attendance-group-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));gap:12px}
+.attendance-summary-group{border:1px solid var(--ui-border,#d8dcdf);border-radius:var(--ui-radius-md,6px);padding:12px 14px;min-width:0}
+.attendance-summary-group h3{display:flex;justify-content:space-between;gap:8px;margin-bottom:8px}
+.attendance-summary-group h3 span,.attendance-group-count{font-size:13px;font-weight:600;color:var(--ui-ink-subtle,#626e77);font-variant-numeric:tabular-nums;white-space:nowrap}
+.attendance-summary-group ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.attendance-summary-group li{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:14px;min-width:0;overflow-wrap:anywhere}
+.attendance-summary-group li.is-absent .attendance-member-name,.attendance-summary-group li.is-unlinked .attendance-member-name{font-weight:500;color:var(--ui-ink-subtle,#626e77)}
+.attendance-summary-group li.is-absent .attendance-member-name{text-decoration:line-through}
+.attendance-summary-group small,.attendance-group-member.is-unlinked small{font-size:12.5px;color:var(--ui-ink-subtle,#626e77)}
+.attendance-role-tag,.attendance-pre-absent-tag,.attendance-absent-tag,.attendance-count-badge{display:inline-flex;align-items:center;min-height:20px;padding:0 7px;border-radius:var(--ui-radius-sm,4px);font-size:12px;font-weight:600;white-space:nowrap}
+.attendance-role-tag{background:#f3f8fc;border:1px solid #b9d8ec;color:#0374b5}
+.attendance-pre-absent-tag{background:#fffbeb;border:1px solid #f5d08a;color:#9a4d00}
+.attendance-absent-tag{background:#fff5f5;border:1px solid #f3c4c6;color:#b42318}
+.attendance-count-badge{background:var(--ui-surface-subtle,#f1f4f6);color:var(--ui-ink,#2d3b45);font-variant-numeric:tabular-nums}
+.attendance-shell .attendance-extra-line,.attendance-shell .attendance-chip-list{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0;font-size:14px}
+.attendance-name-chip{display:inline-flex;align-items:center;min-height:28px;padding:0 10px;border-radius:999px;background:var(--ui-surface-subtle,#f1f4f6);border:1px solid var(--ui-border,#d8dcdf);font-size:13.5px}
+.attendance-edit-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:12px 14px;background:var(--ui-bg,#f5f7f8);border:1px solid var(--ui-border,#d8dcdf);border-radius:var(--ui-radius-md,6px)}
+.attendance-shell .attendance-edit-bar p{margin:0;font-weight:700;color:var(--ui-ink,#2d3b45)}
+.attendance-shell .attendance-edit-bar button{min-height:44px;font-weight:600}
+.attendance-instruction{font-size:15px;font-weight:600;color:var(--ui-ink,#2d3b45)}
+.attendance-live-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:10px 14px;margin:0 0 14px;background:var(--ui-bg,#f5f7f8);border:1px solid var(--ui-border,#d8dcdf);border-radius:var(--ui-radius-md,6px);position:sticky;top:0;z-index:2}
+.attendance-shell .attendance-live-bar #actual-count{margin:0;font-weight:700;color:var(--ui-ink,#2d3b45);font-variant-numeric:tabular-nums}
+.attendance-absent-summary{display:flex;flex-wrap:wrap;align-items:center;gap:6px;flex:1 1 200px;min-width:0}
+.attendance-all-present{font-size:13.5px;font-weight:600;color:#256d44}
+.attendance-shell .attendance-absent-chip{min-height:32px;padding:0 10px;border-radius:999px;background:#fff5f5;border-color:#f3c4c6;color:#b42318;font-size:13px;font-weight:600;box-shadow:none}
+.attendance-shell .attendance-absent-chip:hover{background:#ffe9e9;border-color:#b42318;color:#b42318}
+.attendance-group-card{display:flex;flex-direction:column;gap:8px;min-width:0;padding:12px;background:var(--ui-surface,#ffffff);border:1px solid var(--ui-border,#d8dcdf);border-radius:var(--ui-radius-lg,8px)}
+.attendance-group-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:0 2px}
+.attendance-group-members{display:flex;flex-direction:column;gap:6px}
+.attendance-shell .attendance-group-member{display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 10px;border:1px solid var(--ui-border,#d8dcdf);border-radius:var(--ui-radius-md,6px);background:#ffffff;cursor:pointer;min-width:0;transition:background-color .15s ease,border-color .15s ease}
+.attendance-group-member:hover{background:var(--ui-bg,#f5f7f8);border-color:var(--ui-border-strong,#c7cdd1)}
+.attendance-group-member:focus-within{outline:2px solid #0374b5;outline-offset:1px}
+.attendance-group-member input[type=checkbox]{width:20px;height:20px;flex:none;margin:0;accent-color:#256d44;cursor:pointer}
+.attendance-group-member input[type=checkbox]:focus-visible{outline:none}
+.attendance-member-info{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;flex:1;min-width:0}
+.attendance-member-name{font-size:14.5px;font-weight:600;color:var(--ui-ink,#2d3b45);overflow-wrap:anywhere}
+.attendance-state-pill{flex:none;display:inline-flex;align-items:center;min-height:22px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:700;background:#f2fbf6;border:1px solid #b7e4c7;color:#256d44}
+.attendance-group-member.is-absent{background:#fff5f5;border-color:#f3c4c6}
+.attendance-group-member.is-absent:hover{background:#ffeded}
+.attendance-group-member.is-absent .attendance-member-name{text-decoration:line-through;color:var(--ui-ink-muted,#56616a)}
+.attendance-group-member.is-absent .attendance-state-pill{background:#ffffff;border-color:#f3c4c6;color:#b42318}
+.attendance-group-member.is-unlinked{cursor:default;background:var(--ui-bg,#f5f7f8);border-style:dashed}
+.attendance-group-member.is-unlinked:hover{border-color:var(--ui-border,#d8dcdf)}
+.attendance-group-member.is-unlinked .attendance-member-name{color:var(--ui-ink-subtle,#626e77);font-weight:500}
+.attendance-extra-members{margin:16px 0 0;border:1px solid var(--ui-border,#d8dcdf);border-radius:var(--ui-radius-md,6px);padding:0 14px}
+.attendance-extra-members>summary{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;min-height:44px;cursor:pointer;font-weight:600;color:var(--ui-ink,#2d3b45)}
+.attendance-extra-members[open]{padding-bottom:10px}
+.attendance-confirm-bar{margin-top:16px}
+@media(max-width:767px){.attendance-panel{padding:16px 14px}.attendance-summary-grid,.attendance-group-grid{grid-template-columns:1fr}.attendance-live-bar{position:static}.attendance-edit-bar>*{flex:1 1 100%}.attendance-shell .attendance-absent-chip{min-height:40px}}

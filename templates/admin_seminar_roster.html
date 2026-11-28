@@ -1,13 +1,16 @@
 {% extends 'lms_admin_base.html' %}
 {% set lms_title = '본 세미나 참석 명단' if seminar.day_type == 'thu' else '추가 세미나 참석 명단' %}
+{% set attendance_first = group_cards or seminar.attendance_confirmed or seminar.meeting_date <= today %}
+{% set roster_collapsed = group_cards or seminar.attendance_confirmed %}
 {% block title %}{{ lms_title }} · 책 먹는 호반우{% endblock %}
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='lms_attendance.css') }}">{% endblock %}
-{% block content %}<div class="attendance-shell" data-session-id="{{ seminar.id }}" data-confirmation-token="{{ confirmation_token }}" data-csrf="{{ csrf_token }}">
- <a href="{{ url_for('admin_term_attendance', term_id=seminar.term_id) }}">← 학기 참석 현황</a>
- <h1>{{ seminar.meeting_date|seminar_date }} · {{ lms_title }}</h1>
- <p>카카오톡 투표 결과를 옮겨 주세요. 참석 투표자만 조 편성 대상에 포함합니다. 정원·선착순 제한은 없습니다.</p>
- <p class="attendance-notice">{{ '출석 확정 완료' if seminar.attendance_confirmed else '출석 확정 대기' }} · <a href="#actual-attendance">실제 출석 확인하기 →</a></p>
- <section class="attendance-panel"><h2>1. 투표 결과 명단 반영</h2><p>현재 참석 예정 {{ planned_ids|length }}명 · 마지막 반영 {{ seminar.roster_updated_label }}{% if seminar.roster_updated_at %} (한국시간){% endif %}</p>
+
+{% macro member_choice(member, kind) -%}
+<label data-actual-search="{{ member.name }} {{ member.student_id or '' }} {{ member.department or '' }}"><input class="actual-choice" type="checkbox" value="{{ member.id }}" {% if member.id in actual_ids %}checked{% endif %}><span><strong>{{ member.name }}</strong><small>{{ member.student_id or '학번 없음' }} · {{ member.department or '소속 없음' }}</small></span></label>
+{%- endmacro %}
+
+{% macro roster_import() -%}
+ <p>현재 참석 예정 {{ planned_ids|length }}명 · 마지막 반영 {{ seminar.roster_updated_label }}{% if seminar.roster_updated_at %} (한국시간){% endif %}</p>
  <div class="attendance-tabs" role="group" aria-label="명단 입력 방식"><button type="button" data-method="text" aria-pressed="true">붙여넣기</button><button type="button" data-method="file" aria-pressed="false">엑셀</button><button type="button" data-method="selected" aria-pressed="false">직접 선택</button></div>
  <div data-input-panel="text"><label for="roster-text">참석 투표자 이름 또는 이름·학번</label><textarea id="roster-text" rows="6" placeholder="김독서 202612345&#10;이호반 202654321"></textarea><p>한 줄에 한 명씩 입력하세요. 이름만 입력할 수 있지만 동명이인은 학번이 필요합니다. 빈 명단도 미리보기 후 반영할 수 있습니다.</p></div>
  <div data-input-panel="file" hidden><label for="roster-file">.xlsx 파일 (2MB 이하)</label><input id="roster-file" type="file" accept=".xlsx"><p>첫 번째 시트에 이름·학번을 넣어주세요. 예: 이름 | 학번. 업로드한 파일은 서버에 보관하지 않습니다.</p></div>
@@ -15,11 +18,119 @@
  <div class="attendance-actions"><button type="button" id="preview-roster">반영 전 미리보기</button>{% if audit %}<button type="button" id="undo-roster">직전 반영 되돌리기</button>{% endif %}</div>
  <div id="roster-preview" class="attendance-notice" hidden aria-live="polite"></div><button type="button" id="apply-roster" class="lms-button lms-button-primary" hidden>확인한 명단으로 반영</button>
  {% if audit %}<details><summary>최근 명단 반영 내역</summary>{% for item in audit %}<p>{{ item.created_label }} · {{ '불참 (이전 방식)' if item.mode == 'absence' else '참석' }} 명단 {{ item.member_ids|length }}명 → 참석 예정 {{ item.expected_member_ids|length }}명</p>{% endfor %}</details>{% endif %}
+{%- endmacro %}
+
+{% macro roster_section() -%}
+{% if attendance_first %}
+ <details class="attendance-panel attendance-roster-import"{% if not roster_collapsed %} open{% endif %}><summary>카카오톡 투표 명단 반영 <small>참석 예정 {{ planned_ids|length }}명</small></summary>
+{{ roster_import() }}
+ </details>
+{% else %}
+ <section class="attendance-panel"><h2>1. 투표 결과 명단 반영</h2>
+{{ roster_import() }}
  </section>
- <section class="attendance-panel" id="actual-attendance"><h2>실제 출석 확정</h2><p>예정 {{ planned_ids|length }}명 / 조 편성 {{ grouped_ids|length if grouped_ids is not none else '없음' }}{% if grouped_ids is not none %}명{% endif %} · 기본 선택: {{ default_basis }}</p><p>불참자만 해제한 뒤 확정해주세요.{% if grouped_ids %} <button type="button" id="use-grouped" data-ids="{{ grouped_ids|tojson|forceescape }}">조 편성 명단으로 선택</button>{% endif %}</p>{% if group_issues %}<div class="attendance-notice attendance-errors"><p>조 편성에서 회원과 연결하지 못해 선택하지 않은 이름: {% for issue in group_issues %}{{ issue.name }}({{ issue.reason }}){% if not loop.last %}, {% endif %}{% endfor %}</p></div>{% endif %}{% if grouped_skipped %}<p class="attendance-notice">조 편성에 있지만 불참으로 기록돼 선택하지 않은 사람: {{ grouped_skipped|join(', ') }}</p>{% endif %}<p>{{ '출석 확정됨 · 다시 저장하면 실제 참석 기록을 수정합니다.' if seminar.attendance_confirmed else '조 편성 저장과 별개입니다. 실제로 참석한 사람만 선택해주세요.' }}</p>
- <label for="actual-search">회원 검색</label><input id="actual-search" type="search" placeholder="이름·학번·학과"><div class="attendance-people">{% for member in members %}<label data-actual-search="{{ member.name }} {{ member.student_id or '' }} {{ member.department or '' }}"><input class="actual-choice" type="checkbox" value="{{ member.id }}" {% if member.id in actual_ids %}checked{% endif %}><span><strong>{{ member.name }}</strong><small>{{ member.student_id or '학번 없음' }} · {{ member.department or '소속 없음' }}</small></span></label>{% endfor %}</div>
- <p id="actual-count" aria-live="polite"></p><button type="button" id="confirm-attendance" class="lms-button lms-button-primary lms-button-cta" {% if seminar.meeting_date > today %}disabled{% endif %}>실제 출석 확정</button>{% if seminar.meeting_date > today %}<p>세미나 날짜가 되어야 확정할 수 있습니다.</p>{% endif %}
+{% endif %}
+{%- endmacro %}
+
+{% block content %}<div class="attendance-shell" data-session-id="{{ seminar.id }}" data-confirmation-token="{{ confirmation_token }}" data-csrf="{{ csrf_token }}">
+ <a href="{{ url_for('admin_term_attendance', term_id=seminar.term_id) }}">← 학기 참석 현황</a>
+ <h1>{{ seminar.meeting_date|seminar_date }} · {{ lms_title }}</h1>
+ <p>카카오톡 투표 결과를 옮겨 주세요. 참석 투표자만 조 편성 대상에 포함합니다. 정원·선착순 제한은 없습니다.</p>
+ <p class="attendance-notice">{{ '출석 확정 완료' if seminar.attendance_confirmed else '출석 확정 대기' }} · <a href="#actual-attendance">실제 출석 확인하기 →</a></p>
+{% if not attendance_first %}{{ roster_section() }}{% endif %}
+ <section class="attendance-panel attendance-panel-open" id="actual-attendance">
+{% if seminar.attendance_confirmed %}
+  <div id="actual-confirmed-view" class="attendance-confirmed">
+   <div class="attendance-confirmed-head">
+    <span class="attendance-done-pill">실제 참석 반영 완료</span>
+    <h2>실제 참석 반영이 완료되었습니다.</h2>
+    <p class="attendance-confirmed-meta">실제 참석 {{ actual_ids|length }}명{% if confirmed_at_label %} · 반영 시각 {{ confirmed_at_label }} (한국시간){% endif %}</p>
+   </div>
+{% if group_cards %}
+   <div class="attendance-summary-grid">
+{% for card in group_cards %}
+    <div class="attendance-summary-group">
+     <h3>{{ card.title }} <span>{{ card.members|selectattr('attended')|list|length }} / {{ card.members|selectattr('member_id')|list|length }}명</span></h3>
+     <ul>
+{% for m in card.members %}
+      <li class="{% if m.member_id is none %}is-unlinked{% elif not m.attended %}is-absent{% endif %}"><span class="attendance-member-name">{{ m.name }}</span>{% if m.is_facilitator %}<span class="attendance-role-tag">발제</span>{% endif %}{% if m.member_id is none %}<small>({{ m.issue }})</small>{% elif not m.attended %}<span class="attendance-absent-tag">불참</span>{% endif %}</li>
+{% endfor %}
+     </ul>
+    </div>
+{% endfor %}
+   </div>
+{% set extra_attendees = members|rejectattr('id', 'in', grouped_card_member_ids)|selectattr('id', 'in', actual_ids)|list %}
+{% if extra_attendees %}
+   <p class="attendance-extra-line">조 편성 외 참석: {% for member in extra_attendees %}<span class="attendance-name-chip">{{ member.name }}</span>{% endfor %}</p>
+{% endif %}
+{% else %}
+{% set confirmed_people = members|selectattr('id', 'in', actual_ids)|list %}
+   <p class="attendance-chip-list">{% for member in confirmed_people %}<span class="attendance-name-chip">{{ member.name }}</span>{% else %}<span class="attendance-helper">참석자가 없습니다.</span>{% endfor %}</p>
+{% endif %}
+   <div class="attendance-edit-bar">
+    <p>참석 명단을 수정하시겠어요?</p>
+    <button type="button" id="edit-actual-attendance" class="lms-button">참석 명단 수정하기</button>
+   </div>
+  </div>
+{% endif %}
+  <div id="actual-editor"{% if seminar.attendance_confirmed %} hidden{% endif %}>
+   <h2>{{ '실제 참석 명단 수정' if seminar.attendance_confirmed else '실제 출석 확정' }}</h2>
+   <p class="attendance-helper">예정 {{ planned_ids|length }}명 / 조 편성 {{ grouped_ids|length if grouped_ids is not none else '없음' }}{% if grouped_ids is not none %}명{% endif %} · 기본 선택: {{ default_basis }}</p>
+{% if group_issues %}<div class="attendance-notice attendance-errors"><p>조 편성에서 회원과 연결하지 못해 선택하지 않은 이름: {% for issue in group_issues %}{{ issue.name }}({{ issue.reason }}){% if not loop.last %}, {% endif %}{% endfor %}</p></div>{% endif %}
+{% if grouped_skipped %}<p class="attendance-notice">조 편성에 있지만 불참으로 기록돼 선택하지 않은 사람: {{ grouped_skipped|join(', ') }}</p>{% endif %}
+{% if group_cards %}
+   <p class="attendance-instruction">조 편성 화면에서 실제로 불참한 사람만 눌러 체크를 해제해 주세요.</p>
+   {% if seminar.attendance_confirmed %}<p class="attendance-helper">출석 확정됨 · 다시 저장하면 실제 참석 기록을 수정합니다.</p>{% endif %}
+   <div class="attendance-live-bar">
+    <p id="actual-count" aria-live="polite"></p>
+    <div id="absent-summary" class="attendance-absent-summary"></div>
+    {% if grouped_ids %}<button type="button" id="use-grouped" data-ids="{{ grouped_ids|tojson|forceescape }}">조 편성 명단으로 선택</button>{% endif %}
+   </div>
+   <div class="attendance-group-grid">
+{% for card in group_cards %}
+    <div class="attendance-group-card" data-group-card>
+     <div class="attendance-group-head"><h3>{{ card.title }}</h3><span class="attendance-group-count" data-group-count>{{ card.members|selectattr('attended')|list|length }} / {{ card.members|selectattr('member_id')|list|length }}명 참석</span></div>
+     <div class="attendance-group-members">
+{% for m in card.members %}
+{% if m.member_id %}
+      <label class="attendance-group-member{% if not m.attended %} is-absent{% endif %}" data-group-member data-member-name="{{ m.name }}">
+       <input class="actual-choice" type="checkbox" value="{{ m.member_id }}" {% if m.attended %}checked{% endif %}>
+       <span class="attendance-member-info">
+        <strong class="attendance-member-name">{{ m.name }}</strong>
+        {% if m.is_facilitator %}<span class="attendance-role-tag">발제</span>{% endif %}
+        {% if m.pre_absent %}<span class="attendance-pre-absent-tag">사전 불참</span>{% endif %}
+       </span>
+       <span class="attendance-state-pill" data-state-pill>{{ '참석' if m.attended else '불참' }}</span>
+      </label>
+{% else %}
+      <div class="attendance-group-member is-unlinked"><span class="attendance-member-info"><strong class="attendance-member-name">{{ m.name }}</strong><small>({{ m.issue }})</small></span></div>
+{% endif %}
+{% endfor %}
+     </div>
+    </div>
+{% endfor %}
+   </div>
+{% set extra_members = members|rejectattr('id', 'in', grouped_card_member_ids)|list %}
+{% set extra_checked = extra_members|selectattr('id', 'in', actual_ids)|list|length %}
+   <details class="attendance-extra-members"{% if extra_checked %} open{% endif %}>
+    <summary>조 편성 외 회원 추가 선택 (현장 참석 등){% if extra_checked %} <span class="attendance-count-badge">{{ extra_checked }}명 선택</span>{% endif %}</summary>
+    <label for="actual-search">회원 검색</label><input id="actual-search" type="search" placeholder="이름·학번·학과">
+    <div class="attendance-people">{% for member in extra_members %}{{ member_choice(member, 'actual') }}{% else %}<p class="attendance-helper">조 편성 외 회원이 없습니다.</p>{% endfor %}</div>
+   </details>
+{% else %}
+   <p>{{ '출석 확정됨 · 다시 저장하면 실제 참석 기록을 수정합니다.' if seminar.attendance_confirmed else '조 편성 저장과 별개입니다. 실제로 참석한 사람만 선택해주세요.' }}{% if grouped_ids %} <button type="button" id="use-grouped" data-ids="{{ grouped_ids|tojson|forceescape }}">조 편성 명단으로 선택</button>{% endif %}</p>
+   <label for="actual-search">회원 검색</label><input id="actual-search" type="search" placeholder="이름·학번·학과">
+   <div class="attendance-people">{% for member in members %}{{ member_choice(member, 'actual') }}{% endfor %}</div>
+   <p id="actual-count" aria-live="polite"></p>
+{% endif %}
+   <div class="attendance-actions attendance-confirm-bar">
+    <button type="button" id="confirm-attendance" class="lms-button lms-button-primary lms-button-cta" {% if seminar.meeting_date > today %}disabled{% endif %}>{{ '실제 참석 반영 수정 완료' if seminar.attendance_confirmed else '실제 출석 확정' }}</button>
+    {% if seminar.attendance_confirmed %}<button type="button" id="cancel-edit-actual">취소</button>{% endif %}
+   </div>
+   {% if seminar.meeting_date > today %}<p>세미나 날짜가 되어야 확정할 수 있습니다.</p>{% endif %}
+  </div>
  </section>
+{% if attendance_first %}{{ roster_section() }}{% endif %}
  <div class="attendance-actions">{% if session.user_role in ["admin","officer"] %}<a href="{{ url_for('bookclub_index', session_id=seminar.id) }}">이 회차 조 편성</a>{% endif %}<a href="{{ url_for('admin_term_attendance', term_id=seminar.term_id) }}">학기 참석 현황</a></div>
  <p id="attendance-status" role="status"></p>
 </div><script src="{{ url_for('static', filename='attendance_roster.js') }}" defer></script>

@@ -51,8 +51,65 @@
   }));
   apply.addEventListener('click',()=>action(async()=>{if(!token) return;if(!confirm('미리 본 참석 예정 명단으로 반영할까요? 실제 출석 기록은 바뀌지 않습니다.'))return;await post('/roster/apply',{token});location.reload();}));
   document.getElementById('undo-roster')?.addEventListener('click',()=>action(async()=>{if(!confirm('직전 반영 이전의 참석 예정 명단으로 되돌릴까요?'))return;await post('/roster/undo',{});location.reload();}));
-  function countActual(){document.getElementById('actual-count').textContent='실제 참석 '+selected('.actual-choice').length+'명 선택';}
+  const absentSummary = document.getElementById('absent-summary');
+  const groupCards = () => [...(root.querySelectorAll('[data-group-card]') || [])];
+  function syncChoice(input) {
+    const row = input.closest?.('[data-group-member]');
+    if (!row) return;
+    row.classList?.toggle('is-absent', !input.checked);
+    const pill = row.querySelector?.('[data-state-pill]');
+    if (pill) pill.textContent = input.checked ? '참석' : '불참';
+  }
+  function renderAbsentSummary(absent) {
+    if (!absentSummary) return;
+    absentSummary.replaceChildren();
+    if (!absent.length) {
+      const done = document.createElement('span');
+      done.className = 'attendance-all-present';
+      done.textContent = '전원 참석';
+      absentSummary.append(done);
+      return;
+    }
+    absent.forEach(input => {
+      const name = input.closest?.('[data-group-member]')?.dataset?.memberName || input.value;
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'attendance-absent-chip';
+      chip.textContent = name + ' 불참';
+      chip.setAttribute('aria-label', name + '을(를) 참석으로 되돌리기');
+      chip.addEventListener('click', () => { input.checked = true; countActual(); input.focus?.(); });
+      absentSummary.append(chip);
+    });
+  }
+  function countActual(){
+    const choices = [...root.querySelectorAll('.actual-choice')];
+    choices.forEach(syncChoice);
+    const cards = groupCards();
+    const absent = [];
+    cards.forEach(card => {
+      const inputs = [...(card.querySelectorAll?.('.actual-choice') || [])];
+      const attended = inputs.filter(input => input.checked).length;
+      inputs.forEach(input => { if (!input.checked) absent.push(input); });
+      const counter = card.querySelector?.('[data-group-count]');
+      if (counter) counter.textContent = attended + ' / ' + inputs.length + '명 참석';
+    });
+    let text = '실제 참석 ' + selected('.actual-choice').length + '명 선택';
+    if (cards.length) text += ' · 조 편성 중 불참 ' + absent.length + '명';
+    document.getElementById('actual-count').textContent = text;
+    if (cards.length) renderAbsentSummary(absent);
+  }
   root.querySelectorAll('.actual-choice').forEach(input=>input.addEventListener('change',countActual));countActual();
   document.getElementById('use-grouped')?.addEventListener('click',event=>{const ids=new Set(JSON.parse(event.currentTarget.dataset.ids||'[]'));root.querySelectorAll('.actual-choice').forEach(input=>{input.checked=ids.has(Number(input.value));});countActual();status.textContent='조 편성 명단 '+ids.size+'명을 선택했습니다. 확인한 뒤 실제 출석 확정을 눌러주세요.';});
-  document.getElementById('confirm-attendance').addEventListener('click',()=>action(async()=>{const ids=selected('.actual-choice');await post('/attendance/confirm',{member_ids:ids,confirmation_token:root.dataset.confirmationToken});location.reload();}));
+  const confirmedView = document.getElementById('actual-confirmed-view');
+  const editor = document.getElementById('actual-editor');
+  document.getElementById('edit-actual-attendance')?.addEventListener('click', () => {
+    if (confirmedView) confirmedView.hidden = true;
+    if (editor) editor.hidden = false;
+    (root.querySelector?.('[data-group-member] .actual-choice') || document.getElementById('actual-search'))?.focus?.();
+  });
+  document.getElementById('cancel-edit-actual')?.addEventListener('click', () => {
+    if (editor) editor.hidden = true;
+    if (confirmedView) { confirmedView.hidden = false; document.getElementById('edit-actual-attendance')?.focus?.(); }
+  });
+  document.getElementById('confirm-attendance').addEventListener('click',()=>action(async()=>{const ids=selected('.actual-choice');await post('/attendance/confirm',{member_ids:ids,confirmation_token:root.dataset.confirmationToken});if(typeof window!=='undefined')window.location.hash='actual-attendance';location.reload();}));
 })();

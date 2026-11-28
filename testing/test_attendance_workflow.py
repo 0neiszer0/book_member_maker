@@ -122,5 +122,47 @@ class GroupedMemberIdsTests(unittest.TestCase):
         self.assertEqual(issues, [])
 
 
+class AttendanceGroupCardsTests(unittest.TestCase):
+    members = [
+        {'id': 1, 'name': '가', 'student_id': '202600001', 'department': '국문', 'is_active': True},
+        {'id': 2, 'name': '나', 'is_active': True},
+        {'id': 3, 'name': '동명', 'is_active': True},
+        {'id': 4, 'name': '동명', 'is_active': True},
+        {'id': 5, 'name': '라', 'is_active': True},
+        {'id': 6, 'name': '라', 'is_active': False},
+    ]
+
+    def build(self, histories, actual=(1, 5), excluded=(2,)):
+        from attendance_workflow import build_attendance_group_cards
+        return build_attendance_group_cards(histories, self.members, actual, excluded)
+
+    def test_cards_carry_names_facilitators_pre_absent_and_issues(self):
+        cards, ids = self.build([{'groups': [['가', '나'], ['동명', '없음', '라']],
+                                  'facilitators': [' 가 '],
+                                  'group_editor_state': {'group_names': ['토론A']}}])
+        self.assertEqual([c['title'] for c in cards], ['토론A', '2조'])
+        self.assertEqual([c['index'] for c in cards], [1, 2])
+        first = cards[0]['members']
+        self.assertEqual(first[0], {'name': '가', 'member_id': 1, 'student_id': '202600001', 'department': '국문',
+                                    'is_facilitator': True, 'pre_absent': False, 'attended': True, 'issue': None})
+        self.assertEqual((first[1]['pre_absent'], first[1]['attended'], first[1]['is_facilitator']), (True, False, False))
+        second = cards[1]['members']
+        self.assertEqual([(m['name'], m['member_id'], m['issue']) for m in second],
+                         [('동명', None, '동명이인'), ('없음', None, '회원 명단에 없음'), ('라', 5, None)])
+        self.assertEqual(ids, {1, 2, 5})  # active-first match for 라, homonyms never guessed
+
+    def test_each_member_appears_once_across_rows_and_groups(self):
+        cards, ids = self.build([{'groups': [['가', '나']]}, {'groups': [['가'], ['나', '라']]},
+                                 {'groups': []}, {'groups': None}])
+        rendered = [m['member_id'] for c in cards for m in c['members'] if m['member_id']]
+        self.assertEqual(sorted(rendered), sorted(set(rendered)))
+        self.assertEqual(ids, {1, 2, 5})
+        self.assertEqual([c['title'] for c in cards], ['1조', '2조'])
+
+    def test_no_saved_groups_returns_empty(self):
+        self.assertEqual(self.build([]), ([], set()))
+        self.assertEqual(self.build([{'groups': None, 'present': ['가']}]), ([], set()))
+
+
 if __name__ == '__main__':
     unittest.main()
